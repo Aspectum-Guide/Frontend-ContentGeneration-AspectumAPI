@@ -23,10 +23,11 @@ export default function NewSession() {
   } = useForm({
     resolver: zodResolver(createSessionSchema),
     defaultValues: {
+      name: '',
       use_ai: true,
       target_languages: ['en', 'ru'],
       notes: '',
-      content_type: 'city_only', // новое поле
+      content_type: 'city_only',
     },
   });
 
@@ -69,6 +70,19 @@ export default function NewSession() {
               <p className="text-red-800">{error}</p>
             </div>
           )}
+
+          {/* Название сессии */}
+          <div className="mb-6">
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Название сессии (опционально)
+            </label>
+            <input
+              type="text"
+              {...register('name')}
+              placeholder="Например: Рим - историческое путешествие"
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+          </div>
 
           {/* Тип контента */}
           <div className="mb-6">

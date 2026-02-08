@@ -2,6 +2,8 @@ import { z } from 'zod';
 
 // Схема валидации для создания сессии
 export const createSessionSchema = z.object({
+  name: z.string().optional(),
+  content_type: z.enum(['city_only', 'city_with_attractions']).default('city_only'),
   use_ai: z.boolean().default(true),
   target_languages: z.array(z.string()).min(2, 'Необходимо выбрать минимум 2 языка'),
   notes: z.string().optional(),

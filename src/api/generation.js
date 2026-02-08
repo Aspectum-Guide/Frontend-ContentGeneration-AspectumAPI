@@ -24,6 +24,19 @@ export const sessionsAPI = {
   // Получить статистику
   getStats: (sessionId) => 
     apiClient.get(`/generation/sessions/${sessionId}/stats/`),
+  
+  // Опубликовать город в основную базу
+  publish: (sessionId) => 
+    apiClient.post(`/generation/ai-settings/publish/`, { session: sessionId }),
+};
+
+// Задачи генерации
+export const tasksAPI = {
+  // Получить задачу
+  get: (taskId) => apiClient.get(`/generation/tasks/${taskId}/`),
+  
+  // Получить задачи сессии
+  getBySession: (sessionId) => apiClient.get(`/generation/tasks/?session=${sessionId}`),
 };
 
 // Города в сессиях
@@ -62,6 +75,9 @@ export const citiesAPI = {
     }
     return apiClient.post('/generation/cities/ai-generate/', data);
   },
+  
+  // Опубликовать город в основную базу
+  publish: (sessionId) => apiClient.post('/generation/ai-settings/publish/', { session: sessionId }),
   
   // Обновить город
   update: (cityId, data) => apiClient.patch(`/generation/cities/${cityId}/`, data),

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import apiClient from '../../api/client';
 
 export default function AISettingsForm() {
@@ -13,13 +13,62 @@ export default function AISettingsForm() {
   });
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [autoSaving, setAutoSaving] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [testResult, setTestResult] = useState(null);
+  const [ollamaModels, setOllamaModels] = useState([]);
+  const [loadingModels, setLoadingModels] = useState(false);
+  const saveTimeoutRef = useRef(null);
+  const isFirstLoadRef = useRef(true);
 
   useEffect(() => {
     loadSettings();
   }, []);
+
+  useEffect(() => {
+    if (settings.provider === 'ollama' && settings.ollama_base_url) {
+      loadOllamaModels();
+    }
+  }, [settings.provider, settings.ollama_base_url]);
+
+  // Автосохранение при изменении настроек
+  useEffect(() => {
+    // Пропускаем первую загрузку
+    if (isFirstLoadRef.current) {
+      isFirstLoadRef.current = false;
+      return;
+    }
+
+    // Очищаем предыдущий таймер
+    if (saveTimeoutRef.current) {
+      clearTimeout(saveTimeoutRef.current);
+    }
+
+    // Устанавливаем новый таймер на автосохранение через 1 секунду
+    setAutoSaving(true);
+    saveTimeoutRef.current = setTimeout(() => {
+      autoSaveSettings();
+    }, 1000);
+
+    return () => {
+      if (saveTimeoutRef.current) {
+        clearTimeout(saveTimeoutRef.current);
+      }
+    };
+  }, [settings]);
+
+  const autoSaveSettings = async () => {
+    try {
+      await apiClient.post('/generation/ai-settings/', settings);
+      setAutoSaving(false);
+      setSuccess('✓ Автосохранено');
+      setTimeout(() => setSuccess(''), 2000);
+    } catch (err) {
+      setAutoSaving(false);
+      console.error('Ошибка автосохранения:', err);
+    }
+  };
 
   const loadSettings = async () => {
     try {
@@ -31,6 +80,23 @@ export default function AISettingsForm() {
       setError('Не удалось загрузить настройки');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const loadOllamaModels = async () => {
+    setLoadingModels(true);
+    try {
+      const response = await apiClient.get('/generation/ai-settings/ollama-models/');
+      if (response.data.status === 'success') {
+        setOllamaModels(response.data.models || []);
+      } else {
+        setOllamaModels([]);
+      }
+    } catch (err) {
+      console.error('Ошибка загрузки моделей:', err);
+      setOllamaModels([]);
+    } finally {
+      setLoadingModels(false);
     }
   };
 
@@ -77,7 +143,14 @@ export default function AISettingsForm() {
 
   return (
     <div className="max-w-2xl mx-auto p-6 bg-white rounded-lg shadow">
-      <h2 className="text-2xl font-bold mb-6">Настройки AI</h2>
+      <div className="flex justify-between items-center mb-6">
+        <h2 className="text-2xl font-bold">Настройки AI</h2>
+        {autoSaving && (
+          <span className="text-sm text-blue-600 animate-pulse">
+            💾 Сохранение...
+          </span>
+        )}
+      </div>
 
       {error && (
         <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded">
@@ -129,14 +202,47 @@ export default function AISettingsForm() {
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 Модель Ollama
               </label>
-              <input
-                type="text"
-                name="ollama_model"
-                value={settings.ollama_model}
-                onChange={handleChange}
-                placeholder="mistral"
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
+              {loadingModels ? (
+                <div className="w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-50">
+                  Загрузка моделей...
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  <input
+                    type="text"
+                    name="ollama_model"
+                    value={settings.ollama_model}
+                    onChange={handleChange}
+                    list="ollama-models-list"
+                    placeholder="mistral"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                  {ollamaModels.length > 0 && (
+                    <datalist id="ollama-models-list">
+                      {ollamaModels.map((model) => (
+                        <option key={model} value={model} />
+                      ))}
+                    </datalist>
+                  )}
+                  {ollamaModels.length === 0 && (
+                    <p className="text-sm text-amber-600">
+                      ⚠️ Модели не найдены. Убедитесь что Ollama запущен и URL корректен.
+                    </p>
+                  )}
+                  <button
+                    type="button"
+                    onClick={loadOllamaModels}
+                    className="text-sm text-blue-600 hover:text-blue-800"
+                  >
+                    🔄 Обновить список моделей
+                  </button>
+                  {ollamaModels.length > 0 && (
+                    <p className="text-sm text-gray-500">
+                      Доступно моделей: {ollamaModels.length}
+                    </p>
+                  )}
+                </div>
+              )}
             </div>
 
             <div className="grid grid-cols-2 gap-4">

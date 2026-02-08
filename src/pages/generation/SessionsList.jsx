@@ -90,10 +90,13 @@ export default function SessionsList() {
             <thead className="bg-gray-50">
               <tr>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  ID
+                  Название
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Статус
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Публикация
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Языки
@@ -109,8 +112,13 @@ export default function SessionsList() {
             <tbody className="bg-white divide-y divide-gray-200">
               {sessions.map((session) => (
                 <tr key={session.id} className="hover:bg-gray-50">
-                  <td className="px-6 py-4 whitespace-nowrap text-sm font-mono text-gray-900">
-                    {session.id.substring(0, 8)}...
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    <div className="text-sm font-medium text-gray-900">
+                      {session.name || 'Без названия'}
+                    </div>
+                    <div className="text-xs text-gray-500 font-mono">
+                      {session.id.substring(0, 8)}...
+                    </div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <span className={`px-2 py-1 text-xs font-semibold rounded-full ${
@@ -122,6 +130,17 @@ export default function SessionsList() {
                       {SESSION_STATUS_LABELS[session.status] || session.status}
                     </span>
                   </td>
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    {session.is_published ? (
+                      <span className="px-2 py-1 text-xs font-semibold rounded-full bg-green-100 text-green-800">
+                        ✅ Опубликовано
+                      </span>
+                    ) : (
+                      <span className="px-2 py-1 text-xs font-semibold rounded-full bg-gray-100 text-gray-600">
+                        Черновик
+                      </span>
+                    )}
+                  </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                     {session.target_languages?.join(', ') || '-'}
                   </td>
@@ -129,19 +148,21 @@ export default function SessionsList() {
                     {new Date(session.created_at).toLocaleDateString('ru-RU')}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                    <div className="flex gap-2">
+                    <div className="flex gap-3">
                       <Link
                         to={`/generation/${session.id}`}
-                        className="text-blue-600 hover:text-blue-900"
+                        className="inline-flex items-center justify-center w-8 h-8 rounded-md text-blue-600 hover:bg-blue-100 hover:text-blue-900 transition-colors"
+                        title="Открыть сессию"
                       >
-                        Открыть
+                        ✏️
                       </Link>
                       {session.status === 'draft' && (
                         <button
                           onClick={() => handleDelete(session.id)}
-                          className="text-red-600 hover:text-red-900"
+                          className="inline-flex items-center justify-center w-8 h-8 rounded-md text-red-600 hover:bg-red-100 hover:text-red-900 transition-colors"
+                          title="Удалить сессию"
                         >
-                          Удалить
+                          🗑️
                         </button>
                       )}
                     </div>
