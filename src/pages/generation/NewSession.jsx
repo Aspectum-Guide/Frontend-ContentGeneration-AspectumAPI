@@ -50,7 +50,8 @@ export default function NewSession() {
       setLoading(true);
       setError(null);
       const response = await sessionsAPI.create(data);
-      navigate(`/generation/${response.data.id}`);
+      const sessionId = response.data?.session?.id || response.data?.session?.uuid || response.data?.id;
+      navigate(`/generation/${sessionId}`);
     } catch (err) {
       setError(err.response?.data?.error || err.message || 'Ошибка при создании сессии');
       console.error('Ошибка создания сессии:', err);

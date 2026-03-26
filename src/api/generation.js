@@ -1,148 +1,160 @@
 import apiClient from './client';
 
-// Сессии генерации
+const BASE = '/generation';
+
+// ─── Sessions ────────────────────────────────────────────────────────────────
 export const sessionsAPI = {
-  // Получить список сессий
-  list: () => apiClient.get('/generation/sessions/'),
-  
-  // Получить детали сессии
-  get: (sessionId) => apiClient.get(`/generation/sessions/${sessionId}/`),
-  
-  // Создать новую сессию
-  create: (data) => apiClient.post('/generation/sessions/', data),
-  
-  // Обновить сессию
-  update: (sessionId, data) => apiClient.patch(`/generation/sessions/${sessionId}/`, data),
-  
-  // Удалить сессию
-  delete: (sessionId) => apiClient.delete(`/generation/sessions/${sessionId}/`),
-  
-  // Изменить статус
-  changeStatus: (sessionId, status) => 
-    apiClient.post(`/generation/sessions/${sessionId}/change_status/`, { status }),
-  
-  // Получить статистику
-  getStats: (sessionId) => 
-    apiClient.get(`/generation/sessions/${sessionId}/stats/`),
-  
-  // Опубликовать город в основную базу
-  publish: (sessionId) => 
-    apiClient.post(`/generation/ai-settings/publish/`, { session: sessionId }),
+  list: () => apiClient.get(`${BASE}/sessions/`),
+  get: (sessionId) => apiClient.get(`${BASE}/sessions/${sessionId}/`),
+  create: (data = {}) => apiClient.post(`${BASE}/sessions/create/`, data),
+  close: (sessionId, mode = 'save') => apiClient.post(`${BASE}/sessions/${sessionId}/close/`, { mode }),
+  closeAll: () => apiClient.post(`${BASE}/sessions/close-all-my-active/`, {}),
+  forceClose: (sessionId) => apiClient.post(`${BASE}/sessions/${sessionId}/force-close/`, {}),
+  delete: (sessionId) => apiClient.post(`${BASE}/sessions/${sessionId}/delete/`, {}),
+  publish: (sessionId) => apiClient.post(`${BASE}/sessions/${sessionId}/publish/`, {}),
+  checkConflicts: (sessionId) =>
+    apiClient.get(`${BASE}/sessions/${sessionId}/publish/check-conflicts/`),
+  updateCity: (sessionId, data) =>
+    apiClient.post(`${BASE}/sessions/${sessionId}/city/`, data),
+  uploadFromFile: (jsonText) =>
+    apiClient.post(`${BASE}/sessions/upload/`, jsonText, {
+      headers: { 'Content-Type': 'application/json' },
+    }),
 };
 
-// Задачи генерации
-export const tasksAPI = {
-  // Получить задачу
-  get: (taskId) => apiClient.get(`/generation/tasks/${taskId}/`),
-  
-  // Получить задачи сессии
-  getBySession: (sessionId) => apiClient.get(`/generation/tasks/?session=${sessionId}`),
-};
-
-// Города в сессиях
-export const citiesAPI = {
-  // Получить город сессии
-  get: (sessionId) => apiClient.get(`/generation/cities/?session=${sessionId}`),
-  
-  // Создать/обновить город
-  createOrUpdate: (data) => {
-    const formData = new FormData();
-    Object.keys(data).forEach(key => {
-      if (data[key] !== null && data[key] !== undefined) {
-        if (key === 'name' || key === 'description') {
-          formData.append(key, JSON.stringify(data[key]));
-        } else {
-          formData.append(key, data[key]);
-        }
-      }
-    });
-    return apiClient.post('/generation/cities/', formData, {
-      headers: {
-        'Content-Type': 'multipart/form-data',
-      },
-    });
-  },
-  
-  // Генерация города через ИИ
-  aiGenerate: (sessionId, cityName, country, provider = null) => {
-    const data = {
-      session: sessionId,
-      city_name: cityName,
-      country: country,
-    };
-    if (provider) {
-      data.provider = provider;
-    }
-    return apiClient.post('/generation/cities/ai-generate/', data);
-  },
-  
-  // Опубликовать город в основную базу
-  publish: (sessionId) => apiClient.post('/generation/ai-settings/publish/', { session: sessionId }),
-  
-  // Обновить город
-  update: (cityId, data) => apiClient.patch(`/generation/cities/${cityId}/`, data),
-  
-  // Удалить город
-  delete: (cityId) => apiClient.delete(`/generation/cities/${cityId}/`),
-};
-
-// Достопримечательности
+// ─── Attractions ─────────────────────────────────────────────────────────────
 export const attractionsAPI = {
-  // Получить список достопримечательностей
-  list: (sessionId) => apiClient.get(`/generation/attractions/?session=${sessionId}`),
-  
-  // Получить достопримечательность
-  get: (attractionId) => apiClient.get(`/generation/attractions/${attractionId}/`),
-  
-  // Создать достопримечательность
-  create: (data) => apiClient.post('/generation/attractions/', data),
-  
-  // Обновить достопримечательность
-  update: (attractionId, data) => apiClient.patch(`/generation/attractions/${attractionId}/`, data),
-  
-  // Удалить достопримечательность
-  delete: (attractionId) => apiClient.delete(`/generation/attractions/${attractionId}/`),
+  list: (sessionId) =>
+    apiClient.get(`${BASE}/sessions/${sessionId}/attractions/`),
+  create: (sessionId, data) =>
+    apiClient.post(`${BASE}/sessions/${sessionId}/attractions/`, data),
+  get: (sessionId, attrId) =>
+    apiClient.get(`${BASE}/sessions/${sessionId}/attractions/${attrId}/`),
+  update: (sessionId, attrId, data) =>
+    apiClient.post(`${BASE}/sessions/${sessionId}/attractions/${attrId}/update/`, data),
+  delete: (sessionId, attrId) =>
+    apiClient.post(`${BASE}/sessions/${sessionId}/attractions/${attrId}/delete/`, {}),
+  saveContent: (sessionId, attrId, data) =>
+    apiClient.post(`${BASE}/sessions/${sessionId}/attractions/${attrId}/content/`, data),
 };
 
-// Контент достопримечательностей
-export const contentsAPI = {
-  // Получить контент
-  list: (attractionId) => apiClient.get(`/generation/contents/?attraction=${attractionId}`),
-  
-  // Создать контент
-  create: (data) => apiClient.post('/generation/contents/', data),
-  
-  // Обновить контент
-  update: (contentId, data) => apiClient.patch(`/generation/contents/${contentId}/`, data),
-  
-  // Удалить контент
-  delete: (contentId) => apiClient.delete(`/generation/contents/${contentId}/`),
+// ─── Cities (reference) ───────────────────────────────────────────────────────
+export const citiesAPI = {
+  get: (cityId) => apiClient.get(`${BASE}/cities/${cityId}/`),
+  update: (cityId, data) => apiClient.post(`${BASE}/cities/${cityId}/update/`, data),
+  delete: (cityId) => apiClient.post(`${BASE}/cities/${cityId}/delete/`, {}),
+  exportJson: () =>
+    apiClient.get(`${BASE}/cities/export/`, { responseType: 'blob' }),
+  // CityAPI list (used in EventGeneration, CitiesCatalog)
+  list: (params) => apiClient.get('/city/list', { params }),
 };
 
-// Медиафайлы
-export const mediaAPI = {
-  // Получить медиафайлы
-  list: (sessionId, attractionId = null) => {
-    let url = `/generation/media/?session=${sessionId}`;
-    if (attractionId) url += `&attraction=${attractionId}`;
-    return apiClient.get(url);
-  },
-  
-  // Загрузить медиафайл
-  upload: (data) => {
-    const formData = new FormData();
-    Object.keys(data).forEach(key => {
-      if (data[key] !== null && data[key] !== undefined) {
-        formData.append(key, data[key]);
-      }
-    });
-    return apiClient.post('/generation/media/', formData, {
-      headers: {
-        'Content-Type': 'multipart/form-data',
-      },
-    });
-  },
-  
-  // Удалить медиафайл
-  delete: (mediaId) => apiClient.delete(`/generation/media/${mediaId}/`),
+// ─── Images ──────────────────────────────────────────────────────────────────
+export const imagesAPI = {
+  upload: (formData) =>
+    apiClient.post(`${BASE}/image/upload/`, formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    }),
+  get: (imageId) => apiClient.get(`${BASE}/images/${imageId}/`),
+  update: (imageId, data) =>
+    apiClient.post(`${BASE}/images/${imageId}/update/`, data),
+  delete: (imageId) => apiClient.post(`${BASE}/images/${imageId}/delete/`, {}),
+  // Wikimedia Commons integration
+  searchCommons: (query, limit = 10, page = 1) =>
+    apiClient.get(`/media/commons/search/`, {
+      params: { q: query, limit, page },
+    }),
+  importCommons: (data) =>
+    apiClient.post(`/media/commons/import/`, data),
 };
+
+// ─── Generation Tasks ─────────────────────────────────────────────────────────
+export const tasksAPI = {
+  list: () => apiClient.get(`${BASE}/tasks/`),
+  get: (taskId) => apiClient.get(`${BASE}/tasks/${taskId}/`),
+};
+
+// ─── City Filters ─────────────────────────────────────────────────────────────
+export const cityFiltersAPI = {
+  list: () => apiClient.get(`${BASE}/city-filters/`),
+  get: (filterId) => apiClient.get(`${BASE}/city-filters/${filterId}/`),
+  update: (filterId, data) =>
+    apiClient.post(`${BASE}/city-filters/${filterId}/update/`, data),
+  delete: (filterId) =>
+    apiClient.post(`${BASE}/city-filters/${filterId}/delete/`, {}),
+};
+
+// ─── Event Filters ────────────────────────────────────────────────────────────
+export const eventFiltersAPI = {
+  list: () => apiClient.get(`${BASE}/event-filters/`),
+  get: (filterId) => apiClient.get(`${BASE}/event-filters/${filterId}/`),
+  update: (filterId, data) =>
+    apiClient.post(`${BASE}/event-filters/${filterId}/update/`, data),
+  delete: (filterId) =>
+    apiClient.post(`${BASE}/event-filters/${filterId}/delete/`, {}),
+};
+
+// ─── AI ───────────────────────────────────────────────────────────────────────
+export const aiAPI = {
+  getSettings: () => apiClient.get(`${BASE}/ai/settings/`),
+  updateSettings: (data) => apiClient.post(`${BASE}/ai/settings/update/`, data),
+  test: (message, search = false) =>
+    apiClient.post(`${BASE}/ai/test/`, { message, search }),
+  streamStart: (data) => apiClient.post(`${BASE}/ai/stream/start/`, data),
+  streamStatus: (streamId) =>
+    apiClient.get(`${BASE}/ai/stream/${streamId}/`),
+  searchImages: (data) =>
+    apiClient.post(`${BASE}/ai/search-images/`, data),
+  citiesJsonStart: (data) =>
+    apiClient.post(`${BASE}/ai/cities-json/start/`, data),
+  citiesJson: () => apiClient.get(`${BASE}/ai/cities-json/`),
+};
+
+// ─── Events (reference) ───────────────────────────────────────────────────────
+export const eventsAPI = {
+  list: (params) =>
+    apiClient.get(`${BASE}/events/reference/`, { params }),
+  get: (eventId) => apiClient.get(`${BASE}/events/${eventId}/`),
+  update: (eventId, data) =>
+    apiClient.post(`${BASE}/events/${eventId}/update/`, data),
+  delete: (eventId) =>
+    apiClient.post(`${BASE}/events/${eventId}/delete/`, {}),
+  setMedia: (eventId, data) =>
+    apiClient.post(`${BASE}/events/${eventId}/media/`, data),
+  filtersReference: () =>
+    apiClient.get(`${BASE}/events/filters-reference/`),
+  cities: () => apiClient.get(`${BASE}/events/cities/`),
+  generate: (data) => apiClient.post(`${BASE}/events/generate/`, data),
+  generateTasks: () => apiClient.get(`${BASE}/events/generate/tasks/`),
+  generateStatus: (taskId) =>
+    apiClient.get(`${BASE}/events/generate/${taskId}/`),
+};
+
+// ─── Export ───────────────────────────────────────────────────────────────────
+export const exportAPI = {
+  zip: () =>
+    apiClient.get(`${BASE}/export/zip/`, { responseType: 'blob' }),
+  cities: () =>
+    apiClient.get(`${BASE}/cities/export/`, { responseType: 'blob' }),
+};
+
+// ─── Import ───────────────────────────────────────────────────────────────────
+export const importAPI = {
+  fromZip: (formData) =>
+    apiClient.post(`${BASE}/import/zip/`, formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    }),
+  fromSheets: (data) => apiClient.post(`${BASE}/import/sheets/`, data),
+  fromSheetsStatus: (params) =>
+    apiClient.get(`${BASE}/import/sheets/status/`, { params }),
+  events: (formData) =>
+    apiClient.post(`${BASE}/events/import/`, formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    }),
+};
+
+// ─── Legacy exports for SessionWizard / Step1City backward compatibility ──────
+// sessionsAPI already exported above
+// citiesAPI.get(sessionId) — no longer maps to session cities;
+// use sessionsAPI.get(sessionId) and read session.city_data
+export { citiesAPI as citiesAPI_legacy };

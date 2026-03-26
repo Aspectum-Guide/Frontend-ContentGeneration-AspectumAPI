@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { citiesAPI } from '../../../../api/generation';
+import { sessionsAPI, citiesAPI } from '../../../../api/generation';
 import { citySchema } from '../../../../utils/validation';
 
 type Params = {
@@ -78,27 +78,33 @@ export default function useCityForm(session: any, initialCityData?: any, onCompl
       setLoading(true);
       setError(null);
 
-      const payload: any = {
-        session: session.id,
-        name: data.name,
-        description: data.description,
-        country: data.country,
-        image_copyright: data.image_copyright,
-      };
-
       if (initialCityData?.id) {
-        payload.city_id = initialCityData.id;
-      }
+        // Update existing city via cities/<uuid>/update/
+        const formData = new FormData();
+        formData.append('name', JSON.stringify(data.name));
+        formData.append('description', JSON.stringify(data.description));
+        formData.append('country', JSON.stringify(
+          typeof data.country === 'string' ? { en: data.country } : data.country
+        ));
+        if (data.image_copyright) formData.append('image_copyright', data.image_copyright);
+        if (imageFile) formData.append('main_image', imageFile);
 
-      if (imageFile) {
-        // attach file to payload and let API helper build FormData
-        payload.main_image = imageFile;
-      }
+        const resp = await citiesAPI.update(initialCityData.id, formData);
+        return resp.data;
+      } else {
+        // Create/update session city via sessions/<uuid>/city/
+        const formData = new FormData();
+        formData.append('name', JSON.stringify(data.name));
+        formData.append('description', JSON.stringify(data.description));
+        formData.append('country', JSON.stringify(
+          typeof data.country === 'string' ? { en: data.country } : data.country
+        ));
+        if (data.image_copyright) formData.append('image_copyright', data.image_copyright);
+        if (imageFile) formData.append('main_image', imageFile);
 
-      const resp = await citiesAPI.createOrUpdate(payload);
-      console.debug('useCityForm.onSubmit - resp:', resp);
-      const created = resp.data;
-      return created;
+        const resp = await sessionsAPI.updateCity(session.id, formData);
+        return resp.data;
+      }
     } catch (err: any) {
       const errorMsg = err?.response?.data?.error || err?.message || 'Ошибка при сохранении';
       setError(errorMsg);

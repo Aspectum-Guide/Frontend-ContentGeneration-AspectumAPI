@@ -12,6 +12,9 @@ export default defineConfig({
   },
   server: {
     port: 3000,
+    allowedHosts: [
+      'admin.dev2.aspectum-guide.com'
+    ],
     proxy: {
       '/api': {
         target: 'http://localhost:8443',

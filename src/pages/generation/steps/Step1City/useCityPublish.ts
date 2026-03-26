@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { citiesAPI } from '../../../../api/generation';
+import { sessionsAPI } from '../../../../api/generation';
 
 export default function useCityPublish(session: any) {
   const [publishLoading, setPublishLoading] = useState(false);
@@ -12,7 +12,7 @@ export default function useCityPublish(session: any) {
       setError(null);
       setPublishSuccess(null);
 
-      const response = await citiesAPI.publish(session.id);
+      const response = await sessionsAPI.publish(session.id);
       if (response.data?.status === 'success') {
         setPublishSuccess(response.data.message || 'Город опубликован');
         return { success: true, message: response.data.message };

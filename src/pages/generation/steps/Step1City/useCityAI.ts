@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { citiesAPI, tasksAPI } from '../../../../api/generation';
+import { aiAPI, tasksAPI } from '../../../../api/generation';
 
 type GenerateParams = {
   cityName: string;
@@ -88,8 +88,8 @@ export default function useCityAI(session: any) {
       setProgress(0);
       setCurrentStep('Запуск генерации...');
 
-      // Запускаем асинхронную генерацию
-      const response = await citiesAPI.aiGenerate(session.id, cityName, country, 'ollama', true);
+      // Запускаем асинхронную генерацию одного города
+      const response = await aiAPI.citiesJsonStart({ cities: [cityName + (country ? `, ${country}` : '')] });
       
       // Если это синхронный ответ (старый формат)
       if (response.data && response.data.name) {

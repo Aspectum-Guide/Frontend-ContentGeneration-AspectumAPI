@@ -1,240 +1,859 @@
-import { useState, useEffect } from 'react';
+/**
+ * SessionWizard — полная миграция Django ContentGeneration визарда
+ *
+ * Структура:
+ *  Header bar (имя сессии, UUID, дата, статус, кнопки)
+ *  Photo tile (слева) + Wizard (справа):
+ *    Шаг 1: Город — локальные таблетки, название/описание/страна, карта, координаты
+ *    Шаг 2: Теги — тегодробавления с подсказками из city-filters
+ *    Шаг 3: Достопримечательности — список + детальный просмотр
+ *    Шаг 4: Контент — заглушка
+ *    Шаг 5: Публикация
+ */
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
+import 'leaflet/dist/leaflet.css';
 import Layout from '../../components/Layout';
-import Wizard from '../../components/wizard/Wizard';
-import SessionSidebar from '../../components/generation/SessionSidebar';
-import { sessionsAPI, citiesAPI } from '../../api/generation';
-import Step1City from './steps/Step1City';
-import Step2Attractions from './steps/Step2Attractions';
-import Step3Content from './steps/Step3Content';
-import Step4Commit from './steps/Step4Commit';
-import { WIZARD_STEPS } from '../../utils/constants';
+import CommonsImagePicker from '../../components/generation/CommonsImagePicker';
+import { sessionsAPI, attractionsAPI, cityFiltersAPI, imagesAPI, aiAPI } from '../../api/generation';
 
-const ALL_STEPS = [
-  WIZARD_STEPS.CITY,
-  WIZARD_STEPS.ATTRACTIONS,
-  WIZARD_STEPS.CONTENT,
-  WIZARD_STEPS.COMMIT,
+// ─── Constants ────────────────────────────────────────────────────────────────
+const TOTAL_STEPS = 5;
+const STEP_LABELS = ['Город', 'Теги', 'Достопримечательности', 'Контент', 'Публикация'];
+
+const LOCALE_FLAGS = {
+  US: '🇺🇸', IT: '🇮🇹', RU: '🇷🇺', FR: '🇫🇷', DE: '🇩🇪', ES: '🇪🇸',
+  JP: '🇯🇵', CN: '🇨🇳', KR: '🇰🇷', GB: '🇬🇧', UA: '🇺🇦', NL: '🇳🇱',
+  PL: '🇵🇱', PT: '🇵🇹', TR: '🇹🇷', BR: '🇧🇷', CA: '🇨🇦', AU: '🇦🇺',
+};
+
+const LOCALE_INFO_MAP = {
+  ru: { code: 'RU', name: 'Русский' }, en: { code: 'US', name: 'Английский' },
+  it: { code: 'IT', name: 'Итальянский' }, fr: { code: 'FR', name: 'Французский' },
+  de: { code: 'DE', name: 'Немецкий' }, es: { code: 'ES', name: 'Испанский' },
+  pl: { code: 'PL', name: 'Польский' }, pt: { code: 'PT', name: 'Португальский' },
+  nl: { code: 'NL', name: 'Нидерландский' }, zh: { code: 'CN', name: 'Китайский' },
+  ja: { code: 'JP', name: 'Японский' }, ko: { code: 'KR', name: 'Корейский' },
+  tr: { code: 'TR', name: 'Турецкий' }, uk: { code: 'UA', name: 'Украинский' },
+};
+
+const DEFAULT_LOCALE_DEFS = [
+  { key: 'ru-RU', lang: 'ru', code: 'RU', langName: 'Русский', isDefault: true },
+  { key: 'en-US', lang: 'en', code: 'US', langName: 'Английский', isDefault: true },
+  { key: 'it-IT', lang: 'it', code: 'IT', langName: 'Итальянский', isDefault: true },
 ];
 
+const STATUS_MAP = {
+  draft:            { label: 'Черновик',            cls: 'bg-gray-100 text-gray-700' },
+  in_progress:      { label: 'В процессе',           cls: 'bg-yellow-100 text-yellow-800' },
+  completed:        { label: 'Завершена',             cls: 'bg-green-100 text-green-800' },
+  published:        { label: 'Опубликована',          cls: 'bg-blue-100 text-blue-800' },
+  closed_saved:     { label: 'Закрыта (сохранена)',   cls: 'bg-purple-100 text-purple-700' },
+  closed_discarded: { label: 'Закрыта (отменена)',    cls: 'bg-red-100 text-red-700' },
+  corrected:        { label: 'Скорректирована',       cls: 'bg-teal-100 text-teal-700' },
+};
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+function makeLocaleData() {
+  return Object.fromEntries(
+    DEFAULT_LOCALE_DEFS.map(l => [
+      l.key,
+      { code: l.code, lang: l.lang, langName: l.langName, isDefault: l.isDefault,
+        name: '', description: '', country: '' },
+    ])
+  );
+}
+
+function getLocaleInfo(lang) {
+  const k = (lang || '').toLowerCase().substring(0, 2);
+  return LOCALE_INFO_MAP[k] || { code: (lang || 'XX').toUpperCase().substring(0, 2), name: lang || 'Язык' };
+}
+
+function getFlag(code) {
+  return LOCALE_FLAGS[(code || '').toUpperCase()] || '🌍';
+}
+
+function getAttrName(attr) {
+  const n = attr?.name || {};
+  return n.ru || n.en || n.it || Object.values(n).find(Boolean) || '(без названия)';
+}
+
+// ─── Notification toast ───────────────────────────────────────────────────────
+function Notification({ note }) {
+  if (!note) return null;
+  const colorMap = { success: 'bg-green-600', error: 'bg-red-600', info: 'bg-blue-600', warning: 'bg-yellow-500' };
+  return (
+    <div className={`fixed top-5 right-5 z-50 px-4 py-3 rounded-lg text-white text-sm shadow-lg transition-all ${colorMap[note.type] || colorMap.info}`}>
+      {note.msg}
+    </div>
+  );
+}
+
+// ─── StatusBadge ─────────────────────────────────────────────────────────────
+function StatusBadge({ status, label }) {
+  const s = STATUS_MAP[status] || { label: label || status, cls: 'bg-gray-100 text-gray-600' };
+  return (
+    <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold ${s.cls}`}>
+      {label || s.label}
+    </span>
+  );
+}
+
+// ─── LocalePills component ─────────────────────────────────────────────────────
+function LocalePills({ localeData, activeLocale, defaultLocale, onSwitch, onSetDefault, onAddLocale, onRemoveLocale }) {
+  return (
+    <div className="flex items-center gap-1 flex-wrap mb-4">
+      {Object.keys(localeData).map(key => {
+        const loc = localeData[key];
+        const isActive = key === activeLocale;
+        const isDefault = key === defaultLocale;
+        return (
+          <div key={key} className="flex items-center gap-0.5">
+            <button
+              type="button"
+              onClick={() => onSwitch(key)}
+              className={`flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium border transition-all ${
+                isActive
+                  ? 'bg-blue-600 text-white border-blue-600'
+                  : 'bg-white text-gray-600 border-gray-300 hover:border-blue-400 hover:text-blue-600'
+              }`}
+            >
+              <span>{getFlag(loc.code)}</span>
+              <span>{loc.langName}</span>
+            </button>
+            <button
+              type="button"
+              title={isDefault ? 'Язык по умолчанию' : 'Установить как язык по умолчанию'}
+              onClick={() => onSetDefault(key)}
+              className={`text-xs px-1 transition-colors ${isDefault ? 'text-yellow-500' : 'text-gray-300 hover:text-yellow-400'}`}
+            >
+              ★
+            </button>
+            {!loc.isDefault && (
+              <button
+                type="button"
+                title="Удалить адаптацию"
+                onClick={() => onRemoveLocale(key)}
+                className="text-xs text-gray-300 hover:text-red-400 transition-colors px-0.5"
+              >
+                ×
+              </button>
+            )}
+          </div>
+        );
+      })}
+      <button
+        type="button"
+        title="Добавить адаптацию"
+        onClick={onAddLocale}
+        className="w-6 h-6 rounded-full border-2 border-dashed border-gray-300 text-gray-400 hover:border-blue-400 hover:text-blue-500 text-sm font-bold flex items-center justify-center transition-colors"
+      >
+        +
+      </button>
+    </div>
+  );
+}
+
+// ─── Main component ───────────────────────────────────────────────────────────
 export default function SessionWizard() {
   const { sessionId } = useParams();
   const navigate = useNavigate();
-  const [currentStep, setCurrentStep] = useState(1);
+
+  // ── Notification ─────────────────────────────────────────────────────────
+  const [note, setNote] = useState(null);
+  const showNote = useCallback((msg, type = 'info') => {
+    setNote({ msg, type });
+    setTimeout(() => setNote(null), 3500);
+  }, []);
+
+  // ── Session ───────────────────────────────────────────────────────────────
   const [session, setSession] = useState(null);
-  const [cities, setCities] = useState([]);
   const [loading, setLoading] = useState(true);
+
+  // ── Wizard step ───────────────────────────────────────────────────────────
+  const [currentStep, setCurrentStep] = useState(1);
+
+  // ── Step 1 — Locales ─────────────────────────────────────────────────────
+  const [localeData, setLocaleData] = useState(makeLocaleData);
+  const [activeLocale, setActiveLocale] = useState('ru-RU');
+  const [defaultLocale, setDefaultLocale] = useState('ru-RU');
+  const [addLocaleOpen, setAddLocaleOpen] = useState(false);
+  const [newLocaleCode, setNewLocaleCode] = useState('');
+  const [newLocaleLang, setNewLocaleLang] = useState('');
+
+  // ── Step 1 — Coords ───────────────────────────────────────────────────────
+  const [lat, setLat] = useState('');
+  const [lon, setLon] = useState('');
+  const [savedLat, setSavedLat] = useState(null);
+  const [savedLon, setSavedLon] = useState(null);
+
+  // ── Step 1 — Photo ────────────────────────────────────────────────────────
+  const [imageId, setImageId] = useState(null);
+  const [imagePreview, setImagePreview] = useState('');
+  const [imageCopyright, setImageCopyright] = useState('');
+  const [photoUploading, setPhotoUploading] = useState(false);
+  const photoFileRef = useRef(null);
+  const [commonsModalOpen, setCommonsModalOpen] = useState(false);
+
+  // ── Step 2 — Tags ─────────────────────────────────────────────────────────
+  const [cityTags, setCityTags] = useState([]);
+  const [tagInput, setTagInput] = useState('');
+  const [availableTags, setAvailableTags] = useState([]);
+
+  // ── Step 3 — Attractions ──────────────────────────────────────────────────
+  const [attractions, setAttractions] = useState([]);
+  const [attrView, setAttrView] = useState('list'); // 'list' | 'detail'
+  const [currentAttr, setCurrentAttr] = useState(null);
+  const [attrLocaleData, setAttrLocaleData] = useState({});
+  const [attrActiveLocale, setAttrActiveLocale] = useState('ru-RU');
+  const [attrSaving, setAttrSaving] = useState(false);
+  const [attractionsLoaded, setAttractionsLoaded] = useState(false);
+
+  // ── Step 4 — AI Content ───────────────────────────────────────────────────
+  const [aiGenAttrId, setAiGenAttrId] = useState(null);
+  const [aiGenLang, setAiGenLang] = useState('ru');
+  const [aiGenStreamId, setAiGenStreamId] = useState(null);
+  const [aiGenText, setAiGenText] = useState('');
+  const [aiGenDone, setAiGenDone] = useState(false);
+  const [aiGenError, setAiGenError] = useState(null);
+  const [aiGenSaving, setAiGenSaving] = useState(false);
+  const aiPollRef = useRef(null);
+
+  // ── Saving / Close ────────────────────────────────────────────────────────
+  const [saving, setSaving] = useState(false);
+  const [closeOpen, setCloseOpen] = useState(false);
+  const [closeMode, setCloseMode] = useState('save');
+  const [closing, setClosing] = useState(false);
   const [publishing, setPublishing] = useState(false);
-  const [publishError, setPublishError] = useState('');
-  const [publishSuccess, setPublishSuccess] = useState('');
-  const [selectedCity, setSelectedCity] = useState(undefined);
 
-  useEffect(() => {
-    loadSession();
-  }, [sessionId]);
+  // ── Map ───────────────────────────────────────────────────────────────────
+  const mapRef = useRef(null);
+  const mapInstanceRef = useRef(null);
+  const mapReadyRef = useRef(false);
 
-  useEffect(() => {
-    if (!session) return;
-    if (getSteps(session).length === 1 && currentStep !== 1) {
-      setCurrentStep(1);
-    }
-  }, [session]);
-
-  const loadSession = async () => {
+  // ─────────────────────────────────────────────────────────────────────────
+  // Load session
+  // ─────────────────────────────────────────────────────────────────────────
+  const loadSession = useCallback(async () => {
     try {
-      const response = await sessionsAPI.get(sessionId);
-      setSession(response.data);
-      // also load cities for content view
-      if (response.data?.id) {
-        await loadCities(response.data.id);
+      setLoading(true);
+      console.log('Loading session:', sessionId);
+      const res = await sessionsAPI.get(sessionId);
+      const data = res?.data;
+      console.log('Session loaded:', data);
+      setSession(data);
+      if (data?.city) {
+        console.log('City data found:', data.city);
+        loadCityIntoForm(data.city);
+      } else {
+        console.log('No city data in session');
       }
+      if (Array.isArray(data?.attractions)) setAttractions(data.attractions);
     } catch (err) {
-      console.error('Ошибка загрузки сессии:', err);
+      console.error('Failed to load session:', err);
+      showNote('Не удалось загрузить сессию: ' + (err?.response?.data?.error || err.message), 'error');
       navigate('/generation');
     } finally {
       setLoading(false);
     }
-  };
+  }, [sessionId]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const loadCities = async (sessId) => {
-    try {
-      if (!sessId) {
-        console.warn('loadCities: нет sessionId');
-        return;
+  useEffect(() => { loadSession(); }, [loadSession]);
+  useEffect(() => () => clearInterval(aiPollRef.current), []);
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // Load city data into form (mirrors loadCityIntoForm from cg-wizard.js)
+  // ─────────────────────────────────────────────────────────────────────────
+  const loadCityIntoForm = useCallback((city) => {
+    console.log('loadCityIntoForm called with city:', city);
+    if (!city) {
+      console.log('City is null/undefined, skipping');
+      return;
+    }
+    const latVal = city.lat != null ? String(city.lat) : '';
+    const lonVal = city.lon != null ? String(city.lon) : '';
+    console.log('Setting lat/lon:', latVal, lonVal);
+    setLat(latVal);
+    setLon(lonVal);
+    if (city.lat != null) setSavedLat(city.lat);
+    if (city.lon != null) setSavedLon(city.lon);
+
+    setCityTags(Array.isArray(city.tags) ? city.tags.slice() : []);
+    setImagePreview(city.image_url || '');
+    setImageId(city.image_id || null);
+    setImageCopyright(city.image_copyright || '');
+
+    const nameObj = city.name || {};
+    const descObj = city.description || {};
+    const countryRaw = city.country;
+    const countryObj = countryRaw && typeof countryRaw === 'object'
+      ? countryRaw
+      : (typeof countryRaw === 'string' && countryRaw.trim() ? { en: countryRaw.trim() } : {});
+
+    const newLocale = makeLocaleData();
+    const allKeys = [...new Set([...Object.keys(nameObj), ...Object.keys(descObj), ...Object.keys(countryObj)])];
+
+    allKeys.forEach(rawKey => {
+      const lang = (rawKey.includes('-') ? rawKey.split('-')[0] : rawKey).toLowerCase().substring(0, 2);
+      const info = getLocaleInfo(lang);
+      const key = `${lang}-${info.code}`;
+      if (!newLocale[key]) {
+        newLocale[key] = { code: info.code, lang, langName: info.name, isDefault: false, name: '', description: '', country: '' };
       }
-      console.log('SessionWizard.loadCities - загрузка для сессии:', sessId);
-      const citiesResponse = await citiesAPI.get(sessId);
-      console.log('SessionWizard.loadCities - citiesResponse:', citiesResponse);
-      console.log('SessionWizard.loadCities - citiesResponse.data:', citiesResponse.data);
-      
-      let citiesData = [];
-      
-      if (Array.isArray(citiesResponse.data)) {
-        citiesData = citiesResponse.data;
-      } else if (citiesResponse.data && typeof citiesResponse.data === 'object') {
-        // Если это объект с results
-        if (citiesResponse.data.results && Array.isArray(citiesResponse.data.results)) {
-          citiesData = citiesResponse.data.results;
-        } else if (citiesResponse.data.id) {
-          // Если это один объект города
-          citiesData = [citiesResponse.data];
-        } else if (Object.keys(citiesResponse.data).length === 0) {
-          // Пустой объект
-          citiesData = [];
-        }
-      }
-      
-      console.log('SessionWizard.loadCities - итоговый citiesData:', citiesData);
-      setCities(citiesData);
-    } catch (err) {
-      console.error('Ошибка загрузки городов:', err);
-      console.error('Ошибка загрузки городов - детали:', err.response?.data);
-      setCities([]);
+      const resolve = (obj) => {
+        const v = obj[key] ?? obj[lang] ?? obj[rawKey] ?? '';
+        return typeof v === 'string' ? v : (v?.text || '');
+      };
+      newLocale[key].name = resolve(nameObj);
+      newLocale[key].description = resolve(descObj);
+      newLocale[key].country = resolve(countryObj);
+    });
+
+    setLocaleData(newLocale);
+    const pref = newLocale['ru-RU'] ? 'ru-RU' : Object.keys(newLocale)[0] || 'ru-RU';
+    setDefaultLocale(pref);
+    setActiveLocale(pref);
+    console.log('loadCityIntoForm completed');
+  }, []);
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // Leaflet map init - runs ONCE when component mounts
+  // ─────────────────────────────────────────────────────────────────────────
+  useEffect(() => {
+    if (!mapRef.current) {
+      console.log('Map init: mapRef.current is null, waiting...');
+      return;
     }
-  };
-
-  const handleNext = () => {
-    if (currentStep < getSteps(session).length) {
-      setCurrentStep(currentStep + 1);
-    }
-  };
-
-  const handlePrevious = () => {
-    if (currentStep > 1) {
-      setCurrentStep(currentStep - 1);
-    }
-  };
-
-  const handleStepChange = (step) => {
-    setCurrentStep(step);
-  };
-
-  const handlePublish = async () => {
-    if (!confirm('Опубликовать город в основную базу? Это действие нельзя отменить.')) {
+    
+    if (mapInstanceRef.current) {
+      console.log('Map already initialized');
       return;
     }
 
-    setPublishing(true);
-    setPublishError('');
-    setPublishSuccess('');
+    console.log('Initializing Leaflet map...');
+    import('leaflet').then(({ default: L }) => {
+      console.log('Leaflet library loaded');
+      
+      delete L.Icon.Default.prototype._getIconUrl;
+      L.Icon.Default.mergeOptions({
+        iconUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
+        iconRetinaUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png',
+        shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
+      });
 
+      // Start with default view, will update when coords are loaded
+      const map = L.map(mapRef.current).setView([55.75, 37.62], 3);
+      
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '© OpenStreetMap contributors',
+        maxZoom: 19,
+        minZoom: 2,
+      }).addTo(map);
+
+      let marker = null;
+      const updateMarker = (la, lo) => {
+        const flat = parseFloat(la), flon = parseFloat(lo);
+        if (!Number.isFinite(flat) || !Number.isFinite(flon)) {
+          if (marker) { map.removeLayer(marker); marker = null; }
+          return;
+        }
+        if (marker) marker.setLatLng([flat, flon]);
+        else { marker = L.marker([flat, flon]).addTo(map); }
+        map.setView([flat, flon], 12);
+        console.log('Marker updated:', flat, flon);
+      };
+
+      map.on('click', (e) => {
+        console.log('Map clicked:', e.latlng);
+        setLat(String(e.latlng.lat));
+        setLon(String(e.latlng.lng));
+      });
+
+      mapInstanceRef.current = { map, updateMarker };
+      mapReadyRef.current = true;
+      
+      console.log('Map initialized successfully!');
+
+      // Check if we already have coords
+      if (lat && lon) {
+        const hasCoords = !isNaN(parseFloat(lat)) && !isNaN(parseFloat(lon));
+        if (hasCoords) {
+          console.log('Applying existing coords:', lat, lon);
+          updateMarker(lat, lon);
+        }
+      }
+    }).catch((err) => {
+      console.error('Failed to load Leaflet:', err);
+    });
+
+    return () => {
+      if (mapInstanceRef.current?.map) {
+        mapInstanceRef.current.map.remove();
+        mapInstanceRef.current = null;
+        mapReadyRef.current = false;
+        console.log('Map cleaned up');
+      }
+    };
+  }, []); // Empty deps - runs only once on mount
+
+  // Sync map marker when lat/lon state changes (after initial map creation)
+  useEffect(() => {
+    if (!mapReadyRef.current || !mapInstanceRef.current?.updateMarker) {
+      return;
+    }
+    if (!lat || !lon) {
+      return;
+    }
+    const hasCoords = !isNaN(parseFloat(lat)) && !isNaN(parseFloat(lon));
+    if (hasCoords) {
+      console.log('Sync map marker:', lat, lon);
+      mapInstanceRef.current.updateMarker(lat, lon);
+    }
+  }, [lat, lon]); // Runs whenever lat/lon changes
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // Load city tags for step 2
+  // ─────────────────────────────────────────────────────────────────────────
+  useEffect(() => {
+    cityFiltersAPI.list().then(res => {
+      const data = res?.data;
+      const tags = Array.isArray(data?.tags) ? data.tags
+        : Array.isArray(data?.results) ? data.results
+        : Array.isArray(data) ? data : [];
+      setAvailableTags(tags);
+    }).catch(() => {});
+  }, []);
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // Load attractions when entering step 3
+  // ─────────────────────────────────────────────────────────────────────────
+  useEffect(() => {
+    if (currentStep === 3 && !attractionsLoaded) {
+      loadAttractions();
+    }
+  }, [currentStep]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const loadAttractions = useCallback(async () => {
     try {
-      const response = await citiesAPI.publish(sessionId);
-      setPublishSuccess(response.data.message);
-      await loadSession();
-      alert(`Успешно! ${response.data.message}\nГород ID: ${response.data.city.id}\nДостопримечательностей: ${response.data.attractions_count}`);
+      const res = await sessionsAPI.get(sessionId);
+      const list = res?.data?.attractions || [];
+      setAttractions(list);
+      setAttractionsLoaded(true);
+    } catch (e) {
+      showNote('Не удалось загрузить достопримечательности', 'error');
+    }
+  }, [sessionId, showNote]);
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // Save city (mirrors saveCityForStep1 from cg-wizard.js)
+  // ─────────────────────────────────────────────────────────────────────────
+  const saveCityForStep1 = useCallback(async () => {
+    if (!defaultLocale || !localeData[defaultLocale]) {
+      showNote('Необходимо установить язык по умолчанию', 'error');
+      throw new Error('no-default-locale');
+    }
+    const defLoc = localeData[defaultLocale];
+    if (!defLoc.name?.trim()) {
+      showNote(`Необходимо заполнить название города для языка "${defLoc.langName}" (язык по умолчанию)`, 'error');
+      setActiveLocale(defaultLocale);
+      throw new Error('missing-default-name');
+    }
+    if (!defLoc.description?.trim()) {
+      showNote(`Необходимо заполнить описание города для языка "${defLoc.langName}" (язык по умолчанию)`, 'error');
+      setActiveLocale(defaultLocale);
+      throw new Error('missing-default-description');
+    }
+    if (!defLoc.country?.trim()) {
+      showNote(`Необходимо указать страну (для языка по умолчанию)`, 'error');
+      setActiveLocale(defaultLocale);
+      throw new Error('missing-country');
+    }
+
+    const name = {}, description = {}, country = {};
+    Object.values(localeData).forEach(loc => {
+      if (loc.name || loc.description) {
+        name[loc.lang] = loc.name || '';
+        description[loc.lang] = loc.description || '';
+      }
+      if (loc.country?.trim()) country[loc.lang] = loc.country.trim();
+    });
+
+    const payload = {
+      name, description, country,
+      lat: lat ? parseFloat(lat) : null,
+      lon: lon ? parseFloat(lon) : null,
+      default_language: localeData[defaultLocale]?.lang || null,
+      tags: cityTags,
+      image_id: imageId,
+    };
+
+    setSaving(true);
+    try {
+      const res = await sessionsAPI.updateCity(sessionId, payload);
+      const data = res?.data;
+      const msg = data?.applied_to_published
+        ? 'Корректировки сохранены и применены к объектам (City, Event, EventLocation). Сессия закрыта.'
+        : 'Город сохранён в рамках сессии';
+      showNote(msg, 'success');
+      if (data?.city?.image_url) {
+        setImagePreview(data.city.image_url);
+        if (data.city.image_id != null) setImageId(data.city.image_id);
+      }
+      if (data?.status) {
+        setSession(prev => prev ? { ...prev, status: data.status, status_display: data.status_display } : prev);
+      }
+      return data;
     } catch (err) {
-      const errorMsg = err.response?.data?.message || err.message || 'Ошибка публикации';
-      setPublishError(errorMsg);
-      console.error('Ошибка публикации:', err);
+      showNote('Ошибка при сохранении города: ' + (err?.response?.data?.error || err.message), 'error');
+      throw err;
+    } finally {
+      setSaving(false);
+    }
+  }, [sessionId, localeData, defaultLocale, lat, lon, cityTags, imageId, showNote]);
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // Step navigation
+  // ─────────────────────────────────────────────────────────────────────────
+  const goToStep = useCallback(async (target) => {
+    if (target < 1 || target > TOTAL_STEPS || target === currentStep) return;
+    // Auto-save city when leaving step 1 or 2 going forward
+    if ((currentStep === 1 || currentStep === 2) && target > currentStep) {
+      try {
+        await saveCityForStep1();
+      } catch {
+        return; // Validation failed, stay on current step
+      }
+    }
+    setCurrentStep(target);
+  }, [currentStep, saveCityForStep1]);
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // Locale management
+  // ─────────────────────────────────────────────────────────────────────────
+  const switchLocale = useCallback((key) => {
+    setActiveLocale(key);
+  }, []);
+
+  const addLocale = useCallback(() => {
+    const code = newLocaleCode.trim().toUpperCase();
+    const langName = newLocaleLang.trim();
+    if (!code || code.length !== 2) { showNote('Введите корректный двухбуквенный код страны', 'error'); return; }
+    if (!langName) { showNote('Введите название языка', 'error'); return; }
+    const lang = langName.toLowerCase().substring(0, 2);
+    const key = `${lang}-${code}`;
+    if (localeData[key]) { showNote('Такая адаптация уже добавлена', 'error'); return; }
+    setLocaleData(prev => ({
+      ...prev,
+      [key]: { code, lang, langName, isDefault: false, name: '', description: '', country: '' },
+    }));
+    setAddLocaleOpen(false);
+    setNewLocaleCode('');
+    setNewLocaleLang('');
+    showNote(`Адаптация "${langName} (${code})" добавлена`, 'success');
+  }, [newLocaleCode, newLocaleLang, localeData, showNote]);
+
+  const removeLocale = useCallback((key) => {
+    if (localeData[key]?.isDefault) { showNote('Предустановленные языки нельзя удалять', 'error'); return; }
+    setLocaleData(prev => { const n = { ...prev }; delete n[key]; return n; });
+    if (activeLocale === key) {
+      const remaining = Object.keys(localeData).filter(k => k !== key);
+      if (remaining.length) setActiveLocale(remaining[0]);
+    }
+    if (defaultLocale === key) {
+      const remaining = Object.keys(localeData).filter(k => k !== key);
+      if (remaining.length) setDefaultLocale(remaining[0]);
+    }
+  }, [localeData, activeLocale, defaultLocale]);
+
+  const updateLocaleField = useCallback((field, value) => {
+    setLocaleData(prev => ({
+      ...prev,
+      [activeLocale]: { ...prev[activeLocale], [field]: value },
+    }));
+  }, [activeLocale]);
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // Photo upload
+  // ─────────────────────────────────────────────────────────────────────────
+  const handlePhotoFile = useCallback(async (e) => {
+    const f = e.target.files?.[0];
+    if (!f || !f.type.startsWith('image/')) return;
+    e.target.value = '';
+    setPhotoUploading(true);
+    try {
+      const fd = new FormData();
+      fd.append('file', f);
+      if (imageCopyright) fd.append('copyright', imageCopyright);
+      fd.append('session_uuid', session?.uuid || session?.session_uuid || '');
+      fd.append('city_name', localeData[activeLocale]?.name || '');
+      fd.append('temp', '1');
+      const res = await imagesAPI.upload(fd);
+      const { id, url } = res?.data || {};
+      if (id && url) {
+        setImageId(id);
+        setImagePreview(url);
+        showNote('Изображение загружено', 'success');
+      }
+    } catch (err) {
+      showNote('Ошибка загрузки: ' + (err?.response?.data?.error || err.message), 'error');
+    } finally {
+      setPhotoUploading(false);
+    }
+  }, [session, localeData, activeLocale, imageCopyright, showNote]);
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // Commons image selection
+  // ─────────────────────────────────────────────────────────────────────────
+  const handleCommonsImageSelect = useCallback(({ imageId, localUrl, copyright }) => {
+    setImageId(imageId);
+    setImagePreview(localUrl);
+    setImageCopyright(copyright);
+    showNote('Изображение загружено из Wikimedia Commons', 'success');
+  }, [showNote]);
+
+  const getSessionUuid = useCallback(() => {
+    return session?.uuid || session?.session_uuid || '';
+  }, [session]);
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // Tags
+  // ─────────────────────────────────────────────────────────────────────────
+  const addTag = useCallback((text) => {
+    const t = text.trim();
+    if (!t || cityTags.includes(t)) return;
+    setCityTags(prev => [...prev, t]);
+  }, [cityTags]);
+
+  const removeTag = useCallback((t) => {
+    setCityTags(prev => prev.filter(x => x !== t));
+  }, []);
+
+  const handleTagKeyDown = useCallback((e) => {
+    if (e.key === 'Enter' || e.key === ',') {
+      e.preventDefault();
+      const v = tagInput.trim().replace(/,$/, '');
+      if (v) { addTag(v); setTagInput(''); }
+    }
+  }, [tagInput, addTag]);
+
+  const handleTagBlur = useCallback(() => {
+    if (tagInput.trim()) { addTag(tagInput.trim()); setTagInput(''); }
+  }, [tagInput, addTag]);
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // Attractions
+  // ─────────────────────────────────────────────────────────────────────────
+  const buildAttrLocaleData = useCallback((attr) => {
+    const data = {};
+    DEFAULT_LOCALE_DEFS.forEach(loc => {
+      data[loc.key] = {
+        lang: loc.lang, code: loc.code, langName: loc.langName,
+        name: (attr.name && attr.name[loc.lang]) || '',
+        description: (attr.description && attr.description[loc.lang]) || '',
+        contentText: (attr.contents && attr.contents[loc.lang]) || '',
+      };
+    });
+    return data;
+  }, []);
+
+  const openAttrDetail = useCallback(async (attrId) => {
+    try {
+      const res = await attractionsAPI.get(sessionId, attrId);
+      const attr = res?.data?.attraction || attractions.find(a => a.id === attrId);
+      if (!attr) return;
+      setCurrentAttr(attr);
+      setAttrLocaleData(buildAttrLocaleData(attr));
+      setAttrActiveLocale('ru-RU');
+      setAttrView('detail');
+    } catch (e) {
+      showNote('Не удалось открыть достопримечательность: ' + e.message, 'error');
+    }
+  }, [sessionId, attractions, buildAttrLocaleData, showNote]);
+
+  const addAttraction = useCallback(async () => {
+    try {
+      const res = await attractionsAPI.create(sessionId, {});
+      const attr = res?.data?.attraction;
+      if (attr) {
+        setAttractions(prev => [...prev, attr]);
+        setCurrentAttr(attr);
+        setAttrLocaleData(buildAttrLocaleData(attr));
+        setAttrActiveLocale('ru-RU');
+        setAttrView('detail');
+        showNote('Достопримечательность добавлена', 'success');
+      }
+    } catch (e) {
+      showNote('Ошибка при добавлении: ' + e.message, 'error');
+    }
+  }, [sessionId, buildAttrLocaleData, showNote]);
+
+  const saveCurrentAttr = useCallback(async () => {
+    if (!currentAttr) return;
+    setAttrSaving(true);
+    try {
+      const name = {}, description = {};
+      Object.values(attrLocaleData).forEach(d => {
+        if (d.name || d.description) {
+          name[d.lang] = d.name || '';
+          description[d.lang] = d.description || '';
+        }
+      });
+      const updated = await attractionsAPI.update(sessionId, currentAttr.id, { name, description });
+      if (updated?.data?.attraction) {
+        setAttractions(prev => prev.map(a => a.id === currentAttr.id ? { ...a, ...updated.data.attraction } : a));
+        setCurrentAttr(prev => ({ ...prev, ...updated.data.attraction }));
+      }
+      // Save content for each locale
+      await Promise.all(
+        Object.values(attrLocaleData).map(d =>
+          attractionsAPI.saveContent(sessionId, currentAttr.id, { language: d.lang, text: d.contentText || '' })
+        )
+      );
+      showNote('Достопримечательность сохранена', 'success');
+    } catch (e) {
+      showNote('Ошибка при сохранении: ' + e.message, 'error');
+    } finally {
+      setAttrSaving(false);
+    }
+  }, [sessionId, currentAttr, attrLocaleData, showNote]);
+
+  const deleteCurrentAttr = useCallback(async () => {
+    if (!currentAttr) return;
+    const name = getAttrName(currentAttr);
+    if (!confirm(`Удалить «${name}»?`)) return;
+    try {
+      await attractionsAPI.delete(sessionId, currentAttr.id);
+      setAttractions(prev => prev.filter(a => a.id !== currentAttr.id));
+      setAttrView('list');
+      setCurrentAttr(null);
+      showNote('Удалено', 'success');
+    } catch (e) {
+      showNote('Ошибка при удалении: ' + e.message, 'error');
+    }
+  }, [sessionId, currentAttr, showNote]);
+
+  const updateAttrLocaleField = useCallback((field, value) => {
+    setAttrLocaleData(prev => ({
+      ...prev,
+      [attrActiveLocale]: { ...prev[attrActiveLocale], [field]: value },
+    }));
+  }, [attrActiveLocale]);
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // Step 4: AI content generation helpers
+  // ─────────────────────────────────────────────────────────────────────────
+  const startAiContent = useCallback(async (attrId, lang) => {
+    const attr = attractions.find(a => a.id === attrId);
+    if (!attr) return;
+    const cityName = Object.values(localeData)[0]?.name || 'город';
+    const attrName = getAttrName(attr);
+    clearInterval(aiPollRef.current);
+    setAiGenAttrId(attrId);
+    setAiGenLang(lang);
+    setAiGenText('');
+    setAiGenDone(false);
+    setAiGenError(null);
+    try {
+      const r = await aiAPI.streamStart({
+        prompt: `Напиши подробный текст для туристического приложения о достопримечательности «${attrName}» в городе «${cityName}». Включи историю, интересные факты, что посмотреть. Язык ответа: ${lang}. Объём: 200-350 слов.`,
+        language: lang,
+        system_prompt: 'Ты — эксперт по туризму и культуре. Пиши живо, интересно и информативно.',
+      });
+      const sid = r?.data?.stream_id;
+      if (!sid) { setAiGenError('Не удалось запустить генерацию'); return; }
+      setAiGenStreamId(sid);
+      aiPollRef.current = setInterval(async () => {
+        try {
+          const sr = await aiAPI.streamStatus(sid);
+          const sd = sr?.data;
+          if (sd?.text) setAiGenText(sd.text);
+          if (sd?.done) {
+            clearInterval(aiPollRef.current);
+            setAiGenDone(true);
+          }
+          if (sd?.error) {
+            clearInterval(aiPollRef.current);
+            setAiGenError(sd.error);
+            setAiGenDone(true);
+          }
+        } catch {
+          clearInterval(aiPollRef.current);
+          setAiGenError('Ошибка получения результата');
+          setAiGenDone(true);
+        }
+      }, 1500);
+    } catch (e) {
+      setAiGenError(e?.response?.data?.error || e.message || 'Ошибка запуска');
+    }
+  }, [attractions, localeData]);
+
+  const saveAiContent = useCallback(async () => {
+    if (!aiGenAttrId || !aiGenText.trim()) return;
+    setAiGenSaving(true);
+    try {
+      await attractionsAPI.saveContent(sessionId, aiGenAttrId, { language: aiGenLang, text: aiGenText });
+      setAttractions(prev => prev.map(a => {
+        if (a.id !== aiGenAttrId) return a;
+        const contents = { ...(a.contents || {}), [aiGenLang]: aiGenText };
+        return { ...a, contents };
+      }));
+      showNote('Контент сохранён', 'success');
+    } catch (e) {
+      showNote('Ошибка сохранения: ' + (e?.response?.data?.error || e.message), 'error');
+    } finally {
+      setAiGenSaving(false);
+    }
+  }, [sessionId, aiGenAttrId, aiGenLang, aiGenText, showNote]);
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // Close session
+  // ─────────────────────────────────────────────────────────────────────────
+  const handleClose = useCallback(async () => {
+    setClosing(true);
+    try {
+      await sessionsAPI.close(sessionId, closeMode);
+      setCloseOpen(false);
+      navigate('/generation');
+    } catch (err) {
+      showNote(err?.response?.data?.error || 'Ошибка закрытия сессии', 'error');
+    } finally {
+      setClosing(false);
+    }
+  }, [sessionId, closeMode, navigate, showNote]);
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // Publish session
+  // ─────────────────────────────────────────────────────────────────────────
+  const handlePublish = useCallback(async () => {
+    if (!confirm('Опубликовать всю сессию? Данные будут записаны в основную базу.')) return;
+    setPublishing(true);
+    try {
+      const res = await sessionsAPI.publish(sessionId);
+      showNote(res?.data?.message || 'Сессия опубликована', 'success');
+      await loadSession();
+    } catch (err) {
+      showNote(err?.response?.data?.error || err?.response?.data?.message || 'Ошибка публикации', 'error');
     } finally {
       setPublishing(false);
     }
-  };
+  }, [sessionId, loadSession, showNote]);
 
-  const getSteps = (sessionData) => {
-    if (sessionData?.content_type === 'city_only') {
-      return [WIZARD_STEPS.CITY];
-    }
-    return ALL_STEPS;
-  };
-
-  const renderStep = () => {
-    // Если выбран город (включая null для создания нового), показываем форму
-    if (selectedCity !== undefined) {
-      return (
-        <div className="bg-white rounded-lg shadow p-6">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-xl font-bold text-gray-900">
-              {selectedCity?.id ? 'Редактирование города' : 'Создание нового города'}
-            </h2>
-            <button
-              onClick={() => setSelectedCity(undefined)}
-              className="text-sm text-gray-600 hover:text-gray-900"
-            >
-              ✕ Закрыть
-            </button>
-          </div>
-          <Step1City 
-            session={session}
-            cityData={selectedCity}
-            onComplete={async () => {
-              // Сначала обновляем список городов
-              await loadCities(session.id);
-              // Потом обновляем сессию
-              await loadSession();
-              // Закрываем форму
-              setSelectedCity(undefined);
-            }}
-            onSavedCity={(city) => {
-              setCities((prev) => {
-                const idx = prev.findIndex((p) => p.id === city.id);
-                if (idx >= 0) {
-                  const copy = [...prev]; copy[idx] = city; return copy;
-                }
-                return [...prev, city];
-              });
-            }}
-          />
-        </div>
-      );
-    }
-
-    // Иначе показываем визард
-    const steps = getSteps(session);
-    const stepId = steps[currentStep - 1];
-
-    switch (stepId) {
-      case WIZARD_STEPS.CITY:
-        // Если город не выбран — показываем содержание (список городов) или пустой экран
-        if (selectedCity === undefined) {
-          return (
-            <div className="bg-white rounded-lg shadow p-6">
-              <h3 className="text-lg font-semibold text-gray-900 mb-4">Содержание — Города</h3>
-              <div className="space-y-2">
-                {cities.map((c) => {
-                  const cityName = typeof c.name === 'object'
-                    ? (c.name?.en || c.name?.ru || Object.values(c.name || {})[0] || 'Без названия')
-                    : (c.name || 'Без названия');
-                  return (
-                    <div key={c.id} className="p-3 border rounded-md hover:bg-gray-50 cursor-pointer" onClick={() => setSelectedCity(c)}>
-                      <div className="text-sm font-medium text-gray-900">{cityName}</div>
-                      {c.country && <div className="text-xs text-gray-500">{c.country}</div>}
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          );
-        }
-        return <Step1City session={session} onComplete={async () => {
-          await loadCities(session.id);
-          await loadSession();
-        }} onSavedCity={(city) => {
-          setCities((prev) => {
-            const idx = prev.findIndex((p) => p.id === city.id);
-            if (idx >= 0) {
-              const copy = [...prev]; copy[idx] = city; return copy;
-            }
-            return [...prev, city];
-          });
-        }} />;
-      case WIZARD_STEPS.ATTRACTIONS:
-        return <Step2Attractions session={session} onComplete={loadSession} />;
-      case WIZARD_STEPS.CONTENT:
-        return <Step3Content session={session} onComplete={loadSession} />;
-      case WIZARD_STEPS.COMMIT:
-        return <Step4Commit session={session} onComplete={loadSession} />;
-      default:
-        return null;
-    }
-  };
+  // ─────────────────────────────────────────────────────────────────────────
+  // Render
+  // ─────────────────────────────────────────────────────────────────────────
+  const isCorrectionMode = session?.closed_with_save === true;
+  const isActive = session?.status === 'draft' || session?.status === 'in_progress';
+  const currentLocale = localeData[activeLocale] || {};
+  const attrCurrentLocale = attrLocaleData[attrActiveLocale] || {};
 
   if (loading) {
     return (
       <Layout>
-        <div className="text-center py-12">
-          <p className="text-gray-600">Загрузка сессии...</p>
+        <div className="flex items-center justify-center py-24">
+          <div className="flex items-center gap-3 text-gray-500">
+            <div className="animate-spin w-6 h-6 border-2 border-blue-600 border-t-transparent rounded-full" />
+            <span>Загрузка сессии...</span>
+          </div>
         </div>
       </Layout>
     );
@@ -243,140 +862,724 @@ export default function SessionWizard() {
   if (!session) {
     return (
       <Layout>
-        <div className="text-center py-12">
-          <p className="text-red-600">Сессия не найдена</p>
-        </div>
+        <div className="text-center py-24 text-red-600">Сессия не найдена</div>
       </Layout>
     );
   }
 
   return (
     <Layout>
-      <div className="mb-6 flex justify-between items-center">
-        <button
-          onClick={() => navigate('/generation')}
-          className="text-blue-600 hover:text-blue-800 text-sm"
-        >
-          ← Назад к списку сессий
-        </button>
+      <Notification note={note} />
 
-        {session && !session.is_published && (
-          <button
-            onClick={handlePublish}
-            disabled={publishing}
-            className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 disabled:opacity-50 font-medium"
-          >
-            {publishing ? '📤 Публикация...' : '📤 Опубликовать в основную базу'}
-          </button>
-        )}
-
-        {session?.is_published && (
-          <div className="px-4 py-2 bg-green-50 border border-green-200 rounded-md">
-            <span className="text-green-800 font-medium">
-              ✅ Опубликовано (ID города: {session.published_city_id})
-            </span>
+      {/* ── Header bar ───────────────────────────────────────────────────── */}
+      <div className="flex items-start justify-between gap-4 mb-5 pb-4 border-b border-gray-200">
+        <div>
+          <h1 className="text-xl font-bold text-gray-900">{session.name || 'Сессия генерации контента'}</h1>
+          <div className="flex items-center gap-4 mt-1 text-xs text-gray-500">
+            <span><span className="text-gray-400">UID:</span> <span className="font-mono">{session.uuid || session.session_uuid || session.id}</span></span>
+            {session.created_at && (
+              <span>
+                <span className="text-gray-400">Дата начала:</span>{' '}
+                {new Date(session.created_at).toLocaleString('ru-RU', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
+              </span>
+            )}
+            <StatusBadge status={session.status} label={session.status_display} />
           </div>
-        )}
+        </div>
+        <div className="flex items-center gap-2 shrink-0">
+          <button
+            onClick={() => navigate('/generation')}
+            title="Назад к списку"
+            className="px-3 py-1.5 text-sm text-gray-600 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+          >
+            ← Назад
+          </button>
+          {!isCorrectionMode && (
+            <button
+              onClick={handlePublish}
+              disabled={publishing}
+              className="px-3 py-1.5 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors"
+            >
+              {publishing ? '...' : 'Опубликовать всю сессию'}
+            </button>
+          )}
+          <button
+            onClick={() => saveCityForStep1()}
+            disabled={saving}
+            title={isCorrectionMode ? 'Сохранить корректировки' : 'Сохранить'}
+            className="w-8 h-8 flex items-center justify-center text-gray-500 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 transition-colors"
+          >
+            {saving ? <span className="animate-spin w-3.5 h-3.5 border-2 border-gray-400 border-t-transparent rounded-full" /> : '💾'}
+          </button>
+          {isActive && (
+            <button
+              onClick={() => { setCloseMode('save'); setCloseOpen(true); }}
+              title="Закрыть сессию"
+              className="w-8 h-8 flex items-center justify-center text-gray-500 bg-white border border-gray-300 rounded-lg hover:bg-red-50 hover:border-red-300 hover:text-red-500 transition-colors"
+            >
+              ✕
+            </button>
+          )}
+        </div>
       </div>
 
-      {publishError && (
-        <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-md">
-          <p className="text-red-800">{publishError}</p>
-        </div>
-      )}
+      {/* ── Main layout ──────────────────────────────────────────────────── */}
+      <div className="flex gap-5 items-start">
 
-      {publishSuccess && (
-        <div className="mb-4 p-4 bg-green-50 border border-green-200 rounded-md">
-          <p className="text-green-800">{publishSuccess}</p>
-        </div>
-      )}
-
-      {/* Настройки сессии */}
-      {session && (
-        <div className="mb-6 bg-white rounded-lg shadow p-4">
-          <div className="flex items-center justify-between">
+        {/* ── Photo tile ─────────────────────────────────────────────────── */}
+        <aside className="w-52 shrink-0 space-y-3">
+          <div className="relative aspect-[3/4] bg-gray-100 rounded-xl overflow-hidden border border-gray-200 flex items-center justify-center">
+            {imagePreview ? (
+              <img src={imagePreview} alt="Фото города" className="w-full h-full object-cover" />
+            ) : (
+              <span className="text-gray-400 text-sm">Фото</span>
+            )}
+            {photoUploading && (
+              <div className="absolute inset-0 bg-black/40 flex items-center justify-center">
+                <div className="animate-spin w-6 h-6 border-2 border-white border-t-transparent rounded-full" />
+              </div>
+            )}
+            {/* Commons button overlay */}
+            <button
+              type="button"
+              onClick={() => setCommonsModalOpen(true)}
+              className="absolute top-2 right-2 px-2 py-1 text-xs bg-purple-600 text-white rounded-md hover:bg-purple-700 transition-colors shadow-lg"
+              title="Подобрать в Wikimedia Commons"
+            >
+              ✦ Commons
+            </button>
+          </div>
+          <div>
+            <label className="block w-full text-center text-xs text-blue-600 bg-blue-50 border border-blue-200 rounded-lg py-1.5 cursor-pointer hover:bg-blue-100 transition-colors">
+              + Добавить фото
+              <input ref={photoFileRef} type="file" accept="image/*" className="hidden" onChange={handlePhotoFile} />
+            </label>
+          </div>
+          <div className="space-y-1.5">
             <div>
-              <h3 className="text-lg font-semibold text-gray-900">Настройки генерации</h3>
-              <p className="text-sm text-gray-500 mt-1">
-                Типа контента: {session.content_type === 'city_only' ? 'Только город' : 'Город с достопримечательностями'}
-              </p>
+              <label className="block text-xs text-gray-500 mb-0.5">URL</label>
+              <input
+                type="url"
+                value={imagePreview}
+                onChange={e => { setImagePreview(e.target.value); setImageId(null); }}
+                placeholder="https://..."
+                className="w-full px-2 py-1 text-xs border border-gray-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-blue-400"
+              />
             </div>
-            <div className="flex items-center gap-4">
-              <div className="text-right">
-                <label className="block text-xs text-gray-500 mb-1">Городов</label>
+            <div>
+              <label className="block text-xs text-gray-500 mb-0.5">Авторские права</label>
+              <input
+                type="text"
+                value={imageCopyright}
+                onChange={e => setImageCopyright(e.target.value)}
+                placeholder="© Автор / Источник"
+                className="w-full px-2 py-1 text-xs border border-gray-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-blue-400"
+              />
+            </div>
+          </div>
+        </aside>
+
+        {/* ── Wizard ─────────────────────────────────────────────────────── */}
+        <main className="flex-1 min-w-0">
+          {/* Progress bar */}
+          <div className="mb-5">
+            <div className="relative h-1.5 bg-gray-200 rounded-full mb-3">
+              <div
+                className="absolute inset-y-0 left-0 bg-blue-600 rounded-full transition-all duration-300"
+                style={{ width: `${((currentStep - 1) / (TOTAL_STEPS - 1)) * 100}%` }}
+              />
+            </div>
+            <div className="flex">
+              {STEP_LABELS.map((label, i) => {
+                const step = i + 1;
+                const isCompleted = step < currentStep;
+                const isActive = step === currentStep;
+                return (
+                  <button
+                    key={step}
+                    type="button"
+                    onClick={() => goToStep(step)}
+                    className={`flex-1 text-xs py-1 px-1 text-center transition-colors border-b-2 ${
+                      isActive
+                        ? 'border-blue-600 text-blue-700 font-semibold'
+                        : isCompleted
+                        ? 'border-blue-300 text-blue-500 hover:text-blue-700 cursor-pointer'
+                        : 'border-transparent text-gray-400 hover:text-gray-600 cursor-pointer'
+                    }`}
+                  >
+                    {step}. {label}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* ─── Step 1: Город ─────────────────────────────────────────── */}
+          {currentStep === 1 && (
+            <div className="space-y-4">
+              <div>
+                <h2 className="text-lg font-semibold text-gray-900">Город</h2>
+                <p className="text-sm text-gray-500">Название, описание, страна и координаты</p>
+              </div>
+
+              {/* Locale pills */}
+              <LocalePills
+                localeData={localeData}
+                activeLocale={activeLocale}
+                defaultLocale={defaultLocale}
+                onSwitch={switchLocale}
+                onSetDefault={setDefaultLocale}
+                onAddLocale={() => setAddLocaleOpen(true)}
+                onRemoveLocale={removeLocale}
+              />
+
+              {/* Two columns: fields | map */}
+              <div className="grid grid-cols-2 gap-5">
+                {/* Fields */}
+                <div className="space-y-3">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Название города ({currentLocale.lang?.toUpperCase() || activeLocale.split('-')[0].toUpperCase()})
+                    </label>
+                    <input
+                      type="text"
+                      value={currentLocale.name || ''}
+                      onChange={e => updateLocaleField('name', e.target.value)}
+                      placeholder={`Например, ${currentLocale.name || 'название'}`}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Описание ({currentLocale.lang?.toUpperCase() || activeLocale.split('-')[0].toUpperCase()})
+                    </label>
+                    <textarea
+                      value={currentLocale.description || ''}
+                      onChange={e => updateLocaleField('description', e.target.value)}
+                      rows={4}
+                      placeholder={`Описание города на ${currentLocale.langName?.toLowerCase() || 'языке'}`}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Страна ({currentLocale.lang?.toUpperCase() || activeLocale.split('-')[0].toUpperCase()})
+                    </label>
+                    <input
+                      type="text"
+                      value={currentLocale.country || ''}
+                      onChange={e => updateLocaleField('country', e.target.value)}
+                      placeholder={currentLocale.lang === 'ru' ? 'Россия' : currentLocale.lang === 'en' ? 'Russia' : ''}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                  </div>
+                </div>
+
+                {/* Map + Coords */}
+                <div>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="text-sm font-medium text-gray-700">Координаты</label>
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs text-gray-400">Клик по карте или ввод вручную</span>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (savedLat != null && savedLon != null) {
+                            setLat(String(savedLat));
+                            setLon(String(savedLon));
+                          }
+                        }}
+                        disabled={savedLat == null}
+                        className="px-2 py-0.5 text-xs text-gray-500 border border-gray-300 rounded hover:bg-gray-50 disabled:opacity-40 transition-colors"
+                      >
+                        Вернуть
+                      </button>
+                    </div>
+                  </div>
+                  <div ref={mapRef} className="w-full h-48 rounded-lg border border-gray-200 overflow-hidden z-0" />
+                  <div className="grid grid-cols-2 gap-2 mt-2">
+                    <input
+                      type="number"
+                      step="0.000001"
+                      value={lat}
+                      onChange={e => setLat(e.target.value)}
+                      placeholder="Широта"
+                      className="px-3 py-1.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                    <input
+                      type="number"
+                      step="0.000001"
+                      value={lon}
+                      onChange={e => setLon(e.target.value)}
+                      placeholder="Долгота"
+                      className="px-3 py-1.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Next button */}
+              <div className="flex justify-end pt-2">
+                <button
+                  onClick={() => goToStep(2)}
+                  disabled={saving}
+                  className="px-5 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors"
+                >
+                  {saving ? 'Сохранение...' : 'Далее: Теги →'}
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* ─── Step 2: Теги ──────────────────────────────────────────── */}
+          {currentStep === 2 && (
+            <div className="space-y-4">
+              <div>
+                <h2 className="text-lg font-semibold text-gray-900">Теги</h2>
+                <p className="text-sm text-gray-500">Категории для поиска. Можно выбрать из справочника или добавить свои.</p>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Теги города</label>
                 <input
-                  type="number"
-                  value={session.cities_count || 1}
-                  onChange={(e) => {
-                    const newValue = parseInt(e.target.value);
-                    if (newValue >= 1 && newValue <= 50) {
-                      sessionsAPI.update(session.id, { cities_count: newValue }).then(loadSession);
-                    }
-                  }}
-                  min="1"
-                  max="50"
-                  className="w-20 px-2 py-1 text-center border border-gray-300 rounded-md text-sm"
+                  type="text"
+                  value={tagInput}
+                  onChange={e => setTagInput(e.target.value)}
+                  onKeyDown={handleTagKeyDown}
+                  onBlur={handleTagBlur}
+                  placeholder="Введите тег и нажмите Enter"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
               </div>
-              {session.content_type === 'city_with_attractions' && (
-                <div className="text-right">
-                  <label className="block text-xs text-gray-500 mb-1">Достопримечательностей</label>
-                  <input
-                    type="number"
-                    value={session.attractions_per_city || 10}
-                    onChange={(e) => {
-                      const newValue = parseInt(e.target.value);
-                      if (newValue >= 1 && newValue <= 100) {
-                        sessionsAPI.update(session.id, { attractions_per_city: newValue }).then(loadSession);
-                      }
-                    }}
-                    min="1"
-                    max="100"
-                    className="w-20 px-2 py-1 text-center border border-gray-300 rounded-md text-sm"
-                  />
+
+              {/* Current tags */}
+              <div className="flex flex-wrap gap-2 min-h-[2.5rem] p-2 bg-gray-50 rounded-lg border border-gray-200">
+                {cityTags.length === 0 ? (
+                  <span className="text-sm text-gray-400 self-center">Тегов пока нет</span>
+                ) : cityTags.map(tag => (
+                  <span key={tag} className="inline-flex items-center gap-1 px-2.5 py-1 bg-blue-100 text-blue-800 text-xs font-medium rounded-full">
+                    {tag}
+                    <button type="button" onClick={() => removeTag(tag)} className="hover:text-red-600 transition-colors">×</button>
+                  </span>
+                ))}
+              </div>
+
+              {/* Suggestions */}
+              {availableTags.length > 0 && (
+                <div>
+                  <p className="text-xs text-gray-500 mb-1.5">Справочник тегов:</p>
+                  <div className="flex flex-wrap gap-1.5">
+                    {availableTags.map((tag, i) => {
+                      const label = tag.display_name || tag.slug || tag.name || (typeof tag === 'string' ? tag : '');
+                      if (!label) return null;
+                      const isAdded = cityTags.includes(label);
+                      return (
+                        <button
+                          key={tag.id || i}
+                          type="button"
+                          onClick={() => addTag(label)}
+                          className={`px-2.5 py-1 text-xs rounded-full border transition-colors ${
+                            isAdded
+                              ? 'bg-blue-600 text-white border-blue-600'
+                              : 'bg-white text-gray-600 border-gray-300 hover:border-blue-400 hover:text-blue-600'
+                          }`}
+                        >
+                          {label}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              <div className="flex justify-between pt-2">
+                <button onClick={() => goToStep(1)} className="px-4 py-2 text-sm text-gray-600 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors">
+                  ← Назад
+                </button>
+                <button
+                  onClick={() => goToStep(3)}
+                  disabled={saving}
+                  className="px-5 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors"
+                >
+                  {saving ? 'Сохранение...' : 'Далее: Достопримечательности →'}
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* ─── Step 3: Достопримечательности ───────────────────────── */}
+          {currentStep === 3 && (
+            <div>
+              {attrView === 'list' ? (
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h2 className="text-lg font-semibold text-gray-900">Достопримечательности</h2>
+                      <p className="text-sm text-gray-500">Добавьте объекты для этого города</p>
+                    </div>
+                    <button
+                      onClick={addAttraction}
+                      className="px-3 py-1.5 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors"
+                    >
+                      + Добавить
+                    </button>
+                  </div>
+
+                  {attractions.length === 0 ? (
+                    <div className="text-center py-12 text-gray-400">
+                      <div className="text-3xl mb-2">🏛️</div>
+                      <p className="text-sm">Нет достопримечательностей. Нажмите «+ Добавить»</p>
+                    </div>
+                  ) : (
+                    <div className="space-y-2">
+                      {attractions.map((attr, idx) => (
+                        <div
+                          key={attr.id}
+                          onClick={() => openAttrDetail(attr.id)}
+                          className="flex items-center justify-between p-3 bg-white border border-gray-200 rounded-lg hover:border-blue-300 hover:bg-blue-50 cursor-pointer transition-colors"
+                        >
+                          <div className="flex items-center gap-3">
+                            <span className="w-6 h-6 flex items-center justify-center rounded-full bg-gray-100 text-xs font-medium text-gray-600">
+                              {idx + 1}
+                            </span>
+                            <span className="text-sm font-medium text-gray-900">{getAttrName(attr)}</span>
+                          </div>
+                          <span className="text-xs text-blue-600 font-medium">Открыть →</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  <div className="flex justify-between pt-2">
+                    <button onClick={() => goToStep(2)} className="px-4 py-2 text-sm text-gray-600 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors">
+                      ← Назад
+                    </button>
+                    <button onClick={() => goToStep(4)} className="px-5 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors">
+                      Далее: Контент →
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                /* ─── Attraction detail view ─── */
+                <div className="space-y-4">
+                  <div className="flex items-center gap-3">
+                    <button
+                      onClick={() => { setAttrView('list'); setCurrentAttr(null); }}
+                      className="w-8 h-8 flex items-center justify-center border border-gray-300 rounded-lg text-gray-500 hover:bg-gray-50 transition-colors"
+                    >
+                      ←
+                    </button>
+                    <span className="text-base font-semibold text-gray-900">{getAttrName(currentAttr)}</span>
+                    <button
+                      onClick={deleteCurrentAttr}
+                      className="ml-auto px-3 py-1 text-xs font-medium text-red-600 bg-red-50 rounded-lg hover:bg-red-100 transition-colors"
+                    >
+                      Удалить
+                    </button>
+                  </div>
+
+                  {/* Locale pills for attraction */}
+                  <div className="flex items-center gap-1 flex-wrap">
+                    {DEFAULT_LOCALE_DEFS.map(loc => {
+                      const isActive = loc.key === attrActiveLocale;
+                      return (
+                        <button
+                          key={loc.key}
+                          type="button"
+                          onClick={() => setAttrActiveLocale(loc.key)}
+                          className={`flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium border transition-all ${
+                            isActive
+                              ? 'bg-blue-600 text-white border-blue-600'
+                              : 'bg-white text-gray-600 border-gray-300 hover:border-blue-400'
+                          }`}
+                        >
+                          <span>{getFlag(loc.code)}</span>
+                          <span>{loc.langName}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Название ({attrCurrentLocale.lang?.toUpperCase() || 'RU'})
+                    </label>
+                    <input
+                      type="text"
+                      value={attrCurrentLocale.name || ''}
+                      onChange={e => updateAttrLocaleField('name', e.target.value)}
+                      placeholder="Название достопримечательности"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Описание ({attrCurrentLocale.lang?.toUpperCase() || 'RU'})
+                    </label>
+                    <textarea
+                      value={attrCurrentLocale.description || ''}
+                      onChange={e => updateAttrLocaleField('description', e.target.value)}
+                      rows={3}
+                      placeholder="Краткое описание"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
+                    />
+                  </div>
+
+                  <div>
+                    <div className="flex items-center gap-2 mb-1">
+                      <label className="text-sm font-medium text-gray-700">Текст</label>
+                      <span className="px-1.5 py-0.5 bg-blue-100 text-blue-700 text-xs rounded font-mono">
+                        {attrCurrentLocale.lang?.toUpperCase() || 'RU'}
+                      </span>
+                    </div>
+                    <textarea
+                      value={attrCurrentLocale.contentText || ''}
+                      onChange={e => updateAttrLocaleField('contentText', e.target.value)}
+                      rows={7}
+                      placeholder="Подробный текст-описание, история, интересные факты..."
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
+                    />
+                  </div>
+
+                  <div className="flex justify-end">
+                    <button
+                      onClick={saveCurrentAttr}
+                      disabled={attrSaving}
+                      className="px-5 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors"
+                    >
+                      {attrSaving ? 'Сохранение...' : 'Сохранить'}
+                    </button>
+                  </div>
                 </div>
               )}
             </div>
+          )}
+
+          {/* ─── Step 4: Контент ───────────────────────────────────────── */}
+          {currentStep === 4 && (
+            <div className="space-y-4">
+              <div>
+                <h2 className="text-lg font-semibold text-gray-900">Контент</h2>
+                <p className="text-sm text-gray-500">Генерация текстового контента для достопримечательностей с помощью ИИ</p>
+              </div>
+
+              {attractions.length === 0 ? (
+                <div className="py-8 text-center text-gray-400 text-sm border border-dashed border-gray-200 rounded-xl">
+                  Нет достопримечательностей. Добавьте их на шаге 3.
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {attractions.map(attr => {
+                    const name = getAttrName(attr);
+                    const hasContent = attr.contents && Object.values(attr.contents).some(Boolean);
+                    const isSelected = aiGenAttrId === attr.id;
+                    return (
+                      <div key={attr.id} className={`border rounded-xl p-4 transition-all ${isSelected ? 'border-blue-400 bg-blue-50' : 'border-gray-200 bg-white'}`}>
+                        <div className="flex items-center justify-between gap-3">
+                          <div>
+                            <p className="text-sm font-medium text-gray-900">{name}</p>
+                            {hasContent && (
+                              <p className="text-xs text-green-600 mt-0.5">✓ Контент заполнен</p>
+                            )}
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <select
+                              value={isSelected ? aiGenLang : 'ru'}
+                              onChange={e => { if (!isSelected) setAiGenLang(e.target.value); }}
+                              onClick={e => { setAiGenLang(e.target.value); setAiGenAttrId(attr.id); }}
+                              className="text-xs border border-gray-300 rounded-md px-2 py-1 focus:outline-none"
+                            >
+                              <option value="ru">RU</option>
+                              <option value="en">EN</option>
+                              <option value="it">IT</option>
+                            </select>
+                            <button
+                              onClick={() => startAiContent(attr.id, aiGenLang)}
+                              disabled={isSelected && !aiGenDone}
+                              className="px-3 py-1.5 text-xs font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 disabled:opacity-50 transition-colors"
+                            >
+                              {isSelected && !aiGenDone ? (
+                                <span className="flex items-center gap-1">
+                                  <span className="animate-spin inline-block w-3 h-3 border border-white border-t-transparent rounded-full" />
+                                  Генерация...
+                                </span>
+                              ) : '✨ Сгенерировать'}
+                            </button>
+                          </div>
+                        </div>
+
+                        {isSelected && (aiGenText || aiGenError) && (
+                          <div className="mt-3 space-y-2">
+                            {aiGenError && (
+                              <p className="text-xs text-red-600">{aiGenError}</p>
+                            )}
+                            {aiGenText && (
+                              <>
+                                <textarea
+                                  value={aiGenText}
+                                  onChange={e => setAiGenText(e.target.value)}
+                                  rows={6}
+                                  className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
+                                />
+                                {!aiGenDone && (
+                                  <div className="flex items-center gap-1.5 text-xs text-blue-500">
+                                    <span className="animate-pulse inline-block w-2 h-2 bg-blue-400 rounded-full" />
+                                    Генерация...
+                                  </div>
+                                )}
+                                {aiGenDone && (
+                                  <button
+                                    onClick={saveAiContent}
+                                    disabled={aiGenSaving}
+                                    className="px-4 py-1.5 text-xs font-medium text-white bg-green-600 rounded-md hover:bg-green-700 disabled:opacity-50 transition-colors"
+                                  >
+                                    {aiGenSaving ? 'Сохранение...' : '✓ Сохранить контент'}
+                                  </button>
+                                )}
+                              </>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+
+              <div className="flex justify-between pt-2">
+                <button onClick={() => goToStep(3)} className="px-4 py-2 text-sm text-gray-600 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors">
+                  ← Назад
+                </button>
+                <button onClick={() => goToStep(5)} className="px-5 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors">
+                  Далее: Публикация →
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* ─── Step 5: Публикация ────────────────────────────────────── */}
+          {currentStep === 5 && (
+            <div className="space-y-4">
+              <div>
+                <h2 className="text-lg font-semibold text-gray-900">Публикация</h2>
+                <p className="text-sm text-gray-500">Проверьте данные и опубликуйте сессию.</p>
+              </div>
+              {/* Summary */}
+              <div className="bg-gray-50 rounded-xl border border-gray-200 p-4 space-y-2 text-sm">
+                <div className="flex justify-between"><span className="text-gray-500">Сессия:</span><span className="font-medium">{session.name}</span></div>
+                <div className="flex justify-between"><span className="text-gray-500">Статус:</span><StatusBadge status={session.status} label={session.status_display} /></div>
+                <div className="flex justify-between"><span className="text-gray-500">Достопримечательности:</span><span className="font-medium">{attractions.length}</span></div>
+                <div className="flex justify-between"><span className="text-gray-500">Теги:</span><span className="font-medium">{cityTags.length > 0 ? cityTags.join(', ') : '—'}</span></div>
+              </div>
+              <div className="flex justify-between pt-2">
+                <button onClick={() => goToStep(4)} className="px-4 py-2 text-sm text-gray-600 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors">
+                  ← Назад
+                </button>
+                <button
+                  onClick={handlePublish}
+                  disabled={publishing}
+                  className="px-6 py-2 text-sm font-medium text-white bg-green-600 rounded-lg hover:bg-green-700 disabled:opacity-50 transition-colors"
+                >
+                  {publishing ? 'Публикация...' : '✓ Опубликовать город'}
+                </button>
+              </div>
+            </div>
+          )}
+        </main>
+      </div>
+
+      {/* ── Add locale modal ─────────────────────────────────────────────── */}
+      {addLocaleOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+          <div className="absolute inset-0 bg-black/40" onClick={() => setAddLocaleOpen(false)} />
+          <div className="relative bg-white rounded-xl shadow-xl p-6 w-80 space-y-4">
+            <h3 className="text-base font-semibold text-gray-900">Добавить адаптацию</h3>
+            <div>
+              <label className="block text-sm text-gray-600 mb-1">Код страны (2 буквы)</label>
+              <input
+                type="text"
+                maxLength={2}
+                value={newLocaleCode}
+                onChange={e => setNewLocaleCode(e.target.value.toUpperCase())}
+                placeholder="RU, US, DE..."
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+            <div>
+              <label className="block text-sm text-gray-600 mb-1">Название языка</label>
+              <input
+                type="text"
+                value={newLocaleLang}
+                onChange={e => setNewLocaleLang(e.target.value)}
+                placeholder="Немецкий, Испанский..."
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+            <div className="flex gap-2 justify-end">
+              <button onClick={() => setAddLocaleOpen(false)} className="px-4 py-2 text-sm text-gray-600 border border-gray-300 rounded-lg hover:bg-gray-50">
+                Отмена
+              </button>
+              <button onClick={addLocale} className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700">
+                Добавить
+              </button>
+            </div>
           </div>
         </div>
       )}
 
-      {/* Основной контент с сайдбаром */}
-      <div className="flex gap-6">
-        {/* Боковая панель со списком городов и достопримечательностей */}
-        {session && (
-          <SessionSidebar 
-            session={session} 
-            onCitySelect={setSelectedCity}
-            selectedCityId={selectedCity?.id}
-            onCitiesChange={(newCities) => {
-              if (newCities && Array.isArray(newCities)) {
-                setCities(newCities);
-              } else {
-                loadCities(session.id);
-              }
-            }}
-            initialCities={cities}
-          />
-        )}
-
-        {/* Основная область с визардом */}
-        <div className="flex-1">
-          <Wizard
-            steps={getSteps(session)}
-            currentStep={currentStep}
-            onStepChange={handleStepChange}
-            onNext={handleNext}
-            onPrevious={handlePrevious}
-            canGoNext={currentStep < getSteps(session).length}
-            canGoPrevious={currentStep > 1}
-          />
-
-          <div className="mt-8">
-            {renderStep()}
+      {/* ── Close session modal ──────────────────────────────────────────── */}
+      {closeOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+          <div className="absolute inset-0 bg-black/40" onClick={() => !closing && setCloseOpen(false)} />
+          <div className="relative bg-white rounded-xl shadow-xl p-6 w-96 space-y-4">
+            <h3 className="text-base font-semibold text-gray-900">Закрыть сессию</h3>
+            <p className="text-sm text-gray-600">
+              Сессия <span className="font-medium">«{session.name}»</span> будет закрыта. Выберите режим:
+            </p>
+            <div className="space-y-2">
+              {[
+                { mode: 'save', title: 'Сохранить', desc: 'Данные сессии сохранятся', cls: 'border-blue-500 bg-blue-50' },
+                { mode: 'discard', title: 'Отменить', desc: 'Данные сессии будут удалены без сохранения', cls: 'border-red-500 bg-red-50' },
+              ].map(opt => (
+                <label key={opt.mode} className={`flex items-start gap-3 p-3 rounded-lg border-2 cursor-pointer transition-colors ${closeMode === opt.mode ? opt.cls : 'border-gray-200 hover:border-gray-300'}`}>
+                  <input type="radio" name="closeMode" value={opt.mode} checked={closeMode === opt.mode} onChange={() => setCloseMode(opt.mode)} className="mt-0.5" />
+                  <div>
+                    <div className="text-sm font-medium text-gray-900">{opt.title}</div>
+                    <div className="text-xs text-gray-500">{opt.desc}</div>
+                  </div>
+                </label>
+              ))}
+            </div>
+            <div className="flex gap-2 justify-end">
+              <button onClick={() => setCloseOpen(false)} disabled={closing} className="px-4 py-2 text-sm text-gray-600 border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50">
+                Отмена
+              </button>
+              <button
+                onClick={handleClose}
+                disabled={closing}
+                className={`px-4 py-2 text-sm font-medium text-white rounded-lg disabled:opacity-50 transition-colors ${closeMode === 'discard' ? 'bg-red-600 hover:bg-red-700' : 'bg-blue-600 hover:bg-blue-700'}`}
+              >
+                {closing ? (
+                  <span className="flex items-center gap-1.5">
+                    <span className="animate-spin w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full" />
+                    Закрытие...
+                  </span>
+                ) : closeMode === 'discard' ? 'Закрыть без сохранения' : 'Закрыть с сохранением'}
+              </button>
+            </div>
           </div>
         </div>
-      </div>
+      )}
+
+      {/* Wikimedia Commons Image Picker */}
+      <CommonsImagePicker
+        isOpen={commonsModalOpen}
+        onClose={() => setCommonsModalOpen(false)}
+        onImageSelected={handleCommonsImageSelect}
+        getSessionUuid={getSessionUuid}
+        defaultQuery={localeData[activeLocale]?.name || ''}
+      />
     </Layout>
   );
 }
