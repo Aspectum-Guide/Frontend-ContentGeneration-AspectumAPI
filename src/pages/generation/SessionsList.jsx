@@ -5,10 +5,13 @@
  * Поиск, мультиселект для массового удаления, создание новой сессии.
  */
 import { useState, useEffect, useCallback, useMemo } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import Layout from '../../components/Layout';
 import Modal from '../../components/ui/Modal';
+import { useLayoutActions } from '../../context/LayoutActionsContext';
 import { sessionsAPI } from '../../api/generation';
+import { parseApiError } from '../../utils/apiError';
+import { trackEvent } from '../../utils/analytics';
 
 // ─── Status badge ──────────────────────────────────────────────────────────────
 const STATUS_MAP = {
@@ -43,6 +46,7 @@ function Notification({ note }) {
 
 // ─── Main component ────────────────────────────────────────────────────────────
 export default function SessionsList() {
+  const { setMobileActions } = useLayoutActions();
   const navigate = useNavigate();
 
   // State
@@ -85,7 +89,7 @@ export default function SessionsList() {
       setSessions(list);
       setSelected(new Set());
     } catch (err) {
-      setError(err?.response?.data?.error || err.message || 'Не удалось загрузить сессии');
+      setError(parseApiError(err, 'Не удалось загрузить сессии'));
     } finally {
       setLoading(false);
     }
@@ -95,6 +99,7 @@ export default function SessionsList() {
 
   // ─── Create session ───────────────────────────────────────────────────────
   const handleCreate = async () => {
+    trackEvent('create_session_requested', { source: 'sessions_list' });
     setCreating(true);
     setCreateError(null);
     try {
@@ -102,17 +107,29 @@ export default function SessionsList() {
       const data = res?.data;
       const sessionId = data?.session?.id || data?.session?.uuid || data?.id;
       if (sessionId) {
+        trackEvent('create_session_success', { source: 'sessions_list', sessionId: String(sessionId) });
         navigate(`/generation/${sessionId}`);
       } else {
         setCreateError('Сессия создана, но не удалось получить ID. Обновите страницу.');
         await loadSessions();
       }
     } catch (err) {
-      setCreateError(err?.response?.data?.error || err.message || 'Ошибка создания сессии');
+      trackEvent('create_session_fail', { source: 'sessions_list', reason: parseApiError(err, 'Ошибка создания') });
+      setCreateError(parseApiError(err, 'Ошибка создания сессии'));
     } finally {
       setCreating(false);
     }
   };
+
+  const openSession = useCallback((item, source = 'row') => {
+    if (!item?.id) return;
+    trackEvent('open_session', {
+      sessionId: String(item.id),
+      status: item.status || 'unknown',
+      source,
+    });
+    navigate(`/generation/${item.id}`);
+  }, [navigate]);
 
   // ─── Close session ────────────────────────────────────────────────────────
   const handleClose = async () => {
@@ -124,7 +141,7 @@ export default function SessionsList() {
       showNote('Сессия закрыта', 'success');
       await loadSessions();
     } catch (err) {
-      showNote(err?.response?.data?.error || 'Ошибка закрытия сессии', 'error');
+      showNote(parseApiError(err, 'Ошибка закрытия сессии'), 'error');
     } finally {
       setClosing(false);
     }
@@ -140,7 +157,7 @@ export default function SessionsList() {
       showNote('Сессия удалена', 'success');
       await loadSessions();
     } catch (err) {
-      showNote(err?.response?.data?.error || 'Ошибка удаления', 'error');
+      showNote(parseApiError(err, 'Ошибка удаления'), 'error');
     } finally {
       setDeleting(false);
     }
@@ -190,28 +207,59 @@ export default function SessionsList() {
 
   const allSelected = filtered.length > 0 && selected.size === filtered.length;
 
+  useEffect(() => {
+    setMobileActions([
+      {
+        id: 'create-session',
+        label: creating ? 'Создание...' : 'Создать сессию',
+        onClick: () => {
+          if (!creating) handleCreate();
+        },
+        disabled: creating,
+        variant: 'primary',
+      },
+      {
+        id: 'refresh-sessions',
+        label: 'Обновить список',
+        onClick: () => loadSessions(),
+      },
+    ]);
+
+    return () => setMobileActions([]);
+  }, [setMobileActions, creating, loadSessions]);
+
   return (
-    <Layout>
+    <Layout
+      pageHeader={{
+        title: 'Сессии генерации',
+        description: 'Каждая сессия — один рабочий цикл создания контента',
+        actions: [
+          {
+            id: 'create-session-header',
+            label: creating ? 'Создание...' : '+ Новая сессия',
+            onClick: () => {
+              if (!creating) handleCreate();
+            },
+            disabled: creating,
+            variant: 'primary',
+          },
+        ],
+      }}
+      pageHeaderMode="desktop"
+    >
       <Notification note={note} />
 
-      {/* ── Header ───────────────────────────────────────────────────────── */}
-      <div className="flex items-center justify-between mb-5">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Сессии генерации</h1>
-          <p className="mt-0.5 text-sm text-gray-500">Каждая сессия — один рабочий цикл создания контента</p>
+      {(creating || bulkDeleting || deleting || closing) && (
+        <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg text-sm text-blue-800 flex items-center gap-2">
+          <span className="animate-spin w-4 h-4 border-2 border-blue-500 border-t-transparent rounded-full" />
+          <span>
+            {creating && 'Создаем новую сессию...'}
+            {bulkDeleting && 'Удаляем выбранные сессии...'}
+            {deleting && 'Удаляем сессию...'}
+            {closing && 'Закрываем сессию...'}
+          </span>
         </div>
-        <button
-          onClick={handleCreate}
-          disabled={creating}
-          className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-60 transition-colors"
-        >
-          {creating ? (
-            <><span className="animate-spin w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full" />Создание...</>
-          ) : (
-            <>+ Новая сессия</>
-          )}
-        </button>
-      </div>
+      )}
 
       {/* Create error */}
       {createError && (
@@ -311,7 +359,7 @@ export default function SessionsList() {
               ) : filtered.map(s => (
                 <tr
                   key={s.id}
-                  onClick={() => navigate(`/generation/${s.id}`)}
+                  onClick={() => openSession(s, 'row')}
                   className="hover:bg-blue-50 cursor-pointer transition-colors group"
                 >
                   <td className="w-10 px-3 py-2.5" onClick={e => e.stopPropagation()}>
@@ -344,13 +392,14 @@ export default function SessionsList() {
                     {s.creator_name || '—'}
                   </td>
                   <td className="px-3 py-2.5 text-right" onClick={e => e.stopPropagation()}>
-                    <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                      <Link
-                        to={`/generation/${s.id}`}
+                    <div className="flex items-center justify-end gap-1 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
+                      <button
+                        type="button"
+                        onClick={() => openSession(s, 'action')}
                         className="px-2.5 py-1 text-xs font-medium text-blue-600 bg-blue-50 rounded-md hover:bg-blue-100 transition-colors"
                       >
                         Открыть
-                      </Link>
+                      </button>
                       {isActive(s) && (
                         <button
                           onClick={() => { setCloseMode('save'); setCloseTarget(s); }}

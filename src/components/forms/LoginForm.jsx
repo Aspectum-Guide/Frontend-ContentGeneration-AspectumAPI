@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import TokenManager from '../../utils/TokenManager';
 
 export default function LoginForm() {
   const [email, setEmail] = useState('');
@@ -32,8 +33,21 @@ export default function LoginForm() {
       }
 
       const data = await response.json();
-      localStorage.setItem('access_token', data.access);
-      localStorage.setItem('refresh_token', data.refresh);
+      if (!data?.access || !data?.refresh) {
+        setError('Сервер вернул некорректные токены');
+        return;
+      }
+
+      // Unified auth storage: TokenManager (`jwt_tokens`)
+      TokenManager.saveTokens({
+        access: data.access,
+        refresh: data.refresh,
+        expiresAt: Date.now() + 3600000, // ~1 час
+      });
+
+      // Cleanup legacy keys (if any)
+      localStorage.removeItem('access_token');
+      localStorage.removeItem('refresh_token');
       
       navigate('/generation');
     } catch (err) {

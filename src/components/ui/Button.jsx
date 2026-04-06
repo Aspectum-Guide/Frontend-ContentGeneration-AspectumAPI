@@ -7,7 +7,7 @@ export default function Button({
   className = '',
   ...props 
 }) {
-  const baseClasses = 'px-4 py-2 rounded-md font-medium transition-colors';
+  const baseClasses = 'inline-flex items-center justify-center px-4 py-2 rounded-md font-medium transition-colors min-h-[44px] text-base sm:text-sm';
   
   const variants = {
     primary: 'bg-blue-600 text-white hover:bg-blue-700 disabled:bg-gray-400',

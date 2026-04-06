@@ -22,14 +22,16 @@ import ExportZip from './pages/export/ExportZip';
 import ExportCities from './pages/export/ExportCities';
 import ExportEvents from './pages/export/ExportEvents';
 import ImportGoogleSheet from './pages/import/ImportGoogleSheet';
+import { LayoutActionsProvider } from './context/LayoutActionsContext';
 
 // TODO: Включить маршрут входа когда будет готов
 const ENABLE_LOGIN = false;
 
 function App() {
   return (
-    <BrowserRouter>
-      <Routes>
+    <LayoutActionsProvider>
+      <BrowserRouter>
+        <Routes>
         {/* Страница ввода токена */}
         <Route path="/token-auth" element={<TokenAuth />} />
         
@@ -67,8 +69,9 @@ function App() {
         <Route path="/export/cities" element={<ProtectedRoute><ExportCities /></ProtectedRoute>} />
         <Route path="/export/events" element={<ProtectedRoute><ExportEvents /></ProtectedRoute>} />
         <Route path="/import/google-sheet" element={<ProtectedRoute><ImportGoogleSheet /></ProtectedRoute>} />
-      </Routes>
-    </BrowserRouter>
+        </Routes>
+      </BrowserRouter>
+    </LayoutActionsProvider>
   );
 }
 

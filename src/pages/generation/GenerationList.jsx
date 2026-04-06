@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import Layout from '../../components/Layout';
 import Button from '../../components/ui/Button';
 import { sessionsAPI } from '../../api/generation';
+import { parseApiError } from '../../utils/apiError';
 
 export default function GenerationList() {
   const [sessions, setSessions] = useState([]);
@@ -43,7 +44,7 @@ export default function GenerationList() {
       console.error('  Status:', err.response?.status);
       console.error('  Data:', err.response?.data);
       
-      setError(err?.response?.data?.error || err.message || 'Не удалось загрузить сессии');
+      setError(parseApiError(err, 'Не удалось загрузить сессии'));
     } finally {
       setLoading(false);
     }

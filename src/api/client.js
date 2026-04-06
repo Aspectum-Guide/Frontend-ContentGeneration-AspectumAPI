@@ -3,10 +3,13 @@ import TokenManager from '../utils/TokenManager';
 
 // Определяем базовый URL для API
 // В Vite переменные окружения доступны через import.meta.env
-// Используем VITE_API_URL или адрес API сервера по умолчанию
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'https://dev2.aspectum-guide.com/api/v1';
+// Используем VITE_API_URL или dev-proxy '/api'
+const API_BASE_URL = import.meta.env.VITE_API_URL || '/api';
+const IS_DEV = import.meta.env.DEV;
 
-console.log('🔧 API Client initialized with baseURL:', API_BASE_URL);
+if (IS_DEV) {
+  console.log('🔧 API Client initialized with baseURL:', API_BASE_URL);
+}
 
 // Создаем экземпляр axios с базовой конфигурацией
 const apiClient = axios.create({
@@ -95,12 +98,14 @@ apiClient.interceptors.request.use(
       }
     }
     
-    console.log('📤 API Request:', {
-      method: config.method.toUpperCase(),
-      url: config.baseURL + config.url,
-      hasToken: !!tokens?.access,
-      hasCsrf: !!config.headers['X-CSRFToken'],
-    });
+    if (IS_DEV) {
+      console.log('📤 API Request:', {
+        method: config.method.toUpperCase(),
+        url: config.baseURL + config.url,
+        hasToken: !!tokens?.access,
+        hasCsrf: !!config.headers['X-CSRFToken'],
+      });
+    }
     return config;
   },
   (error) => {
@@ -111,22 +116,26 @@ apiClient.interceptors.request.use(
 // Интерсептор для обработки ошибок и автоматического обновления токена
 apiClient.interceptors.response.use(
   (response) => {
-    console.log('📥 API Response:', {
-      status: response.status,
-      url: response.config.baseURL + response.config.url,
-      data: response.data,
-    });
+    if (IS_DEV) {
+      console.log('📥 API Response:', {
+        status: response.status,
+        url: response.config.baseURL + response.config.url,
+        data: response.data,
+      });
+    }
     return response;
   },
   async (error) => {
     const config = error.config;
     
-    console.error('❌ API Error:', {
-      status: error.response?.status,
-      url: config?.url,
-      message: error.message,
-      retry: config?._retry,
-    });
+    if (IS_DEV) {
+      console.error('❌ API Error:', {
+        status: error.response?.status,
+        url: config?.url,
+        message: error.message,
+        retry: config?._retry,
+      });
+    }
 
     // Обработка 401 ошибки - попытка обновить токен и повторить запрос
     if (
@@ -159,19 +168,29 @@ apiClient.interceptors.response.use(
         } else {
           console.log('❌ [APIClient] Token refresh failed:', refreshResult.error);
 
-          // Если refresh токен истек, перенаправляем на страницу входа
-          if (refreshResult.isExpired) {
+          // Разлогиниваем только при аутентификационной ошибке refresh токена.
+          if (refreshResult.isAuthError || refreshResult.isExpired) {
             console.log('🔥 [APIClient] Clearing tokens due to expired refresh');
             TokenManager.clearTokens();
-            window.location.href = '/token-auth';
+            window.location.replace('/token-auth');
+            return Promise.reject(error);
+          }
+
+          // Временные сетевые/инфраструктурные ошибки не должны убивать сессию.
+          if (refreshResult.isTransient) {
+            console.warn('⚠️ [APIClient] Refresh failed due to transient error, keeping session');
+            return Promise.reject(error);
           }
 
           throw new Error(refreshResult.error || 'Token refresh failed');
         }
       } catch (refreshError) {
         console.error('❌ [APIClient] Token refresh error:', refreshError);
-        TokenManager.clearTokens();
-        window.location.href = '/token-auth';
+        // Сбрасываем сессию только если refresh действительно невалиден/просрочен.
+        if (refreshError?.isAuthError || refreshError?.isExpired) {
+          TokenManager.clearTokens();
+          window.location.replace('/token-auth');
+        }
         return Promise.reject(refreshError);
       }
     }
@@ -180,7 +199,7 @@ apiClient.interceptors.response.use(
     if (error.response?.status === 401 && config?.url?.includes('/auth/token/refresh')) {
       console.log('🚨 [APIClient] 401 from refresh endpoint - forcing logout');
       TokenManager.clearTokens();
-      window.location.href = '/token-auth';
+      window.location.replace('/token-auth');
     }
 
     return Promise.reject(error);

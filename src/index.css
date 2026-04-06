@@ -16,3 +16,18 @@ body {
 #root {
   min-height: 100vh;
 }
+
+@media (max-width: 640px) {
+  input,
+  select,
+  textarea,
+  button {
+    font-size: 16px;
+  }
+
+  input,
+  select,
+  button {
+    min-height: 44px;
+  }
+}

@@ -99,8 +99,40 @@ export default function DataTable({
           <p className="text-gray-500 text-sm">{emptyText}</p>
         </div>
       ) : (
-        <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-          <div className="overflow-x-auto">
+        <>
+          <div className="md:hidden space-y-3">
+            {rows.map((row, idx) => (
+              <div
+                key={row.id ?? idx}
+                className={`bg-white rounded-xl border border-gray-200 p-3 ${onRowClick ? 'cursor-pointer' : ''}`}
+                onClick={onRowClick ? () => onRowClick(row) : undefined}
+              >
+                <div className="space-y-2">
+                  {columns.map((col, cidx) => (
+                    <div key={col.key} className="grid grid-cols-[110px_1fr] gap-2 items-start">
+                      <div className="text-[11px] uppercase tracking-wide text-gray-400 font-semibold pt-0.5">
+                        {col.label}
+                      </div>
+                      <div className={`text-sm text-gray-800 min-w-0 ${cidx === 0 ? 'font-medium text-gray-900' : ''}`}>
+                        {col.render ? col.render(row[col.key], row) : (row[col.key] ?? '—')}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                {actions && (
+                  <div
+                    className="mt-3 pt-3 border-t border-gray-100 flex flex-wrap gap-2"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    {actions(row)}
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+
+          <div className="hidden md:block bg-white rounded-xl border border-gray-200 overflow-hidden">
+            <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
                 <tr className="bg-gray-50 border-b border-gray-200 text-xs text-gray-500 uppercase tracking-wide">
@@ -138,27 +170,29 @@ export default function DataTable({
                 ))}
               </tbody>
             </table>
-          </div>
-
-          {/* Пагинация */}
-          {showPagination && (
-            <div className="flex items-center justify-between px-4 py-3 border-t border-gray-100 bg-gray-50">
-              <span className="text-xs text-gray-500">
-                {(page - 1) * pageSize + 1}–{Math.min(page * pageSize, totalCount)} из {totalCount}
-              </span>
-              <div className="flex items-center gap-1">
-                <PageBtn disabled={page <= 1} onClick={() => onPage(page - 1)}>←</PageBtn>
-                {buildPageRange(page, totalPages).map((p, i) =>
-                  p === '...' ? (
-                    <span key={`ellipsis-${i}`} className="px-2 text-gray-400 text-xs">…</span>
-                  ) : (
-                    <PageBtn key={p} active={p === page} onClick={() => onPage(p)}>{p}</PageBtn>
-                  )
-                )}
-                <PageBtn disabled={page >= totalPages} onClick={() => onPage(page + 1)}>→</PageBtn>
-              </div>
             </div>
-          )}
+
+          </div>
+        </>
+      )}
+
+      {/* Пагинация */}
+      {showPagination && !loading && rows.length > 0 && (
+        <div className="mt-3 flex flex-wrap items-center justify-between gap-2 px-4 py-3 border border-gray-200 rounded-xl bg-white">
+          <span className="text-xs text-gray-500">
+            {(page - 1) * pageSize + 1}–{Math.min(page * pageSize, totalCount)} из {totalCount}
+          </span>
+          <div className="flex items-center gap-1">
+            <PageBtn disabled={page <= 1} onClick={() => onPage(page - 1)}>←</PageBtn>
+            {buildPageRange(page, totalPages).map((p, i) =>
+              p === '...' ? (
+                <span key={`ellipsis-${i}`} className="px-2 text-gray-400 text-xs">…</span>
+              ) : (
+                <PageBtn key={p} active={p === page} onClick={() => onPage(p)}>{p}</PageBtn>
+              )
+            )}
+            <PageBtn disabled={page >= totalPages} onClick={() => onPage(page + 1)}>→</PageBtn>
+          </div>
         </div>
       )}
     </div>

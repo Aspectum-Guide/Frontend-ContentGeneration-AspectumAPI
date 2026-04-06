@@ -14,6 +14,7 @@ class TokenManager {
     this.refreshQueue = [];
     this.lastRefreshTime = 0;
     this.REFRESH_COOLDOWN = 1000; // 1 second between refresh attempts
+    this.REFRESH_TIMEOUT_MS = 10000;
   }
 
   /**
@@ -154,8 +155,8 @@ class TokenManager {
   async refreshTokens(refreshToken) {
     // If already refreshing, queue this request
     if (this.isRefreshing && this.refreshPromise) {
-      return new Promise((resolve, reject) => {
-        this.refreshQueue.push({ resolve, reject });
+      return new Promise((resolve) => {
+        this.refreshQueue.push({ resolve });
       });
     }
 
@@ -165,6 +166,7 @@ class TokenManager {
       return {
         success: false,
         error: 'Refresh cooldown active',
+        isTransient: true,
       };
     }
 
@@ -181,9 +183,10 @@ class TokenManager {
       const errorResult = {
         success: false,
         error: error instanceof Error ? error.message : 'Unknown error',
+        isTransient: true,
       };
       this.processQueue(errorResult);
-      throw error;
+      return errorResult;
     } finally {
       this.isRefreshing = false;
       this.refreshPromise = null;
@@ -194,12 +197,8 @@ class TokenManager {
    * Process queued refresh requests
    */
   processQueue(result) {
-    this.refreshQueue.forEach(({ resolve, reject }) => {
-      if (result.success) {
-        resolve(result);
-      } else {
-        reject(new Error(result.error));
-      }
+    this.refreshQueue.forEach(({ resolve }) => {
+      resolve(result);
     });
     this.refreshQueue = [];
   }
@@ -216,14 +215,17 @@ class TokenManager {
           success: false,
           error: 'Refresh token is invalid',
           isExpired: refreshValidation.isExpired,
+          isAuthError: true,
         };
       }
 
       // Get API URL from environment
-      const apiUrl = import.meta.env.VITE_API_URL || 'https://dev2.aspectum-guide.com/api/v1';
+      const apiUrl = import.meta.env.VITE_API_URL || '/api';
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), this.REFRESH_TIMEOUT_MS);
 
       // Call refresh endpoint
-      const response = await fetch(`${apiUrl}/auth/token/refresh`, {
+      const response = await fetch(`${apiUrl}/auth/token/refresh/`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -231,6 +233,9 @@ class TokenManager {
         body: JSON.stringify({
           refresh: refreshToken,
         }),
+        signal: controller.signal,
+      }).finally(() => {
+        clearTimeout(timeoutId);
       });
 
       if (!response.ok) {
@@ -239,6 +244,14 @@ class TokenManager {
             success: false,
             error: 'Refresh token expired',
             isExpired: true,
+            isAuthError: true,
+          };
+        }
+        if (response.status === 400 || response.status === 403) {
+          return {
+            success: false,
+            error: `Refresh rejected: HTTP ${response.status}`,
+            isAuthError: true,
           };
         }
         throw new Error(`HTTP ${response.status}: ${response.statusText}`);
@@ -251,6 +264,7 @@ class TokenManager {
         return {
           success: false,
           error: 'Invalid response format',
+          isAuthError: true,
         };
       }
 
@@ -261,6 +275,7 @@ class TokenManager {
         return {
           success: false,
           error: 'New access token is invalid',
+          isAuthError: true,
         };
       }
 
@@ -277,9 +292,11 @@ class TokenManager {
       return { success: true, data: newTokens };
     } catch (error) {
       console.error('[TokenManager] Refresh failed:', error);
+      const isTimeout = error?.name === 'AbortError';
       return {
         success: false,
-        error: error instanceof Error ? error.message : 'Unknown error',
+        error: isTimeout ? 'Refresh request timeout' : (error instanceof Error ? error.message : 'Unknown error'),
+        isTransient: true,
       };
     }
   }

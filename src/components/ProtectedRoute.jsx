@@ -12,8 +12,9 @@ export default function ProtectedRoute({ children }) {
   // Проверяем что access токен еще действителен
   const validation = TokenManager.validateToken(tokens.access);
   if (!validation.isValid) {
-    // Если истек, но есть refresh токен - это ок, интерцептор обновит
-    if (!tokens.refresh) {
+    const refreshValidation = TokenManager.validateToken(tokens.refresh);
+    // Пропускаем только если refresh токен действительно валиден.
+    if (!refreshValidation.isValid) {
       return <Navigate to="/token-auth" replace />;
     }
   }

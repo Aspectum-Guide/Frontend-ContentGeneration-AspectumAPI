@@ -15,7 +15,10 @@ import { useParams, useNavigate } from 'react-router-dom';
 import 'leaflet/dist/leaflet.css';
 import Layout from '../../components/Layout';
 import CommonsImagePicker from '../../components/generation/CommonsImagePicker';
+import { useLayoutActions } from '../../context/LayoutActionsContext';
 import { sessionsAPI, attractionsAPI, cityFiltersAPI, imagesAPI, aiAPI } from '../../api/generation';
+import { parseApiError } from '../../utils/apiError';
+import { trackEvent } from '../../utils/analytics';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 const TOTAL_STEPS = 5;
@@ -156,6 +159,7 @@ function LocalePills({ localeData, activeLocale, defaultLocale, onSwitch, onSetD
 
 // ─── Main component ───────────────────────────────────────────────────────────
 export default function SessionWizard() {
+  const { setMobileActions } = useLayoutActions();
   const { sessionId } = useParams();
   const navigate = useNavigate();
 
@@ -225,6 +229,8 @@ export default function SessionWizard() {
   const [closeMode, setCloseMode] = useState('save');
   const [closing, setClosing] = useState(false);
   const [publishing, setPublishing] = useState(false);
+  const sessionOpenedAtRef = useRef(null);
+  const firstCitySaveAtRef = useRef(null);
 
   // ── Map ───────────────────────────────────────────────────────────────────
   const mapRef = useRef(null);
@@ -242,6 +248,14 @@ export default function SessionWizard() {
       const data = res?.data;
       console.log('Session loaded:', data);
       setSession(data);
+      if (!sessionOpenedAtRef.current) {
+        sessionOpenedAtRef.current = Date.now();
+        trackEvent('open_session', {
+          source: 'session_wizard',
+          sessionId: String(sessionId),
+          status: data?.status || 'unknown',
+        });
+      }
       if (data?.city) {
         console.log('City data found:', data.city);
         loadCityIntoForm(data.city);
@@ -251,7 +265,7 @@ export default function SessionWizard() {
       if (Array.isArray(data?.attractions)) setAttractions(data.attractions);
     } catch (err) {
       console.error('Failed to load session:', err);
-      showNote('Не удалось загрузить сессию: ' + (err?.response?.data?.error || err.message), 'error');
+      showNote('Не удалось загрузить сессию: ' + parseApiError(err, 'Ошибка загрузки'), 'error');
       navigate('/generation');
     } finally {
       setLoading(false);
@@ -502,9 +516,28 @@ export default function SessionWizard() {
       if (data?.status) {
         setSession(prev => prev ? { ...prev, status: data.status, status_display: data.status_display } : prev);
       }
+
+      if (!firstCitySaveAtRef.current) {
+        firstCitySaveAtRef.current = Date.now();
+        trackEvent('save_city_success', {
+          sessionId: String(sessionId),
+          firstSave: true,
+          msFromOpen: sessionOpenedAtRef.current ? (firstCitySaveAtRef.current - sessionOpenedAtRef.current) : null,
+        });
+      } else {
+        trackEvent('save_city_success', {
+          sessionId: String(sessionId),
+          firstSave: false,
+        });
+      }
+
       return data;
     } catch (err) {
-      showNote('Ошибка при сохранении города: ' + (err?.response?.data?.error || err.message), 'error');
+      trackEvent('save_city_fail', {
+        sessionId: String(sessionId),
+        reason: parseApiError(err, 'Ошибка сохранения'),
+      });
+      showNote('Ошибка при сохранении города: ' + parseApiError(err, 'Ошибка сохранения'), 'error');
       throw err;
     } finally {
       setSaving(false);
@@ -595,7 +628,7 @@ export default function SessionWizard() {
         showNote('Изображение загружено', 'success');
       }
     } catch (err) {
-      showNote('Ошибка загрузки: ' + (err?.response?.data?.error || err.message), 'error');
+      showNote('Ошибка загрузки: ' + parseApiError(err, 'Ошибка загрузки'), 'error');
     } finally {
       setPhotoUploading(false);
     }
@@ -783,7 +816,7 @@ export default function SessionWizard() {
         }
       }, 1500);
     } catch (e) {
-      setAiGenError(e?.response?.data?.error || e.message || 'Ошибка запуска');
+      setAiGenError(parseApiError(e, 'Ошибка запуска'));
     }
   }, [attractions, localeData]);
 
@@ -799,7 +832,7 @@ export default function SessionWizard() {
       }));
       showNote('Контент сохранён', 'success');
     } catch (e) {
-      showNote('Ошибка сохранения: ' + (e?.response?.data?.error || e.message), 'error');
+      showNote('Ошибка сохранения: ' + parseApiError(e, 'Ошибка сохранения'), 'error');
     } finally {
       setAiGenSaving(false);
     }
@@ -812,10 +845,21 @@ export default function SessionWizard() {
     setClosing(true);
     try {
       await sessionsAPI.close(sessionId, closeMode);
+      trackEvent('close_session_mode', {
+        sessionId: String(sessionId),
+        mode: closeMode,
+        result: 'success',
+      });
       setCloseOpen(false);
       navigate('/generation');
     } catch (err) {
-      showNote(err?.response?.data?.error || 'Ошибка закрытия сессии', 'error');
+      trackEvent('close_session_mode', {
+        sessionId: String(sessionId),
+        mode: closeMode,
+        result: 'fail',
+        reason: parseApiError(err, 'Ошибка закрытия'),
+      });
+      showNote(parseApiError(err, 'Ошибка закрытия сессии'), 'error');
     } finally {
       setClosing(false);
     }
@@ -829,20 +873,71 @@ export default function SessionWizard() {
     setPublishing(true);
     try {
       const res = await sessionsAPI.publish(sessionId);
+      trackEvent('publish_session_success', {
+        sessionId: String(sessionId),
+        msFromOpen: sessionOpenedAtRef.current ? (Date.now() - sessionOpenedAtRef.current) : null,
+        msFromFirstSave: firstCitySaveAtRef.current ? (Date.now() - firstCitySaveAtRef.current) : null,
+      });
       showNote(res?.data?.message || 'Сессия опубликована', 'success');
       await loadSession();
     } catch (err) {
-      showNote(err?.response?.data?.error || err?.response?.data?.message || 'Ошибка публикации', 'error');
+      trackEvent('publish_session_fail', {
+        sessionId: String(sessionId),
+        reason: parseApiError(err, 'Ошибка публикации'),
+      });
+      showNote(parseApiError(err, 'Ошибка публикации'), 'error');
     } finally {
       setPublishing(false);
     }
   }, [sessionId, loadSession, showNote]);
 
+  const isCorrectionMode = session?.closed_with_save === true;
+  const isActive = session?.status === 'draft' || session?.status === 'in_progress';
+
+  useEffect(() => {
+    const actions = [
+      {
+        id: 'save-city-data',
+        label: saving ? 'Сохранение...' : 'Сохранить город',
+        onClick: () => {
+          if (!saving) saveCityForStep1();
+        },
+        disabled: saving,
+        variant: 'primary',
+      },
+    ];
+
+    if (!isCorrectionMode) {
+      actions.push({
+        id: 'publish-session',
+        label: publishing ? 'Публикация...' : 'Опубликовать сессию',
+        onClick: () => {
+          if (!publishing) handlePublish();
+        },
+        disabled: publishing,
+      });
+    }
+
+    if (isActive) {
+      actions.push({
+        id: 'close-session',
+        label: 'Закрыть сессию',
+        onClick: () => {
+          setCloseMode('save');
+          setCloseOpen(true);
+        },
+        variant: 'danger',
+      });
+    }
+
+    setMobileActions(actions);
+
+    return () => setMobileActions([]);
+  }, [setMobileActions, saving, publishing, saveCityForStep1, handlePublish, isCorrectionMode, isActive]);
+
   // ─────────────────────────────────────────────────────────────────────────
   // Render
   // ─────────────────────────────────────────────────────────────────────────
-  const isCorrectionMode = session?.closed_with_save === true;
-  const isActive = session?.status === 'draft' || session?.status === 'in_progress';
   const currentLocale = localeData[activeLocale] || {};
   const attrCurrentLocale = attrLocaleData[attrActiveLocale] || {};
 
@@ -871,6 +966,19 @@ export default function SessionWizard() {
     <Layout>
       <Notification note={note} />
 
+      {(saving || publishing || closing || photoUploading || aiGenSaving) && (
+        <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg text-sm text-blue-800 flex items-center gap-2">
+          <span className="animate-spin w-4 h-4 border-2 border-blue-500 border-t-transparent rounded-full" />
+          <span>
+            {saving && 'Сохраняем данные города...'}
+            {publishing && 'Публикуем сессию...'}
+            {closing && 'Закрываем сессию...'}
+            {photoUploading && 'Загружаем изображение...'}
+            {aiGenSaving && 'Сохраняем AI-контент...'}
+          </span>
+        </div>
+      )}
+
       {/* ── Header bar ───────────────────────────────────────────────────── */}
       <div className="flex items-start justify-between gap-4 mb-5 pb-4 border-b border-gray-200">
         <div>
@@ -894,32 +1002,14 @@ export default function SessionWizard() {
           >
             ← Назад
           </button>
-          {!isCorrectionMode && (
-            <button
-              onClick={handlePublish}
-              disabled={publishing}
-              className="px-3 py-1.5 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors"
-            >
-              {publishing ? '...' : 'Опубликовать всю сессию'}
-            </button>
-          )}
           <button
             onClick={() => saveCityForStep1()}
             disabled={saving}
             title={isCorrectionMode ? 'Сохранить корректировки' : 'Сохранить'}
-            className="w-8 h-8 flex items-center justify-center text-gray-500 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 transition-colors"
+            className="px-3 py-1.5 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors"
           >
-            {saving ? <span className="animate-spin w-3.5 h-3.5 border-2 border-gray-400 border-t-transparent rounded-full" /> : '💾'}
+            {saving ? 'Сохранение...' : (isCorrectionMode ? 'Сохранить корректировки' : 'Сохранить город')}
           </button>
-          {isActive && (
-            <button
-              onClick={() => { setCloseMode('save'); setCloseOpen(true); }}
-              title="Закрыть сессию"
-              className="w-8 h-8 flex items-center justify-center text-gray-500 bg-white border border-gray-300 rounded-lg hover:bg-red-50 hover:border-red-300 hover:text-red-500 transition-colors"
-            >
-              ✕
-            </button>
-          )}
         </div>
       </div>
 

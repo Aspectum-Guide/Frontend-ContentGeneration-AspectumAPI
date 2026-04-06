@@ -29,7 +29,7 @@ export function TextInput({ className = '', ...props }) {
   return (
     <input
       {...props}
-      className={`w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none disabled:bg-gray-50 disabled:text-gray-500 ${className}`}
+      className={`w-full px-3 py-2 border border-gray-300 rounded-lg text-base sm:text-sm min-h-[44px] focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none disabled:bg-gray-50 disabled:text-gray-500 ${className}`}
     />
   );
 }
@@ -40,7 +40,7 @@ export function Textarea({ className = '', rows = 3, ...props }) {
     <textarea
       rows={rows}
       {...props}
-      className={`w-full px-3 py-2 border border-gray-300 rounded-lg text-sm resize-none focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none disabled:bg-gray-50 ${className}`}
+      className={`w-full px-3 py-2 border border-gray-300 rounded-lg text-base sm:text-sm resize-none focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none disabled:bg-gray-50 ${className}`}
     />
   );
 }
@@ -50,7 +50,7 @@ export function Select({ className = '', children, ...props }) {
   return (
     <select
       {...props}
-      className={`w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none disabled:bg-gray-50 ${className}`}
+      className={`w-full px-3 py-2 border border-gray-300 rounded-lg text-base sm:text-sm min-h-[44px] focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none disabled:bg-gray-50 ${className}`}
     >
       {children}
     </select>
@@ -92,8 +92,8 @@ export function MultiLangField({
         </label>
       )}
       {langs.map((lang) => (
-        <div key={lang} className="flex gap-2 items-start">
-          <span className="shrink-0 w-8 mt-2 text-xs font-semibold text-gray-400 uppercase">
+        <div key={lang} className="flex flex-col sm:flex-row gap-2 sm:items-start">
+          <span className="shrink-0 w-fit sm:w-8 mt-1 sm:mt-2 text-xs font-semibold text-gray-400 uppercase">
             {lang}
           </span>
           {multiline ? (
@@ -129,12 +129,12 @@ export function FormActions({ onSave, onCancel, saving, saveLabel = 'Сохра�
   }[saveVariant] || 'bg-blue-600 text-white hover:bg-blue-700';
 
   return (
-    <div className="flex gap-3 pt-2">
+    <div className="flex flex-col sm:flex-row gap-3 pt-2">
       <button
         type={onSave ? 'button' : 'submit'}
         onClick={onSave}
         disabled={saving}
-        className={`flex-1 py-2.5 text-sm font-medium rounded-lg transition-colors disabled:opacity-50 ${saveClass}`}
+        className={`flex-1 min-h-[44px] py-2.5 text-base sm:text-sm font-medium rounded-lg transition-colors disabled:opacity-50 ${saveClass}`}
       >
         {saving ? (
           <span className="flex items-center justify-center gap-2">
@@ -148,7 +148,7 @@ export function FormActions({ onSave, onCancel, saving, saveLabel = 'Сохра�
           type="button"
           onClick={onCancel}
           disabled={saving}
-          className="flex-1 py-2.5 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors disabled:opacity-50"
+          className="flex-1 min-h-[44px] py-2.5 text-base sm:text-sm font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors disabled:opacity-50"
         >
           {cancelLabel}
         </button>

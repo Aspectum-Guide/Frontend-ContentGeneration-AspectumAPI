@@ -4,7 +4,9 @@ import DataTable from '../../components/ui/DataTable';
 import Modal from '../../components/ui/Modal';
 import { ConfirmModal } from '../../components/ui/Modal';
 import { Field, TextInput, Textarea, FormActions } from '../../components/ui/FormField';
+import { useLayoutActions } from '../../context/LayoutActionsContext';
 import { eventsAPI, citiesAPI, eventFiltersAPI } from '../../api/generation';
+import { parseApiError } from '../../utils/apiError';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 function getMultiLang(val) {
@@ -80,6 +82,7 @@ function LangBlock({ label, value = {}, onChange, activeLang, multiline = false,
 
 // ─── Main component ───────────────────────────────────────────────────────────
 export default function EventsCatalog() {
+  const { setMobileActions } = useLayoutActions();
   const [events, setEvents] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -124,7 +127,7 @@ export default function EventsCatalog() {
       setEvents(list);
       setTotalCount(count);
     } catch (err) {
-      setError(err?.response?.data?.error || err.message || 'Ошибка загрузки событий');
+      setError(parseApiError(err, 'Ошибка загрузки событий'));
     } finally {
       setLoading(false);
     }
@@ -222,12 +225,7 @@ export default function EventsCatalog() {
       setEditingEvent(null);
       await loadEvents(page, search, cityFilter);
     } catch (err) {
-      setSaveError(
-        err?.response?.data?.error ||
-        err?.response?.data?.message ||
-        err.message ||
-        'Ошибка сохранения'
-      );
+      setSaveError(parseApiError(err, 'Ошибка сохранения'));
     } finally {
       setSaving(false);
     }
@@ -242,11 +240,7 @@ export default function EventsCatalog() {
       setDeleteTarget(null);
       await loadEvents(page, search, cityFilter);
     } catch (err) {
-      alert(
-        err?.response?.data?.error ||
-        err?.response?.data?.message ||
-        'Ошибка удаления'
-      );
+      alert(parseApiError(err, 'Ошибка удаления'));
     } finally {
       setDeleting(false);
     }
@@ -303,6 +297,32 @@ export default function EventsCatalog() {
   const ee = editingEvent;
   const titleVal = typeof ee?.title === 'object' ? ee.title : {};
   const descVal = typeof ee?.description === 'object' ? ee.description : {};
+
+  useEffect(() => {
+    if (!editingEvent) {
+      setMobileActions([]);
+      return;
+    }
+
+    setMobileActions([
+      {
+        id: 'save-event',
+        label: saving ? 'Сохранение...' : 'Сохранить событие',
+        onClick: () => {
+          if (!saving) handleSave();
+        },
+        disabled: saving,
+        variant: 'primary',
+      },
+      {
+        id: 'close-event-editor',
+        label: 'Закрыть форму',
+        onClick: () => setEditingEvent(null),
+      },
+    ]);
+
+    return () => setMobileActions([]);
+  }, [editingEvent, saving, setMobileActions]);
 
   return (
     <Layout>
@@ -517,7 +537,12 @@ export default function EventsCatalog() {
             )}
 
             {/* ── Действия ──────────────────────────────────────────── */}
-            <FormActions saving={saving} onCancel={() => setEditingEvent(null)} />
+            <div className="hidden md:block">
+              <FormActions saving={saving} onCancel={() => setEditingEvent(null)} />
+            </div>
+            <div className="md:hidden text-xs text-gray-500 border border-dashed border-gray-300 rounded-lg p-3">
+              Кнопки формы перенесены в верхнее меню «Действия».
+            </div>
           </form>
         )}
       </Modal>

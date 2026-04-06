@@ -29,7 +29,7 @@ function CountryAutocomplete({ value, onChange }: { value: string; onChange: (v:
     <div className="relative">
       <input
         type="text"
-        className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
+        className="w-full px-3 py-2 border border-gray-300 rounded-md text-base sm:text-sm min-h-[44px]"
         placeholder="Начните вводить название страны..."
         value={query}
         onChange={(e) => { setQuery(e.target.value); setOpen(true); }}
@@ -41,7 +41,7 @@ function CountryAutocomplete({ value, onChange }: { value: string; onChange: (v:
           {suggestions.map((s) => (
             <div
               key={s}
-              className="px-3 py-2 hover:bg-gray-50 cursor-pointer text-sm"
+              className="px-3 py-2.5 hover:bg-gray-50 cursor-pointer text-base sm:text-sm"
               onMouseDown={(e) => { e.preventDefault(); onChange(s); setQuery(s); setOpen(false); }}
             >
               {s}
@@ -201,7 +201,7 @@ export default function CityForm({
             type="file"
             accept="image/*"
             onChange={onImageChange}
-            className="block w-full text-sm text-gray-500
+            className="block w-full text-base sm:text-sm text-gray-500
               file:mr-4 file:py-2 file:px-4
               file:rounded-md file:border-0
               file:text-sm file:font-semibold

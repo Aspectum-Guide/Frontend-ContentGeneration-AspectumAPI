@@ -55,7 +55,7 @@ export default function CityGeneration() {
         .filter(Boolean);
 
       const payload = {
-        cities,
+        prompt: cities.join('\n'),
         ...(provider ? { provider } : {}),
       };
 

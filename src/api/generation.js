@@ -107,7 +107,7 @@ export const aiAPI = {
     apiClient.post(`${BASE}/ai/search-images/`, data),
   citiesJsonStart: (data) =>
     apiClient.post(`${BASE}/ai/cities-json/start/`, data),
-  citiesJson: () => apiClient.get(`${BASE}/ai/cities-json/`),
+  citiesJson: (data) => apiClient.post(`${BASE}/ai/cities-json/`, data),
 };
 
 // ─── Events (reference) ───────────────────────────────────────────────────────

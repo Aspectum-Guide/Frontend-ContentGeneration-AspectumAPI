@@ -88,8 +88,9 @@ export default function useCityAI(session: any) {
       setProgress(0);
       setCurrentStep('Запуск генерации...');
 
-      // Запускаем асинхронную генерацию одного города
-      const response = await aiAPI.citiesJsonStart({ cities: [cityName + (country ? `, ${country}` : '')] });
+      // Backend ожидает prompt, а не массив cities
+      const prompt = [cityName, country].filter(Boolean).join(', ');
+      const response = await aiAPI.citiesJsonStart({ prompt });
       
       // Если это синхронный ответ (старый формат)
       if (response.data && response.data.name) {
