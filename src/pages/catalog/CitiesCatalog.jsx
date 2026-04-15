@@ -151,7 +151,9 @@ export default function CitiesCatalog() {
         : Array.isArray(data?.filters) ? data.filters
         : Array.isArray(data) ? data : [];
       setAllFilters(list);
-    } catch {}
+    } catch {
+      // ignore loading errors, UI will show empty state
+    }
   }, []);
 
   useEffect(() => { loadCities(); loadFilters(); }, [loadCities, loadFilters]);
@@ -194,7 +196,9 @@ export default function CitiesCatalog() {
           city_filter_ids: d.city_filter_ids || prev.city_filter_ids || [],
         }));
       }
-    } catch {}
+    } catch {
+      // ignore loading errors, edit dialog will use list row data
+    }
     setEditLoading(false);
   }, []);
 
@@ -292,7 +296,7 @@ export default function CitiesCatalog() {
     {
       key: 'name',
       label: 'Название',
-      render: (name, row) => (
+      render: (name) => (
         <div>
           <div className="font-medium text-gray-900 text-sm">{getMultiLang(name) || '—'}</div>
           {name && typeof name === 'object' && (

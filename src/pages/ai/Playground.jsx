@@ -7,7 +7,6 @@ export default function Playground() {
   const [message, setMessage] = useState('Привет');
   const [useSearch, setUseSearch] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [reply, setReply] = useState('');
   const [error, setError] = useState(null);
   const [messages, setMessages] = useState([]);
 
@@ -31,7 +30,6 @@ export default function Playground() {
       });
 
       const aiReply = response.data.reply || '—';
-      setReply(aiReply);
       setMessages((prev) => [...prev, { role: 'assistant', content: aiReply }]);
       setMessage('');
     } catch (err) {
@@ -44,7 +42,6 @@ export default function Playground() {
 
   const handleClear = () => {
     setMessages([]);
-    setReply('');
     setMessage('Привет');
     setError(null);
   };

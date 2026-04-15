@@ -189,7 +189,9 @@ export default function EventsCatalog() {
           media: d.media || null,
         }));
       }
-    } catch {}
+    } catch {
+      // ignore loading errors, edit dialog will use list row data
+    }
     setEditLoading(false);
   }, []);
 

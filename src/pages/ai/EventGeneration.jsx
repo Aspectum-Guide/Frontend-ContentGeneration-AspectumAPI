@@ -40,7 +40,9 @@ export default function EventGeneration() {
       const list = Array.isArray(data?.cities) ? data.cities
         : Array.isArray(data) ? data : [];
       setCities(list);
-    } catch {}
+    } catch {
+      // ignore loading errors, UI will show empty state
+    }
   }, []);
 
   const loadFilters = useCallback(async () => {
@@ -50,7 +52,9 @@ export default function EventGeneration() {
       const list = Array.isArray(data?.filters) ? data.filters
         : Array.isArray(data) ? data : [];
       setFilters(list);
-    } catch {}
+    } catch {
+      // ignore loading errors, UI will show empty state
+    }
   }, []);
 
   const loadTasks = useCallback(async (silent = false) => {
@@ -61,7 +65,9 @@ export default function EventGeneration() {
       const list = Array.isArray(data?.tasks) ? data.tasks
         : Array.isArray(data) ? data : [];
       setTasks(list);
-    } catch {}
+    } catch {
+      // ignore loading errors, UI will show empty state
+    }
     finally { if (!silent) setLoadingTasks(false); }
   }, []);
 

@@ -1,11 +1,8 @@
-import { useState } from 'react';
-import { WIZARD_STEP_LABELS } from '../../utils/constants';
 import Button from '../ui/Button';
 
 export default function Wizard({ 
   steps, 
   currentStep, 
-  onStepChange,
   onNext,
   onPrevious,
   canGoNext = true,

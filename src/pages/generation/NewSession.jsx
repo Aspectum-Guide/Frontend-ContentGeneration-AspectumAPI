@@ -4,7 +4,6 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import Layout from '../../components/Layout';
 import Button from '../../components/ui/Button';
-import Input from '../../components/ui/Input';
 import { sessionsAPI } from '../../api/generation';
 import { createSessionSchema } from '../../utils/validation';
 import { LANGUAGES } from '../../utils/constants';

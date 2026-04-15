@@ -225,7 +225,7 @@ class TokenManager {
       const timeoutId = setTimeout(() => controller.abort(), this.REFRESH_TIMEOUT_MS);
 
       // Call refresh endpoint
-      const response = await fetch(`${apiUrl}/auth/token/refresh/`, {
+      const response = await fetch(`${apiUrl}/auth/token/refresh`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

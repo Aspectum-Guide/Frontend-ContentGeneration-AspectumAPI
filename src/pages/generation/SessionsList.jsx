@@ -7,7 +7,6 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Layout from '../../components/Layout';
-import Modal from '../../components/ui/Modal';
 import { useLayoutActions } from '../../context/LayoutActionsContext';
 import { sessionsAPI } from '../../api/generation';
 import { parseApiError } from '../../utils/apiError';

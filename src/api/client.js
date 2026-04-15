@@ -17,7 +17,6 @@ const apiClient = axios.create({
   headers: {
     'Content-Type': 'application/json',
   },
-  withCredentials: true, // Отправляем cookies для аутентификации
 });
 
 // Simple in-memory cache and in-flight dedupe for GET requests to reduce 429
@@ -48,7 +47,7 @@ apiClient.get = async (url, config = {}) => {
   // Make request with retry on 429
   const makeRequest = async () => {
     let attempt = 0;
-    while (true) {
+    for (;;) {
       try {
         const resp = await originalGet(url, config);
         // cache shallowly
@@ -72,7 +71,7 @@ apiClient.get = async (url, config = {}) => {
   return promise;
 };
 
-// Интерсептор для добавления JWT access токена и CSRF токена
+// Интерсептор для добавления JWT access токена
 apiClient.interceptors.request.use(
   (config) => {
     const tokens = TokenManager.getTokens();
@@ -81,29 +80,11 @@ apiClient.interceptors.request.use(
       config.headers.Authorization = `Bearer ${tokens.access}`;
     }
     
-    // Добавляем CSRF токен для POST/PUT/PATCH/DELETE запросов
-    const csrfMethods = ['POST', 'PUT', 'PATCH', 'DELETE'];
-    if (csrfMethods.includes(config.method?.toUpperCase())) {
-      // Получаем CSRF токен из cookie (Django устанавливает csrftoken)
-      const csrftoken = document.cookie
-        .split('; ')
-        .find(row => row.startsWith('csrftoken='))
-        ?.split('=')[1];
-      
-      if (csrftoken) {
-        config.headers['X-CSRFToken'] = csrftoken;
-        config.headers['X-Requested-With'] = 'XMLHttpRequest';
-      } else {
-        console.warn('⚠️ CSRF token not found in cookies!');
-      }
-    }
-    
     if (IS_DEV) {
       console.log('📤 API Request:', {
         method: config.method.toUpperCase(),
         url: config.baseURL + config.url,
         hasToken: !!tokens?.access,
-        hasCsrf: !!config.headers['X-CSRFToken'],
       });
     }
     return config;

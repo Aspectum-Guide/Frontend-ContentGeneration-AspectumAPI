@@ -216,7 +216,6 @@ export default function SessionWizard() {
   // ── Step 4 — AI Content ───────────────────────────────────────────────────
   const [aiGenAttrId, setAiGenAttrId] = useState(null);
   const [aiGenLang, setAiGenLang] = useState('ru');
-  const [aiGenStreamId, setAiGenStreamId] = useState(null);
   const [aiGenText, setAiGenText] = useState('');
   const [aiGenDone, setAiGenDone] = useState(false);
   const [aiGenError, setAiGenError] = useState(null);
@@ -794,7 +793,6 @@ export default function SessionWizard() {
       });
       const sid = r?.data?.stream_id;
       if (!sid) { setAiGenError('Не удалось запустить генерацию'); return; }
-      setAiGenStreamId(sid);
       aiPollRef.current = setInterval(async () => {
         try {
           const sr = await aiAPI.streamStatus(sid);
