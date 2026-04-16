@@ -114,9 +114,10 @@ export const aiAPI = {
 export const eventsAPI = {
   list: (params) =>
     apiClient.get(`${BASE}/events/reference/`, { params }),
+  create: (data) => apiClient.post(`${BASE}/events/create/`, data),
   get: (eventId) => apiClient.get(`${BASE}/events/${eventId}/`),
   update: (eventId, data) =>
-    apiClient.post(`${BASE}/events/${eventId}/update/`, data),
+    apiClient.patch(`${BASE}/events/${eventId}/update/`, data),
   delete: (eventId) =>
     apiClient.post(`${BASE}/events/${eventId}/delete/`, {}),
   setMedia: (eventId, data) =>

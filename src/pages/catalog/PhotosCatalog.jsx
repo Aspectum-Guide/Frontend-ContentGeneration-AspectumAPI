@@ -26,7 +26,10 @@ export default function PhotosCatalog() {
       const list = Array.isArray(data?.results) ? data.results
         : Array.isArray(data) ? data
         : [];
-      setImages(list);
+      setImages(list.map((img) => ({
+        ...img,
+        image_url: img.image_url || img.url || null,
+      })));
       setTotalCount(data?.count || list.length);
     } catch (err) {
       // Fallback: endpoint might not support listing; show friendly message

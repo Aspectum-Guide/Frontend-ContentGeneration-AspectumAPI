@@ -24,6 +24,22 @@ const LANGS = [
   { code: 'es', label: 'ES', flag: '🇪🇸' },
 ];
 
+function createEmptyEvent() {
+  return {
+    id: null,
+    title: {},
+    description: {},
+    tag_ids: [],
+    city_id: '',
+    is_show: true,
+    image_url: null,
+    image_copyright: '',
+    lat: null,
+    lon: null,
+    media: null,
+  };
+}
+
 // ─── LangTabs ────────────────────────────────────────────────────────────────
 function LangTabs({ active, onSwitch, values = {} }) {
   const filled = new Set(Object.entries(values).filter(([, v]) => v?.trim()).map(([k]) => k));
@@ -195,6 +211,13 @@ export default function EventsCatalog() {
     setEditLoading(false);
   }, []);
 
+  const openCreate = useCallback(() => {
+    setSaveError(null);
+    setEditLoading(false);
+    setActiveLang('ru');
+    setEditingEvent(createEmptyEvent());
+  }, []);
+
   // ── Toggle event tag ────────────────────────────────────────────────────
   const toggleTag = useCallback((filterId) => {
     setEditingEvent(prev => {
@@ -213,21 +236,26 @@ export default function EventsCatalog() {
   // ── Save ────────────────────────────────────────────────────────────────
   const handleSave = async (e) => {
     e?.preventDefault();
-    if (!editingEvent?.id) return;
+    if (!editingEvent) return;
     try {
       setSaving(true);
       setSaveError(null);
-      await eventsAPI.update(editingEvent.id, {
+      const payload = {
         title: editingEvent.title || {},
         description: editingEvent.description || {},
         is_show: !!editingEvent.is_show,
         city_id: editingEvent.city_id || null,
         tag_ids: (editingEvent.tag_ids || []).filter(Boolean),
-      });
+      };
+      if (editingEvent.id) {
+        await eventsAPI.update(editingEvent.id, payload);
+      } else {
+        await eventsAPI.create(payload);
+      }
       setEditingEvent(null);
       await loadEvents(page, search, cityFilter);
     } catch (err) {
-      setSaveError(parseApiError(err, 'Ошибка сохранения'));
+      setSaveError(parseApiError(err, editingEvent?.id ? 'Ошибка сохранения' : 'Ошибка создания'));
     } finally {
       setSaving(false);
     }
@@ -301,15 +329,25 @@ export default function EventsCatalog() {
   const descVal = typeof ee?.description === 'object' ? ee.description : {};
 
   useEffect(() => {
+    const actions = [
+      {
+        id: 'create-event',
+        label: 'Создать событие',
+        onClick: openCreate,
+        disabled: saving,
+        variant: editingEvent ? 'secondary' : 'primary',
+      },
+    ];
+
     if (!editingEvent) {
-      setMobileActions([]);
-      return;
+      setMobileActions(actions);
+      return () => setMobileActions([]);
     }
 
-    setMobileActions([
+    actions.push(
       {
         id: 'save-event',
-        label: saving ? 'Сохранение...' : 'Сохранить событие',
+        label: saving ? (editingEvent?.id ? 'Сохранение...' : 'Создание...') : (editingEvent?.id ? 'Сохранить событие' : 'Создать событие'),
         onClick: () => {
           if (!saving) handleSave();
         },
@@ -321,10 +359,12 @@ export default function EventsCatalog() {
         label: 'Закрыть форму',
         onClick: () => setEditingEvent(null),
       },
-    ]);
+    );
+
+    setMobileActions(actions);
 
     return () => setMobileActions([]);
-  }, [editingEvent, saving, setMobileActions]);
+  }, [editingEvent, openCreate, saving, setMobileActions]);
 
   return (
     <Layout>
@@ -383,7 +423,9 @@ export default function EventsCatalog() {
       <Modal
         open={!!editingEvent}
         onClose={() => setEditingEvent(null)}
-        title={`Редактировать событие${ee ? ` — ${getMultiLang(ee.title) || ''}` : ''}`}
+        title={ee?.id
+          ? `Редактировать событие${ee ? ` — ${getMultiLang(ee.title) || ''}` : ''}`
+          : 'Создать событие'}
         size="xl"
       >
         {editingEvent && (
@@ -540,7 +582,11 @@ export default function EventsCatalog() {
 
             {/* ── Действия ──────────────────────────────────────────── */}
             <div className="hidden md:block">
-              <FormActions saving={saving} onCancel={() => setEditingEvent(null)} />
+              <FormActions
+                saving={saving}
+                onCancel={() => setEditingEvent(null)}
+                saveLabel={ee?.id ? 'Сохранить' : 'Создать'}
+              />
             </div>
             <div className="md:hidden text-xs text-gray-500 border border-dashed border-gray-300 rounded-lg p-3">
               Кнопки формы перенесены в верхнее меню «Действия».
