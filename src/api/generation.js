@@ -78,6 +78,7 @@ export const tasksAPI = {
 export const cityFiltersAPI = {
   list: () => apiClient.get(`${BASE}/city-filters/`),
   get: (filterId) => apiClient.get(`${BASE}/city-filters/${filterId}/`),
+  create: (data) => apiClient.post(`${BASE}/city-filters/create/`, data),
   update: (filterId, data) =>
     apiClient.post(`${BASE}/city-filters/${filterId}/update/`, data),
   delete: (filterId) =>
@@ -88,6 +89,7 @@ export const cityFiltersAPI = {
 export const eventFiltersAPI = {
   list: () => apiClient.get(`${BASE}/event-filters/`),
   get: (filterId) => apiClient.get(`${BASE}/event-filters/${filterId}/`),
+  create: (data) => apiClient.post(`${BASE}/event-filters/create/`, data),
   update: (filterId, data) =>
     apiClient.post(`${BASE}/event-filters/${filterId}/update/`, data),
   delete: (filterId) =>

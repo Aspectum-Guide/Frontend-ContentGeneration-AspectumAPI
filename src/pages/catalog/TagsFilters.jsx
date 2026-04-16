@@ -27,6 +27,7 @@ function useFilters(api) {
       const data = r?.data;
       const list = Array.isArray(data?.filters) ? data.filters
         : Array.isArray(data?.results) ? data.results
+        : Array.isArray(data?.tags) ? data.tags
         : Array.isArray(data) ? data : [];
       setFilters(list);
     } catch (e) {
@@ -41,7 +42,7 @@ function useFilters(api) {
   return { filters, loading, error, reload: load };
 }
 
-function FilterTab({ api, icon, emptyText }) {
+function FilterTab({ api, icon, emptyText, createLabel }) {
   const { filters, loading, error, reload } = useFilters(api);
   const [search, setSearch] = useState('');
   const [editingFilter, setEditingFilter] = useState(null);
@@ -49,6 +50,12 @@ function FilterTab({ api, icon, emptyText }) {
   const [saveError, setSaveError] = useState(null);
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [deleting, setDeleting] = useState(false);
+
+  // Create
+  const [createModalOpen, setCreateModalOpen] = useState(false);
+  const [creating, setCreating] = useState(false);
+  const [createError, setCreateError] = useState(null);
+  const [newFilter, setNewFilter] = useState({ name: {}, emoji: '' });
 
   const filtered = filters.filter((f) => {
     if (!search.trim()) return true;
@@ -75,6 +82,30 @@ function FilterTab({ api, icon, emptyText }) {
       setSaveError(err?.response?.data?.error || 'Ошибка сохранения');
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleCreate = async (e) => {
+    e?.preventDefault();
+    try {
+      setCreating(true);
+      setCreateError(null);
+
+      const payload = {
+        title: newFilter?.name || {},
+      };
+      if (newFilter?.emoji?.trim()) {
+        payload.emoji = newFilter.emoji.trim();
+      }
+
+      await api.create(payload);
+      setCreateModalOpen(false);
+      setNewFilter({ name: {}, emoji: '' });
+      await reload();
+    } catch (err) {
+      setCreateError(err?.response?.data?.error || err.message || 'Ошибка создания');
+    } finally {
+      setCreating(false);
     }
   };
 
@@ -117,6 +148,21 @@ function FilterTab({ api, icon, emptyText }) {
 
   return (
     <>
+      <div className="flex justify-end mb-3">
+        <button
+          type="button"
+          onClick={() => {
+            setCreateError(null);
+            setNewFilter({ name: {}, emoji: '' });
+            setCreateModalOpen(true);
+          }}
+          className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50"
+          disabled={creating}
+        >
+          {createLabel || 'Создать тег'}
+        </button>
+      </div>
+
       <DataTable
         columns={columns}
         rows={filtered}
@@ -144,6 +190,40 @@ function FilterTab({ api, icon, emptyText }) {
           </>
         )}
       />
+
+      {/* Create Modal */}
+      <Modal
+        open={createModalOpen}
+        onClose={() => setCreateModalOpen(false)}
+        title={createLabel || 'Создать тег'}
+        size="md"
+      >
+        <form onSubmit={handleCreate} className="space-y-4">
+          {createError && (
+            <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">
+              {createError}
+            </div>
+          )}
+
+          <MultiLangField
+            label="Название"
+            value={newFilter.name}
+            onChange={(v) => setNewFilter((p) => ({ ...p, name: v }))}
+            langs={LANGS}
+          />
+
+          <Field label="Эмодзи (опционально)">
+            <TextInput
+              value={newFilter.emoji || ''}
+              onChange={(e) => setNewFilter((p) => ({ ...p, emoji: e.target.value }))}
+              placeholder="🏙️"
+              maxLength={4}
+            />
+          </Field>
+
+          <FormActions saving={creating} onCancel={() => setCreateModalOpen(false)} saveLabel="Создать" />
+        </form>
+      </Modal>
 
       {/* Edit Modal */}
       <Modal
@@ -236,6 +316,7 @@ export default function TagsFilters() {
           api={cityFiltersAPI}
           icon="🏙️"
           emptyText="Тегов городов нет"
+          createLabel="Создать тег города"
         />
       ) : (
         <FilterTab
@@ -243,6 +324,7 @@ export default function TagsFilters() {
           api={eventFiltersAPI}
           icon="🎪"
           emptyText="Тегов событий нет"
+          createLabel="Создать тег ивента"
         />
       )}
     </Layout>

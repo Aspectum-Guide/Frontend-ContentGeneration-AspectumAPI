@@ -429,6 +429,12 @@ export default function CitiesCatalog() {
           variant: 'primary',
         },
         {
+          id: 'create-city-tag',
+          label: 'Создать тег города',
+          onClick: () => navigate('/catalog/tags?tab=city'),
+          variant: 'secondary',
+        },
+        {
           id: 'open-sessions',
           label: 'Открыть сессии',
           onClick: () => navigate('/generation'),

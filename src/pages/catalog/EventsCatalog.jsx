@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 import Layout from '../../components/Layout';
 import DataTable from '../../components/ui/DataTable';
 import Modal from '../../components/ui/Modal';
@@ -99,6 +100,7 @@ function LangBlock({ label, value = {}, onChange, activeLang, multiline = false,
 // ─── Main component ───────────────────────────────────────────────────────────
 export default function EventsCatalog() {
   const { setMobileActions } = useLayoutActions();
+  const navigate = useNavigate();
   const [events, setEvents] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -337,6 +339,12 @@ export default function EventsCatalog() {
         disabled: saving,
         variant: editingEvent ? 'secondary' : 'primary',
       },
+      {
+        id: 'create-event-tag',
+        label: 'Создать тег ивента',
+        onClick: () => navigate('/catalog/tags?tab=event'),
+        variant: 'secondary',
+      },
     ];
 
     if (!editingEvent) {
@@ -364,7 +372,7 @@ export default function EventsCatalog() {
     setMobileActions(actions);
 
     return () => setMobileActions([]);
-  }, [editingEvent, openCreate, saving, setMobileActions]);
+  }, [editingEvent, openCreate, saving, setMobileActions, navigate]);
 
   return (
     <Layout>
