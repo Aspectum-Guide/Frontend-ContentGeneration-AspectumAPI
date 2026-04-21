@@ -9,6 +9,8 @@ const CATALOG_ITEMS = [
   { to: '/catalog/ticket-types', title: 'Типы билетов', description: 'Ticket types (booking)', icon: '🎟️' },
   { to: '/catalog/slot-availabilities', title: 'Слоты (доступность)', description: 'Доступные слоты по времени', icon: '🕒' },
   { to: '/catalog/ticket-prices', title: 'Цены билетов', description: 'Цены по слотам и типам', icon: '💶' },
+  { to: '/catalog/subscription-types', title: 'Типы подписки', description: 'Настройка пакетов подписки', icon: '🧩' },
+  { to: '/catalog/activation-codes', title: 'Коды активации', description: 'Коды для активации подписок', icon: '🔐' },
 ];
 
 function CatalogCard({ to, title, description, icon }) {
