@@ -11,3 +11,19 @@ export const ticketTypesAPI = {
 export const bookingReferenceAPI = {
   events: (params) => apiClient.get('/events/', { params }),
 };
+
+export const eventSlotAvailabilitiesAPI = {
+  list: (params) => apiClient.get('/booking/slot-availabilities/', { params }),
+  get: (id) => apiClient.get(`/booking/slot-availabilities/${id}/`),
+  create: (data) => apiClient.post('/booking/slot-availabilities/', data),
+  update: (id, data) => apiClient.patch(`/booking/slot-availabilities/${id}/`, data),
+  delete: (id) => apiClient.delete(`/booking/slot-availabilities/${id}/`),
+};
+
+export const ticketPricesAPI = {
+  list: (params) => apiClient.get('/booking/ticket-prices/', { params }),
+  get: (id) => apiClient.get(`/booking/ticket-prices/${id}/`),
+  create: (data) => apiClient.post('/booking/ticket-prices/', data),
+  update: (id, data) => apiClient.patch(`/booking/ticket-prices/${id}/`, data),
+  delete: (id) => apiClient.delete(`/booking/ticket-prices/${id}/`),
+};

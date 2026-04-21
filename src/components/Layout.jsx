@@ -103,9 +103,12 @@ export default function Layout({ children, pageHeader = null, pageHeaderMode = '
     {
       title: 'Справочники',
       items: [
+        { label: 'Каталог (все справочники)', to: '/catalog' },
         { label: 'Города', to: '/catalog/cities' },
         { label: 'Ивенты', to: '/catalog/events' },
         { label: 'Типы билетов', to: '/catalog/ticket-types' },
+        { label: 'Слоты (Доступность)', to: '/catalog/slot-availabilities' },
+        { label: 'Цены билетов', to: '/catalog/ticket-prices' },
         { label: 'Фотографии', to: '/catalog/photos' },
         { label: 'Теги и фильтры', to: '/catalog/tags' },
       ],
@@ -136,6 +139,8 @@ export default function Layout({ children, pageHeader = null, pageHeaderMode = '
     { startsWith: '/catalog/cities', title: 'Справочник городов' },
     { startsWith: '/catalog/events', title: 'Справочник ивентов' },
     { startsWith: '/catalog/ticket-types', title: 'Справочник типов билетов' },
+    { startsWith: '/catalog/slot-availabilities', title: 'Справочник слотов (доступность)' },
+    { startsWith: '/catalog/ticket-prices', title: 'Справочник цен билетов' },
     { startsWith: '/catalog/photos', title: 'Каталог фото' },
     { startsWith: '/catalog/tags', title: 'Теги и фильтры' },
     { startsWith: '/export/zip', title: 'Экспорт ZIP' },

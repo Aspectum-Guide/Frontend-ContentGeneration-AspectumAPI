@@ -6,11 +6,14 @@ import CityGeneration from './pages/ai/CityGeneration';
 import EventGeneration from './pages/ai/EventGeneration';
 import ImageGeneration from './pages/ai/ImageGeneration';
 import Playground from './pages/ai/Playground';
+import CatalogHome from './pages/catalog/CatalogHome';
 import CitiesCatalog from './pages/catalog/CitiesCatalog';
 import EventsCatalog from './pages/catalog/EventsCatalog';
 import PhotosCatalog from './pages/catalog/PhotosCatalog';
 import TagsFilters from './pages/catalog/TagsFilters';
 import TicketTypesCatalog from './pages/catalog/TicketTypesCatalog';
+import SlotAvailabilitiesCatalog from './pages/catalog/SlotAvailabilitiesCatalog';
+import TicketPricesCatalog from './pages/catalog/TicketPricesCatalog';
 import ExportCities from './pages/export/ExportCities';
 import ExportEvents from './pages/export/ExportEvents';
 import ExportZip from './pages/export/ExportZip';
@@ -60,9 +63,12 @@ function App() {
           <Route path="/tasks" element={<ProtectedRoute><MyTasks /></ProtectedRoute>} />
 
           {/* Справочники */}
+          <Route path="/catalog" element={<ProtectedRoute><CatalogHome /></ProtectedRoute>} />
           <Route path="/catalog/cities" element={<ProtectedRoute><CitiesCatalog /></ProtectedRoute>} />
           <Route path="/catalog/events" element={<ProtectedRoute><EventsCatalog /></ProtectedRoute>} />
           <Route path="/catalog/ticket-types" element={<ProtectedRoute><TicketTypesCatalog /></ProtectedRoute>} />
+          <Route path="/catalog/slot-availabilities" element={<ProtectedRoute><SlotAvailabilitiesCatalog /></ProtectedRoute>} />
+          <Route path="/catalog/ticket-prices" element={<ProtectedRoute><TicketPricesCatalog /></ProtectedRoute>} />
           <Route path="/catalog/photos" element={<ProtectedRoute><PhotosCatalog /></ProtectedRoute>} />
           <Route path="/catalog/tags" element={<ProtectedRoute><TagsFilters /></ProtectedRoute>} />
 
