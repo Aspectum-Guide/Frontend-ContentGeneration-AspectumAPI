@@ -9,6 +9,9 @@ import { parseApiError } from '../../../utils/apiError';
 import { useCatalogFilters } from '../core/useCatalogFilters';
 import { useCatalogResource } from '../core/useCatalogResource';
 import { useEventOptions, useTicketTypeOptions } from '../shared/bookingOptions';
+import CatalogPageHeader from '../shared/components/CatalogPageHeader';
+import StatusBadge from '../shared/components/StatusBadge';
+import TableRowActions from '../shared/components/TableRowActions';
 import { getMultiLangValue } from '../shared/i18n';
 
 const PAGE_SIZE = 20;
@@ -253,33 +256,21 @@ export default function SlotAvailabilitiesCatalog() {
     {
       key: 'is_active',
       label: 'Статус',
-      render: (active) => (
-        <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${active ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'
-          }`}>
-          {active ? 'Активен' : 'Отключен'}
-        </span>
-      ),
+      render: (active) => <StatusBadge active={active} />,
     },
   ];
 
   return (
     <Layout>
-      <div className="mb-6 flex items-start justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Справочник слотов (доступность)</h1>
-          <p className="mt-1 text-sm text-gray-500">Слоты по событиям и типам билетов</p>
-        </div>
-        <button
-          type="button"
-          onClick={() => {
-            setSaveError(null);
-            setEditingAvailability(createEmptyAvailability());
-          }}
-          className="hidden md:inline-flex px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors"
-        >
-          Создать слот
-        </button>
-      </div>
+      <CatalogPageHeader
+        title="Справочник слотов (доступность)"
+        description="Слоты по событиям и типам билетов"
+        createLabel="Создать слот"
+        onCreate={() => {
+          setSaveError(null);
+          setEditingAvailability(createEmptyAvailability());
+        }}
+      />
 
       <DataTable
         columns={columns}
@@ -327,22 +318,10 @@ export default function SlotAvailabilitiesCatalog() {
           </>
         )}
         actions={(row) => (
-          <>
-            <button
-              type="button"
-              onClick={() => openEdit(row)}
-              className="px-3 py-1.5 text-xs font-medium text-blue-600 bg-blue-50 rounded-md hover:bg-blue-100 transition-colors"
-            >
-              Ред.
-            </button>
-            <button
-              type="button"
-              onClick={() => setDeleteTarget(row)}
-              className="px-3 py-1.5 text-xs font-medium text-red-600 bg-red-50 rounded-md hover:bg-red-100 transition-colors"
-            >
-              Удалить
-            </button>
-          </>
+          <TableRowActions
+            onEdit={() => openEdit(row)}
+            onDelete={() => setDeleteTarget(row)}
+          />
         )}
       />
 

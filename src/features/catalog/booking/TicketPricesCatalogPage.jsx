@@ -9,6 +9,9 @@ import { parseApiError } from '../../../utils/apiError';
 import { useCatalogFilters } from '../core/useCatalogFilters';
 import { useCatalogResource } from '../core/useCatalogResource';
 import { useEventOptions, useTicketTypeOptions } from '../shared/bookingOptions';
+import CatalogPageHeader from '../shared/components/CatalogPageHeader';
+import StatusBadge from '../shared/components/StatusBadge';
+import TableRowActions from '../shared/components/TableRowActions';
 import { getMultiLangValue } from '../shared/i18n';
 import { normalizeListResponse } from '../shared/normalize';
 
@@ -290,34 +293,27 @@ export default function TicketPricesCatalog() {
       key: 'is_active',
       label: 'Статус',
       render: (active) => (
-        <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${active
-          ? 'bg-green-100 text-green-700'
-          : 'bg-red-100 text-red-700'
-          }`}>
-          {active ? 'Активна' : 'Неактивна'}
-        </span>
+        <StatusBadge
+          active={active}
+          activeLabel="Активна"
+          inactiveLabel="Неактивна"
+          inactiveTone="red"
+        />
       ),
     },
   ];
 
   return (
     <Layout>
-      <div className="mb-6 flex items-start justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Справочник цен билетов</h1>
-          <p className="mt-1 text-sm text-gray-500">Управление ценами по слотам и типам билетов</p>
-        </div>
-        <button
-          type="button"
-          onClick={() => {
-            setSaveError(null);
-            setEditingPrice(createEmptyTicketPrice());
-          }}
-          className="hidden md:inline-flex px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors"
-        >
-          Создать цену
-        </button>
-      </div>
+      <CatalogPageHeader
+        title="Справочник цен билетов"
+        description="Управление ценами по слотам и типам билетов"
+        createLabel="Создать цену"
+        onCreate={() => {
+          setSaveError(null);
+          setEditingPrice(createEmptyTicketPrice());
+        }}
+      />
 
       <DataTable
         columns={columns}
@@ -375,22 +371,10 @@ export default function TicketPricesCatalog() {
           </>
         )}
         actions={(row) => (
-          <>
-            <button
-              type="button"
-              onClick={() => openEdit(row)}
-              className="px-3 py-1.5 text-xs font-medium text-blue-600 bg-blue-50 rounded-md hover:bg-blue-100 transition-colors"
-            >
-              Ред.
-            </button>
-            <button
-              type="button"
-              onClick={() => setDeleteTarget(row)}
-              className="px-3 py-1.5 text-xs font-medium text-red-600 bg-red-50 rounded-md hover:bg-red-100 transition-colors"
-            >
-              Удалить
-            </button>
-          </>
+          <TableRowActions
+            onEdit={() => openEdit(row)}
+            onDelete={() => setDeleteTarget(row)}
+          />
         )}
       />
 
