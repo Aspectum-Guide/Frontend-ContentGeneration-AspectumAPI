@@ -73,12 +73,17 @@ export function MultiLangField({
   label,
   value = {},
   onChange,
-  langs = ['ru', 'en', 'it'],
+  langs,
   multiline = false,
   rows = 3,
   disabled = false,
   required = false,
 }) {
+  const effectiveLangs =
+    Array.isArray(langs) && langs.length > 0
+      ? langs
+      : Object.keys(value || {}).filter((lang) => typeof lang === 'string' && lang.trim());
+
   const handleChange = (lang, val) => {
     onChange?.({ ...value, [lang]: val });
   };
@@ -91,7 +96,7 @@ export function MultiLangField({
           {required && <span className="text-red-500 ml-0.5">*</span>}
         </label>
       )}
-      {langs.map((lang) => (
+      {effectiveLangs.map((lang) => (
         <div key={lang} className="flex flex-col sm:flex-row gap-2 sm:items-start">
           <span className="shrink-0 w-fit sm:w-8 mt-1 sm:mt-2 text-xs font-semibold text-gray-400 uppercase">
             {lang}

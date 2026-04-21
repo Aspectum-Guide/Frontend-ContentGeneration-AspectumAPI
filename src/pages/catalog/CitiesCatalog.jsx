@@ -1,32 +1,18 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import 'leaflet/dist/leaflet.css';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { citiesAPI, cityFiltersAPI, imagesAPI } from '../../api/generation';
+import CommonsImagePicker from '../../components/generation/CommonsImagePicker';
 import Layout from '../../components/Layout';
 import DataTable from '../../components/ui/DataTable';
-import Modal from '../../components/ui/Modal';
-import { ConfirmModal } from '../../components/ui/Modal';
-import { Field, TextInput, Textarea, FormActions } from '../../components/ui/FormField';
-import CommonsImagePicker from '../../components/generation/CommonsImagePicker';
+import { Field, FormActions, TextInput, Textarea } from '../../components/ui/FormField';
+import Modal, { ConfirmModal } from '../../components/ui/Modal';
 import { useLayoutActions } from '../../context/LayoutActionsContext';
-import { citiesAPI, cityFiltersAPI, imagesAPI } from '../../api/generation';
+import { buildLangOptions, getMultiLangValue, pickPrimaryLangCode } from '../../features/catalog/shared/i18n';
+import { normalizeListResponse } from '../../features/catalog/shared/normalize';
 import { parseApiError } from '../../utils/apiError';
-import 'leaflet/dist/leaflet.css';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
-function getMultiLang(val) {
-  if (!val) return '';
-  if (typeof val === 'string') return val;
-  return val.ru || val.en || val.it || Object.values(val).find(Boolean) || '';
-}
-
-const LANGS = [
-  { code: 'ru', label: 'RU', flag: '🇷🇺' },
-  { code: 'en', label: 'EN', flag: '🇺🇸' },
-  { code: 'it', label: 'IT', flag: '🇮🇹' },
-  { code: 'fr', label: 'FR', flag: '🇫🇷' },
-  { code: 'de', label: 'DE', flag: '🇩🇪' },
-  { code: 'es', label: 'ES', flag: '🇪🇸' },
-];
-
 const CITY_EDIT_TABS = [
   { key: 'content', label: 'Контент' },
   { key: 'media', label: 'Обложка' },
@@ -34,22 +20,21 @@ const CITY_EDIT_TABS = [
 ];
 
 // ─── LangTabs ────────────────────────────────────────────────────────────────
-function LangTabs({ active, onSwitch, values = {} }) {
+function LangTabs({ active, onSwitch, values = {}, langOptions = [] }) {
   const filled = new Set(Object.entries(values).filter(([, v]) => v?.trim()).map(([k]) => k));
   return (
     <div className="flex flex-wrap gap-1 mb-3">
-      {LANGS.map(({ code, label, flag }) => (
+      {langOptions.map(({ code, label, flag }) => (
         <button
           key={code}
           type="button"
           onClick={() => onSwitch(code)}
-          className={`flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium border transition-all ${
-            active === code
-              ? 'bg-blue-600 text-white border-blue-600'
-              : filled.has(code)
+          className={`flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium border transition-all ${active === code
+            ? 'bg-blue-600 text-white border-blue-600'
+            : filled.has(code)
               ? 'bg-blue-50 text-blue-700 border-blue-300 hover:border-blue-500'
               : 'bg-white text-gray-500 border-gray-300 hover:border-blue-300 hover:text-blue-600'
-          }`}
+            }`}
         >
           <span>{flag}</span>
           <span>{label}</span>
@@ -65,6 +50,7 @@ function LangTabs({ active, onSwitch, values = {} }) {
 // ─── LangBlock ─────────────────────────────────────────────────────────────
 function LangBlock({ label, value = {}, onChange, activeLang, multiline = false, rows = 3, required }) {
   const lang = activeLang;
+  if (!lang) return null;
   return (
     <div>
       <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -102,8 +88,8 @@ export default function CitiesCatalog() {
 
   // Edit state
   const [editingCity, setEditingCity] = useState(null);
-  const [editLoading, setEditLoading] = useState(false);
-  const [activeLang, setActiveLang] = useState('ru');
+  const [preparingEdit, setPreparingEdit] = useState(false);
+  const [activeLang, setActiveLang] = useState('');
   const [activeEditTab, setActiveEditTab] = useState('content');
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState(null);
@@ -131,9 +117,7 @@ export default function CitiesCatalog() {
       setError(null);
       const response = await citiesAPI.list({});
       const data = response?.data;
-      const list = Array.isArray(data?.data) ? data.data
-        : Array.isArray(data?.results) ? data.results
-        : Array.isArray(data) ? data : [];
+      const list = normalizeListResponse(data, ['data', 'results']);
       setAllCities(list);
     } catch (err) {
       setError(parseApiError(err, 'Ошибка загрузки городов'));
@@ -147,9 +131,7 @@ export default function CitiesCatalog() {
     try {
       const r = await cityFiltersAPI.list();
       const data = r?.data;
-      const list = Array.isArray(data?.tags) ? data.tags
-        : Array.isArray(data?.filters) ? data.filters
-        : Array.isArray(data) ? data : [];
+      const list = normalizeListResponse(data, ['tags', 'filters', 'results']);
       setAllFilters(list);
     } catch {
       // ignore loading errors, UI will show empty state
@@ -164,8 +146,8 @@ export default function CitiesCatalog() {
     if (!search.trim()) return true;
     const q = search.toLowerCase();
     return (
-      getMultiLang(c.name).toLowerCase().includes(q) ||
-      getMultiLang(c.country).toLowerCase().includes(q) ||
+      getMultiLangValue(c.name).toLowerCase().includes(q) ||
+      getMultiLangValue(c.country).toLowerCase().includes(q) ||
       (c.display_country || '').toLowerCase().includes(q)
     );
   });
@@ -174,33 +156,38 @@ export default function CitiesCatalog() {
 
   // ── Open edit: load full city data ─────────────────────────────────────
   const openEdit = useCallback(async (row) => {
+    if (preparingEdit) return;
     setSaveError(null);
-    setActiveLang('ru');
+    setActiveLang(pickPrimaryLangCode([row?.name, row?.description, row?.country]));
     setActiveEditTab('content');
-    setEditingCity({ ...row, city_filter_ids: row.city_filter_ids || [] });
-    setEditLoading(true);
+    setPreparingEdit(true);
+
+    let nextCity = { ...row, city_filter_ids: row.city_filter_ids || [] };
     try {
       const r = await citiesAPI.get(row.id);
       const d = r?.data?.city || r?.data;
       if (d) {
-        setEditingCity(prev => ({
-          ...prev,
-          name: d.name || prev.name || {},
-          description: d.description || prev.description || {},
-          country: d.country || prev.country || {},
-          lat: d.lat ?? prev.lat ?? '',
-          lon: d.lon ?? prev.lon ?? '',
-          image_id: d.image_id ?? prev.image_id ?? null,
-          image_url: d.image_url ?? prev.image_url ?? null,
-          image_copyright: d.image_copyright ?? prev.image_copyright ?? '',
-          city_filter_ids: d.city_filter_ids || prev.city_filter_ids || [],
-        }));
+        nextCity = {
+          ...nextCity,
+          name: d.name || nextCity.name || {},
+          description: d.description || nextCity.description || {},
+          country: d.country || nextCity.country || {},
+          lat: d.lat ?? nextCity.lat ?? '',
+          lon: d.lon ?? nextCity.lon ?? '',
+          image_id: d.image_id ?? nextCity.image_id ?? null,
+          image_url: d.image_url ?? nextCity.image_url ?? null,
+          image_copyright: d.image_copyright ?? nextCity.image_copyright ?? '',
+          city_filter_ids: d.city_filter_ids || nextCity.city_filter_ids || [],
+        };
       }
     } catch {
       // ignore loading errors, edit dialog will use list row data
+    } finally {
+      setPreparingEdit(false);
     }
-    setEditLoading(false);
-  }, []);
+
+    setEditingCity(nextCity);
+  }, [preparingEdit]);
 
   // ── Toggle filter ───────────────────────────────────────────────────────
   const toggleFilter = useCallback((filterId) => {
@@ -298,7 +285,7 @@ export default function CitiesCatalog() {
       label: 'Название',
       render: (name) => (
         <div>
-          <div className="font-medium text-gray-900 text-sm">{getMultiLang(name) || '—'}</div>
+          <div className="font-medium text-gray-900 text-sm">{getMultiLangValue(name) || '—'}</div>
           {name && typeof name === 'object' && (
             <div className="text-xs text-gray-400 mt-0.5">
               {Object.entries(name).filter(([, v]) => v).map(([k, v]) => `${k}: ${v}`).join(' · ')}
@@ -311,7 +298,7 @@ export default function CitiesCatalog() {
       key: 'country',
       label: 'Страна',
       render: (country, row) => (
-        <span className="text-sm text-gray-600">{row.display_country || getMultiLang(country) || '—'}</span>
+        <span className="text-sm text-gray-600">{row.display_country || getMultiLangValue(country) || '—'}</span>
       ),
     },
     {
@@ -336,6 +323,15 @@ export default function CitiesCatalog() {
   const nameVal = typeof ec?.name === 'object' ? ec.name : {};
   const descVal = typeof ec?.description === 'object' ? ec.description : {};
   const countryVal = typeof ec?.country === 'object' ? ec.country : {};
+  const langOptions = buildLangOptions([nameVal, descVal, countryVal]);
+
+  useEffect(() => {
+    if (!editingCity || langOptions.length === 0) return;
+    const hasActive = langOptions.some((lang) => lang.code === activeLang);
+    if (!hasActive) {
+      setActiveLang(langOptions[0].code);
+    }
+  }, [editingCity, langOptions, activeLang]);
 
   useEffect(() => {
     const parseCoord = (v) => {
@@ -500,9 +496,10 @@ export default function CitiesCatalog() {
           <>
             <button
               onClick={() => openEdit(row)}
+              disabled={preparingEdit}
               className="px-3 py-1.5 text-xs font-medium text-blue-600 bg-blue-50 rounded-md hover:bg-blue-100 transition-colors"
             >
-              Ред.
+              {preparingEdit ? 'Загрузка...' : 'Ред.'}
             </button>
             <button
               onClick={() => setDeleteTarget(row)}
@@ -518,7 +515,7 @@ export default function CitiesCatalog() {
       <Modal
         open={!!editingCity}
         onClose={() => setEditingCity(null)}
-        title={`Редактировать город${ec ? ` — ${getMultiLang(ec.name) || ''}` : ''}`}
+        title={`Редактировать город${ec ? ` — ${getMultiLangValue(ec.name) || ''}` : ''}`}
         size="xl"
       >
         {editingCity && (
@@ -529,24 +526,16 @@ export default function CitiesCatalog() {
               </div>
             )}
 
-            {editLoading && (
-              <div className="flex items-center gap-2 text-sm text-gray-400 py-2">
-                <span className="animate-spin w-4 h-4 border-2 border-blue-500 border-t-transparent rounded-full inline-block" />
-                Загрузка данных...
-              </div>
-            )}
-
             <div className="flex flex-wrap gap-2 border-b border-gray-200 pb-3">
               {CITY_EDIT_TABS.map((tab) => (
                 <button
                   key={tab.key}
                   type="button"
                   onClick={() => setActiveEditTab(tab.key)}
-                  className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
-                    activeEditTab === tab.key
-                      ? 'bg-blue-600 text-white'
-                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                  }`}
+                  className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${activeEditTab === tab.key
+                    ? 'bg-blue-600 text-white'
+                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                    }`}
                 >
                   {tab.label}
                 </button>
@@ -555,38 +544,47 @@ export default function CitiesCatalog() {
 
             {activeEditTab === 'content' && (
               <div className="space-y-5">
-                <div className="p-3 bg-gray-50 rounded-xl border border-gray-200">
-                  <p className="text-xs font-medium text-gray-500 mb-2 uppercase tracking-wide">Активный язык</p>
-                  <LangTabs
-                    active={activeLang}
-                    onSwitch={setActiveLang}
-                    values={nameVal}
-                  />
-                </div>
+                {langOptions.length > 0 ? (
+                  <>
+                    <div className="p-3 bg-gray-50 rounded-xl border border-gray-200">
+                      <p className="text-xs font-medium text-gray-500 mb-2 uppercase tracking-wide">Активный язык</p>
+                      <LangTabs
+                        active={activeLang}
+                        onSwitch={setActiveLang}
+                        values={nameVal}
+                        langOptions={langOptions}
+                      />
+                    </div>
 
-                <LangBlock
-                  label="Название"
-                  value={nameVal}
-                  onChange={v => setEditingCity(p => ({ ...p, name: v }))}
-                  activeLang={activeLang}
-                  required
-                />
+                    <LangBlock
+                      label="Название"
+                      value={nameVal}
+                      onChange={v => setEditingCity(p => ({ ...p, name: v }))}
+                      activeLang={activeLang}
+                      required
+                    />
 
-                <LangBlock
-                  label="Описание"
-                  value={descVal}
-                  onChange={v => setEditingCity(p => ({ ...p, description: v }))}
-                  activeLang={activeLang}
-                  multiline
-                  rows={4}
-                />
+                    <LangBlock
+                      label="Описание"
+                      value={descVal}
+                      onChange={v => setEditingCity(p => ({ ...p, description: v }))}
+                      activeLang={activeLang}
+                      multiline
+                      rows={4}
+                    />
 
-                <LangBlock
-                  label="Страна"
-                  value={countryVal}
-                  onChange={v => setEditingCity(p => ({ ...p, country: v }))}
-                  activeLang={activeLang}
-                />
+                    <LangBlock
+                      label="Страна"
+                      value={countryVal}
+                      onChange={v => setEditingCity(p => ({ ...p, country: v }))}
+                      activeLang={activeLang}
+                    />
+                  </>
+                ) : (
+                  <div className="p-3 bg-yellow-50 border border-yellow-200 rounded-lg text-sm text-yellow-800">
+                    Для этого города бэкенд не прислал переводы. Языки отображаются строго из JSON-ключей ответа.
+                  </div>
+                )}
               </div>
             )}
 
@@ -691,17 +689,16 @@ export default function CitiesCatalog() {
                       {allFilters.map((f) => {
                         const fid = String(f.id);
                         const selected = (ec?.city_filter_ids || []).includes(fid);
-                        const label = getMultiLang(f.name) || f.display_name || fid;
+                        const label = getMultiLangValue(f.name) || f.display_name || fid;
                         return (
                           <button
                             key={fid}
                             type="button"
                             onClick={() => toggleFilter(fid)}
-                            className={`flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium border transition-all ${
-                              selected
-                                ? 'bg-blue-600 text-white border-blue-600'
-                                : 'bg-white text-gray-600 border-gray-300 hover:border-blue-400 hover:text-blue-600'
-                            }`}
+                            className={`flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium border transition-all ${selected
+                              ? 'bg-blue-600 text-white border-blue-600'
+                              : 'bg-white text-gray-600 border-gray-300 hover:border-blue-400 hover:text-blue-600'
+                              }`}
                           >
                             {f.emoji && <span>{f.emoji}</span>}
                             {label}
@@ -735,7 +732,7 @@ export default function CitiesCatalog() {
         onClose={() => setDeleteTarget(null)}
         onConfirm={handleDelete}
         title="Удалить город?"
-        message={`Город «${getMultiLang(deleteTarget?.name) || deleteTarget?.id}» будет удалён безвозвратно.`}
+        message={`Город «${getMultiLangValue(deleteTarget?.name) || deleteTarget?.id}» будет удалён безвозвратно.`}
         confirmLabel="Удалить"
         danger
         loading={deleting}
@@ -746,8 +743,17 @@ export default function CitiesCatalog() {
         onClose={() => setCommonsModalOpen(false)}
         onImageSelected={handleCommonsImageSelect}
         getSessionUuid={() => ''}
-        defaultQuery={getMultiLang(ec?.name || '')}
+        defaultQuery={getMultiLangValue(ec?.name || '')}
       />
+
+      {preparingEdit && (
+        <div className="fixed inset-0 z-[70] bg-white/75 backdrop-blur-sm flex items-center justify-center">
+          <div className="px-4 py-3 rounded-xl border border-gray-200 bg-white shadow-sm flex items-center gap-2 text-sm text-gray-700">
+            <span className="animate-spin w-4 h-4 border-2 border-blue-500 border-t-transparent rounded-full inline-block" />
+            Загружаем данные города...
+          </div>
+        </div>
+      )}
     </Layout>
   );
 }

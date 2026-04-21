@@ -8,23 +8,10 @@ import { Field, TextInput, Textarea, FormActions } from '../../components/ui/For
 import { useLayoutActions } from '../../context/LayoutActionsContext';
 import { eventsAPI, citiesAPI, eventFiltersAPI } from '../../api/generation';
 import { parseApiError } from '../../utils/apiError';
+import { buildLangOptions, getMultiLangValue, pickPrimaryLangCode } from '../../features/catalog/shared/i18n';
+import { normalizeListResponse } from '../../features/catalog/shared/normalize';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
-function getMultiLang(val) {
-  if (!val) return '';
-  if (typeof val === 'string') return val;
-  return val.ru || val.en || val.it || Object.values(val).find(Boolean) || '';
-}
-
-const LANGS = [
-  { code: 'ru', label: 'RU', flag: '🇷🇺' },
-  { code: 'en', label: 'EN', flag: '🇺🇸' },
-  { code: 'it', label: 'IT', flag: '🇮🇹' },
-  { code: 'fr', label: 'FR', flag: '🇫🇷' },
-  { code: 'de', label: 'DE', flag: '🇩🇪' },
-  { code: 'es', label: 'ES', flag: '🇪🇸' },
-];
-
 function createEmptyEvent() {
   return {
     id: null,
@@ -42,11 +29,11 @@ function createEmptyEvent() {
 }
 
 // ─── LangTabs ────────────────────────────────────────────────────────────────
-function LangTabs({ active, onSwitch, values = {} }) {
+function LangTabs({ active, onSwitch, values = {}, langOptions = [] }) {
   const filled = new Set(Object.entries(values).filter(([, v]) => v?.trim()).map(([k]) => k));
   return (
     <div className="flex flex-wrap gap-1 mb-3">
-      {LANGS.map(({ code, label, flag }) => (
+      {langOptions.map(({ code, label, flag }) => (
         <button
           key={code}
           type="button"
@@ -73,6 +60,7 @@ function LangTabs({ active, onSwitch, values = {} }) {
 // ─── LangBlock ────────────────────────────────────────────────────────────────
 function LangBlock({ label, value = {}, onChange, activeLang, multiline = false, rows = 3, required }) {
   const lang = activeLang;
+  if (!lang) return null;
   return (
     <div>
       <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -114,7 +102,7 @@ export default function EventsCatalog() {
   // Edit state
   const [editingEvent, setEditingEvent] = useState(null);
   const [editLoading, setEditLoading] = useState(false);
-  const [activeLang, setActiveLang] = useState('ru');
+  const [activeLang, setActiveLang] = useState('');
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState(null);
 
@@ -138,9 +126,7 @@ export default function EventsCatalog() {
       };
       const response = await eventsAPI.list(params);
       const data = response?.data;
-      const list = Array.isArray(data?.events) ? data.events
-        : Array.isArray(data?.results) ? data.results
-        : Array.isArray(data) ? data : [];
+      const list = normalizeListResponse(data, ['events', 'results']);
       const count = data?.total ?? data?.count ?? list.length;
       setEvents(list);
       setTotalCount(count);
@@ -155,17 +141,13 @@ export default function EventsCatalog() {
   useEffect(() => {
     citiesAPI.list({ page_size: 300 }).then(r => {
       const data = r?.data;
-      const list = Array.isArray(data?.data) ? data.data
-        : Array.isArray(data?.results) ? data.results
-        : Array.isArray(data) ? data : [];
+      const list = normalizeListResponse(data, ['data', 'results']);
       setCityOptions(list);
     }).catch(() => {});
 
     eventFiltersAPI.list().then(r => {
       const data = r?.data;
-      const list = Array.isArray(data?.filters) ? data.filters
-        : Array.isArray(data?.tags) ? data.tags
-        : Array.isArray(data) ? data : [];
+      const list = normalizeListResponse(data, ['filters', 'tags', 'results']);
       setAllEventFilters(list);
     }).catch(() => {});
   }, []);
@@ -180,7 +162,7 @@ export default function EventsCatalog() {
   // ── Open edit: load full event data ─────────────────────────────────────
   const openEdit = useCallback(async (row) => {
     setSaveError(null);
-    setActiveLang('ru');
+    setActiveLang(pickPrimaryLangCode([row?.title, row?.description]));
     setEditingEvent({
       ...row,
       title: row.title || {},
@@ -216,7 +198,7 @@ export default function EventsCatalog() {
   const openCreate = useCallback(() => {
     setSaveError(null);
     setEditLoading(false);
-    setActiveLang('ru');
+    setActiveLang('');
     setEditingEvent(createEmptyEvent());
   }, []);
 
@@ -285,7 +267,7 @@ export default function EventsCatalog() {
       label: 'Название',
       render: (title, row) => (
         <div>
-          <div className="font-medium text-gray-900 text-sm">{getMultiLang(title) || '—'}</div>
+          <div className="font-medium text-gray-900 text-sm">{getMultiLangValue(title) || '—'}</div>
           {row.tags?.length > 0 && (
             <div className="flex flex-wrap gap-1 mt-1">
               {row.tags.slice(0, 3).map((tag, i) => (
@@ -329,6 +311,15 @@ export default function EventsCatalog() {
   const ee = editingEvent;
   const titleVal = typeof ee?.title === 'object' ? ee.title : {};
   const descVal = typeof ee?.description === 'object' ? ee.description : {};
+  const langOptions = buildLangOptions([titleVal, descVal]);
+
+  useEffect(() => {
+    if (!editingEvent || langOptions.length === 0) return;
+    const hasActive = langOptions.some((lang) => lang.code === activeLang);
+    if (!hasActive) {
+      setActiveLang(langOptions[0].code);
+    }
+  }, [editingEvent, langOptions, activeLang]);
 
   useEffect(() => {
     const actions = [
@@ -404,7 +395,7 @@ export default function EventsCatalog() {
             >
               <option value="">Все города</option>
               {cityOptions.map((c) => (
-                <option key={c.id} value={c.id}>{getMultiLang(c.name) || c.id}</option>
+                <option key={c.id} value={c.id}>{getMultiLangValue(c.name) || c.id}</option>
               ))}
             </select>
           )
@@ -432,7 +423,7 @@ export default function EventsCatalog() {
         open={!!editingEvent}
         onClose={() => setEditingEvent(null)}
         title={ee?.id
-          ? `Редактировать событие${ee ? ` — ${getMultiLang(ee.title) || ''}` : ''}`
+          ? `Редактировать событие${ee ? ` — ${getMultiLangValue(ee.title) || ''}` : ''}`
           : 'Создать событие'}
         size="xl"
       >
@@ -452,33 +443,42 @@ export default function EventsCatalog() {
             )}
 
             {/* ── Language switcher ─────────────────────────────────── */}
-            <div className="p-3 bg-gray-50 rounded-xl border border-gray-200">
-              <p className="text-xs font-medium text-gray-500 mb-2 uppercase tracking-wide">Активный язык</p>
-              <LangTabs
-                active={activeLang}
-                onSwitch={setActiveLang}
-                values={titleVal}
-              />
-            </div>
+            {langOptions.length > 0 ? (
+              <>
+                <div className="p-3 bg-gray-50 rounded-xl border border-gray-200">
+                  <p className="text-xs font-medium text-gray-500 mb-2 uppercase tracking-wide">Активный язык</p>
+                  <LangTabs
+                    active={activeLang}
+                    onSwitch={setActiveLang}
+                    values={titleVal}
+                    langOptions={langOptions}
+                  />
+                </div>
 
-            {/* ── Название ──────────────────────────────────────────── */}
-            <LangBlock
-              label="Название"
-              value={titleVal}
-              onChange={v => setEditingEvent(p => ({ ...p, title: v }))}
-              activeLang={activeLang}
-              required
-            />
+                {/* ── Название ──────────────────────────────────────────── */}
+                <LangBlock
+                  label="Название"
+                  value={titleVal}
+                  onChange={v => setEditingEvent(p => ({ ...p, title: v }))}
+                  activeLang={activeLang}
+                  required
+                />
 
-            {/* ── Описание ──────────────────────────────────────────── */}
-            <LangBlock
-              label="Описание"
-              value={descVal}
-              onChange={v => setEditingEvent(p => ({ ...p, description: v }))}
-              activeLang={activeLang}
-              multiline
-              rows={4}
-            />
+                {/* ── Описание ──────────────────────────────────────────── */}
+                <LangBlock
+                  label="Описание"
+                  value={descVal}
+                  onChange={v => setEditingEvent(p => ({ ...p, description: v }))}
+                  activeLang={activeLang}
+                  multiline
+                  rows={4}
+                />
+              </>
+            ) : (
+              <div className="p-3 bg-yellow-50 border border-yellow-200 rounded-lg text-sm text-yellow-800">
+                Для этого события бэкенд не прислал переводы. Языки отображаются строго из JSON-ключей ответа.
+              </div>
+            )}
 
             {/* ── Город + Видимость ─────────────────────────────────── */}
             <div className="grid grid-cols-2 gap-3">
@@ -491,7 +491,7 @@ export default function EventsCatalog() {
                   <option value="">— Без города —</option>
                   {cityOptions.map(c => (
                     <option key={c.id} value={String(c.id)}>
-                      {getMultiLang(c.name) || c.id}
+                      {getMultiLangValue(c.name) || c.id}
                     </option>
                   ))}
                 </select>
@@ -525,7 +525,7 @@ export default function EventsCatalog() {
                   {allEventFilters.map((f) => {
                     const fid = String(f.id);
                     const selected = (ee?.tag_ids || []).includes(fid);
-                    const label = getMultiLang(f.name) || f.display_name || fid;
+                    const label = getMultiLangValue(f.name) || f.display_name || fid;
                     return (
                       <button
                         key={fid}
@@ -609,7 +609,7 @@ export default function EventsCatalog() {
         onClose={() => setDeleteTarget(null)}
         onConfirm={handleDelete}
         title="Удалить событие?"
-        message={`Событие «${getMultiLang(deleteTarget?.title || deleteTarget?.name) || deleteTarget?.id}» будет удалено безвозвратно.`}
+        message={`Событие «${getMultiLangValue(deleteTarget?.title || deleteTarget?.name) || deleteTarget?.id}» будет удалено безвозвратно.`}
         confirmLabel="Удалить"
         danger
         loading={deleting}

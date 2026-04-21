@@ -5,14 +5,8 @@ import Modal from '../../components/ui/Modal';
 import { ConfirmModal } from '../../components/ui/Modal';
 import { MultiLangField, Field, TextInput, FormActions } from '../../components/ui/FormField';
 import { cityFiltersAPI, eventFiltersAPI } from '../../api/generation';
-
-function getMultiLang(val) {
-  if (!val) return '';
-  if (typeof val === 'string') return val;
-  return val.ru || val.en || val.it || Object.values(val).find(Boolean) || '';
-}
-
-const LANGS = ['ru', 'en', 'it'];
+import { extractLangCodes, getMultiLangValue } from '../../features/catalog/shared/i18n';
+import { normalizeListResponse } from '../../features/catalog/shared/normalize';
 
 function useFilters(api) {
   const [filters, setFilters] = useState([]);
@@ -25,10 +19,7 @@ function useFilters(api) {
       setError(null);
       const r = await api.list();
       const data = r?.data;
-      const list = Array.isArray(data?.filters) ? data.filters
-        : Array.isArray(data?.results) ? data.results
-        : Array.isArray(data?.tags) ? data.tags
-        : Array.isArray(data) ? data : [];
+      const list = normalizeListResponse(data, ['filters', 'results', 'tags']);
       setFilters(list);
     } catch (e) {
       setError(e?.response?.data?.error || e.message || 'Ошибка загрузки');
@@ -60,9 +51,17 @@ function FilterTab({ api, icon, emptyText, createLabel }) {
   const filtered = filters.filter((f) => {
     if (!search.trim()) return true;
     const q = search.toLowerCase();
-    return getMultiLang(f.name).toLowerCase().includes(q) ||
+      return getMultiLangValue(f.name).toLowerCase().includes(q) ||
       (f.slug || '').toLowerCase().includes(q);
   });
+
+  const dynamicLangs = extractLangCodes(
+    [
+      ...filters.map((f) => f?.name),
+      editingFilter?.name,
+      newFilter?.name,
+    ]
+  );
 
   const handleSave = async (e) => {
     e?.preventDefault();
@@ -129,7 +128,7 @@ function FilterTab({ api, icon, emptyText, createLabel }) {
       label: 'Название',
       render: (name) => (
         <div>
-          <div className="font-medium text-gray-900 text-sm">{getMultiLang(name) || '—'}</div>
+          <div className="font-medium text-gray-900 text-sm">{getMultiLangValue(name) || '—'}</div>
           {name && typeof name === 'object' && (
             <div className="text-xs text-gray-400 mt-0.5">
               {Object.entries(name).filter(([, v]) => v).map(([k, v]) => `${k}: ${v}`).join(' · ')}
@@ -209,7 +208,7 @@ function FilterTab({ api, icon, emptyText, createLabel }) {
             label="Название"
             value={newFilter.name}
             onChange={(v) => setNewFilter((p) => ({ ...p, name: v }))}
-            langs={LANGS}
+            langs={dynamicLangs}
           />
 
           <Field label="Эмодзи (опционально)">
@@ -243,7 +242,7 @@ function FilterTab({ api, icon, emptyText, createLabel }) {
               label="Название"
               value={typeof editingFilter.name === 'object' ? editingFilter.name : {}}
               onChange={(v) => setEditingFilter((p) => ({ ...p, name: v }))}
-              langs={LANGS}
+              langs={dynamicLangs}
             />
             <Field label="Эмодзи (опционально)">
               <TextInput
@@ -271,7 +270,7 @@ function FilterTab({ api, icon, emptyText, createLabel }) {
         onClose={() => setDeleteTarget(null)}
         onConfirm={handleDelete}
         title="Удалить фильтр?"
-        message={`Фильтр «${getMultiLang(deleteTarget?.name) || deleteTarget?.slug || deleteTarget?.id}» будет удалён.`}
+        message={`Фильтр «${getMultiLangValue(deleteTarget?.name) || deleteTarget?.slug || deleteTarget?.id}» будет удалён.`}
         confirmLabel="Удалить"
         danger
         loading={deleting}
