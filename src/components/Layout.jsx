@@ -1,9 +1,9 @@
-import { useState, useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import useTokenValidation from '../hooks/useTokenValidation';
-import TokenManager from '../utils/TokenManager';
 import { sessionsAPI } from '../api/generation';
 import { useLayoutActions } from '../context/LayoutActionsContext';
+import useTokenValidation from '../hooks/useTokenValidation';
+import TokenManager from '../utils/TokenManager';
 
 function getActiveSessions(sessions) {
   return sessions.filter(
@@ -43,7 +43,7 @@ export default function Layout({ children, pageHeader = null, pageHeaderMode = '
       const list = Array.isArray(data?.results) ? data.results
         : Array.isArray(data) ? data : [];
       setActiveSessions(getActiveSessions(list));
-    }).catch(() => {});
+    }).catch(() => { });
   }, [location.pathname]);
 
   useEffect(() => {
@@ -105,6 +105,7 @@ export default function Layout({ children, pageHeader = null, pageHeaderMode = '
       items: [
         { label: 'Города', to: '/catalog/cities' },
         { label: 'Ивенты', to: '/catalog/events' },
+        { label: 'Типы билетов', to: '/catalog/ticket-types' },
         { label: 'Фотографии', to: '/catalog/photos' },
         { label: 'Теги и фильтры', to: '/catalog/tags' },
       ],
@@ -134,6 +135,7 @@ export default function Layout({ children, pageHeader = null, pageHeaderMode = '
     { startsWith: '/tasks', title: 'Мои задачи' },
     { startsWith: '/catalog/cities', title: 'Справочник городов' },
     { startsWith: '/catalog/events', title: 'Справочник ивентов' },
+    { startsWith: '/catalog/ticket-types', title: 'Справочник типов билетов' },
     { startsWith: '/catalog/photos', title: 'Каталог фото' },
     { startsWith: '/catalog/tags', title: 'Теги и фильтры' },
     { startsWith: '/export/zip', title: 'Экспорт ZIP' },
@@ -171,9 +173,8 @@ export default function Layout({ children, pageHeader = null, pageHeaderMode = '
     <nav className="space-y-4">
       {sidebarSections.map((section) => (
         <div key={section.title}>
-          <p className={`pb-2 text-xs font-semibold uppercase tracking-wide text-gray-400 ${
-            sidebarExpanded ? 'px-3' : 'px-1 text-center'
-          }`}>
+          <p className={`pb-2 text-xs font-semibold uppercase tracking-wide text-gray-400 ${sidebarExpanded ? 'px-3' : 'px-1 text-center'
+            }`}>
             {sidebarExpanded ? section.title : section.title.charAt(0)}
           </p>
           <div className="space-y-0.5">
@@ -186,13 +187,11 @@ export default function Layout({ children, pageHeader = null, pageHeaderMode = '
                   key={`${section.title}-${item.label}`}
                   to={item.to}
                   title={!sidebarExpanded ? item.label : ''}
-                  className={`flex items-center justify-between rounded-lg text-sm font-medium transition-colors ${
-                    sidebarExpanded ? 'px-3' : 'px-1 justify-center'
-                  } py-2 ${
-                    isActive
+                  className={`flex items-center justify-between rounded-lg text-sm font-medium transition-colors ${sidebarExpanded ? 'px-3' : 'px-1 justify-center'
+                    } py-2 ${isActive
                       ? 'bg-blue-100 text-blue-700'
                       : 'text-gray-700 hover:bg-gray-100'
-                  }`}
+                    }`}
                 >
                   <span className={`truncate ${!sidebarExpanded && 'hidden'}`}>{item.label}</span>
                   {item.badge && sidebarExpanded && (
@@ -210,7 +209,7 @@ export default function Layout({ children, pageHeader = null, pageHeaderMode = '
   );
 
   return (
-      <div className="flex h-screen bg-gray-50">
+    <div className="flex h-screen bg-gray-50">
       {isMobile && mobileSidebarOpen && (
         <button
           type="button"
@@ -230,11 +229,10 @@ export default function Layout({ children, pageHeader = null, pageHeaderMode = '
       )}
 
       {/* Left Sidebar */}
-      <aside className={`fixed inset-y-0 left-0 bg-white border-r border-gray-200 shadow-sm transition-all duration-300 flex flex-col z-40 ${
-        isMobile
+      <aside className={`fixed inset-y-0 left-0 bg-white border-r border-gray-200 shadow-sm transition-all duration-300 flex flex-col z-40 ${isMobile
           ? `w-72 max-w-[85vw] transform ${mobileSidebarOpen ? 'translate-x-0' : '-translate-x-full'}`
           : sidebarExpanded ? 'w-64' : 'w-20'
-      }`}>
+        }`}>
         {/* Sidebar Header with User Info */}
         <div className="border-b border-gray-200 p-3 flex flex-col gap-3">
           <div className="flex items-center justify-between gap-2">
@@ -277,9 +275,8 @@ export default function Layout({ children, pageHeader = null, pageHeaderMode = '
         <div className="border-t border-gray-200 p-3 space-y-2">
           <button
             onClick={handleLogout}
-            className={`w-full flex items-center justify-center gap-2 rounded-lg text-sm font-medium text-red-600 hover:bg-red-50 transition-colors py-2 ${
-              (sidebarExpanded || isMobile) ? 'px-3' : 'px-1'
-            }`}
+            className={`w-full flex items-center justify-center gap-2 rounded-lg text-sm font-medium text-red-600 hover:bg-red-50 transition-colors py-2 ${(sidebarExpanded || isMobile) ? 'px-3' : 'px-1'
+              }`}
             title={(!sidebarExpanded && !isMobile) ? 'Logout' : ''}
           >
             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -322,13 +319,12 @@ export default function Layout({ children, pageHeader = null, pageHeaderMode = '
                       setMobileActionsOpen(false);
                       action.onClick?.();
                     }}
-                    className={`w-full px-3 py-2 rounded-lg text-left text-sm font-medium transition-colors disabled:opacity-50 ${
-                      action.variant === 'danger'
+                    className={`w-full px-3 py-2 rounded-lg text-left text-sm font-medium transition-colors disabled:opacity-50 ${action.variant === 'danger'
                         ? 'bg-red-50 text-red-700 hover:bg-red-100'
                         : action.variant === 'primary'
-                        ? 'bg-blue-600 text-white hover:bg-blue-700'
-                        : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                    }`}
+                          ? 'bg-blue-600 text-white hover:bg-blue-700'
+                          : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                      }`}
                   >
                     {action.label}
                   </button>
@@ -356,9 +352,8 @@ export default function Layout({ children, pageHeader = null, pageHeaderMode = '
       )}
 
       {/* Main Content */}
-      <main className={`flex-1 overflow-auto transition-all duration-300 ${
-        isMobile ? 'ml-0' : sidebarExpanded ? 'ml-64' : 'ml-20'
-      }`}>
+      <main className={`flex-1 overflow-auto transition-all duration-300 ${isMobile ? 'ml-0' : sidebarExpanded ? 'ml-64' : 'ml-20'
+        }`}>
         {isMobile && (
           <div className="sticky top-0 z-20 bg-gray-50/95 backdrop-blur border-b border-gray-200 px-4 py-3">
             <div className="flex items-center justify-between gap-2">
@@ -444,6 +439,6 @@ export default function Layout({ children, pageHeader = null, pageHeaderMode = '
           </div>
         </div>
       </main>
-      </div>
+    </div>
   );
 }
