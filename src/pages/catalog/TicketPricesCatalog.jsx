@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { bookingReferenceAPI, ticketPricesAPI, ticketTypesAPI } from '../../api/booking';
+import { bookingReferenceAPI, eventSlotAvailabilitiesAPI, ticketPricesAPI, ticketTypesAPI } from '../../api/booking';
 import Layout from '../../components/Layout';
 import DataTable from '../../components/ui/DataTable';
 import { Field, FormActions, TextInput } from '../../components/ui/FormField';
@@ -44,6 +44,11 @@ export default function TicketPricesCatalog() {
 
   const [ticketTypeOptions, setTicketTypeOptions] = useState([]);
   const [ticketTypesLoading, setTicketTypesLoading] = useState(false);
+
+  const [formTicketTypeOptions, setFormTicketTypeOptions] = useState([]);
+  const [formTicketTypesLoading, setFormTicketTypesLoading] = useState(false);
+  const [slotOptions, setSlotOptions] = useState([]);
+  const [slotsLoading, setSlotsLoading] = useState(false);
 
   const [editingPrice, setEditingPrice] = useState(null);
   const [saving, setSaving] = useState(false);
@@ -102,6 +107,52 @@ export default function TicketPricesCatalog() {
     }
   }, []);
 
+  const loadFormTicketTypes = useCallback(async (eventId) => {
+    const normalizedEventId = eventId || '';
+    if (!normalizedEventId) {
+      setFormTicketTypeOptions([]);
+      return;
+    }
+
+    try {
+      setFormTicketTypesLoading(true);
+      const response = await ticketTypesAPI.list({ event: normalizedEventId, page_size: 500, ordering: 'name' });
+      const data = response?.data;
+      const list = normalizeListResponse(data, ['results', 'data']);
+      setFormTicketTypeOptions(list);
+    } catch {
+      setFormTicketTypeOptions([]);
+    } finally {
+      setFormTicketTypesLoading(false);
+    }
+  }, []);
+
+  const loadSlots = useCallback(async (eventId, ticketTypeId) => {
+    const normalizedEventId = eventId || '';
+    const normalizedTicketTypeId = ticketTypeId || '';
+    if (!normalizedEventId || !normalizedTicketTypeId) {
+      setSlotOptions([]);
+      return;
+    }
+
+    try {
+      setSlotsLoading(true);
+      const response = await eventSlotAvailabilitiesAPI.list({
+        event: normalizedEventId,
+        ticket_type: normalizedTicketTypeId,
+        page_size: 500,
+        ordering: 'slot_datetime',
+      });
+      const data = response?.data;
+      const list = normalizeListResponse(data, ['results', 'data']);
+      setSlotOptions(list);
+    } catch {
+      setSlotOptions([]);
+    } finally {
+      setSlotsLoading(false);
+    }
+  }, []);
+
   useEffect(() => {
     loadEvents();
   }, [loadEvents]);
@@ -110,6 +161,13 @@ export default function TicketPricesCatalog() {
     loadTicketTypes(eventFilter);
     setTicketTypeFilter('');
   }, [eventFilter, loadTicketTypes]);
+
+  useEffect(() => {
+    const eventId = editingPrice?.event || '';
+    const ticketTypeId = editingPrice?.ticket_type || '';
+    loadFormTicketTypes(eventId);
+    loadSlots(eventId, ticketTypeId);
+  }, [editingPrice?.event, editingPrice?.ticket_type, loadFormTicketTypes, loadSlots]);
 
   const reload = useCallback(async (pageNum) => {
     const isActiveParam =
@@ -420,7 +478,6 @@ export default function TicketPricesCatalog() {
                   onChange={(e) => {
                     const nextEvent = e.target.value;
                     setEditingPrice((prev) => ({ ...prev, event: nextEvent, ticket_type: '', slot: '' }));
-                    setEventFilter(nextEvent);
                   }}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none"
                   required
@@ -440,10 +497,10 @@ export default function TicketPricesCatalog() {
                   onChange={(e) => setEditingPrice((prev) => ({ ...prev, ticket_type: e.target.value, slot: '' }))}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none"
                   required
-                  disabled={!editingPrice.event || ticketTypesLoading}
+                  disabled={!editingPrice.event || formTicketTypesLoading}
                 >
                   <option value="">{editingPrice.event ? 'Выберите тип' : 'Сначала выберите событие'}</option>
-                  {ticketTypeOptions.map((tt) => (
+                  {formTicketTypeOptions.map((tt) => (
                     <option key={tt.id} value={tt.id}>
                       {tt.name || tt.id}
                     </option>
@@ -452,13 +509,23 @@ export default function TicketPricesCatalog() {
               </Field>
             </div>
 
-            <Field label="ID слота (slot availability UUID)" required>
-              <TextInput
+            <Field label="Слот" required>
+              <select
                 value={editingPrice.slot}
                 onChange={(e) => setEditingPrice((prev) => ({ ...prev, slot: e.target.value }))}
-                placeholder="Например: 6f0c0d2f-...."
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none"
                 required
-              />
+                disabled={!editingPrice.ticket_type || slotsLoading}
+              >
+                <option value="">
+                  {editingPrice.ticket_type ? 'Выберите слот' : 'Сначала выберите тип билета'}
+                </option>
+                {slotOptions.map((slotItem) => (
+                  <option key={slotItem.id} value={slotItem.id}>
+                    {new Date(slotItem.slot_datetime).toLocaleString()} | мест: {slotItem.available_seats}
+                  </option>
+                ))}
+              </select>
             </Field>
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
