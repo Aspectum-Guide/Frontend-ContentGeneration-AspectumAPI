@@ -5,15 +5,11 @@ import DataTable from '../../components/ui/DataTable';
 import { Field, FormActions, TextInput, Textarea } from '../../components/ui/FormField';
 import Modal, { ConfirmModal } from '../../components/ui/Modal';
 import { useLayoutActions } from '../../context/LayoutActionsContext';
+import { getMultiLangValue } from '../../features/catalog/shared/i18n';
+import { normalizeListResponse } from '../../features/catalog/shared/normalize';
 import { parseApiError } from '../../utils/apiError';
 
 const PAGE_SIZE = 20;
-
-function getMultiLang(val) {
-  if (!val) return '';
-  if (typeof val === 'string') return val;
-  return val.ru || val.en || val.it || Object.values(val).find(Boolean) || '';
-}
 
 function createEmptyTicketType() {
   return {
@@ -52,7 +48,7 @@ export default function TicketTypesCatalog() {
   const eventMap = useMemo(() => {
     const map = new Map();
     for (const eventItem of eventOptions) {
-      map.set(String(eventItem.id), getMultiLang(eventItem.title) || String(eventItem.id));
+      map.set(String(eventItem.id), getMultiLangValue(eventItem.title) || String(eventItem.id));
     }
     return map;
   }, [eventOptions]);
@@ -62,11 +58,7 @@ export default function TicketTypesCatalog() {
       setEventsLoading(true);
       const response = await bookingReferenceAPI.events({ page_size: 500 });
       const data = response?.data;
-      const list = Array.isArray(data?.results)
-        ? data.results
-        : Array.isArray(data)
-          ? data
-          : [];
+      const list = normalizeListResponse(data, ['results', 'data']);
       setEventOptions(list);
     } catch {
       setEventOptions([]);
@@ -86,7 +78,6 @@ export default function TicketTypesCatalog() {
 
     try {
       setLoading(true);
-      setError(null);
 
       const params = {
         event: state.eventFilter || undefined,
@@ -310,7 +301,7 @@ export default function TicketTypesCatalog() {
               <option value="">Все события</option>
               {eventOptions.map((eventItem) => (
                 <option key={eventItem.id} value={eventItem.id}>
-                  {getMultiLang(eventItem.title) || eventItem.id}
+                  {getMultiLangValue(eventItem.title) || eventItem.id}
                 </option>
               ))}
             </select>
@@ -382,7 +373,7 @@ export default function TicketTypesCatalog() {
                   <option value="">Выберите событие</option>
                   {eventOptions.map((eventItem) => (
                     <option key={eventItem.id} value={eventItem.id}>
-                      {getMultiLang(eventItem.title) || eventItem.id}
+                      {getMultiLangValue(eventItem.title) || eventItem.id}
                     </option>
                   ))}
                 </select>
