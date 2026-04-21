@@ -9,7 +9,10 @@ import { parseApiError } from '../../../utils/apiError';
 import { useCatalogFilters } from '../core/useCatalogFilters';
 import { useCatalogResource } from '../core/useCatalogResource';
 import { useEventOptions, useTicketTypeOptions } from '../shared/bookingOptions';
+import ActiveCheckboxField from '../shared/components/ActiveCheckboxField';
 import CatalogPageHeader from '../shared/components/CatalogPageHeader';
+import FormErrorAlert from '../shared/components/FormErrorAlert';
+import FormHint from '../shared/components/FormHint';
 import StatusBadge from '../shared/components/StatusBadge';
 import TableRowActions from '../shared/components/TableRowActions';
 import { getMultiLangValue } from '../shared/i18n';
@@ -386,11 +389,7 @@ export default function TicketPricesCatalog() {
       >
         {editingPrice && (
           <form onSubmit={handleSave} className="space-y-4">
-            {saveError && (
-              <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">
-                {saveError}
-              </div>
-            )}
+            <FormErrorAlert message={saveError} />
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               <Field label="Событие" required>
@@ -470,22 +469,16 @@ export default function TicketPricesCatalog() {
                   required
                 />
               </Field>
-              <Field label="Статус">
-                <label className="flex items-center gap-2 select-none cursor-pointer w-fit pt-2">
-                  <input
-                    type="checkbox"
-                    checked={!!editingPrice.is_active}
-                    onChange={(e) => setEditingPrice((prev) => ({ ...prev, is_active: e.target.checked }))}
-                    className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                  />
-                  <span className="text-sm text-gray-700">Активна</span>
-                </label>
-              </Field>
+              <ActiveCheckboxField
+                checked={editingPrice.is_active}
+                onChange={(next) => setEditingPrice((prev) => ({ ...prev, is_active: next }))}
+                text="Активна"
+              />
             </div>
 
-            <div className="p-3 bg-gray-50 border border-gray-200 rounded-lg text-xs text-gray-600">
+            <FormHint>
               Важно: в бэкенде цена должна ссылаться на слот и тип билета, причём слот обязан соответствовать этому типу билета.
-            </div>
+            </FormHint>
 
             <FormActions
               saving={saving}
