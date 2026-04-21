@@ -1,13 +1,13 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { bookingReferenceAPI, ticketTypesAPI } from '../../../api/booking';
+import { ticketTypesAPI } from '../../../api/booking';
 import Layout from '../../../components/Layout';
 import DataTable from '../../../components/ui/DataTable';
 import { Field, FormActions, TextInput, Textarea } from '../../../components/ui/FormField';
 import Modal, { ConfirmModal } from '../../../components/ui/Modal';
 import { useLayoutActions } from '../../../context/LayoutActionsContext';
-import { getMultiLangValue } from '../shared/i18n';
-import { normalizeListResponse } from '../shared/normalize';
 import { parseApiError } from '../../../utils/apiError';
+import { useEventOptions } from '../shared/bookingOptions';
+import { getMultiLangValue } from '../shared/i18n';
 
 const PAGE_SIZE = 20;
 
@@ -28,8 +28,7 @@ export default function TicketTypesCatalog() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  const [eventOptions, setEventOptions] = useState([]);
-  const [eventsLoading, setEventsLoading] = useState(true);
+  const { eventOptions, eventsLoading } = useEventOptions();
 
   const [search, setSearch] = useState('');
   const [eventFilter, setEventFilter] = useState('');
@@ -52,20 +51,6 @@ export default function TicketTypesCatalog() {
     }
     return map;
   }, [eventOptions]);
-
-  const loadEvents = useCallback(async () => {
-    try {
-      setEventsLoading(true);
-      const response = await bookingReferenceAPI.events({ page_size: 500 });
-      const data = response?.data;
-      const list = normalizeListResponse(data, ['results', 'data']);
-      setEventOptions(list);
-    } catch {
-      setEventOptions([]);
-    } finally {
-      setEventsLoading(false);
-    }
-  }, []);
 
   const loadTicketTypes = useCallback(async (paramsState) => {
     const state = paramsState || {
@@ -113,10 +98,6 @@ export default function TicketTypesCatalog() {
       setLoading(false);
     }
   }, [eventFilter, ordering, page, search, statusFilter]);
-
-  useEffect(() => {
-    loadEvents();
-  }, [loadEvents]);
 
   useEffect(() => {
     loadTicketTypes();

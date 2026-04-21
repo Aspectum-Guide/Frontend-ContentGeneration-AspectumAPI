@@ -1,15 +1,15 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { bookingReferenceAPI, eventSlotAvailabilitiesAPI, ticketTypesAPI } from '../../../api/booking';
+import { eventSlotAvailabilitiesAPI } from '../../../api/booking';
 import Layout from '../../../components/Layout';
 import DataTable from '../../../components/ui/DataTable';
 import { Field, FormActions, TextInput } from '../../../components/ui/FormField';
 import Modal, { ConfirmModal } from '../../../components/ui/Modal';
 import { useLayoutActions } from '../../../context/LayoutActionsContext';
+import { parseApiError } from '../../../utils/apiError';
 import { useCatalogFilters } from '../core/useCatalogFilters';
 import { useCatalogResource } from '../core/useCatalogResource';
+import { useEventOptions, useTicketTypeOptions } from '../shared/bookingOptions';
 import { getMultiLangValue } from '../shared/i18n';
-import { normalizeListResponse } from '../shared/normalize';
-import { parseApiError } from '../../../utils/apiError';
 
 const PAGE_SIZE = 20;
 
@@ -57,12 +57,10 @@ export default function SlotAvailabilitiesCatalog() {
     defaultErrorMessage: 'Ошибка загрузки слотов',
   });
 
-  const [eventOptions, setEventOptions] = useState([]);
-  const [eventsLoading, setEventsLoading] = useState(true);
+  const { eventOptions, eventsLoading } = useEventOptions();
   const [eventFilter, setEventFilter] = useState('');
 
-  const [ticketTypeOptions, setTicketTypeOptions] = useState([]);
-  const [ticketTypesLoading, setTicketTypesLoading] = useState(false);
+  const { ticketTypeOptions, ticketTypesLoading } = useTicketTypeOptions(eventFilter);
   const [ticketTypeFilter, setTicketTypeFilter] = useState('');
 
   const [editingAvailability, setEditingAvailability] = useState(null);
@@ -88,48 +86,9 @@ export default function SlotAvailabilitiesCatalog() {
     return map;
   }, [ticketTypeOptions]);
 
-  const loadEvents = useCallback(async () => {
-    try {
-      setEventsLoading(true);
-      const response = await bookingReferenceAPI.events({ page_size: 500 });
-      const data = response?.data;
-      const list = normalizeListResponse(data, ['results', 'data']);
-      setEventOptions(list);
-    } catch {
-      setEventOptions([]);
-    } finally {
-      setEventsLoading(false);
-    }
-  }, []);
-
-  const loadTicketTypes = useCallback(async (eventId) => {
-    const normalizedEventId = eventId || '';
-    if (!normalizedEventId) {
-      setTicketTypeOptions([]);
-      return;
-    }
-
-    try {
-      setTicketTypesLoading(true);
-      const response = await ticketTypesAPI.list({ event: normalizedEventId, page_size: 500, ordering: 'name' });
-      const data = response?.data;
-      const list = normalizeListResponse(data, ['results', 'data']);
-      setTicketTypeOptions(list);
-    } catch {
-      setTicketTypeOptions([]);
-    } finally {
-      setTicketTypesLoading(false);
-    }
-  }, []);
-
   useEffect(() => {
-    loadEvents();
-  }, [loadEvents]);
-
-  useEffect(() => {
-    loadTicketTypes(eventFilter);
     setTicketTypeFilter('');
-  }, [eventFilter, loadTicketTypes]);
+  }, [eventFilter]);
 
   const reload = useCallback(async (pageNum) => {
     await avail.load(
@@ -295,9 +254,8 @@ export default function SlotAvailabilitiesCatalog() {
       key: 'is_active',
       label: 'Статус',
       render: (active) => (
-        <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
-          active ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'
-        }`}>
+        <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${active ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'
+          }`}>
           {active ? 'Активен' : 'Отключен'}
         </span>
       ),

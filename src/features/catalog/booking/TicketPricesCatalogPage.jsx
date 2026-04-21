@@ -1,15 +1,16 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { bookingReferenceAPI, eventSlotAvailabilitiesAPI, ticketPricesAPI, ticketTypesAPI } from '../../../api/booking';
+import { eventSlotAvailabilitiesAPI, ticketPricesAPI } from '../../../api/booking';
 import Layout from '../../../components/Layout';
 import DataTable from '../../../components/ui/DataTable';
 import { Field, FormActions, TextInput } from '../../../components/ui/FormField';
 import Modal, { ConfirmModal } from '../../../components/ui/Modal';
 import { useLayoutActions } from '../../../context/LayoutActionsContext';
-import { getMultiLangValue } from '../shared/i18n';
-import { normalizeListResponse } from '../shared/normalize';
+import { parseApiError } from '../../../utils/apiError';
 import { useCatalogFilters } from '../core/useCatalogFilters';
 import { useCatalogResource } from '../core/useCatalogResource';
-import { parseApiError } from '../../../utils/apiError';
+import { useEventOptions, useTicketTypeOptions } from '../shared/bookingOptions';
+import { getMultiLangValue } from '../shared/i18n';
+import { normalizeListResponse } from '../shared/normalize';
 
 const PAGE_SIZE = 20;
 
@@ -35,18 +36,14 @@ export default function TicketPricesCatalog() {
     defaultErrorMessage: 'Ошибка загрузки цен',
   });
 
-  const [eventOptions, setEventOptions] = useState([]);
-  const [eventsLoading, setEventsLoading] = useState(true);
+  const { eventOptions, eventsLoading } = useEventOptions();
 
   const [eventFilter, setEventFilter] = useState('');
   const [ticketTypeFilter, setTicketTypeFilter] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
 
-  const [ticketTypeOptions, setTicketTypeOptions] = useState([]);
-  const [ticketTypesLoading, setTicketTypesLoading] = useState(false);
-
-  const [formTicketTypeOptions, setFormTicketTypeOptions] = useState([]);
-  const [formTicketTypesLoading, setFormTicketTypesLoading] = useState(false);
+  const { ticketTypeOptions, ticketTypesLoading } = useTicketTypeOptions(eventFilter);
+  const { ticketTypeOptions: formTicketTypeOptions, ticketTypesLoading: formTicketTypesLoading } = useTicketTypeOptions(editingPrice?.event || '');
   const [slotOptions, setSlotOptions] = useState([]);
   const [slotsLoading, setSlotsLoading] = useState(false);
 
@@ -72,60 +69,6 @@ export default function TicketPricesCatalog() {
     }
     return map;
   }, [ticketTypeOptions]);
-
-  const loadEvents = useCallback(async () => {
-    try {
-      setEventsLoading(true);
-      const response = await bookingReferenceAPI.events({ page_size: 500 });
-      const data = response?.data;
-      const list = normalizeListResponse(data, ['results', 'data']);
-      setEventOptions(list);
-    } catch {
-      setEventOptions([]);
-    } finally {
-      setEventsLoading(false);
-    }
-  }, []);
-
-  const loadTicketTypes = useCallback(async (eventId) => {
-    const normalizedEventId = eventId || '';
-    if (!normalizedEventId) {
-      setTicketTypeOptions([]);
-      return;
-    }
-
-    try {
-      setTicketTypesLoading(true);
-      const response = await ticketTypesAPI.list({ event: normalizedEventId, page_size: 500, ordering: 'name' });
-      const data = response?.data;
-      const list = normalizeListResponse(data, ['results', 'data']);
-      setTicketTypeOptions(list);
-    } catch {
-      setTicketTypeOptions([]);
-    } finally {
-      setTicketTypesLoading(false);
-    }
-  }, []);
-
-  const loadFormTicketTypes = useCallback(async (eventId) => {
-    const normalizedEventId = eventId || '';
-    if (!normalizedEventId) {
-      setFormTicketTypeOptions([]);
-      return;
-    }
-
-    try {
-      setFormTicketTypesLoading(true);
-      const response = await ticketTypesAPI.list({ event: normalizedEventId, page_size: 500, ordering: 'name' });
-      const data = response?.data;
-      const list = normalizeListResponse(data, ['results', 'data']);
-      setFormTicketTypeOptions(list);
-    } catch {
-      setFormTicketTypeOptions([]);
-    } finally {
-      setFormTicketTypesLoading(false);
-    }
-  }, []);
 
   const loadSlots = useCallback(async (eventId, ticketTypeId) => {
     const normalizedEventId = eventId || '';
@@ -154,20 +97,14 @@ export default function TicketPricesCatalog() {
   }, []);
 
   useEffect(() => {
-    loadEvents();
-  }, [loadEvents]);
-
-  useEffect(() => {
-    loadTicketTypes(eventFilter);
     setTicketTypeFilter('');
-  }, [eventFilter, loadTicketTypes]);
+  }, [eventFilter]);
 
   useEffect(() => {
     const eventId = editingPrice?.event || '';
     const ticketTypeId = editingPrice?.ticket_type || '';
-    loadFormTicketTypes(eventId);
     loadSlots(eventId, ticketTypeId);
-  }, [editingPrice?.event, editingPrice?.ticket_type, loadFormTicketTypes, loadSlots]);
+  }, [editingPrice?.event, editingPrice?.ticket_type, loadSlots]);
 
   const reload = useCallback(async (pageNum) => {
     const isActiveParam =
@@ -570,7 +507,7 @@ export default function TicketPricesCatalog() {
               saving={saving}
               saveLabel={editingPrice.id ? 'Сохранить' : 'Создать'}
               onCancel={() => setEditingPrice(null)}
-              />
+            />
           </form>
         )}
       </Modal>
