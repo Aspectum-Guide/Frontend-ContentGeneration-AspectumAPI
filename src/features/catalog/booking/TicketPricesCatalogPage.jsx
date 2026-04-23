@@ -44,6 +44,10 @@ export default function TicketPricesCatalog() {
 
   const { eventOptions, eventsLoading } = useEventOptions();
 
+  const [editingPrice, setEditingPrice] = useState(null);
+  const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState(null);
+
   const [eventFilter, setEventFilter] = useState('');
   const [ticketTypeFilter, setTicketTypeFilter] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
@@ -52,10 +56,6 @@ export default function TicketPricesCatalog() {
   const { ticketTypeOptions: formTicketTypeOptions, ticketTypesLoading: formTicketTypesLoading } = useTicketTypeOptions(editingPrice?.event || '');
   const [slotOptions, setSlotOptions] = useState([]);
   const [slotsLoading, setSlotsLoading] = useState(false);
-
-  const [editingPrice, setEditingPrice] = useState(null);
-  const [saving, setSaving] = useState(false);
-  const [saveError, setSaveError] = useState(null);
 
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [deleting, setDeleting] = useState(false);
@@ -357,7 +357,7 @@ export default function TicketPricesCatalog() {
               <option value="">{eventFilter ? 'Все типы' : 'Сначала выберите событие'}</option>
               {ticketTypeOptions.map((tt) => (
                 <option key={tt.id} value={tt.id}>
-                  {tt.name || tt.id}
+                  {getMultiLangValue(tt.name) || tt.name_primary || tt.id}
                 </option>
               ))}
             </select>
@@ -422,7 +422,7 @@ export default function TicketPricesCatalog() {
                   <option value="">{editingPrice.event ? 'Выберите тип' : 'Сначала выберите событие'}</option>
                   {formTicketTypeOptions.map((tt) => (
                     <option key={tt.id} value={tt.id}>
-                      {tt.name || tt.id}
+                      {getMultiLangValue(tt.name) || tt.name_primary || tt.id}
                     </option>
                   ))}
                 </select>

@@ -21,7 +21,10 @@ export function extractLangCodes(values = [], fallback = []) {
   for (const value of values) {
     if (!isPlainObject(value)) continue;
     for (const [lang, text] of Object.entries(value)) {
-      if (hasAnyText(text)) {
+      if (typeof lang === 'string' && lang.trim()) {
+        // include keys even if empty to allow managing translations via UI
+        set.add(lang);
+      } else if (hasAnyText(text)) {
         set.add(lang);
       }
     }

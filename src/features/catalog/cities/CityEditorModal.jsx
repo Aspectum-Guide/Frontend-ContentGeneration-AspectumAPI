@@ -169,7 +169,31 @@ export default function CityEditorModal({
                   <>
                     <div className="p-3 bg-gray-50 rounded-xl border border-gray-200">
                       <p className="text-xs font-medium text-gray-500 mb-2 uppercase tracking-wide">Активный язык</p>
-                      <LangTabs active={activeLang} onSwitch={setActiveLang} value={nameVal} langOptions={langOptions} />
+                      <LangTabs
+                        active={activeLang}
+                        onSwitch={setActiveLang}
+                        value={nameVal}
+                        langOptions={langOptions}
+                        onAddLang={(code) => {
+                          setCity((p) => ({
+                            ...p,
+                            name: { ...(p?.name || {}), [code]: p?.name?.[code] ?? '' },
+                            description: { ...(p?.description || {}), [code]: p?.description?.[code] ?? '' },
+                            country: { ...(p?.country || {}), [code]: p?.country?.[code] ?? '' },
+                          }));
+                        }}
+                        onRemoveLang={(code) => {
+                          setCity((p) => {
+                            const nextName = { ...(p?.name || {}) };
+                            const nextDesc = { ...(p?.description || {}) };
+                            const nextCountry = { ...(p?.country || {}) };
+                            delete nextName[code];
+                            delete nextDesc[code];
+                            delete nextCountry[code];
+                            return { ...p, name: nextName, description: nextDesc, country: nextCountry };
+                          });
+                        }}
+                      />
                     </div>
 
                     <LangBlock

@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
-import { eventSlotAvailabilitiesAPI } from '../../../api/booking';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { eventSlotAvailabilitiesAPI, ticketTypesAPI } from '../../../api/booking';
 import Layout from '../../../components/Layout';
 import DataTable from '../../../components/ui/DataTable';
 import { Field, FormActions, TextInput } from '../../../components/ui/FormField';
@@ -23,7 +23,7 @@ function createEmptyAvailability() {
   return {
     id: null,
     event: '',
-    ticket_type: '',
+    ticket_types: [],
     slot_datetime: '',
     booking_closes_minutes_before: 60,
     available_seats: 0,
@@ -69,6 +69,10 @@ export default function SlotAvailabilitiesCatalog() {
   const { ticketTypeOptions, ticketTypesLoading } = useTicketTypeOptions(eventFilter);
   const [ticketTypeFilter, setTicketTypeFilter] = useState('');
 
+  // Cache ticket type labels for table rendering (so we can show labels even when filters are empty).
+  const ticketTypeCacheRef = useRef(new Map()); // id -> { title: string, primary: string }
+  const [ticketTypeLabelVersion, setTicketTypeLabelVersion] = useState(0);
+
   const [editingAvailability, setEditingAvailability] = useState(null);
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState(null);
@@ -84,13 +88,70 @@ export default function SlotAvailabilitiesCatalog() {
     return map;
   }, [eventOptions]);
 
-  const ticketTypeLabelById = useMemo(() => {
-    const map = new Map();
+  const ticketTypeById = useMemo(() => {
+    // start with cached (covers table rows)
+    const map = new Map(ticketTypeCacheRef.current);
+    // overlay currently loaded options for selects (event-filtered)
     for (const tt of ticketTypeOptions) {
-      map.set(String(tt.id), tt.name || String(tt.id));
+      const id = String(tt?.id || '');
+      if (!id) continue;
+      const title = getMultiLangValue(tt?.name) || tt?.name_primary || id;
+      const primary = String(tt?.name_primary || '').trim();
+      map.set(id, { title, primary });
     }
     return map;
-  }, [ticketTypeOptions]);
+  }, [ticketTypeOptions, ticketTypeLabelVersion]);
+
+  useEffect(() => {
+    // Prefetch ticket type labels for all events visible in current table page,
+    // so the "Тип билета" column shows name_primary instead of UUID.
+    const items = Array.isArray(avail.items) ? avail.items : [];
+    const eventIds = Array.from(
+      new Set(items.map((x) => String(x?.event || '')).filter(Boolean))
+    );
+    if (!eventIds.length) return;
+
+    let cancelled = false;
+
+    (async () => {
+      try {
+        const responses = await Promise.all(
+          eventIds.map((eventId) =>
+            ticketTypesAPI.list({
+              event: eventId,
+              page_size: 500,
+              ordering: 'name_primary',
+            })
+          )
+        );
+        if (cancelled) return;
+
+        let changed = false;
+        for (const r of responses) {
+          const data = r?.data;
+          const list = Array.isArray(data?.results) ? data.results : Array.isArray(data) ? data : [];
+          for (const tt of list) {
+            const id = String(tt?.id || '');
+            if (!id) continue;
+            const title = getMultiLangValue(tt?.name) || tt?.name_primary || id;
+            const primary = String(tt?.name_primary || '').trim();
+            const prev = ticketTypeCacheRef.current.get(id);
+            if (!prev || prev.title !== title || prev.primary !== primary) {
+              ticketTypeCacheRef.current.set(id, { title, primary });
+              changed = true;
+            }
+          }
+        }
+        if (changed) setTicketTypeLabelVersion((v) => v + 1);
+      } catch {
+        // ignore prefetch errors (table will fallback to UUID)
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [avail.items]);
 
   useEffect(() => {
     setTicketTypeFilter('');
@@ -149,7 +210,7 @@ export default function SlotAvailabilitiesCatalog() {
     const base = {
       id: row?.id || null,
       event: row?.event ? String(row.event) : '',
-      ticket_type: row?.ticket_type ? String(row.ticket_type) : '',
+      ticket_types: Array.isArray(row?.ticket_types) ? row.ticket_types.map((x) => String(x)) : [],
       slot_datetime: row?.slot_datetime || '',
       booking_closes_minutes_before: Number(row?.booking_closes_minutes_before ?? 60),
       available_seats: Number(row?.available_seats ?? 0),
@@ -157,6 +218,8 @@ export default function SlotAvailabilitiesCatalog() {
     };
 
     setEditingAvailability(base);
+    // Important: trigger ticket type options load for edit form
+    setEventFilter(base.event || '');
     if (!row?.id) return;
 
     try {
@@ -166,7 +229,7 @@ export default function SlotAvailabilitiesCatalog() {
         setEditingAvailability((prev) => ({
           ...prev,
           event: d.event ? String(d.event) : prev.event,
-          ticket_type: d.ticket_type ? String(d.ticket_type) : prev.ticket_type,
+          ticket_types: Array.isArray(d.ticket_types) ? d.ticket_types.map((x) => String(x)) : prev.ticket_types,
           slot_datetime: d.slot_datetime || prev.slot_datetime,
           booking_closes_minutes_before: Number(d.booking_closes_minutes_before ?? prev.booking_closes_minutes_before ?? 60),
           available_seats: Number(d.available_seats ?? prev.available_seats ?? 0),
@@ -184,7 +247,9 @@ export default function SlotAvailabilitiesCatalog() {
 
     const payload = {
       event: editingAvailability.event || null,
-      ticket_type: editingAvailability.ticket_type || null,
+      ticket_types: Array.isArray(editingAvailability.ticket_types)
+        ? editingAvailability.ticket_types.filter(Boolean)
+        : [],
       slot_datetime: editingAvailability.slot_datetime || null,
       booking_closes_minutes_before: Number(editingAvailability.booking_closes_minutes_before || 0),
       available_seats: Number(editingAvailability.available_seats || 0),
@@ -238,12 +303,25 @@ export default function SlotAvailabilitiesCatalog() {
       ),
     },
     {
-      key: 'ticket_type',
-      label: 'Тип билета',
-      render: (ticketTypeId) => (
-        <span className="text-sm text-gray-700">
-          {ticketTypeLabelById.get(String(ticketTypeId)) || String(ticketTypeId || '—')}
-        </span>
+      key: 'ticket_types',
+      label: 'Типы билетов',
+      render: (ticketTypeIds) => (
+        <div className="min-w-0">
+          {(() => {
+            const ids = Array.isArray(ticketTypeIds) ? ticketTypeIds.map((x) => String(x)) : [];
+            if (!ids.length) return <div className="text-sm text-gray-400">—</div>;
+            const titles = ids.map((id) => ticketTypeById.get(id)?.title || id).filter(Boolean);
+            const primaries = ids.map((id) => ticketTypeById.get(id)?.primary || '').filter(Boolean);
+            return (
+              <>
+                <div className="text-sm text-gray-700 truncate">{titles.join(', ')}</div>
+                {primaries.length ? (
+                  <div className="text-xs text-gray-400 truncate">{primaries.join(', ')}</div>
+                ) : null}
+              </>
+            );
+          })()}
+        </div>
       ),
     },
     {
@@ -314,7 +392,7 @@ export default function SlotAvailabilitiesCatalog() {
               <option value="">{eventFilter ? 'Все типы' : 'Сначала выберите событие'}</option>
               {ticketTypeOptions.map((tt) => (
                 <option key={tt.id} value={tt.id}>
-                  {tt.name || tt.id}
+                  {getMultiLangValue(tt.name) || tt.name_primary || tt.id}
                 </option>
               ))}
             </select>
@@ -344,7 +422,7 @@ export default function SlotAvailabilitiesCatalog() {
                   value={editingAvailability.event}
                   onChange={(e) => {
                     const nextEvent = e.target.value;
-                    setEditingAvailability((prev) => ({ ...prev, event: nextEvent, ticket_type: '' }));
+                    setEditingAvailability((prev) => ({ ...prev, event: nextEvent, ticket_types: [] }));
                     setEventFilter(nextEvent);
                   }}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none"
@@ -359,18 +437,23 @@ export default function SlotAvailabilitiesCatalog() {
                 </select>
               </Field>
 
-              <Field label="Тип билета" required>
+              <Field label="Типы билетов">
                 <select
-                  value={editingAvailability.ticket_type}
-                  onChange={(e) => setEditingAvailability((prev) => ({ ...prev, ticket_type: e.target.value }))}
+                  multiple
+                  value={editingAvailability.ticket_types}
+                  onChange={(e) => {
+                    const selected = Array.from(e.target.selectedOptions).map((o) => o.value);
+                    setEditingAvailability((prev) => ({ ...prev, ticket_types: selected }));
+                  }}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none"
-                  required
                   disabled={!editingAvailability.event || ticketTypesLoading}
                 >
-                  <option value="">{editingAvailability.event ? 'Выберите тип' : 'Сначала выберите событие'}</option>
+                  {!editingAvailability.event ? (
+                    <option value="" disabled>Сначала выберите событие</option>
+                  ) : null}
                   {ticketTypeOptions.map((tt) => (
                     <option key={tt.id} value={tt.id}>
-                      {tt.name || tt.id}
+                      {getMultiLangValue(tt.name) || tt.name_primary || tt.id}
                     </option>
                   ))}
                 </select>

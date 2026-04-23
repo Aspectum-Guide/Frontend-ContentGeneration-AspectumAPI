@@ -113,7 +113,8 @@ export default function CommonsImagePicker({
         payload.session_uuid = sessionUuid;
       }
 
-      const data = await imagesAPI.importCommons(payload);
+      const response = await imagesAPI.importCommons(payload);
+      const data = response?.data ?? response;
       const image = data?.image;
 
       if (!image || !image.url) {

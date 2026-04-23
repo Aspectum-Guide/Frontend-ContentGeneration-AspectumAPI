@@ -13,6 +13,8 @@ import FormErrorAlert from '../shared/components/FormErrorAlert';
 import StatusBadge from '../shared/components/StatusBadge';
 import TableRowActions from '../shared/components/TableRowActions';
 import { getMultiLangValue } from '../shared/i18n';
+import { buildLangOptions, pickPrimaryLangCode } from '../shared/i18n';
+import { LangBlock, LangTabs } from '../shared/LangFields';
 
 const PAGE_SIZE = 20;
 
@@ -20,8 +22,9 @@ function createEmptyTicketType() {
   return {
     id: null,
     event: '',
-    name: '',
-    description: '',
+    name: {},
+    name_primary: '',
+    description: {},
     sort_order: 0,
     is_active: true,
   };
@@ -43,6 +46,7 @@ export default function TicketTypesCatalog() {
   const [totalCount, setTotalCount] = useState(0);
 
   const [editingType, setEditingType] = useState(null);
+  const [activeLang, setActiveLang] = useState('');
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState(null);
 
@@ -151,11 +155,13 @@ export default function TicketTypesCatalog() {
 
   const openEdit = useCallback((row) => {
     setSaveError(null);
+    setActiveLang(pickPrimaryLangCode([row?.name]));
     setEditingType({
       id: row.id,
       event: row.event || '',
-      name: row.name || '',
-      description: row.description || '',
+      name: typeof row.name === 'object' && row.name ? row.name : (row.name ? { ru: String(row.name) } : {}),
+      name_primary: row.name_primary || '',
+      description: typeof row.description === 'object' && row.description ? row.description : (row.description ? { ru: String(row.description) } : {}),
       sort_order: Number.isFinite(row.sort_order) ? row.sort_order : 0,
       is_active: row.is_active !== false,
     });
@@ -167,8 +173,9 @@ export default function TicketTypesCatalog() {
 
     const payload = {
       event: editingType.event,
-      name: editingType.name,
-      description: editingType.description || '',
+      name: editingType.name || {},
+      description: editingType.description || {},
+      name_primary: (editingType.name_primary || '').trim(),
       sort_order: Number(editingType.sort_order || 0),
       is_active: !!editingType.is_active,
     };
@@ -211,9 +218,13 @@ export default function TicketTypesCatalog() {
       label: 'Тип билета',
       render: (value, row) => (
         <div>
-          <div className="text-sm font-medium text-gray-900">{value || '—'}</div>
+          <div className="text-sm font-medium text-gray-900">
+            {getMultiLangValue(row?.name) || row?.name_primary || value || '—'}
+          </div>
           {row.description ? (
-            <div className="text-xs text-gray-500 mt-0.5 line-clamp-2">{row.description}</div>
+            <div className="text-xs text-gray-500 mt-0.5 line-clamp-2">
+              {getMultiLangValue(row.description) || (typeof row.description === 'string' ? row.description : '')}
+            </div>
           ) : null}
         </div>
       ),
@@ -246,6 +257,7 @@ export default function TicketTypesCatalog() {
         createLabel="Создать тип билета"
         onCreate={() => {
           setSaveError(null);
+          setActiveLang('');
           setEditingType(createEmptyTicketType());
         }}
       />
@@ -297,8 +309,8 @@ export default function TicketTypesCatalog() {
             >
               <option value="sort_order">Сортировка: порядок ↑</option>
               <option value="-sort_order">Сортировка: порядок ↓</option>
-              <option value="name">Сортировка: название А-Я</option>
-              <option value="-name">Сортировка: название Я-А</option>
+              <option value="name_primary">Сортировка: название А-Я</option>
+              <option value="-name_primary">Сортировка: название Я-А</option>
             </select>
           </>
         )}
@@ -313,7 +325,9 @@ export default function TicketTypesCatalog() {
       <Modal
         open={!!editingType}
         onClose={() => setEditingType(null)}
-        title={editingType?.id ? `Редактировать тип билета: ${editingType.name || ''}` : 'Создать тип билета'}
+        title={editingType?.id
+          ? `Редактировать тип билета: ${getMultiLangValue(editingType.name) || editingType.name_primary || ''}`
+          : 'Создать тип билета'}
         size="lg"
       >
         {editingType && (
@@ -337,6 +351,17 @@ export default function TicketTypesCatalog() {
                 </select>
               </Field>
 
+              <Field
+                label="Ключ (name_primary)"
+                hint="Используется для сортировки/поиска/фильтрации. Если оставить пустым — будет взят из переводов."
+              >
+                <TextInput
+                  value={editingType.name_primary || ''}
+                  onChange={(e) => setEditingType((prev) => ({ ...prev, name_primary: e.target.value }))}
+                  placeholder="Например: adult / child / vip"
+                />
+              </Field>
+
               <Field label="Порядок сортировки">
                 <TextInput
                   type="number"
@@ -354,24 +379,55 @@ export default function TicketTypesCatalog() {
               </Field>
             </div>
 
-            <Field label="Название" required>
-              <TextInput
-                value={editingType.name}
-                onChange={(e) => setEditingType((prev) => ({ ...prev, name: e.target.value }))}
-                placeholder="Например: VIP"
-                required
-                maxLength={100}
-              />
-            </Field>
-
-            <Field label="Описание">
-              <Textarea
-                rows={3}
-                value={editingType.description || ''}
-                onChange={(e) => setEditingType((prev) => ({ ...prev, description: e.target.value }))}
-                placeholder="Краткое описание типа билета"
-              />
-            </Field>
+            {(() => {
+              const nameVal = typeof editingType?.name === 'object' ? editingType.name : {};
+              const descVal = typeof editingType?.description === 'object' ? editingType.description : {};
+              const langOptions = buildLangOptions([nameVal, descVal], ['ru', 'en', 'it']);
+              return (
+                <div className="space-y-3">
+                  <div className="p-3 bg-gray-50 rounded-xl border border-gray-200">
+                    <p className="text-xs font-medium text-gray-500 mb-2 uppercase tracking-wide">Переводы</p>
+                    <LangTabs
+                      active={activeLang}
+                      onSwitch={setActiveLang}
+                      value={nameVal}
+                      langOptions={langOptions}
+                      onAddLang={(code) => {
+                        setEditingType((p) => ({
+                          ...p,
+                          name: { ...(p?.name || {}), [code]: p?.name?.[code] ?? '' },
+                          description: { ...(p?.description || {}), [code]: p?.description?.[code] ?? '' },
+                        }));
+                      }}
+                      onRemoveLang={(code) => {
+                        setEditingType((p) => {
+                          const nextName = { ...(p?.name || {}) };
+                          const nextDesc = { ...(p?.description || {}) };
+                          delete nextName[code];
+                          delete nextDesc[code];
+                          return { ...p, name: nextName, description: nextDesc };
+                        });
+                      }}
+                    />
+                  </div>
+                  <LangBlock
+                    label="Название"
+                    value={nameVal}
+                    onChange={(v) => setEditingType((prev) => ({ ...prev, name: v }))}
+                    activeLang={activeLang}
+                    required
+                  />
+                  <LangBlock
+                    label="Описание"
+                    value={descVal}
+                    onChange={(v) => setEditingType((prev) => ({ ...prev, description: v }))}
+                    activeLang={activeLang}
+                    multiline
+                    rows={3}
+                  />
+                </div>
+              );
+            })()}
 
             <ActiveCheckboxField
               checked={editingType.is_active}
@@ -393,7 +449,7 @@ export default function TicketTypesCatalog() {
         onClose={() => setDeleteTarget(null)}
         onConfirm={handleDelete}
         title="Удалить тип билета?"
-        message={`Тип «${deleteTarget?.name || deleteTarget?.id || ''}» будет удален без возможности восстановления.`}
+        message={`Тип «${getMultiLangValue(deleteTarget?.name) || deleteTarget?.name_primary || deleteTarget?.id || ''}» будет удален без возможности восстановления.`}
         confirmLabel="Удалить"
         danger
         loading={deleting}

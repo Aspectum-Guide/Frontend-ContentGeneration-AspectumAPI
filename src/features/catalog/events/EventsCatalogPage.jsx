@@ -167,6 +167,9 @@ export default function EventsCatalogPage() {
         cityOptions={e.cityOptions}
         allEventFilters={e.allEventFilters}
         toggleTag={e.toggleTag}
+        onSetMedia={e.setEventMedia}
+        mediaSaving={e.mediaSaving}
+        mediaError={e.mediaError}
       />
 
       <ConfirmModal

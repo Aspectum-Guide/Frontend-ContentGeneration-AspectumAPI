@@ -119,6 +119,24 @@ export function useEventsCatalog() {
     });
   }, []);
 
+  const [mediaSaving, setMediaSaving] = useState(false);
+  const [mediaError, setMediaError] = useState(null);
+
+  const setEventMedia = useCallback(async (imageId) => {
+    if (!editingEvent?.id) return;
+    try {
+      setMediaSaving(true);
+      setMediaError(null);
+      await eventsCatalogAPI.setMedia(editingEvent.id, { image_id: imageId });
+      const r = await eventsCatalogAPI.get(editingEvent.id);
+      setEditingEvent((prev) => mergeEventWithDetail(prev, r?.data));
+    } catch (err) {
+      setMediaError(parseApiError(err, 'Ошибка сохранения обложки'));
+    } finally {
+      setMediaSaving(false);
+    }
+  }, [editingEvent?.id]);
+
   const handleSave = useCallback(async (e) => {
     e?.preventDefault();
     if (!editingEvent) return;
@@ -204,6 +222,9 @@ export function useEventsCatalog() {
     descVal,
     allEventFilters,
     toggleTag,
+    setEventMedia,
+    mediaSaving,
+    mediaError,
 
     // delete
     deleteTarget,

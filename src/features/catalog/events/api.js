@@ -6,6 +6,7 @@ export const eventsCatalogAPI = {
   create: (data) => eventsAPI.create(data),
   update: (id, data) => eventsAPI.update(id, data),
   remove: (id) => eventsAPI.delete(id),
+  setMedia: (id, data) => eventsAPI.setMedia(id, data),
   listCities: (params) => citiesAPI.list(params),
   listFilters: () => eventFiltersAPI.list(),
 };
