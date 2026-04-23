@@ -11,7 +11,7 @@
  *    Шаг 5: Публикация
  */
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import 'leaflet/dist/leaflet.css';
 import Layout from '../../components/Layout';
 import CommonsImagePicker from '../../components/generation/CommonsImagePicker';
@@ -43,7 +43,6 @@ const LOCALE_INFO_MAP = {
 const DEFAULT_LOCALE_DEFS = [
   { key: 'ru-RU', lang: 'ru', code: 'RU', langName: 'Русский', isDefault: true },
   { key: 'en-US', lang: 'en', code: 'US', langName: 'Английский', isDefault: true },
-  { key: 'it-IT', lang: 'it', code: 'IT', langName: 'Итальянский', isDefault: true },
 ];
 
 const STATUS_MAP = {
@@ -79,6 +78,16 @@ function getFlag(code) {
 function getAttrName(attr) {
   const n = attr?.name || {};
   return n.ru || n.en || n.it || Object.values(n).find(Boolean) || '(без названия)';
+}
+
+function getCityDraftName(draft) {
+  const n = draft?.name || {};
+  return n.ru || n.en || n.it || Object.values(n).find(Boolean) || 'Новый город';
+}
+
+function normalizeDraftId(value) {
+  if (value == null || value === '') return null;
+  return String(value);
 }
 
 // ─── Notification toast ───────────────────────────────────────────────────────
@@ -162,6 +171,7 @@ export default function SessionWizard() {
   const { setMobileActions } = useLayoutActions();
   const { sessionId } = useParams();
   const navigate = useNavigate();
+  const location = useLocation();
 
   // ── Notification ─────────────────────────────────────────────────────────
   const [note, setNote] = useState(null);
@@ -173,6 +183,9 @@ export default function SessionWizard() {
   // ── Session ───────────────────────────────────────────────────────────────
   const [session, setSession] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [cityDrafts, setCityDrafts] = useState([]);
+  const [activeCityDraftId, setActiveCityDraftId] = useState(null);
+  const activeCityDraftIdRef = useRef(null);
 
   // ── Wizard step ───────────────────────────────────────────────────────────
   const [currentStep, setCurrentStep] = useState(1);
@@ -228,6 +241,7 @@ export default function SessionWizard() {
   const [closeMode, setCloseMode] = useState('save');
   const [closing, setClosing] = useState(false);
   const [publishing, setPublishing] = useState(false);
+  const [translating, setTranslating] = useState(false);
   const sessionOpenedAtRef = useRef(null);
   const firstCitySaveAtRef = useRef(null);
 
@@ -235,11 +249,43 @@ export default function SessionWizard() {
   const mapRef = useRef(null);
   const mapInstanceRef = useRef(null);
   const mapReadyRef = useRef(false);
+  const requestedCityDraftIdRef = useRef(null);
+
+  useEffect(() => {
+    activeCityDraftIdRef.current = activeCityDraftId;
+  }, [activeCityDraftId]);
+
+  useEffect(() => {
+    const routeDraftId = new URLSearchParams(location.search).get('cityDraftId');
+    requestedCityDraftIdRef.current = normalizeDraftId(routeDraftId || location.state?.cityDraftId);
+  }, [location.search, location.state]);
+
+  const syncActiveDraftRoute = useCallback((draftId) => {
+    const normalizedDraftId = normalizeDraftId(draftId);
+    const params = new URLSearchParams(location.search);
+    const currentDraftId = normalizeDraftId(params.get('cityDraftId') || location.state?.cityDraftId);
+
+    if (currentDraftId === normalizedDraftId) return;
+
+    if (normalizedDraftId) params.set('cityDraftId', normalizedDraftId);
+    else params.delete('cityDraftId');
+
+    navigate(
+      {
+        pathname: location.pathname,
+        search: params.toString() ? `?${params.toString()}` : '',
+      },
+      {
+        replace: true,
+        state: normalizedDraftId ? { cityDraftId: normalizedDraftId } : null,
+      }
+    );
+  }, [navigate, location.pathname, location.search, location.state]);
 
   // ─────────────────────────────────────────────────────────────────────────
   // Load session
   // ─────────────────────────────────────────────────────────────────────────
-  const loadSession = useCallback(async () => {
+  const loadSession = useCallback(async (preferredDraftId = null) => {
     try {
       setLoading(true);
       console.log('Loading session:', sessionId);
@@ -255,11 +301,28 @@ export default function SessionWizard() {
           status: data?.status || 'unknown',
         });
       }
-      if (data?.city) {
-        console.log('City data found:', data.city);
-        loadCityIntoForm(data.city);
+      const drafts = Array.isArray(data?.city_drafts) && data.city_drafts.length > 0
+        ? data.city_drafts
+        : (data?.city ? [{ ...data.city, id: 'legacy', is_primary: true, order: 0 }] : []);
+      setCityDrafts(drafts);
+      const requestedDraftId = normalizeDraftId(
+        preferredDraftId || requestedCityDraftIdRef.current || activeCityDraftIdRef.current
+      );
+      const selectedDraft = requestedDraftId
+        ? drafts.find((draft) => normalizeDraftId(draft.id) === requestedDraftId)
+        : null;
+      const fallbackDraft = drafts.find((draft) => draft.is_primary) || drafts[0] || null;
+      const resolvedDraft = selectedDraft || fallbackDraft;
+      const resolvedDraftId = normalizeDraftId(resolvedDraft?.id);
+      requestedCityDraftIdRef.current = resolvedDraftId;
+      activeCityDraftIdRef.current = resolvedDraftId;
+      setActiveCityDraftId(resolvedDraftId);
+      if (selectedDraft) {
+        loadCityIntoForm(selectedDraft);
+      } else if (fallbackDraft) {
+        loadCityIntoForm(fallbackDraft);
       } else {
-        console.log('No city data in session');
+        console.log('No city draft data in session');
       }
       if (Array.isArray(data?.attractions)) setAttractions(data.attractions);
     } catch (err) {
@@ -269,7 +332,7 @@ export default function SessionWizard() {
     } finally {
       setLoading(false);
     }
-  }, [sessionId]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [sessionId, navigate, showNote]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => { loadSession(); }, [loadSession]);
   useEffect(() => () => clearInterval(aiPollRef.current), []);
@@ -498,6 +561,9 @@ export default function SessionWizard() {
       default_language: localeData[defaultLocale]?.lang || null,
       tags: cityTags,
       image_id: imageId,
+      ...(activeCityDraftIdRef.current && activeCityDraftIdRef.current !== 'legacy'
+        ? { draft_id: activeCityDraftIdRef.current }
+        : {}),
     };
 
     setSaving(true);
@@ -508,13 +574,23 @@ export default function SessionWizard() {
         ? 'Корректировки сохранены и применены к объектам (City, Event, EventLocation). Сессия закрыта.'
         : 'Город сохранён в рамках сессии';
       showNote(msg, 'success');
-      if (data?.city?.image_url) {
-        setImagePreview(data.city.image_url);
-        if (data.city.image_id != null) setImageId(data.city.image_id);
+      const savedDraft = data?.draft || null;
+      const savedCity = savedDraft || data?.city || null;
+      if (savedCity?.image_url) {
+        setImagePreview(savedCity.image_url);
+        if (savedCity.image_id != null) setImageId(savedCity.image_id);
       }
       if (data?.status) {
         setSession(prev => prev ? { ...prev, status: data.status, status_display: data.status_display } : prev);
       }
+      const savedDraftId = normalizeDraftId(data?.draft_id || activeCityDraftIdRef.current);
+      if (savedDraftId) {
+        requestedCityDraftIdRef.current = savedDraftId;
+        activeCityDraftIdRef.current = savedDraftId;
+        setActiveCityDraftId(savedDraftId);
+        syncActiveDraftRoute(savedDraftId);
+      }
+      await loadSession(savedDraftId);
 
       if (!firstCitySaveAtRef.current) {
         firstCitySaveAtRef.current = Date.now();
@@ -541,7 +617,7 @@ export default function SessionWizard() {
     } finally {
       setSaving(false);
     }
-  }, [sessionId, localeData, defaultLocale, lat, lon, cityTags, imageId, showNote]);
+  }, [sessionId, localeData, defaultLocale, lat, lon, cityTags, imageId, showNote, loadSession, syncActiveDraftRoute]);
 
   // ─────────────────────────────────────────────────────────────────────────
   // Step navigation
@@ -603,6 +679,50 @@ export default function SessionWizard() {
       [activeLocale]: { ...prev[activeLocale], [field]: value },
     }));
   }, [activeLocale]);
+
+  const handleSelectDraft = useCallback((draftId) => {
+    const normalizedDraftId = normalizeDraftId(draftId);
+    const draft = cityDrafts.find((item) => normalizeDraftId(item.id) === normalizedDraftId);
+    if (!draft) return;
+    requestedCityDraftIdRef.current = normalizedDraftId;
+    activeCityDraftIdRef.current = normalizedDraftId;
+    setActiveCityDraftId(normalizedDraftId);
+    syncActiveDraftRoute(normalizedDraftId);
+    loadCityIntoForm(draft);
+  }, [cityDrafts, loadCityIntoForm, syncActiveDraftRoute]);
+
+  const handleCreateDraft = useCallback(async () => {
+    try {
+      const res = await sessionsAPI.createCityDraft(sessionId, {});
+      const newDraftId = normalizeDraftId(res?.data?.draft?.id);
+      if (newDraftId) {
+        requestedCityDraftIdRef.current = newDraftId;
+        activeCityDraftIdRef.current = newDraftId;
+        syncActiveDraftRoute(newDraftId);
+      }
+      await loadSession(newDraftId);
+      showNote('Черновик города добавлен', 'success');
+    } catch (err) {
+      showNote(parseApiError(err, 'Ошибка добавления города'), 'error');
+    }
+  }, [sessionId, loadSession, showNote, syncActiveDraftRoute]);
+
+  const handleDeleteDraft = useCallback(async (draftId) => {
+    if (!draftId || draftId === 'legacy') return;
+    if (!confirm('Удалить этот черновик города?')) return;
+    try {
+      await sessionsAPI.deleteCityDraft(sessionId, draftId);
+      const normalizedDraftId = normalizeDraftId(draftId);
+      const nextDraftId = normalizedDraftId === activeCityDraftIdRef.current ? null : activeCityDraftIdRef.current;
+      requestedCityDraftIdRef.current = nextDraftId;
+      activeCityDraftIdRef.current = nextDraftId;
+      syncActiveDraftRoute(nextDraftId);
+      await loadSession(nextDraftId);
+      showNote('Черновик города удален', 'success');
+    } catch (err) {
+      showNote(parseApiError(err, 'Ошибка удаления города'), 'error');
+    }
+  }, [sessionId, loadSession, showNote, syncActiveDraftRoute]);
 
   // ─────────────────────────────────────────────────────────────────────────
   // Photo upload
@@ -889,6 +1009,25 @@ export default function SessionWizard() {
     }
   }, [sessionId, loadSession, showNote]);
 
+  const handleTranslateSession = useCallback(async () => {
+    setTranslating(true);
+    try {
+      const city = session?.city || {};
+      const targetLanguages = Object.keys({
+        ...(city?.name || {}),
+        ...(city?.description || {}),
+        ...(city?.country || {}),
+      });
+      const res = await sessionsAPI.translate(sessionId, { target_languages: targetLanguages });
+      showNote(res?.data?.message || 'Перевод завершен', 'success');
+      await loadSession();
+    } catch (err) {
+      showNote(parseApiError(err, 'Ошибка перевода'), 'error');
+    } finally {
+      setTranslating(false);
+    }
+  }, [sessionId, session, loadSession, showNote]);
+
   const isCorrectionMode = session?.closed_with_save === true;
   const isActive = session?.status === 'draft' || session?.status === 'in_progress';
 
@@ -964,7 +1103,7 @@ export default function SessionWizard() {
     <Layout>
       <Notification note={note} />
 
-      {(saving || publishing || closing || photoUploading || aiGenSaving) && (
+      {(saving || publishing || closing || photoUploading || aiGenSaving || translating) && (
         <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg text-sm text-blue-800 flex items-center gap-2">
           <span className="animate-spin w-4 h-4 border-2 border-blue-500 border-t-transparent rounded-full" />
           <span>
@@ -973,6 +1112,7 @@ export default function SessionWizard() {
             {closing && 'Закрываем сессию...'}
             {photoUploading && 'Загружаем изображение...'}
             {aiGenSaving && 'Сохраняем AI-контент...'}
+            {translating && 'Переводим сессию на другие языки...'}
           </span>
         </div>
       )}
@@ -1108,6 +1248,50 @@ export default function SessionWizard() {
               <div>
                 <h2 className="text-lg font-semibold text-gray-900">Город</h2>
                 <p className="text-sm text-gray-500">Название, описание, страна и координаты</p>
+              </div>
+
+              <div className="p-3 border border-gray-200 rounded-xl bg-gray-50">
+                <div className="flex items-center justify-between mb-2">
+                  <p className="text-sm font-medium text-gray-800">Черновики городов в сессии</p>
+                  <button
+                    type="button"
+                    onClick={handleCreateDraft}
+                    className="px-2.5 py-1 text-xs font-medium text-blue-700 bg-blue-100 rounded-md hover:bg-blue-200 transition-colors"
+                  >
+                    + Добавить город
+                  </button>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {cityDrafts.length === 0 ? (
+                    <span className="text-xs text-gray-500">Пока нет черновиков</span>
+                  ) : cityDrafts.map((draft) => {
+                    const isActiveDraft = normalizeDraftId(draft.id) === activeCityDraftId;
+                    return (
+                      <div
+                        key={draft.id}
+                        className={`flex items-center gap-1 px-2 py-1 rounded-lg border ${isActiveDraft ? 'bg-blue-50 border-blue-300' : 'bg-white border-gray-200'}`}
+                      >
+                        <button
+                          type="button"
+                          onClick={() => handleSelectDraft(draft.id)}
+                          className={`text-xs ${isActiveDraft ? 'text-blue-700 font-medium' : 'text-gray-700'}`}
+                        >
+                          {getCityDraftName(draft)}
+                        </button>
+                        {draft.id !== 'legacy' && (
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteDraft(draft.id)}
+                            className="text-xs text-red-500 hover:text-red-700"
+                            title="Удалить черновик"
+                          >
+                            ×
+                          </button>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
               </div>
 
               {/* Locale pills */}
@@ -1564,13 +1748,22 @@ export default function SessionWizard() {
                 <button onClick={() => goToStep(4)} className="px-4 py-2 text-sm text-gray-600 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors">
                   ← Назад
                 </button>
-                <button
-                  onClick={handlePublish}
-                  disabled={publishing}
-                  className="px-6 py-2 text-sm font-medium text-white bg-green-600 rounded-lg hover:bg-green-700 disabled:opacity-50 transition-colors"
-                >
-                  {publishing ? 'Публикация...' : '✓ Опубликовать город'}
-                </button>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={handleTranslateSession}
+                    disabled={translating}
+                    className="px-4 py-2 text-sm font-medium text-indigo-700 bg-indigo-50 border border-indigo-200 rounded-lg hover:bg-indigo-100 disabled:opacity-50 transition-colors"
+                  >
+                    {translating ? 'Перевод...' : 'Перевести сессию'}
+                  </button>
+                  <button
+                    onClick={handlePublish}
+                    disabled={publishing}
+                    className="px-6 py-2 text-sm font-medium text-white bg-green-600 rounded-lg hover:bg-green-700 disabled:opacity-50 transition-colors"
+                  >
+                    {publishing ? 'Публикация...' : '✓ Опубликовать город'}
+                  </button>
+                </div>
               </div>
             </div>
           )}

@@ -1,17 +1,22 @@
 import { useState, useRef, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import Layout from '../../components/Layout';
 import { aiAPI, tasksAPI } from '../../api/generation';
 
 const POLL_INTERVAL = 4000;
 
 export default function CityGeneration() {
-  const [cityList, setCityList] = useState('');
+  const navigate = useNavigate();
+  const [prompt, setPrompt] = useState('');
   const [provider, setProvider] = useState('');
   const [loading, setLoading] = useState(false);
   const [taskId, setTaskId] = useState(null);
   const [taskStatus, setTaskStatus] = useState(null);
   const [error, setError] = useState(null);
   const [result, setResult] = useState(null);
+  const [resultModalOpen, setResultModalOpen] = useState(false);
+  const [creatingSessions, setCreatingSessions] = useState(false);
+  const [saveSuccess, setSaveSuccess] = useState(null);
   const pollRef = useRef(null);
 
   useEffect(() => {
@@ -41,7 +46,7 @@ export default function CityGeneration() {
 
   const handleStart = async (e) => {
     e.preventDefault();
-    if (!cityList.trim()) return;
+    if (!prompt.trim()) return;
     try {
       setLoading(true);
       setError(null);
@@ -49,13 +54,9 @@ export default function CityGeneration() {
       setTaskStatus(null);
       setTaskId(null);
 
-      const cities = cityList
-        .split('\n')
-        .map((l) => l.trim())
-        .filter(Boolean);
-
       const payload = {
-        prompt: cities.join('\n'),
+        prompt: prompt.trim(),
+        with_images: false,
         ...(provider ? { provider } : {}),
       };
 
@@ -74,6 +75,37 @@ export default function CityGeneration() {
     } catch (err) {
       setError(err?.response?.data?.error || err.message || 'Ошибка генерации');
       setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (taskStatus?.status === 'completed' && taskStatus?.result_data) {
+      setResult(taskStatus.result_data);
+      setResultModalOpen(true);
+    }
+  }, [taskStatus]);
+
+  const resultCities = Array.isArray(result?.data) ? result.data : [];
+  const cityCount = resultCities.length;
+
+  const handleCreateSessions = async () => {
+    if (!taskId) return;
+    try {
+      setCreatingSessions(true);
+      setError(null);
+      const response = await aiAPI.citiesTaskCreateSessions(taskId);
+      const data = response?.data || {};
+      const firstSessionId = data?.session?.id || data?.session?.uuid;
+      setSaveSuccess(`Сохранено. Черновиков городов добавлено: ${data?.count || 0}`);
+      if (firstSessionId) {
+        navigate(`/generation/${firstSessionId}`);
+      } else {
+        navigate('/generation');
+      }
+    } catch (err) {
+      setError(err?.response?.data?.error || err.message || 'Не удалось создать сессии');
+    } finally {
+      setCreatingSessions(false);
     }
   };
 
@@ -98,18 +130,18 @@ export default function CityGeneration() {
           <form onSubmit={handleStart} className="space-y-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
-                Список городов <span className="text-gray-400 font-normal">(по одному на строку)</span>
+                Промпт для генерации
               </label>
               <textarea
-                value={cityList}
-                onChange={(e) => setCityList(e.target.value)}
+                value={prompt}
+                onChange={(e) => setPrompt(e.target.value)}
                 rows={8}
-                placeholder={'Рим, Италия\nПариж, Франция\nБерлин, Германия'}
+                placeholder={'Например: Сгенерируй 5 городов Италии для культурного туризма с кратким описанием и страной на русском языке'}
                 disabled={isRunning}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm font-mono resize-none focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none disabled:bg-gray-50"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm resize-none focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none disabled:bg-gray-50"
               />
               <p className="text-xs text-gray-400 mt-1">
-                {cityList.split('\n').filter((l) => l.trim()).length} городов
+                Изображения при генерации не создаются. Фото добавляются вручную на редакторской странице.
               </p>
             </div>
 
@@ -135,9 +167,15 @@ export default function CityGeneration() {
               </div>
             )}
 
+            {saveSuccess && (
+              <div className="p-3 bg-green-50 border border-green-200 rounded-lg text-sm text-green-700">
+                {saveSuccess}
+              </div>
+            )}
+
             <button
               type="submit"
-              disabled={isRunning || !cityList.trim()}
+              disabled={isRunning || !prompt.trim()}
               className="w-full py-3 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             >
               {isRunning ? (
@@ -219,6 +257,50 @@ export default function CityGeneration() {
           )}
         </div>
       </div>
+
+      {resultModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+          <div className="absolute inset-0 bg-black/50" onClick={() => !creatingSessions && setResultModalOpen(false)} />
+          <div className="relative bg-white rounded-xl shadow-xl w-full max-w-2xl p-6 space-y-4">
+            <h3 className="text-lg font-semibold text-gray-900">Результат генерации</h3>
+            <p className="text-sm text-gray-700">
+              Города найдены: <span className="font-semibold">{cityCount}</span>
+            </p>
+            <div className="max-h-56 overflow-auto border border-gray-200 rounded-lg p-3 bg-gray-50">
+              {resultCities.length === 0 ? (
+                <p className="text-sm text-gray-500">Список городов пуст</p>
+              ) : (
+                <ul className="text-sm text-gray-700 space-y-1">
+                  {resultCities.map((item, idx) => {
+                    const city = item?.city || item || {};
+                    const name = city?.name?.ru || city?.name?.en || Object.values(city?.name || {})[0] || '—';
+                    const country = city?.country?.ru || city?.country?.en || Object.values(city?.country || {})[0] || '—';
+                    return <li key={idx}>{idx + 1}. {name} ({country})</li>;
+                  })}
+                </ul>
+              )}
+            </div>
+            <div className="flex justify-end gap-2">
+              <button
+                type="button"
+                disabled={creatingSessions}
+                onClick={() => setResultModalOpen(false)}
+                className="px-4 py-2 text-sm border border-gray-300 rounded-lg hover:bg-gray-50"
+              >
+                Отмена
+              </button>
+              <button
+                type="button"
+                disabled={creatingSessions || cityCount === 0}
+                onClick={handleCreateSessions}
+                className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-50"
+              >
+                {creatingSessions ? 'Создание...' : 'Создать черновики в сессии'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </Layout>
   );
 }

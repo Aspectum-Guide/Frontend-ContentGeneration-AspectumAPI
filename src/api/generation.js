@@ -12,10 +12,17 @@ export const sessionsAPI = {
   forceClose: (sessionId) => apiClient.post(`${BASE}/sessions/${sessionId}/force-close/`, {}),
   delete: (sessionId) => apiClient.post(`${BASE}/sessions/${sessionId}/delete/`, {}),
   publish: (sessionId) => apiClient.post(`${BASE}/sessions/${sessionId}/publish/`, {}),
+  translate: (sessionId, data = {}) => apiClient.post(`${BASE}/sessions/${sessionId}/translate/`, data),
   checkConflicts: (sessionId) =>
     apiClient.get(`${BASE}/sessions/${sessionId}/publish/check-conflicts/`),
   updateCity: (sessionId, data) =>
     apiClient.post(`${BASE}/sessions/${sessionId}/city/`, data),
+  createCityDraft: (sessionId, data = {}) =>
+    apiClient.post(`${BASE}/sessions/${sessionId}/city-drafts/`, data),
+  deleteCityDraft: (sessionId, draftId) =>
+    apiClient.post(`${BASE}/sessions/${sessionId}/city-drafts/${draftId}/delete/`, {}),
+  setPrimaryCityDraft: (sessionId, draftId) =>
+    apiClient.post(`${BASE}/sessions/${sessionId}/city-drafts/${draftId}/primary/`, {}),
   uploadFromFile: (jsonText) =>
     apiClient.post(`${BASE}/sessions/upload/`, jsonText, {
       headers: { 'Content-Type': 'application/json' },
@@ -109,6 +116,8 @@ export const aiAPI = {
     apiClient.post(`${BASE}/ai/search-images/`, data),
   citiesJsonStart: (data) =>
     apiClient.post(`${BASE}/ai/cities-json/start/`, data),
+  citiesTaskCreateSessions: (taskId) =>
+    apiClient.post(`${BASE}/ai/cities-json/tasks/${taskId}/create-sessions/`, {}),
   citiesJson: (data) => apiClient.post(`${BASE}/ai/cities-json/`, data),
 };
 
