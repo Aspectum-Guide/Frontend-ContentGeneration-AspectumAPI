@@ -339,10 +339,14 @@ function cleanHtmlText(s) {
 function buildCopyright(item) {
   const author = cleanHtmlText(item.author || '');
   const license = cleanHtmlText(item.license || '');
+  const licenseUrl = item.license_url || '';
   const pageUrl = item.file_page_url || '';
+  const title = cleanHtmlText(item.title || '');
   const chunks = [];
   if (author) chunks.push(author);
   if (license) chunks.push(license);
+  if (licenseUrl) chunks.push(licenseUrl);
   if (pageUrl) chunks.push(pageUrl);
+  if (title) chunks.push(title);
   return chunks.join(' | ');
 }
