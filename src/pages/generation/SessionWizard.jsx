@@ -75,6 +75,36 @@ function getFlag(code) {
   return LOCALE_FLAGS[(code || '').toUpperCase()] || '🌍';
 }
 
+const BACKEND_SUPPORTED_LOCALE_NAMES = {
+  it: ['итальянский', 'italian', 'it'],
+  en: ['английский', 'english', 'en'],
+  ru: ['русский', 'russian', 'ru'],
+  fr: ['французский', 'french', 'fr'],
+  de: ['немецкий', 'german', 'de'],
+  es: ['испанский', 'spanish', 'es'],
+};
+
+function normalizeLocaleName(value) {
+  return (value || '').toString().trim().toLowerCase();
+}
+
+function resolveBackendLanguageCode(langName) {
+  const normalized = normalizeLocaleName(langName);
+  if (!normalized) return '';
+
+  if (/^[a-z]{2}$/i.test(normalized) && BACKEND_SUPPORTED_LOCALE_NAMES[normalized]) {
+    return normalized;
+  }
+
+  for (const langCode in BACKEND_SUPPORTED_LOCALE_NAMES) {
+    if (BACKEND_SUPPORTED_LOCALE_NAMES[langCode].includes(normalized)) {
+      return langCode;
+    }
+  }
+
+  return '';
+}
+
 function getAttrName(attr) {
   const n = attr?.name || {};
   return n.ru || n.en || n.it || Object.values(n).find(Boolean) || '(без названия)';
@@ -546,12 +576,26 @@ export default function SessionWizard() {
     }
 
     const name = {}, description = {}, country = {};
-    Object.values(localeData).forEach(loc => {
-      if (loc.name || loc.description) {
-        name[loc.lang] = loc.name || '';
-        description[loc.lang] = loc.description || '';
+    Object.entries(localeData).forEach(([key, loc]) => {
+      if (!loc?.lang) return;
+
+      const localeName = loc.name?.trim() || '';
+      const localeDescription = loc.description?.trim() || '';
+      const localeCountry = loc.country?.trim() || '';
+
+      const shouldPersistLocale = !!(
+        localeName ||
+        localeDescription ||
+        localeCountry ||
+        loc.isCustom ||
+        key === defaultLocale
+      );
+
+      if (shouldPersistLocale) {
+        name[loc.lang] = localeName;
+        description[loc.lang] = localeDescription;
+        country[loc.lang] = localeCountry || loc.code || '';
       }
-      if (loc.country?.trim()) country[loc.lang] = loc.country.trim();
     });
 
     const payload = {
@@ -565,6 +609,8 @@ export default function SessionWizard() {
         ? { draft_id: activeCityDraftIdRef.current }
         : {}),
     };
+
+    console.log('[SessionWizard] saving city payload', payload);
 
     setSaving(true);
     try {
@@ -645,15 +691,49 @@ export default function SessionWizard() {
   const addLocale = useCallback(() => {
     const code = newLocaleCode.trim().toUpperCase();
     const langName = newLocaleLang.trim();
-    if (!code || code.length !== 2) { showNote('Введите корректный двухбуквенный код страны', 'error'); return; }
-    if (!langName) { showNote('Введите название языка', 'error'); return; }
-    const lang = langName.toLowerCase().substring(0, 2);
+
+    if (!/^[A-Z]{2}$/.test(code)) {
+      showNote('Введите корректный двухбуквенный код страны', 'error');
+      return;
+    }
+
+    if (!langName) {
+      showNote('Введите название языка', 'error');
+      return;
+    }
+
+    const lang = resolveBackendLanguageCode(langName);
+
+    if (!lang) {
+      showNote('Этот язык пока не поддерживается. Доступны: Italian, English, Russian, French, German, Spanish.', 'error');
+      return;
+    }
+
+    const existingKey = Object.keys(localeData).find(key => localeData[key]?.lang === lang);
+    if (existingKey) {
+      showNote('Адаптация для этого языка уже добавлена', 'error');
+      setActiveLocale(existingKey);
+      setAddLocaleOpen(false);
+      return;
+    }
+
     const key = `${lang}-${code}`;
-    if (localeData[key]) { showNote('Такая адаптация уже добавлена', 'error'); return; }
+
     setLocaleData(prev => ({
       ...prev,
-      [key]: { code, lang, langName, isDefault: false, name: '', description: '', country: '' },
+      [key]: {
+        code,
+        lang,
+        langName,
+        isDefault: false,
+        isCustom: true,
+        name: '',
+        description: '',
+        country: code,
+      },
     }));
+
+    setActiveLocale(key);
     setAddLocaleOpen(false);
     setNewLocaleCode('');
     setNewLocaleLang('');
@@ -1010,23 +1090,33 @@ export default function SessionWizard() {
   }, [sessionId, loadSession, showNote]);
 
   const handleTranslateSession = useCallback(async () => {
-    setTranslating(true);
-    try {
-      const city = session?.city || {};
-      const targetLanguages = Object.keys({
+    const currentDraftId = activeCityDraftIdRef.current;
+    const activeDraft = cityDrafts.find((draft) => normalizeDraftId(draft.id) === normalizeDraftId(currentDraftId));
+    const city = activeDraft || session?.city || {};
+    const targetLanguages = [...new Set([
+      ...Object.values(localeData).map((loc) => (loc?.lang || '').trim().toLowerCase()).filter(Boolean),
+      ...Object.keys({
         ...(city?.name || {}),
         ...(city?.description || {}),
         ...(city?.country || {}),
-      });
-      const res = await sessionsAPI.translate(sessionId, { target_languages: targetLanguages });
+      }),
+    ])];
+    const payload = {
+      target_languages: targetLanguages,
+      ...(currentDraftId && currentDraftId !== 'legacy' ? { draft_id: currentDraftId } : {}),
+    };
+
+    setTranslating(true);
+    try {
+      const res = await sessionsAPI.translate(sessionId, payload);
       showNote(res?.data?.message || 'Перевод завершен', 'success');
-      await loadSession();
+      await loadSession(currentDraftId);
     } catch (err) {
       showNote(parseApiError(err, 'Ошибка перевода'), 'error');
     } finally {
       setTranslating(false);
     }
-  }, [sessionId, session, loadSession, showNote]);
+  }, [sessionId, cityDrafts, session, localeData, loadSession, showNote]);
 
   const isCorrectionMode = session?.closed_with_save === true;
   const isActive = session?.status === 'draft' || session?.status === 'in_progress';
