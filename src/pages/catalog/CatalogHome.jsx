@@ -12,6 +12,7 @@ const CATALOG_SECTIONS = [
       { to: '/catalog/ticket-types', title: 'Типы билетов', description: 'Ticket types (booking)', icon: '🎟️' },
       { to: '/catalog/slot-availabilities', title: 'Слоты (доступность)', description: 'Доступные слоты по времени', icon: '🕒' },
       { to: '/catalog/ticket-prices', title: 'Цены билетов', description: 'Цены по слотам и типам', icon: '💶' },
+      { to: '/catalog/reservations', title: 'Резервы', description: 'Резервы людей (user/guest) по слотам', icon: '🧾' },
     ],
   },
   {

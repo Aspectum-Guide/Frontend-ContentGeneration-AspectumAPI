@@ -16,6 +16,7 @@ import SlotAvailabilitiesCatalog from './pages/catalog/SlotAvailabilitiesCatalog
 import TicketPricesCatalog from './pages/catalog/TicketPricesCatalog';
 import SubscriptionTypesCatalog from './pages/catalog/SubscriptionTypesCatalog';
 import ActivationCodesCatalog from './pages/catalog/ActivationCodesCatalog';
+import BookingReservationsCatalog from './pages/catalog/BookingReservationsCatalog';
 import ExportCities from './pages/export/ExportCities';
 import ExportEvents from './pages/export/ExportEvents';
 import ExportZip from './pages/export/ExportZip';
@@ -71,6 +72,7 @@ function App() {
           <Route path="/catalog/ticket-types" element={<ProtectedRoute><TicketTypesCatalog /></ProtectedRoute>} />
           <Route path="/catalog/slot-availabilities" element={<ProtectedRoute><SlotAvailabilitiesCatalog /></ProtectedRoute>} />
           <Route path="/catalog/ticket-prices" element={<ProtectedRoute><TicketPricesCatalog /></ProtectedRoute>} />
+          <Route path="/catalog/reservations" element={<ProtectedRoute><BookingReservationsCatalog /></ProtectedRoute>} />
           <Route path="/catalog/subscription-types" element={<ProtectedRoute><SubscriptionTypesCatalog /></ProtectedRoute>} />
           <Route path="/catalog/activation-codes" element={<ProtectedRoute><ActivationCodesCatalog /></ProtectedRoute>} />
           <Route path="/catalog/photos" element={<ProtectedRoute><PhotosCatalog /></ProtectedRoute>} />

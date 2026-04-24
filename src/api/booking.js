@@ -27,3 +27,8 @@ export const ticketPricesAPI = {
   update: (id, data) => apiClient.patch(`/booking/ticket-prices/${id}/`, data),
   delete: (id) => apiClient.delete(`/booking/ticket-prices/${id}/`),
 };
+
+export const bookingReservationsAPI = {
+  list: (params) => apiClient.get('/booking/reservations/', { params }),
+  get: (id) => apiClient.get(`/booking/reservations/${id}/`),
+};
