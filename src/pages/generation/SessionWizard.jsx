@@ -141,6 +141,30 @@ function StatusBadge({ status, label }) {
   );
 }
 
+function parseMapCoord(value) {
+  if (value === null || value === undefined) return NaN;
+
+  return parseFloat(
+    String(value)
+      .trim()
+      .replace(',', '.')
+  );
+}
+
+function hasValidMapCoords(latValue, lonValue) {
+  const parsedLat = parseMapCoord(latValue);
+  const parsedLon = parseMapCoord(lonValue);
+
+  return (
+    Number.isFinite(parsedLat) &&
+    Number.isFinite(parsedLon) &&
+    parsedLat >= -90 &&
+    parsedLat <= 90 &&
+    parsedLon >= -180 &&
+    parsedLon <= 180
+  );
+}
+
 // ─── LocalePills component ─────────────────────────────────────────────────────
 function LocalePills({ localeData, activeLocale, defaultLocale, onSwitch, onSetDefault, onAddLocale, onRemoveLocale }) {
   return (
@@ -278,7 +302,14 @@ export default function SessionWizard() {
   // ── Map ───────────────────────────────────────────────────────────────────
   const mapRef = useRef(null);
   const mapInstanceRef = useRef(null);
+  const markerRef = useRef(null);
   const mapReadyRef = useRef(false);
+  const [mapNode, setMapNode] = useState(null);
+  const setMapContainerRef = useCallback((node) => {
+  mapRef.current = node;
+  setMapNode(node);
+  }, []);
+
   const requestedCityDraftIdRef = useRef(null);
 
   useEffect(() => {
@@ -423,99 +454,145 @@ export default function SessionWizard() {
   }, []);
 
   // ─────────────────────────────────────────────────────────────────────────
-  // Leaflet map init - runs ONCE when component mounts
+  // Leaflet map init - runs when map DOM node is actually mounted
   // ─────────────────────────────────────────────────────────────────────────
   useEffect(() => {
-    if (!mapRef.current) {
-      console.log('Map init: mapRef.current is null, waiting...');
+    if (!mapNode) {
+      console.log('Map init: mapNode is null, waiting...');
       return;
     }
-    
-    if (mapInstanceRef.current) {
-      console.log('Map already initialized');
+
+    if (mapInstanceRef.current?.map) {
+      console.log('Map already initialized, invalidating size...');
+
+      requestAnimationFrame(() => {
+        mapInstanceRef.current?.map?.invalidateSize();
+      });
+
       return;
     }
+
+    let cancelled = false;
 
     console.log('Initializing Leaflet map...');
-    import('leaflet').then(({ default: L }) => {
-      console.log('Leaflet library loaded');
-      
-      delete L.Icon.Default.prototype._getIconUrl;
-      L.Icon.Default.mergeOptions({
-        iconUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
-        iconRetinaUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png',
-        shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
-      });
 
-      // Start with default view, will update when coords are loaded
-      const map = L.map(mapRef.current).setView([55.75, 37.62], 3);
-      
-      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        attribution: '© OpenStreetMap contributors',
-        maxZoom: 19,
-        minZoom: 2,
-      }).addTo(map);
+    import('leaflet')
+      .then(({ default: L }) => {
+        if (cancelled || !mapNode || mapInstanceRef.current?.map) return;
 
-      let marker = null;
-      const updateMarker = (la, lo) => {
-        const flat = parseFloat(la), flon = parseFloat(lo);
-        if (!Number.isFinite(flat) || !Number.isFinite(flon)) {
-          if (marker) { map.removeLayer(marker); marker = null; }
-          return;
-        }
-        if (marker) marker.setLatLng([flat, flon]);
-        else { marker = L.marker([flat, flon]).addTo(map); }
-        map.setView([flat, flon], 12);
-        console.log('Marker updated:', flat, flon);
-      };
+        console.log('Leaflet library loaded');
 
-      map.on('click', (e) => {
-        console.log('Map clicked:', e.latlng);
-        setLat(String(e.latlng.lat));
-        setLon(String(e.latlng.lng));
-      });
+        delete L.Icon.Default.prototype._getIconUrl;
 
-      mapInstanceRef.current = { map, updateMarker };
-      mapReadyRef.current = true;
-      
-      console.log('Map initialized successfully!');
+        L.Icon.Default.mergeOptions({
+          iconUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
+          iconRetinaUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png',
+          shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
+        });
 
-      // Check if we already have coords
-      if (lat && lon) {
-        const hasCoords = !isNaN(parseFloat(lat)) && !isNaN(parseFloat(lon));
-        if (hasCoords) {
+        const map = L.map(mapNode, {
+          zoomControl: true,
+          attributionControl: true,
+        }).setView([55.75, 37.62], 3);
+
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+          attribution: '© OpenStreetMap contributors',
+          maxZoom: 19,
+          minZoom: 2,
+        }).addTo(map);
+
+        const updateMarker = (latValue, lonValue) => {
+          const parsedLat = parseMapCoord(latValue);
+          const parsedLon = parseMapCoord(lonValue);
+
+          if (
+            !Number.isFinite(parsedLat) ||
+            !Number.isFinite(parsedLon) ||
+            parsedLat < -90 ||
+            parsedLat > 90 ||
+            parsedLon < -180 ||
+            parsedLon > 180
+          ) {
+            if (markerRef.current) {
+              map.removeLayer(markerRef.current);
+              markerRef.current = null;
+            }
+
+            return;
+          }
+
+          const nextLatLng = [parsedLat, parsedLon];
+
+          if (markerRef.current) {
+            markerRef.current.setLatLng(nextLatLng);
+          } else {
+            markerRef.current = L.marker(nextLatLng).addTo(map);
+          }
+
+          map.setView(nextLatLng, 12);
+
+          requestAnimationFrame(() => {
+            map.invalidateSize();
+          });
+
+          console.log('Marker updated:', parsedLat, parsedLon);
+        };
+
+        map.on('click', (e) => {
+          console.log('Map clicked:', e.latlng);
+
+          setLat(e.latlng.lat.toFixed(6));
+          setLon(e.latlng.lng.toFixed(6));
+        });
+
+        mapInstanceRef.current = {
+          map,
+          updateMarker,
+        };
+
+        mapReadyRef.current = true;
+
+        console.log('Map initialized successfully!');
+
+        setTimeout(() => {
+          map.invalidateSize();
+        }, 0);
+
+        setTimeout(() => {
+          map.invalidateSize();
+        }, 250);
+
+        if (hasValidMapCoords(lat, lon)) {
           console.log('Applying existing coords:', lat, lon);
           updateMarker(lat, lon);
         }
-      }
-    }).catch((err) => {
-      console.error('Failed to load Leaflet:', err);
-    });
+      })
+      .catch((err) => {
+        console.error('Failed to load Leaflet:', err);
+      });
 
     return () => {
+      cancelled = true;
+
       if (mapInstanceRef.current?.map) {
         mapInstanceRef.current.map.remove();
         mapInstanceRef.current = null;
+        markerRef.current = null;
         mapReadyRef.current = false;
+
         console.log('Map cleaned up');
       }
     };
-  }, []); // Empty deps - runs only once on mount
+  }, [mapNode]); // important: init when the map DOM node appears
 
-  // Sync map marker when lat/lon state changes (after initial map creation)
+  // Sync map marker when lat/lon state changes
   useEffect(() => {
     if (!mapReadyRef.current || !mapInstanceRef.current?.updateMarker) {
       return;
     }
-    if (!lat || !lon) {
-      return;
-    }
-    const hasCoords = !isNaN(parseFloat(lat)) && !isNaN(parseFloat(lon));
-    if (hasCoords) {
-      console.log('Sync map marker:', lat, lon);
-      mapInstanceRef.current.updateMarker(lat, lon);
-    }
-  }, [lat, lon]); // Runs whenever lat/lon changes
+
+    mapInstanceRef.current.updateMarker(lat, lon);
+  }, [lat, lon]);
 
   // ─────────────────────────────────────────────────────────────────────────
   // Load city tags for step 2
@@ -1091,25 +1168,53 @@ export default function SessionWizard() {
 
   const handleTranslateSession = useCallback(async () => {
     const currentDraftId = activeCityDraftIdRef.current;
-    const activeDraft = cityDrafts.find((draft) => normalizeDraftId(draft.id) === normalizeDraftId(currentDraftId));
-    const city = activeDraft || session?.city || {};
+
+    const collectLanguageKeys = (cityLike) => {
+      const keys = new Set();
+
+      const collect = (value) => {
+        if (!value || typeof value !== 'object' || Array.isArray(value)) return;
+
+        Object.keys(value).forEach((key) => {
+          const lang = String(key || '').trim().toLowerCase();
+          if (lang) keys.add(lang);
+        });
+      };
+
+      collect(cityLike?.name);
+      collect(cityLike?.description);
+      collect(cityLike?.country);
+
+      return Array.from(keys);
+    };
+
+    const languagesFromLocaleData = Object.values(localeData || {})
+      .map((loc) => (loc?.lang || '').trim().toLowerCase())
+      .filter(Boolean);
+
+    const languagesFromDrafts = (Array.isArray(cityDrafts) ? cityDrafts : [])
+      .flatMap((draft) => collectLanguageKeys(draft));
+
+    const languagesFromLegacyCity = collectLanguageKeys(session?.city || {});
+
     const targetLanguages = [...new Set([
-      ...Object.values(localeData).map((loc) => (loc?.lang || '').trim().toLowerCase()).filter(Boolean),
-      ...Object.keys({
-        ...(city?.name || {}),
-        ...(city?.description || {}),
-        ...(city?.country || {}),
-      }),
+      ...languagesFromLocaleData,
+      ...languagesFromDrafts,
+      ...languagesFromLegacyCity,
     ])];
+
     const payload = {
       target_languages: targetLanguages,
-      ...(currentDraftId && currentDraftId !== 'legacy' ? { draft_id: currentDraftId } : {}),
+      scope: 'all_drafts',
     };
 
     setTranslating(true);
+
     try {
       const res = await sessionsAPI.translate(sessionId, payload);
-      showNote(res?.data?.message || 'Перевод завершен', 'success');
+      showNote(res?.data?.message || 'Перевод всех городов завершен', 'success');
+
+      // После перевода оставляем пользователя на том же выбранном городе
       await loadSession(currentDraftId);
     } catch (err) {
       showNote(parseApiError(err, 'Ошибка перевода'), 'error');
@@ -1458,7 +1563,7 @@ export default function SessionWizard() {
                       </button>
                     </div>
                   </div>
-                  <div ref={mapRef} className="w-full h-48 rounded-lg border border-gray-200 overflow-hidden z-0" />
+                  <div ref={setMapContainerRef} className="w-full h-48 rounded-lg border border-gray-200 overflow-hidden z-0" />
                   <div className="grid grid-cols-2 gap-2 mt-2">
                     <input
                       type="number"

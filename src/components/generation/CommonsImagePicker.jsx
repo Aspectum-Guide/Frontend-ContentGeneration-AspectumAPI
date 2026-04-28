@@ -12,32 +12,21 @@ export default function CommonsImagePicker({
   getSessionUuid,
   defaultQuery = '',
 }) {
-  const [query, setQuery] = useState(defaultQuery);
+  const [query, setQuery] = useState(defaultQuery || '');
   const [page, setPage] = useState(1);
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(false);
   const [hasMore, setHasMore] = useState(true);
-  const [searchDebounceTimer, setSearchDebounceTimer] = useState(null);
 
   const modalRef = useRef(null);
   const dialogRef = useRef(null);
+  const searchDebounceRef = useRef(null);
+
   const limit = 10;
 
-  // Сброс состояния при открытии
-  useEffect(() => {
-    if (isOpen) {
-      setItems([]);
-      setPage(1);
-      setHasMore(true);
-      if (defaultQuery && defaultQuery.length >= 2) {
-        runSearch(defaultQuery, 1);
-      }
-    }
-  }, [isOpen]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  // Поиск с дебаунсом
   const runSearch = useCallback(async (searchQuery, pageNum = 1) => {
-    const q = (searchQuery || query).trim();
+    const q = String(searchQuery || '').trim();
+
     if (!q || q.length < 2) {
       setItems([]);
       setHasMore(false);
@@ -45,62 +34,108 @@ export default function CommonsImagePicker({
     }
 
     setLoading(true);
+
     try {
-      console.log('Commons search:', { q, limit, pageNum });
       const response = await imagesAPI.searchCommons(q, limit, pageNum);
-      console.log('Commons search response:', response);
-      console.log('Commons search response.data:', response.data);
-      
-      // Axios возвращает { data, status, ... }, данные в response.data
-      const data = response.data;
+      const data = response?.data ?? response;
       const incoming = Array.isArray(data?.results) ? data.results : [];
-      console.log('Parsed results:', incoming);
-      
+
       if (pageNum === 1) {
         setItems(incoming);
       } else {
-        setItems(prev => [...prev, ...incoming]);
+        setItems((prev) => [...prev, ...incoming]);
       }
-      
+
       setHasMore(incoming.length >= limit);
     } catch (err) {
       console.error('Commons search error:', err);
+
       if (pageNum === 1) {
         setItems([]);
       }
+
+      setHasMore(false);
     } finally {
       setLoading(false);
     }
-  }, [query, limit]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [limit]);
 
-  // Обработчик ввода с дебаунсом
+  useEffect(() => {
+    if (!isOpen) return;
+
+    const initialQuery = defaultQuery || '';
+
+    setQuery(initialQuery);
+    setItems([]);
+    setPage(1);
+    setHasMore(true);
+
+    if (searchDebounceRef.current) {
+      clearTimeout(searchDebounceRef.current);
+      searchDebounceRef.current = null;
+    }
+
+    if (initialQuery.trim().length >= 2) {
+      runSearch(initialQuery, 1);
+    }
+  }, [isOpen, defaultQuery, runSearch]);
+
+  useEffect(() => {
+    return () => {
+      if (searchDebounceRef.current) {
+        clearTimeout(searchDebounceRef.current);
+      }
+    };
+  }, []);
+
   const handleQueryChange = useCallback((e) => {
-    const value = e.target.value.trim();
+    const value = e.target.value;
+
     setQuery(value);
 
-    if (searchDebounceTimer) clearTimeout(searchDebounceTimer);
+    if (searchDebounceRef.current) {
+      clearTimeout(searchDebounceRef.current);
+    }
 
-    if (value.length < 2) {
+    const normalizedValue = value.trim();
+
+    if (normalizedValue.length < 2) {
       setItems([]);
+      setPage(1);
       setHasMore(false);
       return;
     }
 
-    const timer = setTimeout(() => {
+    searchDebounceRef.current = setTimeout(() => {
       setPage(1);
-      runSearch(value, 1);
+      runSearch(normalizedValue, 1);
     }, 350);
+  }, [runSearch]);
 
-    setSearchDebounceTimer(timer);
-  }, [searchDebounceTimer, runSearch]);
+  const handleSearchSubmit = useCallback((e) => {
+    e?.preventDefault?.();
 
-  // Выбор изображения
+    if (searchDebounceRef.current) {
+      clearTimeout(searchDebounceRef.current);
+      searchDebounceRef.current = null;
+    }
+
+    const normalizedQuery = query.trim();
+
+    setPage(1);
+    runSearch(normalizedQuery, 1);
+  }, [query, runSearch]);
+
   const handleImageSelect = useCallback(async (item) => {
     setLoading(true);
+
     try {
+      const originalUrl = item.image_url || item.original_image_url || '';
+      const thumbUrl = item.thumb_url || originalUrl;
+
       const payload = {
-        image_url: item.thumb_url || item.image_url,
-        original_image_url: item.image_url || '',
+        image_url: originalUrl || thumbUrl,
+        original_image_url: originalUrl,
         title: item.title || '',
         author: cleanHtmlText(item.author || ''),
         license: cleanHtmlText(item.license || ''),
@@ -109,6 +144,7 @@ export default function CommonsImagePicker({
       };
 
       const sessionUuid = getSessionUuid?.();
+
       if (sessionUuid) {
         payload.session_uuid = sessionUuid;
       }
@@ -117,15 +153,32 @@ export default function CommonsImagePicker({
       const data = response?.data ?? response;
       const image = data?.image;
 
-      if (!image || !image.url) {
-        throw new Error('Сервер не вернул локальный URL изображения');
+      if (!image) {
+        throw new Error('Сервер не вернул данные изображения');
       }
 
+      const selectedOriginalUrl = originalUrl || thumbUrl || image.url || '';
       const copyright = buildCopyright(item);
 
       onImageSelected?.({
         imageId: image.id,
-        localUrl: image.url,
+
+        // ВАЖНО:
+        // Оставляем поле localUrl для совместимости с SessionWizard.jsx,
+        // но теперь здесь оригинальная ссылка Wikimedia Commons, а не /media/localhost.
+        localUrl: selectedOriginalUrl,
+
+        // Дополнительные явные поля, если SessionWizard.jsx захочет использовать их напрямую.
+        originalUrl: selectedOriginalUrl,
+        imageUrl: selectedOriginalUrl,
+        thumbUrl,
+        importedLocalUrl: image.url || '',
+
+        title: item.title || '',
+        author: cleanHtmlText(item.author || ''),
+        license: cleanHtmlText(item.license || ''),
+        licenseUrl: item.license_url || '',
+        filePageUrl: item.file_page_url || '',
         copyright,
       });
 
@@ -138,41 +191,46 @@ export default function CommonsImagePicker({
     }
   }, [onImageSelected, onClose, getSessionUuid]);
 
-  // Загрузка по скроллу
   const handleScroll = useCallback(() => {
     const scrollHost = dialogRef.current || modalRef.current;
-    if (!scrollHost || loading || !hasMore || !query) return;
+    const normalizedQuery = query.trim();
+
+    if (!scrollHost || loading || !hasMore || normalizedQuery.length < 2) return;
 
     const scrollBottom = scrollHost.scrollTop + scrollHost.clientHeight;
     const threshold = scrollHost.scrollHeight - 180;
 
     if (scrollBottom >= threshold) {
       const nextPage = page + 1;
+
       setPage(nextPage);
-      runSearch(query, nextPage);
+      runSearch(normalizedQuery, nextPage);
     }
   }, [loading, hasMore, query, page, runSearch]);
 
-  // Привязка scroll обработчика
   useEffect(() => {
     const scrollHost = dialogRef.current || modalRef.current;
+
     if (!scrollHost || !isOpen) return;
 
     scrollHost.addEventListener('scroll', handleScroll);
-    return () => scrollHost.removeEventListener('scroll', handleScroll);
+
+    return () => {
+      scrollHost.removeEventListener('scroll', handleScroll);
+    };
   }, [isOpen, handleScroll]);
 
   if (!isOpen) return null;
 
+  const normalizedQuery = query.trim();
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center">
-      {/* Backdrop */}
       <div
         className="absolute inset-0 bg-black/50"
         onClick={onClose}
       />
 
-      {/* Modal */}
       <div
         ref={modalRef}
         className="relative bg-white rounded-lg shadow-xl w-full max-w-4xl max-h-[90vh] flex flex-col overflow-hidden"
@@ -180,14 +238,17 @@ export default function CommonsImagePicker({
         aria-modal="true"
         aria-label="Выбор изображения из Wikimedia Commons"
       >
-        {/* Header */}
         <div className="flex items-center justify-between p-4 border-b border-gray-200">
           <div>
-            <h3 className="text-lg font-semibold text-gray-900">Wikimedia Commons</h3>
+            <h3 className="text-lg font-semibold text-gray-900">
+              Wikimedia Commons
+            </h3>
+
             <p className="text-sm text-gray-500">
               Выберите изображение города с указанием лицензии и автора
             </p>
           </div>
+
           <button
             type="button"
             onClick={onClose}
@@ -197,19 +258,30 @@ export default function CommonsImagePicker({
           </button>
         </div>
 
-        {/* Search */}
-        <div className="p-4 border-b border-gray-200">
-          <input
-            type="text"
-            value={query}
-            onChange={handleQueryChange}
-            placeholder="Запрос, например: Rome city"
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-            autoFocus
-          />
-        </div>
+        <form
+          onSubmit={handleSearchSubmit}
+          className="p-4 border-b border-gray-200"
+        >
+          <div className="flex gap-2">
+            <input
+              type="text"
+              value={query}
+              onChange={handleQueryChange}
+              placeholder="Запрос, например: Rome city, New York, Moscow skyline"
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              autoFocus
+            />
 
-        {/* Grid */}
+            <button
+              type="submit"
+              disabled={loading || normalizedQuery.length < 2}
+              className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              Найти
+            </button>
+          </div>
+        </form>
+
         <div
           ref={dialogRef}
           className="flex-1 overflow-y-auto p-4"
@@ -218,7 +290,7 @@ export default function CommonsImagePicker({
             <SkeletonGrid />
           ) : items.length === 0 ? (
             <div className="text-center py-12 text-gray-500 text-sm">
-              {query && query.length < 2
+              {normalizedQuery && normalizedQuery.length < 2
                 ? 'Введите минимум 2 символа'
                 : 'Ничего не найдено'}
             </div>
@@ -226,9 +298,8 @@ export default function CommonsImagePicker({
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
               {items.map((item, idx) => (
                 <ImageCard
-                  key={idx}
+                  key={`${item.image_url || item.thumb_url || item.title || 'commons'}:${idx}`}
                   item={item}
-                  idx={idx}
                   onSelect={() => handleImageSelect(item)}
                   disabled={loading}
                 />
@@ -253,14 +324,11 @@ export default function CommonsImagePicker({
   );
 }
 
-// Компонент карточки изображения
-function ImageCard({ item, idx, onSelect, disabled }) {
+function ImageCard({ item, onSelect, disabled }) {
   const title = item.title || '';
   const thumb = item.thumb_url || item.image_url || '';
   const author = cleanHtmlText(item.author || '');
   const license = cleanHtmlText(item.license || '');
-
-  console.log(`ImageCard[${idx}]:`, { title, thumb, author, license });
 
   return (
     <div
@@ -278,7 +346,6 @@ function ImageCard({ item, idx, onSelect, disabled }) {
       role="button"
       aria-label="Выбрать изображение"
     >
-      {/* Thumbnail */}
       <div className="aspect-square bg-gray-100 overflow-hidden">
         {thumb ? (
           <img
@@ -294,15 +361,25 @@ function ImageCard({ item, idx, onSelect, disabled }) {
         )}
       </div>
 
-      {/* Meta */}
       <div className="p-2">
-        <div className="text-xs font-medium text-gray-900 truncate" title={title}>
+        <div
+          className="text-xs font-medium text-gray-900 truncate"
+          title={title}
+        >
           {title || 'Без названия'}
         </div>
-        <div className="text-xs text-gray-500 truncate" title={author}>
+
+        <div
+          className="text-xs text-gray-500 truncate"
+          title={author}
+        >
           Автор: {author || '—'}
         </div>
-        <div className="text-xs text-gray-500 truncate" title={license}>
+
+        <div
+          className="text-xs text-gray-500 truncate"
+          title={license}
+        >
           Лицензия: {license || '—'}
         </div>
       </div>
@@ -310,13 +387,16 @@ function ImageCard({ item, idx, onSelect, disabled }) {
   );
 }
 
-// Skeleton загрузка
 function SkeletonGrid() {
   return (
     <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
       {Array.from({ length: 8 }).map((_, i) => (
-        <div key={i} className="border border-gray-200 rounded-lg overflow-hidden animate-pulse">
+        <div
+          key={i}
+          className="border border-gray-200 rounded-lg overflow-hidden animate-pulse"
+        >
           <div className="aspect-square bg-gray-200" />
+
           <div className="p-2 space-y-1">
             <div className="h-3 bg-gray-200 rounded w-3/4" />
             <div className="h-2 bg-gray-200 rounded w-1/2" />
@@ -328,11 +408,12 @@ function SkeletonGrid() {
   );
 }
 
-// Утилиты
 function cleanHtmlText(s) {
   if (!s) return '';
+
   const d = document.createElement('div');
   d.innerHTML = String(s);
+
   return (d.textContent || d.innerText || '').trim();
 }
 
@@ -342,11 +423,14 @@ function buildCopyright(item) {
   const licenseUrl = item.license_url || '';
   const pageUrl = item.file_page_url || '';
   const title = cleanHtmlText(item.title || '');
+
   const chunks = [];
+
   if (author) chunks.push(author);
   if (license) chunks.push(license);
   if (licenseUrl) chunks.push(licenseUrl);
   if (pageUrl) chunks.push(pageUrl);
   if (title) chunks.push(title);
+
   return chunks.join(' | ');
 }

@@ -24,6 +24,7 @@ const STATUS_MAP = {
 
 function StatusBadge({ status, label }) {
   const s = STATUS_MAP[status] || { label: label || status, cls: 'bg-gray-100 text-gray-500' };
+
   return (
     <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold whitespace-nowrap ${s.cls}`}>
       {label || s.label}
@@ -33,7 +34,13 @@ function StatusBadge({ status, label }) {
 
 function Notification({ note }) {
   if (!note) return null;
-  const cls = { success: 'bg-green-600', error: 'bg-red-600', info: 'bg-blue-600' };
+
+  const cls = {
+    success: 'bg-green-600',
+    error: 'bg-red-600',
+    info: 'bg-blue-600',
+  };
+
   return (
     <div className={`fixed top-5 right-5 z-50 px-4 py-3 rounded-lg text-white text-sm shadow-lg ${cls[note.type] || cls.info}`}>
       {note.msg}
@@ -43,6 +50,7 @@ function Notification({ note }) {
 
 function formatDateTime(value) {
   if (!value) return '—';
+
   return new Date(value).toLocaleString('ru-RU', {
     day: '2-digit',
     month: '2-digit',
@@ -56,11 +64,19 @@ function getFirstText(value) {
   if (!value) return '';
   if (typeof value === 'string') return value;
   if (typeof value !== 'object') return '';
-  return value.ru || value.en || value.it || Object.values(value).find((item) => typeof item === 'string' && item.trim()) || '';
+
+  return (
+    value.ru ||
+    value.en ||
+    value.it ||
+    Object.values(value).find((item) => typeof item === 'string' && item.trim()) ||
+    ''
+  );
 }
 
 function getAssigneeName(source) {
   if (!source) return '';
+
   return (
     source.assignee_name ||
     source.assigned_to_name ||
@@ -169,6 +185,7 @@ function parseSelectionKey(key) {
 
   if (key.startsWith('draft:')) {
     const [, sessionId, ...draftParts] = key.split(':');
+
     return {
       type: 'draft',
       sessionId,
@@ -177,6 +194,20 @@ function parseSelectionKey(key) {
   }
 
   return null;
+}
+
+function buildRowDeleteTarget(group, row) {
+  const shouldDeleteOnlyDraft =
+    group.totalRowsCount > 1 &&
+    row.cityDraftId &&
+    row.cityDraftId !== 'legacy';
+
+  return {
+    type: shouldDeleteOnlyDraft ? 'draft' : 'session',
+    session: group.session,
+    cityRow: row,
+    totalRowsCount: group.totalRowsCount,
+  };
 }
 
 export default function SessionsList() {
@@ -201,6 +232,7 @@ export default function SessionsList() {
   const [closing, setClosing] = useState(false);
 
   const [note, setNote] = useState(null);
+
   const showNote = useCallback((msg, type = 'info') => {
     setNote({ msg, type });
     setTimeout(() => setNote(null), 3500);
@@ -210,10 +242,16 @@ export default function SessionsList() {
     try {
       setLoading(true);
       setError(null);
+
       const res = await sessionsAPI.list();
       const data = res?.data;
-      const list = Array.isArray(data?.results) ? data.results
-        : Array.isArray(data) ? data : [];
+
+      const list = Array.isArray(data?.results)
+        ? data.results
+        : Array.isArray(data)
+          ? data
+          : [];
+
       setSessions(list);
       setSelected(new Set());
     } catch (err) {
@@ -229,21 +267,32 @@ export default function SessionsList() {
 
   const handleCreate = async () => {
     trackEvent('create_session_requested', { source: 'sessions_list' });
+
     setCreating(true);
     setCreateError(null);
+
     try {
       const res = await sessionsAPI.create({});
       const data = res?.data;
       const sessionId = data?.session?.id || data?.session?.uuid || data?.id;
+
       if (sessionId) {
-        trackEvent('create_session_success', { source: 'sessions_list', sessionId: String(sessionId) });
+        trackEvent('create_session_success', {
+          source: 'sessions_list',
+          sessionId: String(sessionId),
+        });
+
         navigate(`/generation/${sessionId}`);
       } else {
         setCreateError('Сессия создана, но не удалось получить ID. Обновите страницу.');
         await loadSessions();
       }
     } catch (err) {
-      trackEvent('create_session_fail', { source: 'sessions_list', reason: parseApiError(err, 'Ошибка создания') });
+      trackEvent('create_session_fail', {
+        source: 'sessions_list',
+        reason: parseApiError(err, 'Ошибка создания'),
+      });
+
       setCreateError(parseApiError(err, 'Ошибка создания сессии'));
     } finally {
       setCreating(false);
@@ -275,7 +324,9 @@ export default function SessionsList() {
 
   const handleClose = async () => {
     if (!closeTarget) return;
+
     setClosing(true);
+
     try {
       await sessionsAPI.close(closeTarget.id, closeMode);
       setCloseTarget(null);
@@ -290,14 +341,34 @@ export default function SessionsList() {
 
   const handleDelete = async () => {
     if (!deleteTarget) return;
+
+    const session = deleteTarget.session;
+    const row = deleteTarget.cityRow;
+    const isDraftDelete = deleteTarget.type === 'draft';
+
+    if (!session?.id) return;
+
     setDeleting(true);
+
     try {
-      await sessionsAPI.delete(deleteTarget.id);
+      if (isDraftDelete) {
+        await sessionsAPI.deleteCityDraft(session.id, row.cityDraftId);
+        showNote('Город удалён из сессии', 'success');
+      } else {
+        await sessionsAPI.delete(session.id);
+        showNote('Сессия удалена', 'success');
+      }
+
       setDeleteTarget(null);
-      showNote('Сессия удалена', 'success');
       await loadSessions();
     } catch (err) {
-      showNote(parseApiError(err, 'Ошибка удаления'), 'error');
+      showNote(
+        parseApiError(
+          err,
+          isDraftDelete ? 'Ошибка удаления города' : 'Ошибка удаления сессии'
+        ),
+        'error'
+      );
     } finally {
       setDeleting(false);
     }
@@ -322,6 +393,7 @@ export default function SessionsList() {
       if (!session) return;
 
       const cityRows = buildCityRows(session);
+
       if (cityRows.length === 1) {
         sessionsToDelete.add(parsed.sessionId);
         return;
@@ -356,6 +428,7 @@ export default function SessionsList() {
     if (!confirm(`Удалить ${confirmLabel}? Действие нельзя отменить.`)) return;
 
     setBulkDeleting(true);
+
     let failed = 0;
 
     for (const sessionId of sessionsToDelete) {
@@ -368,6 +441,7 @@ export default function SessionsList() {
 
     for (const item of uniqueDrafts) {
       if (sessionsToDelete.has(item.sessionId)) continue;
+
       try {
         await sessionsAPI.deleteCityDraft(item.sessionId, item.cityDraftId);
       } catch {
@@ -377,8 +451,11 @@ export default function SessionsList() {
 
     setBulkDeleting(false);
 
-    if (failed) showNote(`Удалено с ошибками: ${failed} элементов не удалось`, 'error');
-    else showNote(`Удалено ${totalCount} элементов`, 'success');
+    if (failed) {
+      showNote(`Удалено с ошибками: ${failed} элементов не удалось`, 'error');
+    } else {
+      showNote(`Удалено ${totalCount} элементов`, 'success');
+    }
 
     await loadSessions();
   };
@@ -392,6 +469,7 @@ export default function SessionsList() {
       .map((session) => {
         const allCityRows = buildCityRows(session);
         const sessionAssignee = getAssigneeName(session);
+
         const sessionSearchBlob = buildSearchBlob([
           session.name,
           session.uuid,
@@ -402,8 +480,10 @@ export default function SessionsList() {
         ]);
 
         let visibleCityRows = allCityRows;
+
         if (q) {
           const sessionMatches = sessionSearchBlob.includes(q);
+
           visibleCityRows = sessionMatches
             ? allCityRows
             : allCityRows.filter((row) => buildSearchBlob([
@@ -443,14 +523,22 @@ export default function SessionsList() {
     [filteredGroups]
   );
 
-  const allSelected = filteredSessionIds.length > 0 && filteredSessionIds.every((id) => selected.has(buildSessionSelectionKey(id)));
+  const allSelected =
+    filteredSessionIds.length > 0 &&
+    filteredSessionIds.every((id) => selected.has(buildSessionSelectionKey(id)));
 
   const toggleSelect = (sessionId) => {
     const selectionKey = buildSessionSelectionKey(sessionId);
+
     setSelected((prev) => {
       const next = new Set(prev);
-      if (next.has(selectionKey)) next.delete(selectionKey);
-      else next.add(selectionKey);
+
+      if (next.has(selectionKey)) {
+        next.delete(selectionKey);
+      } else {
+        next.add(selectionKey);
+      }
+
       return next;
     });
   };
@@ -458,21 +546,29 @@ export default function SessionsList() {
   const toggleAll = () => {
     setSelected((prev) => {
       const next = new Set(prev);
+
       if (allSelected) {
         filteredSessionIds.forEach((id) => next.delete(buildSessionSelectionKey(id)));
       } else {
         filteredSessionIds.forEach((id) => next.add(buildSessionSelectionKey(id)));
       }
+
       return next;
     });
   };
 
   const toggleDraftDelete = useCallback((group, row) => {
     const selectionKey = buildDraftSelectionKey(group.session.id, row.cityDraftId);
+
     setSelected((prev) => {
       const next = new Set(prev);
-      if (next.has(selectionKey)) next.delete(selectionKey);
-      else next.add(selectionKey);
+
+      if (next.has(selectionKey)) {
+        next.delete(selectionKey);
+      } else {
+        next.add(selectionKey);
+      }
+
       return next;
     });
   }, []);
@@ -497,6 +593,10 @@ export default function SessionsList() {
 
     return () => setMobileActions([]);
   }, [setMobileActions, creating, loadSessions]);
+
+  const isDeleteDraftTarget = deleteTarget?.type === 'draft';
+  const deleteTargetSession = deleteTarget?.session;
+  const deleteTargetCityRow = deleteTarget?.cityRow;
 
   return (
     <Layout
@@ -524,8 +624,8 @@ export default function SessionsList() {
           <span className="animate-spin w-4 h-4 border-2 border-blue-500 border-t-transparent rounded-full" />
           <span>
             {creating && 'Создаем новую сессию...'}
-            {bulkDeleting && 'Удаляем выбранные сессии...'}
-            {deleting && 'Удаляем сессию...'}
+            {bulkDeleting && 'Удаляем выбранные элементы...'}
+            {deleting && (deleteTarget?.type === 'draft' ? 'Удаляем город...' : 'Удаляем сессию...')}
             {closing && 'Закрываем сессию...'}
           </span>
         </div>
@@ -534,7 +634,12 @@ export default function SessionsList() {
       {createError && (
         <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700 flex items-center justify-between">
           <span>{createError}</span>
-          <button onClick={() => setCreateError(null)} className="ml-4 text-red-400 hover:text-red-600">✕</button>
+          <button
+            onClick={() => setCreateError(null)}
+            className="ml-4 text-red-400 hover:text-red-600"
+          >
+            ✕
+          </button>
         </div>
       )}
 
@@ -542,9 +647,20 @@ export default function SessionsList() {
         <div className="flex items-center justify-between gap-3 px-4 py-3 border-b border-gray-100">
           <div className="flex items-center gap-2 flex-1">
             <div className="relative flex-1 max-w-lg">
-              <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+              <svg
+                className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+                />
               </svg>
+
               <input
                 type="search"
                 value={search}
@@ -565,6 +681,7 @@ export default function SessionsList() {
             {selected.size > 0 && (
               <div className="flex items-center gap-2 text-sm">
                 <span className="text-gray-500">Выбрано: {selected.size}</span>
+
                 <button
                   onClick={handleBulkDelete}
                   disabled={bulkDeleting}
@@ -580,7 +697,9 @@ export default function SessionsList() {
         {error && (
           <div className="px-4 py-3 bg-red-50 text-sm text-red-700 border-b border-red-100">
             {error}
-            <button onClick={loadSessions} className="ml-3 underline">Повторить</button>
+            <button onClick={loadSessions} className="ml-3 underline">
+              Повторить
+            </button>
           </div>
         )}
 
@@ -596,12 +715,30 @@ export default function SessionsList() {
                     className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
                   />
                 </th>
-                <th className="px-3 py-2.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Город</th>
-                <th className="px-3 py-2.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Страна</th>
-                <th className="px-3 py-2.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Дата</th>
-                <th className="px-3 py-2.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Статус</th>
-                <th className="px-3 py-2.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Ответственный</th>
-                <th className="px-3 py-2.5 text-right text-xs font-semibold text-gray-500 uppercase tracking-wide">Действия</th>
+
+                <th className="px-3 py-2.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">
+                  Город
+                </th>
+
+                <th className="px-3 py-2.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">
+                  Страна
+                </th>
+
+                <th className="px-3 py-2.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">
+                  Дата
+                </th>
+
+                <th className="px-3 py-2.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">
+                  Статус
+                </th>
+
+                <th className="px-3 py-2.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">
+                  Ответственный
+                </th>
+
+                <th className="px-3 py-2.5 text-right text-xs font-semibold text-gray-500 uppercase tracking-wide">
+                  Действия
+                </th>
               </tr>
             </thead>
 
@@ -620,8 +757,12 @@ export default function SessionsList() {
                   <td colSpan={7} className="px-4 py-12 text-center text-gray-400">
                     <div className="text-3xl mb-2">📋</div>
                     <div>{search ? 'По вашему запросу города не найдены' : 'Сессий ещё нет'}</div>
+
                     {!search && (
-                      <button onClick={handleCreate} className="mt-3 text-sm text-blue-600 hover:underline">
+                      <button
+                        onClick={handleCreate}
+                        className="mt-3 text-sm text-blue-600 hover:underline"
+                      >
                         Создать первую сессию
                       </button>
                     )}
@@ -641,83 +782,110 @@ export default function SessionsList() {
                               className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
                             />
                           </div>
+
                           <div className="min-w-0">
                             <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm">
-                              <span className="font-semibold text-slate-900">{group.session.name || 'Сессия без названия'}</span>
+                              <span className="font-semibold text-slate-900">
+                                {group.session.name || 'Сессия без названия'}
+                              </span>
                             </div>
+
                             <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-slate-500">
                               {group.matchedRowsCount !== group.totalRowsCount && (
-                                <span>Показано {group.matchedRowsCount} из {group.totalRowsCount} городов</span>
+                                <span>
+                                  Показано {group.matchedRowsCount} из {group.totalRowsCount} городов
+                                </span>
                               )}
                             </div>
                           </div>
                         </div>
 
                         <div className="text-xs text-slate-500">
-                          {group.totalRowsCount} {group.totalRowsCount === 1 ? 'город' : group.totalRowsCount < 5 ? 'города' : 'городов'}
+                          {group.totalRowsCount}{' '}
+                          {group.totalRowsCount === 1 ? 'город' : group.totalRowsCount < 5 ? 'города' : 'городов'}
                         </div>
                       </div>
                     </td>
                   </tr>
 
-                  {group.cityRows.map((row) => (
-                    <tr
-                      key={row.rowKey}
-                      onClick={() => openSession(group.session, row, 'row')}
-                      className="cursor-pointer bg-white hover:bg-blue-50 transition-colors group"
-                    >
-                      <td className="w-10 px-3 py-3" onClick={(e) => e.stopPropagation()}>
-                        <input
-                          type="checkbox"
-                          checked={selected.has(buildDraftSelectionKey(group.session.id, row.cityDraftId))}
-                          onChange={() => toggleDraftDelete(group, row)}
-                          title={group.totalRowsCount === 1 ? 'Удалить сессию' : 'Удалить город из сессии'}
-                          className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                        />
-                      </td>
-                      <td className="px-3 py-3">
-                        <div className="font-medium text-gray-900">{row.cityName}</div>
-                      </td>
-                      <td className="px-3 py-3 text-gray-600">{row.country}</td>
-                      <td className="px-3 py-3 text-gray-600 whitespace-nowrap">{formatDateTime(row.createdAt)}</td>
-                      <td className="px-3 py-3">
-                        <StatusBadge status={row.status} label={row.statusDisplay} />
-                      </td>
-                      <td className="px-3 py-3 text-gray-600">{row.assignee || '—'}</td>
-                      <td className="px-3 py-3 text-right" onClick={(e) => e.stopPropagation()}>
-                        <div className="flex items-center justify-end gap-1 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
-                          <button
-                            type="button"
-                            onClick={() => openSession(group.session, row, 'action')}
-                            className="px-2.5 py-1 text-xs font-medium text-blue-600 bg-blue-50 rounded-md hover:bg-blue-100 transition-colors"
-                          >
-                            Открыть
-                          </button>
-                          {isActive(group.session) && (
+                  {group.cityRows.map((row) => {
+                    const rowDeleteTarget = buildRowDeleteTarget(group, row);
+                    const deletesOnlyDraft = rowDeleteTarget.type === 'draft';
+
+                    return (
+                      <tr
+                        key={row.rowKey}
+                        onClick={() => openSession(group.session, row, 'row')}
+                        className="cursor-pointer bg-white hover:bg-blue-50 transition-colors group"
+                      >
+                        <td className="w-10 px-3 py-3" onClick={(e) => e.stopPropagation()}>
+                          <input
+                            type="checkbox"
+                            checked={selected.has(buildDraftSelectionKey(group.session.id, row.cityDraftId))}
+                            onChange={() => toggleDraftDelete(group, row)}
+                            title={deletesOnlyDraft ? 'Удалить город из сессии' : 'Удалить сессию'}
+                            className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                          />
+                        </td>
+
+                        <td className="px-3 py-3">
+                          <div className="font-medium text-gray-900">{row.cityName}</div>
+                        </td>
+
+                        <td className="px-3 py-3 text-gray-600">
+                          {row.country}
+                        </td>
+
+                        <td className="px-3 py-3 text-gray-600 whitespace-nowrap">
+                          {formatDateTime(row.createdAt)}
+                        </td>
+
+                        <td className="px-3 py-3">
+                          <StatusBadge status={row.status} label={row.statusDisplay} />
+                        </td>
+
+                        <td className="px-3 py-3 text-gray-600">
+                          {row.assignee || '—'}
+                        </td>
+
+                        <td className="px-3 py-3 text-right" onClick={(e) => e.stopPropagation()}>
+                          <div className="flex items-center justify-end gap-1 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
                             <button
                               type="button"
-                              onClick={() => {
-                                setCloseMode('save');
-                                setCloseTarget(group.session);
-                              }}
-                              className="px-2.5 py-1 text-xs font-medium text-orange-600 bg-orange-50 rounded-md hover:bg-orange-100 transition-colors"
+                              onClick={() => openSession(group.session, row, 'action')}
+                              className="px-2.5 py-1 text-xs font-medium text-blue-600 bg-blue-50 rounded-md hover:bg-blue-100 transition-colors"
                             >
-                              Закрыть
+                              Открыть
                             </button>
-                          )}
-                          {group.session.status === 'draft' && (
-                            <button
-                              type="button"
-                              onClick={() => setDeleteTarget(group.session)}
-                              className="px-2.5 py-1 text-xs font-medium text-red-600 bg-red-50 rounded-md hover:bg-red-100 transition-colors"
-                            >
-                              Удалить
-                            </button>
-                          )}
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
+
+                            {isActive(group.session) && (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setCloseMode('save');
+                                  setCloseTarget(group.session);
+                                }}
+                                className="px-2.5 py-1 text-xs font-medium text-orange-600 bg-orange-50 rounded-md hover:bg-orange-100 transition-colors"
+                              >
+                                Закрыть
+                              </button>
+                            )}
+
+                            {group.session.status === 'draft' && (
+                              <button
+                                type="button"
+                                onClick={() => setDeleteTarget(rowDeleteTarget)}
+                                title={deletesOnlyDraft ? 'Удалить только этот город' : 'Удалить всю сессию'}
+                                className="px-2.5 py-1 text-xs font-medium text-red-600 bg-red-50 rounded-md hover:bg-red-100 transition-colors"
+                              >
+                                Удалить
+                              </button>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </Fragment>
               ))}
             </tbody>
@@ -733,18 +901,54 @@ export default function SessionsList() {
 
       {deleteTarget && (
         <div className="fixed inset-0 z-50 flex items-center justify-center">
-          <div className="absolute inset-0 bg-black/40" onClick={() => !deleting && setDeleteTarget(null)} />
+          <div
+            className="absolute inset-0 bg-black/40"
+            onClick={() => !deleting && setDeleteTarget(null)}
+          />
+
           <div className="relative bg-white rounded-xl shadow-xl p-6 w-96 space-y-4">
-            <h3 className="text-base font-semibold text-gray-900">Удалить сессию?</h3>
-            <p className="text-sm text-gray-600">
-              Сессия <span className="font-medium">«{deleteTarget.name || deleteTarget.uuid || deleteTarget.id}»</span> будет удалена безвозвратно.
-            </p>
+            <h3 className="text-base font-semibold text-gray-900">
+              {isDeleteDraftTarget ? 'Удалить город?' : 'Удалить сессию?'}
+            </h3>
+
+            {isDeleteDraftTarget ? (
+              <p className="text-sm text-gray-600">
+                Город{' '}
+                <span className="font-medium">
+                  «{deleteTargetCityRow?.cityName || deleteTargetCityRow?.cityDraftId || 'Без названия'}»
+                </span>{' '}
+                будет удалён из сессии{' '}
+                <span className="font-medium">
+                  «{deleteTargetSession?.name || deleteTargetSession?.uuid || deleteTargetSession?.id}»
+                </span>.
+                <br />
+                Сама сессия останется.
+              </p>
+            ) : (
+              <p className="text-sm text-gray-600">
+                Сессия{' '}
+                <span className="font-medium">
+                  «{deleteTargetSession?.name || deleteTargetSession?.uuid || deleteTargetSession?.id}»
+                </span>{' '}
+                будет удалена безвозвратно.
+              </p>
+            )}
+
             <div className="flex gap-2 justify-end">
-              <button onClick={() => setDeleteTarget(null)} disabled={deleting} className="px-4 py-2 text-sm text-gray-600 border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50">
+              <button
+                onClick={() => setDeleteTarget(null)}
+                disabled={deleting}
+                className="px-4 py-2 text-sm text-gray-600 border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50"
+              >
                 Отмена
               </button>
-              <button onClick={handleDelete} disabled={deleting} className="px-4 py-2 text-sm font-medium text-white bg-red-600 rounded-lg hover:bg-red-700 disabled:opacity-50">
-                {deleting ? 'Удаление...' : 'Удалить'}
+
+              <button
+                onClick={handleDelete}
+                disabled={deleting}
+                className="px-4 py-2 text-sm font-medium text-white bg-red-600 rounded-lg hover:bg-red-700 disabled:opacity-50"
+              >
+                {deleting ? 'Удаление...' : isDeleteDraftTarget ? 'Удалить город' : 'Удалить сессию'}
               </button>
             </div>
           </div>
@@ -753,34 +957,82 @@ export default function SessionsList() {
 
       {closeTarget && (
         <div className="fixed inset-0 z-50 flex items-center justify-center">
-          <div className="absolute inset-0 bg-black/40" onClick={() => !closing && setCloseTarget(null)} />
+          <div
+            className="absolute inset-0 bg-black/40"
+            onClick={() => !closing && setCloseTarget(null)}
+          />
+
           <div className="relative bg-white rounded-xl shadow-xl p-6 w-96 space-y-4">
-            <h3 className="text-base font-semibold text-gray-900">Закрыть сессию</h3>
+            <h3 className="text-base font-semibold text-gray-900">
+              Закрыть сессию
+            </h3>
+
             <p className="text-sm text-gray-600">
-              Сессия <span className="font-medium">«{closeTarget.name || closeTarget.uuid || closeTarget.id}»</span> будет закрыта. Выберите режим:
+              Сессия{' '}
+              <span className="font-medium">
+                «{closeTarget.name || closeTarget.uuid || closeTarget.id}»
+              </span>{' '}
+              будет закрыта. Выберите режим:
             </p>
+
             <div className="space-y-2">
               {[
-                { mode: 'save', title: 'Сохранить', desc: 'Данные сессии сохранятся, можно будет опубликовать позже', cls: 'border-blue-500 bg-blue-50' },
-                { mode: 'discard', title: 'Отменить', desc: 'Данные сессии будут удалены без сохранения', cls: 'border-red-500 bg-red-50' },
+                {
+                  mode: 'save',
+                  title: 'Сохранить',
+                  desc: 'Данные сессии сохранятся, можно будет опубликовать позже',
+                  cls: 'border-blue-500 bg-blue-50',
+                },
+                {
+                  mode: 'discard',
+                  title: 'Отменить',
+                  desc: 'Данные сессии будут удалены без сохранения',
+                  cls: 'border-red-500 bg-red-50',
+                },
               ].map((opt) => (
-                <label key={opt.mode} className={`flex items-start gap-3 p-3 rounded-lg border-2 cursor-pointer transition-colors ${closeMode === opt.mode ? opt.cls : 'border-gray-200 hover:border-gray-300'}`}>
-                  <input type="radio" name="closeMode" value={opt.mode} checked={closeMode === opt.mode} onChange={() => setCloseMode(opt.mode)} className="mt-0.5" />
+                <label
+                  key={opt.mode}
+                  className={`flex items-start gap-3 p-3 rounded-lg border-2 cursor-pointer transition-colors ${
+                    closeMode === opt.mode ? opt.cls : 'border-gray-200 hover:border-gray-300'
+                  }`}
+                >
+                  <input
+                    type="radio"
+                    name="closeMode"
+                    value={opt.mode}
+                    checked={closeMode === opt.mode}
+                    onChange={() => setCloseMode(opt.mode)}
+                    className="mt-0.5"
+                  />
+
                   <div>
-                    <div className="text-sm font-medium text-gray-900">{opt.title}</div>
-                    <div className="text-xs text-gray-500">{opt.desc}</div>
+                    <div className="text-sm font-medium text-gray-900">
+                      {opt.title}
+                    </div>
+
+                    <div className="text-xs text-gray-500">
+                      {opt.desc}
+                    </div>
                   </div>
                 </label>
               ))}
             </div>
+
             <div className="flex gap-2 justify-end">
-              <button onClick={() => setCloseTarget(null)} disabled={closing} className="px-4 py-2 text-sm text-gray-600 border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50">
+              <button
+                onClick={() => setCloseTarget(null)}
+                disabled={closing}
+                className="px-4 py-2 text-sm text-gray-600 border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50"
+              >
                 Отмена
               </button>
+
               <button
                 onClick={handleClose}
                 disabled={closing}
-                className={`px-4 py-2 text-sm font-medium text-white rounded-lg disabled:opacity-50 transition-colors ${closeMode === 'discard' ? 'bg-red-600 hover:bg-red-700' : 'bg-blue-600 hover:bg-blue-700'}`}
+                className={`px-4 py-2 text-sm font-medium text-white rounded-lg disabled:opacity-50 transition-colors ${
+                  closeMode === 'discard' ? 'bg-red-600 hover:bg-red-700' : 'bg-blue-600 hover:bg-blue-700'
+                }`}
               >
                 {closing ? (
                   <span className="flex items-center gap-1.5">
