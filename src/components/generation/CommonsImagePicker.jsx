@@ -157,22 +157,30 @@ export default function CommonsImagePicker({
         throw new Error('Сервер не вернул данные изображения');
       }
 
-      const selectedOriginalUrl = originalUrl || thumbUrl || image.url || '';
-      const copyright = buildCopyright(item);
+      const selectedOriginalUrl =
+        data?.original_image_url ||
+        data?.source_url ||
+        originalUrl ||
+        thumbUrl ||
+        '';
+
+      const importedLocalUrl = image?.url || '';
+      const copyright = image?.copyright || buildCopyright(item);
 
       onImageSelected?.({
         imageId: image.id,
 
-        // ВАЖНО:
-        // Оставляем поле localUrl для совместимости с SessionWizard.jsx,
-        // но теперь здесь оригинальная ссылка Wikimedia Commons, а не /media/localhost.
-        localUrl: selectedOriginalUrl,
+        // Локальная ссылка backend/media. Её используем только для preview.
+        localUrl: importedLocalUrl,
 
-        // Дополнительные явные поля, если SessionWizard.jsx захочет использовать их напрямую.
+        // Оригинальная ссылка Wikimedia. Её сохраняем в поле URL.
         originalUrl: selectedOriginalUrl,
+        sourceUrl: data?.source_url || selectedOriginalUrl,
+
+        // Дополнительные поля для совместимости.
         imageUrl: selectedOriginalUrl,
         thumbUrl,
-        importedLocalUrl: image.url || '',
+        importedLocalUrl,
 
         title: item.title || '',
         author: cleanHtmlText(item.author || ''),

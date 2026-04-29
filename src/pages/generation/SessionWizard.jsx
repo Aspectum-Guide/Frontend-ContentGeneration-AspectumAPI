@@ -261,6 +261,7 @@ export default function SessionWizard() {
   // ── Step 1 — Photo ────────────────────────────────────────────────────────
   const [imageId, setImageId] = useState(null);
   const [imagePreview, setImagePreview] = useState('');
+  const [imageOriginalUrl, setImageOriginalUrl] = useState('');
   const [imageCopyright, setImageCopyright] = useState('');
   const [photoUploading, setPhotoUploading] = useState(false);
   const photoFileRef = useRef(null);
@@ -682,6 +683,7 @@ export default function SessionWizard() {
       default_language: localeData[defaultLocale]?.lang || null,
       tags: cityTags,
       image_id: imageId,
+      image_original_url: imageOriginalUrl || '',
       ...(activeCityDraftIdRef.current && activeCityDraftIdRef.current !== 'legacy'
         ? { draft_id: activeCityDraftIdRef.current }
         : {}),
@@ -701,8 +703,16 @@ export default function SessionWizard() {
       const savedCity = savedDraft || data?.city || null;
       if (savedCity?.image_url) {
         setImagePreview(savedCity.image_url);
-        if (savedCity.image_id != null) setImageId(savedCity.image_id);
       }
+
+      if (savedCity?.image_id != null) {
+        setImageId(savedCity.image_id);
+      }
+
+      if (savedCity?.image_original_url) {
+        setImageOriginalUrl(savedCity.image_original_url);
+      }
+
       if (data?.status) {
         setSession(prev => prev ? { ...prev, status: data.status, status_display: data.status_display } : prev);
       }
@@ -740,7 +750,7 @@ export default function SessionWizard() {
     } finally {
       setSaving(false);
     }
-  }, [sessionId, localeData, defaultLocale, lat, lon, cityTags, imageId, showNote, loadSession, syncActiveDraftRoute]);
+  }, [sessionId, localeData, defaultLocale, lat, lon, cityTags, imageId, imageOriginalUrl, showNote, loadSession, syncActiveDraftRoute]);
 
   // ─────────────────────────────────────────────────────────────────────────
   // Step navigation
@@ -887,20 +897,37 @@ export default function SessionWizard() {
   const handlePhotoFile = useCallback(async (e) => {
     const f = e.target.files?.[0];
     if (!f || !f.type.startsWith('image/')) return;
+
     e.target.value = '';
     setPhotoUploading(true);
+
     try {
       const fd = new FormData();
       fd.append('file', f);
-      if (imageCopyright) fd.append('copyright', imageCopyright);
+
+      if (imageCopyright) {
+        fd.append('copyright', imageCopyright);
+      }
+
       fd.append('session_uuid', session?.uuid || session?.session_uuid || '');
       fd.append('city_name', localeData[activeLocale]?.name || '');
       fd.append('temp', '1');
+
       const res = await imagesAPI.upload(fd);
-      const { id, url } = res?.data || {};
+      const { id, url, copyright } = res?.data || {};
+
       if (id && url) {
         setImageId(id);
         setImagePreview(url);
+
+        // Обычная ручная загрузка с компьютера не имеет внешнего оригинального URL.
+        // Поэтому очищаем старый Wikimedia URL, если раньше была выбрана Commons-картинка.
+        setImageOriginalUrl('');
+
+        if (copyright != null) {
+          setImageCopyright(copyright || '');
+        }
+
         showNote('Изображение загружено', 'success');
       }
     } catch (err) {
@@ -908,15 +935,34 @@ export default function SessionWizard() {
     } finally {
       setPhotoUploading(false);
     }
-  }, [session, localeData, activeLocale, imageCopyright, showNote]);
+  }, [
+    session,
+    localeData,
+    activeLocale,
+    imageCopyright,
+    showNote,
+  ]);
 
   // ─────────────────────────────────────────────────────────────────────────
   // Commons image selection
   // ─────────────────────────────────────────────────────────────────────────
-  const handleCommonsImageSelect = useCallback(({ imageId, localUrl, copyright }) => {
-    setImageId(imageId);
-    setImagePreview(localUrl);
-    setImageCopyright(copyright);
+  const handleCommonsImageSelect = useCallback(({
+    imageId,
+    localUrl,
+    originalUrl,
+    sourceUrl,
+    copyright,
+  }) => {
+    setImageId(imageId || null);
+
+    // Для preview картинки.
+    setImagePreview(localUrl || '');
+
+    // Для поля URL под фото.
+    setImageOriginalUrl(originalUrl || sourceUrl || '');
+
+    setImageCopyright(copyright || '');
+
     showNote('Изображение загружено из Wikimedia Commons', 'success');
   }, [showNote]);
 
@@ -1383,9 +1429,11 @@ export default function SessionWizard() {
               <label className="block text-xs text-gray-500 mb-0.5">URL</label>
               <input
                 type="url"
-                value={imagePreview}
-                onChange={e => { setImagePreview(e.target.value); setImageId(null); }}
-                placeholder="https://..."
+                value={imageOriginalUrl}
+                onChange={(e) => {
+                  setImageOriginalUrl(e.target.value);
+                }}
+                placeholder="https://upload.wikimedia.org/..."
                 className="w-full px-2 py-1 text-xs border border-gray-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-blue-400"
               />
             </div>

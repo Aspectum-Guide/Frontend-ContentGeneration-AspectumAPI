@@ -210,6 +210,23 @@ function buildRowDeleteTarget(group, row) {
   };
 }
 
+function getGroupDraftSelectionKeys(group) {
+  return group.allCityRows.map((row) => (
+    buildDraftSelectionKey(group.session.id, row.cityDraftId)
+  ));
+}
+
+function isGroupFullySelected(group, selectedSet) {
+  const sessionKey = buildSessionSelectionKey(group.session.id);
+  const draftKeys = getGroupDraftSelectionKeys(group);
+
+  return (
+    selectedSet.has(sessionKey) &&
+    draftKeys.length > 0 &&
+    draftKeys.every((key) => selectedSet.has(key))
+  );
+}
+
 export default function SessionsList() {
   const { setMobileActions } = useLayoutActions();
   const navigate = useNavigate();
@@ -399,15 +416,14 @@ export default function SessionsList() {
         return;
       }
 
-      if (!sessionsToDelete.has(parsed.sessionId)) {
-        draftsToDelete.push({
-          sessionId: parsed.sessionId,
-          cityDraftId: parsed.cityDraftId,
-        });
-      }
+      draftsToDelete.push({
+        sessionId: parsed.sessionId,
+        cityDraftId: parsed.cityDraftId,
+      });
     });
 
     const uniqueDrafts = draftsToDelete.filter((item, index, arr) => (
+      !sessionsToDelete.has(item.sessionId) &&
       arr.findIndex((candidate) => (
         candidate.sessionId === item.sessionId &&
         candidate.cityDraftId === item.cityDraftId
@@ -513,30 +529,53 @@ export default function SessionsList() {
       .filter(Boolean);
   }, [sessions, search]);
 
-  const filteredSessionIds = useMemo(
-    () => filteredGroups.map((group) => String(group.session.id)),
-    [filteredGroups]
-  );
-
   const visibleRowCount = useMemo(
     () => filteredGroups.reduce((sum, group) => sum + group.cityRows.length, 0),
     [filteredGroups]
   );
 
   const allSelected =
-    filteredSessionIds.length > 0 &&
-    filteredSessionIds.every((id) => selected.has(buildSessionSelectionKey(id)));
+    filteredGroups.length > 0 &&
+    filteredGroups.every((group) => isGroupFullySelected(group, selected));
 
-  const toggleSelect = (sessionId) => {
-    const selectionKey = buildSessionSelectionKey(sessionId);
+  const selectedDisplayCount = useMemo(() => {
+    const selectedSessionIds = new Set();
+    const selectedDrafts = [];
+
+    selected.forEach((key) => {
+      const parsed = parseSelectionKey(key);
+      if (!parsed) return;
+
+      if (parsed.type === 'session') {
+        selectedSessionIds.add(parsed.sessionId);
+      }
+
+      if (parsed.type === 'draft') {
+        selectedDrafts.push(parsed);
+      }
+    });
+
+    const draftCount = selectedDrafts.filter((draft) => (
+      !selectedSessionIds.has(draft.sessionId)
+    )).length;
+
+    return selectedSessionIds.size + draftCount;
+  }, [selected]);
+
+  const toggleSelect = (group) => {
+    const sessionKey = buildSessionSelectionKey(group.session.id);
+    const draftKeys = getGroupDraftSelectionKeys(group);
 
     setSelected((prev) => {
       const next = new Set(prev);
+      const shouldUnselect = isGroupFullySelected(group, next);
 
-      if (next.has(selectionKey)) {
-        next.delete(selectionKey);
+      if (shouldUnselect) {
+        next.delete(sessionKey);
+        draftKeys.forEach((key) => next.delete(key));
       } else {
-        next.add(selectionKey);
+        next.add(sessionKey);
+        draftKeys.forEach((key) => next.add(key));
       }
 
       return next;
@@ -547,26 +586,45 @@ export default function SessionsList() {
     setSelected((prev) => {
       const next = new Set(prev);
 
-      if (allSelected) {
-        filteredSessionIds.forEach((id) => next.delete(buildSessionSelectionKey(id)));
-      } else {
-        filteredSessionIds.forEach((id) => next.add(buildSessionSelectionKey(id)));
-      }
+      filteredGroups.forEach((group) => {
+        const sessionKey = buildSessionSelectionKey(group.session.id);
+        const draftKeys = getGroupDraftSelectionKeys(group);
+
+        if (allSelected) {
+          next.delete(sessionKey);
+          draftKeys.forEach((key) => next.delete(key));
+        } else {
+          next.add(sessionKey);
+          draftKeys.forEach((key) => next.add(key));
+        }
+      });
 
       return next;
     });
   };
 
   const toggleDraftDelete = useCallback((group, row) => {
-    const selectionKey = buildDraftSelectionKey(group.session.id, row.cityDraftId);
+    const sessionKey = buildSessionSelectionKey(group.session.id);
+    const draftKey = buildDraftSelectionKey(group.session.id, row.cityDraftId);
+    const allDraftKeys = getGroupDraftSelectionKeys(group);
 
     setSelected((prev) => {
       const next = new Set(prev);
 
-      if (next.has(selectionKey)) {
-        next.delete(selectionKey);
+      if (next.has(draftKey)) {
+        next.delete(draftKey);
       } else {
-        next.add(selectionKey);
+        next.add(draftKey);
+      }
+
+      const allDraftsSelected =
+        allDraftKeys.length > 0 &&
+        allDraftKeys.every((key) => next.has(key));
+
+      if (allDraftsSelected) {
+        next.add(sessionKey);
+      } else {
+        next.delete(sessionKey);
       }
 
       return next;
@@ -678,9 +736,9 @@ export default function SessionsList() {
               </div>
             )}
 
-            {selected.size > 0 && (
+            {selectedDisplayCount > 0 && (
               <div className="flex items-center gap-2 text-sm">
-                <span className="text-gray-500">Выбрано: {selected.size}</span>
+                <span className="text-gray-500">Выбрано: {selectedDisplayCount}</span>
 
                 <button
                   onClick={handleBulkDelete}
@@ -777,8 +835,8 @@ export default function SessionsList() {
                           <div className="pt-0.5">
                             <input
                               type="checkbox"
-                              checked={selected.has(buildSessionSelectionKey(group.session.id))}
-                              onChange={() => toggleSelect(group.session.id)}
+                              checked={isGroupFullySelected(group, selected)}
+                              onChange={() => toggleSelect(group)}
                               className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
                             />
                           </div>
