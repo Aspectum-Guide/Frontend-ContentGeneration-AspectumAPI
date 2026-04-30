@@ -4,7 +4,7 @@ import Layout from '../../../components/Layout';
 import DataTable from '../../../components/ui/DataTable';
 import { Field, FormActions, TextInput } from '../../../components/ui/FormField';
 import Modal, { ConfirmModal } from '../../../components/ui/Modal';
-import { useLayoutActions } from '../../../context/LayoutActionsContext';
+import { useLayoutActions } from '../../../context/useLayoutActions';
 import { parseApiError } from '../../../utils/apiError';
 import { useCatalogFilters } from '../core/useCatalogFilters';
 import { useCatalogResource } from '../core/useCatalogResource';
@@ -128,7 +128,7 @@ export default function TicketPricesCatalog() {
       },
       (err) => parseApiError(err, 'Ошибка загрузки цен')
     );
-  }, [prices.load, eventFilter, ticketTypeFilter, statusFilter, debouncedSearch]);
+  }, [prices, eventFilter, ticketTypeFilter, statusFilter, debouncedSearch]);
 
   useEffect(() => {
     reload(page);

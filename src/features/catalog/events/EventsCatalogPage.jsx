@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import Layout from '../../../components/Layout';
 import DataTable from '../../../components/ui/DataTable';
 import { ConfirmModal } from '../../../components/ui/Modal';
-import { useLayoutActions } from '../../../context/LayoutActionsContext';
+import { useLayoutActions } from '../../../context/useLayoutActions';
 import { getMultiLangValue } from '../shared/i18n';
 import EventEditorModal from './EventEditorModal';
 import { useEventsCatalog } from './useEventsCatalog';
@@ -44,9 +44,8 @@ export default function EventsCatalogPage() {
       key: 'is_show',
       label: 'Статус',
       render: (v) => (
-        <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
-          v ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'
-        }`}>
+        <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${v ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'
+          }`}>
           {v ? 'Активно' : 'Скрыто'}
         </span>
       ),
@@ -98,7 +97,7 @@ export default function EventsCatalogPage() {
 
     setMobileActions(actions);
     return () => setMobileActions([]);
-  }, [e.openCreate, e.saving, e.editingEvent, e.handleSave, e.setEditingEvent, navigate, setMobileActions]);
+  }, [e.openCreate, e.saving, e.editingEvent, e.handleSave, e.setEditingEvent, e, navigate, setMobileActions]);
 
   return (
     <Layout>

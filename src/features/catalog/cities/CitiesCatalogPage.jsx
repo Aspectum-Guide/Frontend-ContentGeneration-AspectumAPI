@@ -2,7 +2,7 @@ import { useEffect } from 'react';
 import Layout from '../../../components/Layout';
 import DataTable from '../../../components/ui/DataTable';
 import { ConfirmModal } from '../../../components/ui/Modal';
-import { useLayoutActions } from '../../../context/LayoutActionsContext';
+import { useLayoutActions } from '../../../context/useLayoutActions';
 import { getMultiLangValue } from '../shared/i18n';
 import CityEditorModal from './CityEditorModal';
 import { useCitiesCatalog } from './useCitiesCatalog';
@@ -91,7 +91,7 @@ export default function CitiesCatalogPage() {
 
     setMobileActions(actions);
     return () => setMobileActions([]);
-  }, [c.editingCity, c.saving, c.imageUploading, c.handleSave, c.setEditingCity, c.setActiveEditTab, c.setCommonsModalOpen, setMobileActions]);
+  }, [c.editingCity, c.saving, c.imageUploading, c.handleSave, c.setEditingCity, c.setActiveEditTab, c.setCommonsModalOpen, c, setMobileActions]);
 
   return (
     <Layout>

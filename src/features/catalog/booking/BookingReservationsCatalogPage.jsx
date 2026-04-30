@@ -4,7 +4,7 @@ import Layout from '../../../components/Layout';
 import DataTable from '../../../components/ui/DataTable';
 import { Field } from '../../../components/ui/FormField';
 import Modal from '../../../components/ui/Modal';
-import { useLayoutActions } from '../../../context/LayoutActionsContext';
+import { useLayoutActions } from '../../../context/useLayoutActions';
 import { parseApiError } from '../../../utils/apiError';
 import { useCatalogFilters } from '../core/useCatalogFilters';
 import { useCatalogResource } from '../core/useCatalogResource';
@@ -120,7 +120,7 @@ export default function BookingReservationsCatalogPage() {
       },
       (err) => parseApiError(err, 'Ошибка загрузки резервов')
     );
-  }, [reservations.load, eventFilter, statusFilter, ticketTypeFilter, slotFilter, debouncedSearch]);
+  }, [reservations, eventFilter, statusFilter, ticketTypeFilter, slotFilter, debouncedSearch]);
 
   useEffect(() => {
     reload(page);

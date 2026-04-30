@@ -4,22 +4,22 @@
  * Each session is rendered as a compact group header, and each city draft is a
  * real table row inside that session.
  */
-import { useState, useEffect, useCallback, useMemo, Fragment } from 'react';
+import { Fragment, useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import Layout from '../../components/Layout';
-import { useLayoutActions } from '../../context/LayoutActionsContext';
 import { sessionsAPI } from '../../api/generation';
-import { parseApiError } from '../../utils/apiError';
+import Layout from '../../components/Layout';
+import { useLayoutActions } from '../../context/useLayoutActions';
 import { trackEvent } from '../../utils/analytics';
+import { parseApiError } from '../../utils/apiError';
 
 const STATUS_MAP = {
-  draft:            { label: 'Черновик', cls: 'bg-gray-100 text-gray-600' },
-  in_progress:      { label: 'В процессе', cls: 'bg-yellow-100 text-yellow-800' },
-  completed:        { label: 'Завершена', cls: 'bg-green-100 text-green-700' },
-  published:        { label: 'Опубликована', cls: 'bg-blue-100 text-blue-700' },
-  closed_saved:     { label: 'Закрыта (сохранена)', cls: 'bg-purple-100 text-purple-700' },
+  draft: { label: 'Черновик', cls: 'bg-gray-100 text-gray-600' },
+  in_progress: { label: 'В процессе', cls: 'bg-yellow-100 text-yellow-800' },
+  completed: { label: 'Завершена', cls: 'bg-green-100 text-green-700' },
+  published: { label: 'Опубликована', cls: 'bg-blue-100 text-blue-700' },
+  closed_saved: { label: 'Закрыта (сохранена)', cls: 'bg-purple-100 text-purple-700' },
   closed_discarded: { label: 'Закрыта (отменена)', cls: 'bg-red-100 text-red-700' },
-  corrected:        { label: 'Скорректирована', cls: 'bg-teal-100 text-teal-700' },
+  corrected: { label: 'Скорректирована', cls: 'bg-teal-100 text-teal-700' },
 };
 
 function StatusBadge({ status, label }) {
@@ -128,14 +128,14 @@ function buildCityRows(session) {
   const drafts = Array.isArray(session.city_drafts) && session.city_drafts.length > 0
     ? [...session.city_drafts].sort((a, b) => (a.order ?? a.upload_batch_order ?? 0) - (b.order ?? b.upload_batch_order ?? 0))
     : [{
-        id: 'legacy',
-        uuid: session.city_uuid || null,
-        display_name: session.city_display_name || session.name || '—',
-        display_country: session.city_country || null,
-        status: session.status,
-        status_display: session.status_display,
-        created_at: session.created_at,
-      }];
+      id: 'legacy',
+      uuid: session.city_uuid || null,
+      display_name: session.city_display_name || session.name || '—',
+      display_country: session.city_country || null,
+      status: session.status,
+      status_display: session.status_display,
+      created_at: session.created_at,
+    }];
 
   return drafts.map((draft, index) => ({
     rowKey: `${session.id}:${draft.id || draft.uuid || index}`,
@@ -282,7 +282,7 @@ export default function SessionsList() {
     loadSessions();
   }, [loadSessions]);
 
-  const handleCreate = async () => {
+  const handleCreate = useCallback(async () => {
     trackEvent('create_session_requested', { source: 'sessions_list' });
 
     setCreating(true);
@@ -314,7 +314,7 @@ export default function SessionsList() {
     } finally {
       setCreating(false);
     }
-  };
+  }, [navigate, loadSessions]);
 
   const openSession = useCallback((session, cityRow, source = 'row') => {
     if (!session?.id) return;
@@ -503,16 +503,16 @@ export default function SessionsList() {
           visibleCityRows = sessionMatches
             ? allCityRows
             : allCityRows.filter((row) => buildSearchBlob([
-                row.cityName,
-                row.country,
-                row.cityDraftId,
-                row.cityDraftUuid,
-                session.uuid,
-                session.id,
-                row.status,
-                row.statusDisplay,
-                row.assignee,
-              ]).includes(q));
+              row.cityName,
+              row.country,
+              row.cityDraftId,
+              row.cityDraftUuid,
+              session.uuid,
+              session.id,
+              row.status,
+              row.statusDisplay,
+              row.assignee,
+            ]).includes(q));
         }
 
         if (!visibleCityRows.length) return null;
@@ -650,7 +650,7 @@ export default function SessionsList() {
     ]);
 
     return () => setMobileActions([]);
-  }, [setMobileActions, creating, loadSessions]);
+  }, [setMobileActions, creating, loadSessions, handleCreate]);
 
   const isDeleteDraftTarget = deleteTarget?.type === 'draft';
   const deleteTargetSession = deleteTarget?.session;
@@ -1050,9 +1050,8 @@ export default function SessionsList() {
               ].map((opt) => (
                 <label
                   key={opt.mode}
-                  className={`flex items-start gap-3 p-3 rounded-lg border-2 cursor-pointer transition-colors ${
-                    closeMode === opt.mode ? opt.cls : 'border-gray-200 hover:border-gray-300'
-                  }`}
+                  className={`flex items-start gap-3 p-3 rounded-lg border-2 cursor-pointer transition-colors ${closeMode === opt.mode ? opt.cls : 'border-gray-200 hover:border-gray-300'
+                    }`}
                 >
                   <input
                     type="radio"
@@ -1088,9 +1087,8 @@ export default function SessionsList() {
               <button
                 onClick={handleClose}
                 disabled={closing}
-                className={`px-4 py-2 text-sm font-medium text-white rounded-lg disabled:opacity-50 transition-colors ${
-                  closeMode === 'discard' ? 'bg-red-600 hover:bg-red-700' : 'bg-blue-600 hover:bg-blue-700'
-                }`}
+                className={`px-4 py-2 text-sm font-medium text-white rounded-lg disabled:opacity-50 transition-colors ${closeMode === 'discard' ? 'bg-red-600 hover:bg-red-700' : 'bg-blue-600 hover:bg-blue-700'
+                  }`}
               >
                 {closing ? (
                   <span className="flex items-center gap-1.5">

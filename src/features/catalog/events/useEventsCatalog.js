@@ -1,11 +1,11 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useCatalogFilters } from '../core/useCatalogFilters';
-import { normalizeListResponse } from '../shared/normalize';
-import { buildLangOptions, pickPrimaryLangCode } from '../shared/i18n';
 import { parseApiError } from '../../../utils/apiError';
-import { eventsCatalogAPI } from './api';
+import { useCatalogFilters } from '../core/useCatalogFilters';
+import { buildLangOptions, pickPrimaryLangCode } from '../shared/i18n';
+import { normalizeListResponse } from '../shared/normalize';
 import { createEmptyEvent, fromApiEventRow, mergeEventWithDetail, toApiEventPayload } from './adapters';
+import { eventsCatalogAPI } from './api';
 
 const PAGE_SIZE = 20;
 
@@ -67,7 +67,7 @@ export function useEventsCatalog() {
         const list = normalizeListResponse(data, ['data', 'results']);
         setCityOptions(list);
       })
-      .catch(() => {});
+      .catch(() => { });
 
     eventsCatalogAPI
       .listFilters()
@@ -76,7 +76,7 @@ export function useEventsCatalog() {
         const list = normalizeListResponse(data, ['filters', 'tags', 'results']);
         setAllEventFilters(list);
       })
-      .catch(() => {});
+      .catch(() => { });
   }, []);
 
   useEffect(() => {
@@ -179,8 +179,8 @@ export function useEventsCatalog() {
   }, [deleteTarget, loadEvents, page, debouncedSearch, cityFilter]);
 
   const ee = editingEvent;
-  const titleVal = typeof ee?.title === 'object' ? ee.title : {};
-  const descVal = typeof ee?.description === 'object' ? ee.description : {};
+  const titleVal = useMemo(() => typeof ee?.title === 'object' ? ee.title : {}, [ee?.title]);
+  const descVal = useMemo(() => typeof ee?.description === 'object' ? ee.description : {}, [ee?.description]);
   const langOptions = useMemo(() => buildLangOptions([titleVal, descVal]), [titleVal, descVal]);
 
   useEffect(() => {

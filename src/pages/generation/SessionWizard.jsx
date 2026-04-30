@@ -10,15 +10,15 @@
  *    Шаг 4: Контент — заглушка
  *    Шаг 5: Публикация
  */
-import { useState, useEffect, useRef, useCallback } from 'react';
-import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import 'leaflet/dist/leaflet.css';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { useLocation, useNavigate, useParams } from 'react-router-dom';
+import { aiAPI, attractionsAPI, cityFiltersAPI, imagesAPI, sessionsAPI } from '../../api/generation';
 import Layout from '../../components/Layout';
 import CommonsImagePicker from '../../components/generation/CommonsImagePicker';
-import { useLayoutActions } from '../../context/LayoutActionsContext';
-import { sessionsAPI, attractionsAPI, cityFiltersAPI, imagesAPI, aiAPI } from '../../api/generation';
-import { parseApiError } from '../../utils/apiError';
+import { useLayoutActions } from '../../context/useLayoutActions';
 import { trackEvent } from '../../utils/analytics';
+import { parseApiError } from '../../utils/apiError';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 const TOTAL_STEPS = 5;
@@ -46,13 +46,13 @@ const DEFAULT_LOCALE_DEFS = [
 ];
 
 const STATUS_MAP = {
-  draft:            { label: 'Черновик',            cls: 'bg-gray-100 text-gray-700' },
-  in_progress:      { label: 'В процессе',           cls: 'bg-yellow-100 text-yellow-800' },
-  completed:        { label: 'Завершена',             cls: 'bg-green-100 text-green-800' },
-  published:        { label: 'Опубликована',          cls: 'bg-blue-100 text-blue-800' },
-  closed_saved:     { label: 'Закрыта (сохранена)',   cls: 'bg-purple-100 text-purple-700' },
-  closed_discarded: { label: 'Закрыта (отменена)',    cls: 'bg-red-100 text-red-700' },
-  corrected:        { label: 'Скорректирована',       cls: 'bg-teal-100 text-teal-700' },
+  draft: { label: 'Черновик', cls: 'bg-gray-100 text-gray-700' },
+  in_progress: { label: 'В процессе', cls: 'bg-yellow-100 text-yellow-800' },
+  completed: { label: 'Завершена', cls: 'bg-green-100 text-green-800' },
+  published: { label: 'Опубликована', cls: 'bg-blue-100 text-blue-800' },
+  closed_saved: { label: 'Закрыта (сохранена)', cls: 'bg-purple-100 text-purple-700' },
+  closed_discarded: { label: 'Закрыта (отменена)', cls: 'bg-red-100 text-red-700' },
+  corrected: { label: 'Скорректирована', cls: 'bg-teal-100 text-teal-700' },
 };
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -60,8 +60,10 @@ function makeLocaleData() {
   return Object.fromEntries(
     DEFAULT_LOCALE_DEFS.map(l => [
       l.key,
-      { code: l.code, lang: l.lang, langName: l.langName, isDefault: l.isDefault,
-        name: '', description: '', country: '' },
+      {
+        code: l.code, lang: l.lang, langName: l.langName, isDefault: l.isDefault,
+        name: '', description: '', country: ''
+      },
     ])
   );
 }
@@ -178,11 +180,10 @@ function LocalePills({ localeData, activeLocale, defaultLocale, onSwitch, onSetD
             <button
               type="button"
               onClick={() => onSwitch(key)}
-              className={`flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium border transition-all ${
-                isActive
-                  ? 'bg-blue-600 text-white border-blue-600'
-                  : 'bg-white text-gray-600 border-gray-300 hover:border-blue-400 hover:text-blue-600'
-              }`}
+              className={`flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium border transition-all ${isActive
+                ? 'bg-blue-600 text-white border-blue-600'
+                : 'bg-white text-gray-600 border-gray-300 hover:border-blue-400 hover:text-blue-600'
+                }`}
             >
               <span>{getFlag(loc.code)}</span>
               <span>{loc.langName}</span>
@@ -307,8 +308,8 @@ export default function SessionWizard() {
   const mapReadyRef = useRef(false);
   const [mapNode, setMapNode] = useState(null);
   const setMapContainerRef = useCallback((node) => {
-  mapRef.current = node;
-  setMapNode(node);
+    mapRef.current = node;
+    setMapNode(node);
   }, []);
 
   const requestedCityDraftIdRef = useRef(null);
@@ -584,7 +585,7 @@ export default function SessionWizard() {
         console.log('Map cleaned up');
       }
     };
-  }, [mapNode]); // important: init when the map DOM node appears
+  }, [mapNode, lat, lon]); // important: init when the map DOM node appears
 
   // Sync map marker when lat/lon state changes
   useEffect(() => {
@@ -603,9 +604,9 @@ export default function SessionWizard() {
       const data = res?.data;
       const tags = Array.isArray(data?.tags) ? data.tags
         : Array.isArray(data?.results) ? data.results
-        : Array.isArray(data) ? data : [];
+          : Array.isArray(data) ? data : [];
       setAvailableTags(tags);
-    }).catch(() => {});
+    }).catch(() => { });
   }, []);
 
   // ─────────────────────────────────────────────────────────────────────────
@@ -838,7 +839,7 @@ export default function SessionWizard() {
       const remaining = Object.keys(localeData).filter(k => k !== key);
       if (remaining.length) setDefaultLocale(remaining[0]);
     }
-  }, [localeData, activeLocale, defaultLocale]);
+  }, [localeData, activeLocale, defaultLocale, showNote]);
 
   const updateLocaleField = useCallback((field, value) => {
     setLocaleData(prev => ({
@@ -872,7 +873,7 @@ export default function SessionWizard() {
     } catch (err) {
       showNote(parseApiError(err, 'Ошибка добавления города'), 'error');
     }
-  }, [sessionId, loadSession, showNote, syncActiveDraftRoute]);
+  }, [sessionId, loadSession, syncActiveDraftRoute, showNote]);
 
   const handleDeleteDraft = useCallback(async (draftId) => {
     if (!draftId || draftId === 'legacy') return;
@@ -889,7 +890,7 @@ export default function SessionWizard() {
     } catch (err) {
       showNote(parseApiError(err, 'Ошибка удаления города'), 'error');
     }
-  }, [sessionId, loadSession, showNote, syncActiveDraftRoute]);
+  }, [sessionId, loadSession, syncActiveDraftRoute, showNote]);
 
   // ─────────────────────────────────────────────────────────────────────────
   // Photo upload
@@ -1470,13 +1471,12 @@ export default function SessionWizard() {
                     key={step}
                     type="button"
                     onClick={() => goToStep(step)}
-                    className={`flex-1 text-xs py-1 px-1 text-center transition-colors border-b-2 ${
-                      isActive
-                        ? 'border-blue-600 text-blue-700 font-semibold'
-                        : isCompleted
+                    className={`flex-1 text-xs py-1 px-1 text-center transition-colors border-b-2 ${isActive
+                      ? 'border-blue-600 text-blue-700 font-semibold'
+                      : isCompleted
                         ? 'border-blue-300 text-blue-500 hover:text-blue-700 cursor-pointer'
                         : 'border-transparent text-gray-400 hover:text-gray-600 cursor-pointer'
-                    }`}
+                      }`}
                   >
                     {step}. {label}
                   </button>
@@ -1693,11 +1693,10 @@ export default function SessionWizard() {
                           key={tag.id || i}
                           type="button"
                           onClick={() => addTag(label)}
-                          className={`px-2.5 py-1 text-xs rounded-full border transition-colors ${
-                            isAdded
-                              ? 'bg-blue-600 text-white border-blue-600'
-                              : 'bg-white text-gray-600 border-gray-300 hover:border-blue-400 hover:text-blue-600'
-                          }`}
+                          className={`px-2.5 py-1 text-xs rounded-full border transition-colors ${isAdded
+                            ? 'bg-blue-600 text-white border-blue-600'
+                            : 'bg-white text-gray-600 border-gray-300 hover:border-blue-400 hover:text-blue-600'
+                            }`}
                         >
                           {label}
                         </button>
@@ -1802,11 +1801,10 @@ export default function SessionWizard() {
                           key={loc.key}
                           type="button"
                           onClick={() => setAttrActiveLocale(loc.key)}
-                          className={`flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium border transition-all ${
-                            isActive
-                              ? 'bg-blue-600 text-white border-blue-600'
-                              : 'bg-white text-gray-600 border-gray-300 hover:border-blue-400'
-                          }`}
+                          className={`flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium border transition-all ${isActive
+                            ? 'bg-blue-600 text-white border-blue-600'
+                            : 'bg-white text-gray-600 border-gray-300 hover:border-blue-400'
+                            }`}
                         >
                           <span>{getFlag(loc.code)}</span>
                           <span>{loc.langName}</span>

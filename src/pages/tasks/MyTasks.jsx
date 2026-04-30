@@ -1,9 +1,9 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { tasksAPI } from '../../api/generation';
 import Layout from '../../components/Layout';
 import DataTable from '../../components/ui/DataTable';
 import Modal from '../../components/ui/Modal';
-import { useLayoutActions } from '../../context/LayoutActionsContext';
-import { tasksAPI } from '../../api/generation';
+import { useLayoutActions } from '../../context/useLayoutActions';
 import { parseApiError } from '../../utils/apiError';
 
 const POLL_INTERVAL = 8000;
@@ -49,7 +49,7 @@ export default function MyTasks() {
       const data = response?.data;
       const list = Array.isArray(data?.tasks) ? data.tasks
         : Array.isArray(data) ? data
-        : Array.isArray(data?.results) ? data.results : [];
+          : Array.isArray(data?.results) ? data.results : [];
       setTasks(list);
       setLastUpdated(new Date());
     } catch (err) {

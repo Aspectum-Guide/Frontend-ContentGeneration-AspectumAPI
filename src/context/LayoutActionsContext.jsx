@@ -1,8 +1,9 @@
-import { createContext, useContext, useMemo, useState } from 'react';
+/* eslint-disable react-refresh/only-export-components */
+import { createContext, useMemo, useState } from 'react';
 
-const LayoutActionsContext = createContext({
+export const LayoutActionsContext = createContext({
   mobileActions: [],
-  setMobileActions: () => {},
+  setMobileActions: () => { },
 });
 
 export function LayoutActionsProvider({ children }) {
@@ -15,9 +16,3 @@ export function LayoutActionsProvider({ children }) {
     </LayoutActionsContext.Provider>
   );
 }
-
-export function useLayoutActions() {
-  return useContext(LayoutActionsContext);
-}
-
-export default LayoutActionsContext;

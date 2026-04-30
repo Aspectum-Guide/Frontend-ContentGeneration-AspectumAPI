@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { sessionsAPI } from '../api/generation';
-import { useLayoutActions } from '../context/LayoutActionsContext';
+import { useLayoutActions } from '../context/useLayoutActions';
 import useTokenValidation from '../hooks/useTokenValidation';
 import TokenManager from '../utils/TokenManager';
 
@@ -239,8 +239,8 @@ export default function Layout({ children, pageHeader = null, pageHeaderMode = '
 
       {/* Left Sidebar */}
       <aside className={`fixed inset-y-0 left-0 bg-white border-r border-gray-200 shadow-sm transition-all duration-300 flex flex-col z-40 ${isMobile
-          ? `w-72 max-w-[85vw] transform ${mobileSidebarOpen ? 'translate-x-0' : '-translate-x-full'}`
-          : sidebarExpanded ? 'w-64' : 'w-20'
+        ? `w-72 max-w-[85vw] transform ${mobileSidebarOpen ? 'translate-x-0' : '-translate-x-full'}`
+        : sidebarExpanded ? 'w-64' : 'w-20'
         }`}>
         {/* Sidebar Header with User Info */}
         <div className="border-b border-gray-200 p-3 flex flex-col gap-3">
@@ -329,10 +329,10 @@ export default function Layout({ children, pageHeader = null, pageHeaderMode = '
                       action.onClick?.();
                     }}
                     className={`w-full px-3 py-2 rounded-lg text-left text-sm font-medium transition-colors disabled:opacity-50 ${action.variant === 'danger'
-                        ? 'bg-red-50 text-red-700 hover:bg-red-100'
-                        : action.variant === 'primary'
-                          ? 'bg-blue-600 text-white hover:bg-blue-700'
-                          : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                      ? 'bg-red-50 text-red-700 hover:bg-red-100'
+                      : action.variant === 'primary'
+                        ? 'bg-blue-600 text-white hover:bg-blue-700'
+                        : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
                       }`}
                   >
                     {action.label}

@@ -4,7 +4,7 @@ import Layout from '../../../components/Layout';
 import DataTable from '../../../components/ui/DataTable';
 import { Field, FormActions, TextInput } from '../../../components/ui/FormField';
 import Modal, { ConfirmModal } from '../../../components/ui/Modal';
-import { useLayoutActions } from '../../../context/LayoutActionsContext';
+import { useLayoutActions } from '../../../context/useLayoutActions';
 import { parseApiError } from '../../../utils/apiError';
 import { useCatalogFilters } from '../core/useCatalogFilters';
 import { useCatalogResource } from '../core/useCatalogResource';
@@ -71,7 +71,7 @@ export default function SlotAvailabilitiesCatalog() {
 
   // Cache ticket type labels for table rendering (so we can show labels even when filters are empty).
   const ticketTypeCacheRef = useRef(new Map()); // id -> { title: string, primary: string }
-  const [ticketTypeLabelVersion, setTicketTypeLabelVersion] = useState(0);
+  const [, setTicketTypeLabelVersion] = useState(0);
 
   const [editingAvailability, setEditingAvailability] = useState(null);
   const [saving, setSaving] = useState(false);
@@ -100,7 +100,7 @@ export default function SlotAvailabilitiesCatalog() {
       map.set(id, { title, primary });
     }
     return map;
-  }, [ticketTypeOptions, ticketTypeLabelVersion]);
+  }, [ticketTypeOptions]);
 
   useEffect(() => {
     // Prefetch ticket type labels for all events visible in current table page,
@@ -168,7 +168,7 @@ export default function SlotAvailabilitiesCatalog() {
       },
       (err) => parseApiError(err, 'Ошибка загрузки слотов')
     );
-  }, [avail.load, eventFilter, ticketTypeFilter]);
+  }, [avail, eventFilter, ticketTypeFilter]);
 
   useEffect(() => {
     reload(page);
