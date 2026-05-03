@@ -7,31 +7,27 @@ import SessionWizardCityStep from './session-wizard/SessionWizardCityStep';
 import SessionWizardContentStep from './session-wizard/SessionWizardContentStep';
 import SessionWizardPublishStep from './session-wizard/SessionWizardPublishStep';
 import SessionWizardTagsStep from './session-wizard/SessionWizardTagsStep';
-import { StatusBadge } from './session-wizard/sessionWizardShared.jsx';
+import { StatusBadge as DefaultStatusBadge } from './session-wizard/sessionWizardShared.jsx';
 import { useSessionWizardController } from './session-wizard/useSessionWizardController';
+import DefaultToast from '../../components/ui/Toast.jsx';
+import DefaultInlineProgressBanner from '../../components/ui/InlineProgressBanner.jsx';
+import { ConfirmModal as DefaultConfirmModal } from '../../components/ui/Modal.jsx';
+import { useConfirmModal } from '../../components/ui/useConfirmModal.jsx';
+import DefaultSessionCloseDialog from '../../components/generation/SessionCloseDialog.jsx';
 
 const STEP_LABELS = ['Город', 'Теги', 'Достопримечательности', 'Контент', 'Публикация'];
 
-function Notification({ note }) {
-  if (!note) return null;
-
-  const colorMap = {
-    success: 'bg-green-600',
-    error: 'bg-red-600',
-    info: 'bg-blue-600',
-    warning: 'bg-yellow-500',
-  };
-
-  return (
-    <div className={`fixed top-5 right-5 z-50 px-4 py-3 rounded-lg text-white text-sm shadow-lg transition-all ${colorMap[note.type] || colorMap.info}`}>
-      {note.msg}
-    </div>
-  );
-}
-
-export default function SessionWizard() {
+export default function SessionWizard({ components = {} } = {}) {
+  const StatusBadge = components.StatusBadge ?? DefaultStatusBadge;
+  const ToastComp = components.Toast ?? DefaultToast;
+  const ConfirmModalComp = components.ConfirmModal ?? DefaultConfirmModal;
+  const ProgressBanner = components.ProgressBanner ?? DefaultInlineProgressBanner;
+  const dialogs = components.dialogs || {};
+  const SessionCloseDialogComp =
+    components.SessionCloseDialog ?? dialogs.SessionCloseDialog ?? DefaultSessionCloseDialog;
+  const { confirm, confirmModal } = useConfirmModal(ConfirmModalComp);
   const { sessionId } = useParams();
-  const controller = useSessionWizardController({ sessionId });
+  const controller = useSessionWizardController({ sessionId, confirm });
 
   const {
     note,
@@ -146,21 +142,24 @@ export default function SessionWizard() {
 
   return (
     <Layout>
-      <Notification note={note} />
+      {confirmModal}
+      <ToastComp note={note} />
 
-      {(saving || publishing || closing || photoUploading || aiGenSaving || translating) && (
-        <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg text-sm text-blue-800 flex items-center gap-2">
-          <span className="animate-spin w-4 h-4 border-2 border-blue-500 border-t-transparent rounded-full" />
-          <span>
-            {saving && 'Сохраняем данные города...'}
-            {publishing && 'Публикуем сессию...'}
-            {closing && 'Закрываем сессию...'}
-            {photoUploading && 'Загружаем изображение...'}
-            {aiGenSaving && 'Сохраняем AI-контент...'}
-            {translating && 'Переводим сессию на другие языки...'}
-          </span>
-        </div>
-      )}
+      <ProgressBanner
+        show={
+          saving || publishing || closing || photoUploading || aiGenSaving || translating
+        }
+        message={[
+          saving && 'Сохраняем данные города...',
+          publishing && 'Публикуем сессию...',
+          closing && 'Закрываем сессию...',
+          photoUploading && 'Загружаем изображение...',
+          aiGenSaving && 'Сохраняем AI-контент...',
+          translating && 'Переводим сессию на другие языки...',
+        ]
+          .filter(Boolean)
+          .join(' ')}
+      />
 
       <div className="flex items-start justify-between gap-4 mb-5 pb-4 border-b border-gray-200">
         <div>
@@ -394,6 +393,7 @@ export default function SessionWizard() {
               cityTags={cityTags}
               translating={translating}
               publishing={publishing}
+              components={{ StatusBadge }}
               onGoToStep={goToStep}
               onTranslateSession={handleTranslateSession}
               onPublish={handlePublish}
@@ -440,53 +440,16 @@ export default function SessionWizard() {
         </div>
       )}
 
-      {closeOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center">
-          <div className="absolute inset-0 bg-black/40" onClick={() => !closing && setCloseOpen(false)} />
-          <div className="relative bg-white rounded-xl shadow-xl p-6 w-96 space-y-4">
-            <h3 className="text-base font-semibold text-gray-900">Закрыть сессию</h3>
-            <p className="text-sm text-gray-600">
-              Сессия <span className="font-medium">«{session.name}»</span> будет закрыта. Выберите режим:
-            </p>
-            <div className="space-y-2">
-              {[
-                { mode: 'save', title: 'Сохранить', desc: 'Данные сессии сохранятся', cls: 'border-blue-500 bg-blue-50' },
-                { mode: 'discard', title: 'Отменить', desc: 'Данные сессии будут удалены без сохранения', cls: 'border-red-500 bg-red-50' },
-              ].map((opt) => (
-                <label
-                  key={opt.mode}
-                  className={`flex items-start gap-3 p-3 rounded-lg border-2 cursor-pointer transition-colors ${closeMode === opt.mode ? opt.cls : 'border-gray-200 hover:border-gray-300'}`}
-                >
-                  <input
-                    type="radio"
-                    name="closeMode"
-                    value={opt.mode}
-                    checked={closeMode === opt.mode}
-                    onChange={() => setCloseMode(opt.mode)}
-                    className="mt-0.5"
-                  />
-                  <div>
-                    <div className="text-sm font-medium text-gray-900">{opt.title}</div>
-                    <div className="text-xs text-gray-500">{opt.desc}</div>
-                  </div>
-                </label>
-              ))}
-            </div>
-            <div className="flex gap-2 justify-end">
-              <button onClick={() => setCloseOpen(false)} disabled={closing} className="px-4 py-2 text-sm text-gray-600 border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50">
-                Отмена
-              </button>
-              <button
-                onClick={handleClose}
-                disabled={closing}
-                className={`px-4 py-2 text-sm font-medium text-white rounded-lg disabled:opacity-50 transition-colors ${closeMode === 'discard' ? 'bg-red-600 hover:bg-red-700' : 'bg-blue-600 hover:bg-blue-700'}`}
-              >
-                {closing ? 'Закрытие...' : closeMode === 'discard' ? 'Закрыть без сохранения' : 'Закрыть с сохранением'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <SessionCloseDialogComp
+        open={closeOpen}
+        session={session}
+        closeMode={closeMode}
+        onCloseModeChange={setCloseMode}
+        closing={closing}
+        onBackdropClick={() => !closing && setCloseOpen(false)}
+        onCancel={() => setCloseOpen(false)}
+        onConfirm={handleClose}
+      />
 
       <CommonsImagePicker
         isOpen={commonsModalOpen}

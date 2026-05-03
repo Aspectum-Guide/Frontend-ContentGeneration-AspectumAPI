@@ -4,6 +4,7 @@ import { aiAPI, attractionsAPI, cityFiltersAPI, imagesAPI, sessionsAPI } from '.
 import { useLayoutActions } from '../../../context/useLayoutActions';
 import { trackEvent } from '../../../utils/analytics';
 import { parseApiError } from '../../../utils/apiError';
+import { useToast } from '../../../components/ui/Toast.jsx';
 import { DEFAULT_LOCALE_DEFS, getLocaleInfo } from './sessionWizardShared.jsx';
 
 const TOTAL_STEPS = 5;
@@ -85,16 +86,20 @@ function getAttrName(attr) {
   return name.ru || name.en || name.it || Object.values(name).find(Boolean) || '(без названия)';
 }
 
-export function useSessionWizardController({ sessionId }) {
+export function useSessionWizardController({ sessionId, confirm: confirmProp } = {}) {
   const { setMobileActions } = useLayoutActions();
   const navigate = useNavigate();
   const location = useLocation();
 
-  const [note, setNote] = useState(null);
-  const showNote = useCallback((msg, type = 'info') => {
-    setNote({ msg, type });
-    setTimeout(() => setNote(null), 3500);
+  const { note, showNote } = useToast();
+
+  const defaultConfirm = useCallback((opts) => {
+    const message = typeof opts === 'string' ? opts : (opts?.message ?? '');
+    if (typeof window === 'undefined') return Promise.resolve(false);
+    return Promise.resolve(window.confirm(message));
   }, []);
+
+  const confirm = confirmProp ?? defaultConfirm;
 
   const [session, setSession] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -375,12 +380,6 @@ export function useSessionWizardController({ sessionId }) {
     }).catch(() => { });
   }, []);
 
-  useEffect(() => {
-    if (currentStep === 3 && !attractionsLoaded) {
-      loadAttractions();
-    }
-  }, [currentStep, attractionsLoaded, loadAttractions]);
-
   const loadAttractions = useCallback(async () => {
     try {
       const res = await sessionsAPI.get(sessionId);
@@ -391,6 +390,12 @@ export function useSessionWizardController({ sessionId }) {
       showNote('Не удалось загрузить достопримечательности', 'error');
     }
   }, [sessionId, showNote]);
+
+  useEffect(() => {
+    if (currentStep === 3 && !attractionsLoaded) {
+      loadAttractions();
+    }
+  }, [currentStep, attractionsLoaded, loadAttractions]);
 
   const saveCityForStep1 = useCallback(async () => {
     if (!defaultLocale || !localeData[defaultLocale]) {
@@ -577,7 +582,7 @@ export function useSessionWizardController({ sessionId }) {
 
   const handleDeleteDraft = useCallback(async (draftId) => {
     if (!draftId || draftId === 'legacy') return;
-    if (!confirm('Удалить этот черновик города?')) return;
+    if (!(await confirm({ message: 'Удалить этот черновик города?', danger: true }))) return;
     try {
       await sessionsAPI.deleteCityDraft(sessionId, draftId);
       const normalizedDraftId = normalizeDraftId(draftId);
@@ -590,7 +595,7 @@ export function useSessionWizardController({ sessionId }) {
     } catch (err) {
       showNote(parseApiError(err, 'Ошибка удаления города'), 'error');
     }
-  }, [sessionId, loadSession, syncActiveDraftRoute, showNote]);
+  }, [sessionId, loadSession, syncActiveDraftRoute, showNote, confirm]);
 
   const handlePhotoFile = useCallback(async (e) => {
     const f = e.target.files?.[0];
@@ -721,7 +726,7 @@ export function useSessionWizardController({ sessionId }) {
   const deleteCurrentAttr = useCallback(async () => {
     if (!currentAttr) return;
     const name = getAttrName(currentAttr);
-    if (!confirm(`Удалить «${name}»?`)) return;
+    if (!(await confirm({ message: `Удалить «${name}»?`, danger: true }))) return;
     try {
       await attractionsAPI.delete(sessionId, currentAttr.id);
       setAttractions(prev => prev.filter((item) => item.id !== currentAttr.id));
@@ -731,7 +736,7 @@ export function useSessionWizardController({ sessionId }) {
     } catch (e) {
       showNote('Ошибка при удалении: ' + e.message, 'error');
     }
-  }, [sessionId, currentAttr, showNote]);
+  }, [sessionId, currentAttr, showNote, confirm]);
 
   const updateAttrLocaleField = useCallback((field, value) => {
     setAttrLocaleData(prev => ({ ...prev, [attrActiveLocale]: { ...prev[attrActiveLocale], [field]: value } }));
@@ -804,7 +809,10 @@ export function useSessionWizardController({ sessionId }) {
   }, [sessionId, closeMode, navigate, showNote]);
 
   const handlePublish = useCallback(async () => {
-    if (!confirm('Опубликовать всю сессию? Данные будут записаны в основную базу.')) return;
+    if (!(await confirm({
+      title: 'Публикация сессии',
+      message: 'Опубликовать всю сессию? Данные будут записаны в основную базу.',
+    }))) return;
     setPublishing(true);
     try {
       const res = await sessionsAPI.publish(sessionId);
@@ -821,7 +829,7 @@ export function useSessionWizardController({ sessionId }) {
     } finally {
       setPublishing(false);
     }
-  }, [sessionId, loadSession, showNote]);
+  }, [sessionId, loadSession, showNote, confirm]);
 
   const handleTranslateSession = useCallback(async () => {
     const currentDraftId = activeCityDraftIdRef.current;

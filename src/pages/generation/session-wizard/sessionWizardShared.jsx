@@ -38,22 +38,4 @@ export function getAttrName(attr) {
   return name.ru || name.en || name.it || Object.values(name).find(Boolean) || '(без названия)';
 }
 
-const STATUS_MAP = {
-  draft: { label: 'Черновик', cls: 'bg-gray-100 text-gray-700' },
-  in_progress: { label: 'В процессе', cls: 'bg-yellow-100 text-yellow-800' },
-  completed: { label: 'Завершена', cls: 'bg-green-100 text-green-800' },
-  published: { label: 'Опубликована', cls: 'bg-blue-100 text-blue-800' },
-  closed_saved: { label: 'Закрыта (сохранена)', cls: 'bg-purple-100 text-purple-700' },
-  closed_discarded: { label: 'Закрыта (отменена)', cls: 'bg-red-100 text-red-700' },
-  corrected: { label: 'Скорректирована', cls: 'bg-teal-100 text-teal-700' },
-};
-
-export function StatusBadge({ status, label }) {
-  const state = STATUS_MAP[status] || { label: label || status, cls: 'bg-gray-100 text-gray-600' };
-
-  return (
-    <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold ${state.cls}`}>
-      {label || state.label}
-    </span>
-  );
-}
+export { SessionStatusBadge as StatusBadge } from '../../../components/ui/StatusBadge.jsx';

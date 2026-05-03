@@ -8,45 +8,16 @@ import { Fragment, useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { sessionsAPI } from '../../api/generation';
 import Layout from '../../components/Layout';
+import { SessionStatusBadge as DefaultStatusBadge } from '../../components/ui/StatusBadge.jsx';
+import DefaultToast, { useToast } from '../../components/ui/Toast.jsx';
+import DefaultInlineProgressBanner from '../../components/ui/InlineProgressBanner.jsx';
+import { ConfirmModal as DefaultConfirmModal } from '../../components/ui/Modal.jsx';
+import { useConfirmModal } from '../../components/ui/useConfirmModal.jsx';
+import DefaultSessionDeleteDialog from '../../components/generation/SessionDeleteDialog.jsx';
+import DefaultSessionCloseDialog from '../../components/generation/SessionCloseDialog.jsx';
 import { useLayoutActions } from '../../context/useLayoutActions';
 import { trackEvent } from '../../utils/analytics';
 import { parseApiError } from '../../utils/apiError';
-
-const STATUS_MAP = {
-  draft: { label: 'Черновик', cls: 'bg-gray-100 text-gray-600' },
-  in_progress: { label: 'В процессе', cls: 'bg-yellow-100 text-yellow-800' },
-  completed: { label: 'Завершена', cls: 'bg-green-100 text-green-700' },
-  published: { label: 'Опубликована', cls: 'bg-blue-100 text-blue-700' },
-  closed_saved: { label: 'Закрыта (сохранена)', cls: 'bg-purple-100 text-purple-700' },
-  closed_discarded: { label: 'Закрыта (отменена)', cls: 'bg-red-100 text-red-700' },
-  corrected: { label: 'Скорректирована', cls: 'bg-teal-100 text-teal-700' },
-};
-
-function StatusBadge({ status, label }) {
-  const s = STATUS_MAP[status] || { label: label || status, cls: 'bg-gray-100 text-gray-500' };
-
-  return (
-    <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold whitespace-nowrap ${s.cls}`}>
-      {label || s.label}
-    </span>
-  );
-}
-
-function Notification({ note }) {
-  if (!note) return null;
-
-  const cls = {
-    success: 'bg-green-600',
-    error: 'bg-red-600',
-    info: 'bg-blue-600',
-  };
-
-  return (
-    <div className={`fixed top-5 right-5 z-50 px-4 py-3 rounded-lg text-white text-sm shadow-lg ${cls[note.type] || cls.info}`}>
-      {note.msg}
-    </div>
-  );
-}
 
 function formatDateTime(value) {
   if (!value) return '—';
@@ -227,7 +198,18 @@ function isGroupFullySelected(group, selectedSet) {
   );
 }
 
-export default function SessionsList() {
+export default function SessionsList({ components = {} } = {}) {
+  const StatusBadge = components.StatusBadge ?? DefaultStatusBadge;
+  const ToastComp = components.Toast ?? DefaultToast;
+  const ConfirmModalComp = components.ConfirmModal ?? DefaultConfirmModal;
+  const ProgressBanner = components.ProgressBanner ?? DefaultInlineProgressBanner;
+  const dialogs = components.dialogs || {};
+  const SessionDeleteDialogComp =
+    components.SessionDeleteDialog ?? dialogs.SessionDeleteDialog ?? DefaultSessionDeleteDialog;
+  const SessionCloseDialogComp =
+    components.SessionCloseDialog ?? dialogs.SessionCloseDialog ?? DefaultSessionCloseDialog;
+  const { confirm, confirmModal } = useConfirmModal(ConfirmModalComp);
+  const { note, showNote } = useToast();
   const { setMobileActions } = useLayoutActions();
   const navigate = useNavigate();
 
@@ -247,13 +229,6 @@ export default function SessionsList() {
   const [closeTarget, setCloseTarget] = useState(null);
   const [closeMode, setCloseMode] = useState('save');
   const [closing, setClosing] = useState(false);
-
-  const [note, setNote] = useState(null);
-
-  const showNote = useCallback((msg, type = 'info') => {
-    setNote({ msg, type });
-    setTimeout(() => setNote(null), 3500);
-  }, []);
 
   const loadSessions = useCallback(async () => {
     try {
@@ -441,7 +416,12 @@ export default function SessionsList() {
       draftsCount ? `${draftsCount} ${draftsCount === 1 ? 'город' : draftsCount < 5 ? 'города' : 'городов'}` : null,
     ].filter(Boolean).join(' и ');
 
-    if (!confirm(`Удалить ${confirmLabel}? Действие нельзя отменить.`)) return;
+    if (!(await confirm({
+      title: 'Удаление',
+      message: `Удалить ${confirmLabel}? Действие нельзя отменить.`,
+      danger: true,
+      confirmLabel: 'Удалить',
+    }))) return;
 
     setBulkDeleting(true);
 
@@ -675,19 +655,20 @@ export default function SessionsList() {
       }}
       pageHeaderMode="desktop"
     >
-      <Notification note={note} />
+      {confirmModal}
+      <ToastComp note={note} />
 
-      {(creating || bulkDeleting || deleting || closing) && (
-        <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg text-sm text-blue-800 flex items-center gap-2">
-          <span className="animate-spin w-4 h-4 border-2 border-blue-500 border-t-transparent rounded-full" />
-          <span>
-            {creating && 'Создаем новую сессию...'}
-            {bulkDeleting && 'Удаляем выбранные элементы...'}
-            {deleting && (deleteTarget?.type === 'draft' ? 'Удаляем город...' : 'Удаляем сессию...')}
-            {closing && 'Закрываем сессию...'}
-          </span>
-        </div>
-      )}
+      <ProgressBanner
+        show={creating || bulkDeleting || deleting || closing}
+        message={[
+          creating && 'Создаем новую сессию...',
+          bulkDeleting && 'Удаляем выбранные элементы...',
+          deleting && (deleteTarget?.type === 'draft' ? 'Удаляем город...' : 'Удаляем сессию...'),
+          closing && 'Закрываем сессию...',
+        ]
+          .filter(Boolean)
+          .join(' ')}
+      />
 
       {createError && (
         <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700 flex items-center justify-between">
@@ -957,150 +938,27 @@ export default function SessionsList() {
         )}
       </div>
 
-      {deleteTarget && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center">
-          <div
-            className="absolute inset-0 bg-black/40"
-            onClick={() => !deleting && setDeleteTarget(null)}
-          />
+      <SessionDeleteDialogComp
+        open={!!deleteTarget}
+        isDraftDelete={isDeleteDraftTarget}
+        cityRow={deleteTargetCityRow}
+        session={deleteTargetSession}
+        deleting={deleting}
+        onBackdropClick={() => !deleting && setDeleteTarget(null)}
+        onCancel={() => setDeleteTarget(null)}
+        onConfirm={handleDelete}
+      />
 
-          <div className="relative bg-white rounded-xl shadow-xl p-6 w-96 space-y-4">
-            <h3 className="text-base font-semibold text-gray-900">
-              {isDeleteDraftTarget ? 'Удалить город?' : 'Удалить сессию?'}
-            </h3>
-
-            {isDeleteDraftTarget ? (
-              <p className="text-sm text-gray-600">
-                Город{' '}
-                <span className="font-medium">
-                  «{deleteTargetCityRow?.cityName || deleteTargetCityRow?.cityDraftId || 'Без названия'}»
-                </span>{' '}
-                будет удалён из сессии{' '}
-                <span className="font-medium">
-                  «{deleteTargetSession?.name || deleteTargetSession?.uuid || deleteTargetSession?.id}»
-                </span>.
-                <br />
-                Сама сессия останется.
-              </p>
-            ) : (
-              <p className="text-sm text-gray-600">
-                Сессия{' '}
-                <span className="font-medium">
-                  «{deleteTargetSession?.name || deleteTargetSession?.uuid || deleteTargetSession?.id}»
-                </span>{' '}
-                будет удалена безвозвратно.
-              </p>
-            )}
-
-            <div className="flex gap-2 justify-end">
-              <button
-                onClick={() => setDeleteTarget(null)}
-                disabled={deleting}
-                className="px-4 py-2 text-sm text-gray-600 border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50"
-              >
-                Отмена
-              </button>
-
-              <button
-                onClick={handleDelete}
-                disabled={deleting}
-                className="px-4 py-2 text-sm font-medium text-white bg-red-600 rounded-lg hover:bg-red-700 disabled:opacity-50"
-              >
-                {deleting ? 'Удаление...' : isDeleteDraftTarget ? 'Удалить город' : 'Удалить сессию'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {closeTarget && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center">
-          <div
-            className="absolute inset-0 bg-black/40"
-            onClick={() => !closing && setCloseTarget(null)}
-          />
-
-          <div className="relative bg-white rounded-xl shadow-xl p-6 w-96 space-y-4">
-            <h3 className="text-base font-semibold text-gray-900">
-              Закрыть сессию
-            </h3>
-
-            <p className="text-sm text-gray-600">
-              Сессия{' '}
-              <span className="font-medium">
-                «{closeTarget.name || closeTarget.uuid || closeTarget.id}»
-              </span>{' '}
-              будет закрыта. Выберите режим:
-            </p>
-
-            <div className="space-y-2">
-              {[
-                {
-                  mode: 'save',
-                  title: 'Сохранить',
-                  desc: 'Данные сессии сохранятся, можно будет опубликовать позже',
-                  cls: 'border-blue-500 bg-blue-50',
-                },
-                {
-                  mode: 'discard',
-                  title: 'Отменить',
-                  desc: 'Данные сессии будут удалены без сохранения',
-                  cls: 'border-red-500 bg-red-50',
-                },
-              ].map((opt) => (
-                <label
-                  key={opt.mode}
-                  className={`flex items-start gap-3 p-3 rounded-lg border-2 cursor-pointer transition-colors ${closeMode === opt.mode ? opt.cls : 'border-gray-200 hover:border-gray-300'
-                    }`}
-                >
-                  <input
-                    type="radio"
-                    name="closeMode"
-                    value={opt.mode}
-                    checked={closeMode === opt.mode}
-                    onChange={() => setCloseMode(opt.mode)}
-                    className="mt-0.5"
-                  />
-
-                  <div>
-                    <div className="text-sm font-medium text-gray-900">
-                      {opt.title}
-                    </div>
-
-                    <div className="text-xs text-gray-500">
-                      {opt.desc}
-                    </div>
-                  </div>
-                </label>
-              ))}
-            </div>
-
-            <div className="flex gap-2 justify-end">
-              <button
-                onClick={() => setCloseTarget(null)}
-                disabled={closing}
-                className="px-4 py-2 text-sm text-gray-600 border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50"
-              >
-                Отмена
-              </button>
-
-              <button
-                onClick={handleClose}
-                disabled={closing}
-                className={`px-4 py-2 text-sm font-medium text-white rounded-lg disabled:opacity-50 transition-colors ${closeMode === 'discard' ? 'bg-red-600 hover:bg-red-700' : 'bg-blue-600 hover:bg-blue-700'
-                  }`}
-              >
-                {closing ? (
-                  <span className="flex items-center gap-1.5">
-                    <span className="animate-spin w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full" />
-                    Закрытие...
-                  </span>
-                ) : closeMode === 'discard' ? 'Закрыть без сохранения' : 'Закрыть с сохранением'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <SessionCloseDialogComp
+        open={!!closeTarget}
+        session={closeTarget}
+        closeMode={closeMode}
+        onCloseModeChange={setCloseMode}
+        closing={closing}
+        onBackdropClick={() => !closing && setCloseTarget(null)}
+        onCancel={() => setCloseTarget(null)}
+        onConfirm={handleClose}
+      />
     </Layout>
   );
 }

@@ -91,7 +91,7 @@ export default function CitiesCatalogPage() {
 
     setMobileActions(actions);
     return () => setMobileActions([]);
-  }, [c.editingCity, c.saving, c.imageUploading, c.handleSave, c.setEditingCity, c.setActiveEditTab, c.setCommonsModalOpen, c, setMobileActions]);
+  }, [c.editingCity, c.saving, c.imageUploading, c.handleSave, c.setEditingCity, c.setActiveEditTab, c.setCommonsModalOpen, setMobileActions]);
 
   return (
     <Layout>

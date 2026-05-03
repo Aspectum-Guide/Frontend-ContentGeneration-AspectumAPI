@@ -1,4 +1,4 @@
-import { StatusBadge } from './sessionWizardShared.jsx';
+import { StatusBadge as DefaultStatusBadge } from './sessionWizardShared.jsx';
 
 export default function SessionWizardPublishStep({
   session,
@@ -6,10 +6,12 @@ export default function SessionWizardPublishStep({
   cityTags,
   translating,
   publishing,
+  components = {},
   onGoToStep,
   onTranslateSession,
   onPublish,
 }) {
+  const StatusBadge = components.StatusBadge ?? DefaultStatusBadge;
   return (
     <div className="space-y-4">
       <div>

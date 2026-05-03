@@ -128,7 +128,7 @@ export default function TicketPricesCatalog() {
       },
       (err) => parseApiError(err, 'Ошибка загрузки цен')
     );
-  }, [prices, eventFilter, ticketTypeFilter, statusFilter, debouncedSearch]);
+  }, [prices.load, eventFilter, ticketTypeFilter, statusFilter, debouncedSearch]);
 
   useEffect(() => {
     reload(page);

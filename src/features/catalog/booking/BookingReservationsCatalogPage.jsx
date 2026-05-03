@@ -120,7 +120,7 @@ export default function BookingReservationsCatalogPage() {
       },
       (err) => parseApiError(err, 'Ошибка загрузки резервов')
     );
-  }, [reservations, eventFilter, statusFilter, ticketTypeFilter, slotFilter, debouncedSearch]);
+  }, [reservations.load, eventFilter, statusFilter, ticketTypeFilter, slotFilter, debouncedSearch]);
 
   useEffect(() => {
     reload(page);

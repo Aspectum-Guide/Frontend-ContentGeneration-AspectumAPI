@@ -3,6 +3,12 @@ import { normalizePaginatedResponse } from '../shared/normalize';
 
 const IDENTITY = (item) => item;
 
+/**
+ * Загрузка списка справочника (пагинация + ошибки).
+ * Возвращаемый объект меняет ссылку при обновлении items / loading / error.
+ * В зависимостях useCallback/useEffect указывайте `resource.load` (и при необходимости `remove`),
+ * а не весь `resource` — иначе после каждого ответа API пересоздаётся callback и возможен цикл запросов.
+ */
 export function useCatalogResource({
   listRequest,
   removeRequest,

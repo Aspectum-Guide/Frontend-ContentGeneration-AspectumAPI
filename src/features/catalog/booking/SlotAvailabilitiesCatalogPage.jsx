@@ -168,7 +168,7 @@ export default function SlotAvailabilitiesCatalog() {
       },
       (err) => parseApiError(err, 'Ошибка загрузки слотов')
     );
-  }, [avail, eventFilter, ticketTypeFilter]);
+  }, [avail.load, eventFilter, ticketTypeFilter]);
 
   useEffect(() => {
     reload(page);

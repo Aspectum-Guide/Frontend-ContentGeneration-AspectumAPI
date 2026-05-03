@@ -97,7 +97,7 @@ export default function EventsCatalogPage() {
 
     setMobileActions(actions);
     return () => setMobileActions([]);
-  }, [e.openCreate, e.saving, e.editingEvent, e.handleSave, e.setEditingEvent, e, navigate, setMobileActions]);
+  }, [e.openCreate, e.saving, e.editingEvent, e.handleSave, e.setEditingEvent, navigate, setMobileActions]);
 
   return (
     <Layout>
