@@ -1,4 +1,4 @@
-import { StatusBadge } from './sessionWizardShared';
+import { StatusBadge } from './sessionWizardShared.jsx';
 
 export default function SessionWizardPublishStep({
   session,

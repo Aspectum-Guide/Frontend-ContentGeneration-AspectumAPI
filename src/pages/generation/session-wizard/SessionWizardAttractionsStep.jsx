@@ -1,4 +1,4 @@
-import { DEFAULT_LOCALE_DEFS, getAttrName, getFlag } from './sessionWizardShared';
+import { DEFAULT_LOCALE_DEFS, getAttrName, getFlag } from './sessionWizardShared.jsx';
 
 export default function SessionWizardAttractionsStep({
   attrView,

@@ -4,7 +4,7 @@ import { aiAPI, attractionsAPI, cityFiltersAPI, imagesAPI, sessionsAPI } from '.
 import { useLayoutActions } from '../../../context/useLayoutActions';
 import { trackEvent } from '../../../utils/analytics';
 import { parseApiError } from '../../../utils/apiError';
-import { DEFAULT_LOCALE_DEFS, getLocaleInfo } from './sessionWizardShared';
+import { DEFAULT_LOCALE_DEFS, getLocaleInfo } from './sessionWizardShared.jsx';
 
 const TOTAL_STEPS = 5;
 

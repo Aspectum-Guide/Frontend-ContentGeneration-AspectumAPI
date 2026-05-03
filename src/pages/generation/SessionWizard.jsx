@@ -7,7 +7,7 @@ import SessionWizardCityStep from './session-wizard/SessionWizardCityStep';
 import SessionWizardContentStep from './session-wizard/SessionWizardContentStep';
 import SessionWizardPublishStep from './session-wizard/SessionWizardPublishStep';
 import SessionWizardTagsStep from './session-wizard/SessionWizardTagsStep';
-import { StatusBadge } from './session-wizard/sessionWizardShared';
+import { StatusBadge } from './session-wizard/sessionWizardShared.jsx';
 import { useSessionWizardController } from './session-wizard/useSessionWizardController';
 
 const STEP_LABELS = ['Город', 'Теги', 'Достопримечательности', 'Контент', 'Публикация'];

@@ -1,4 +1,4 @@
-import { getCityDraftName, getFlag } from './sessionWizardShared';
+import { getCityDraftName, getFlag } from './sessionWizardShared.jsx';
 
 function LocalePills({ localeData, activeLocale, defaultLocale, onSwitch, onSetDefault, onAddLocale, onRemoveLocale }) {
   return (
