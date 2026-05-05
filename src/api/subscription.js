@@ -14,4 +14,5 @@ export const activationCodesAPI = {
   create: (data) => apiClient.post('/subscription/activation-codes/', data),
   update: (id, data) => apiClient.patch(`/subscription/activation-codes/${id}/`, data),
   delete: (id) => apiClient.delete(`/subscription/activation-codes/${id}/`),
+  bulkGenerate: (data) => apiClient.post('/subscription/activation-codes/bulk-generate/', data),
 };

@@ -29,7 +29,10 @@ class TokenManager {
       }
       
       const payload = parts[1];
-      const decoded = atob(payload);
+      // JWT uses base64url (not base64). atob expects base64 with padding.
+      const base64 = payload.replace(/-/g, '+').replace(/_/g, '/');
+      const padded = base64.padEnd(base64.length + ((4 - (base64.length % 4)) % 4), '=');
+      const decoded = atob(padded);
       return JSON.parse(decoded);
     } catch (error) {
       console.error('[TokenManager] Failed to decode token:', error);

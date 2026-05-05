@@ -18,6 +18,7 @@ export const eventSlotAvailabilitiesAPI = {
   create: (data) => apiClient.post('/booking/slot-availabilities/', data),
   update: (id, data) => apiClient.patch(`/booking/slot-availabilities/${id}/`, data),
   delete: (id) => apiClient.delete(`/booking/slot-availabilities/${id}/`),
+  bulkCreate: (data) => apiClient.post('/booking/slot-availabilities/bulk-create/', data),
 };
 
 export const ticketPricesAPI = {
@@ -26,6 +27,7 @@ export const ticketPricesAPI = {
   create: (data) => apiClient.post('/booking/ticket-prices/', data),
   update: (id, data) => apiClient.patch(`/booking/ticket-prices/${id}/`, data),
   delete: (id) => apiClient.delete(`/booking/ticket-prices/${id}/`),
+  bulkCreate: (data) => apiClient.post('/booking/ticket-prices/bulk-create/', data),
 };
 
 export const bookingReservationsAPI = {

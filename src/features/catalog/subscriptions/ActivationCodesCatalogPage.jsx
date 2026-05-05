@@ -48,6 +48,18 @@ function parseInputToIso(value) {
   return d.toISOString();
 }
 
+function createEmptyBulkGenerate() {
+  return {
+    prefix: '',
+    count: 50,
+    subscription_type: '',
+    max_uses: '',
+    expiry_days: '',
+    product_name: '',
+    description: '',
+  };
+}
+
 export default function ActivationCodesCatalogPage() {
   const { setMobileActions } = useLayoutActions();
 
@@ -70,6 +82,12 @@ export default function ActivationCodesCatalogPage() {
 
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [deleting, setDeleting] = useState(false);
+
+  const [bulkOpen, setBulkOpen] = useState(false);
+  const [bulkForm, setBulkForm] = useState(createEmptyBulkGenerate());
+  const [bulkSaving, setBulkSaving] = useState(false);
+  const [bulkError, setBulkError] = useState(null);
+  const [bulkResult, setBulkResult] = useState(null);
 
   const loadSubscriptionTypes = useCallback(async () => {
     try {
@@ -141,6 +159,17 @@ export default function ActivationCodesCatalogPage() {
         },
         variant: editingItem ? 'secondary' : 'primary',
       },
+      {
+        id: 'bulk-generate-activation-codes',
+        label: 'Сгенерировать пачку',
+        onClick: () => {
+          setBulkError(null);
+          setBulkResult(null);
+          setBulkForm(createEmptyBulkGenerate());
+          setBulkOpen(true);
+        },
+        variant: 'secondary',
+      },
     ];
 
     if (editingItem) {
@@ -155,6 +184,32 @@ export default function ActivationCodesCatalogPage() {
     setMobileActions(actions);
     return () => setMobileActions([]);
   }, [editingItem, setMobileActions]);
+
+  const handleBulkGenerate = async (e) => {
+    e?.preventDefault();
+
+    const payload = {
+      prefix: bulkForm.prefix?.trim() || '',
+      count: Number(bulkForm.count),
+      subscription_type: bulkForm.subscription_type,
+      max_uses: bulkForm.max_uses === '' ? null : Number(bulkForm.max_uses),
+      expiry_days: bulkForm.expiry_days === '' ? null : Number(bulkForm.expiry_days),
+      product_name: bulkForm.product_name || '',
+      description: bulkForm.description || '',
+    };
+
+    try {
+      setBulkSaving(true);
+      setBulkError(null);
+      const resp = await activationCodesAPI.bulkGenerate(payload);
+      setBulkResult(resp?.data || { success: true });
+      await loadItems();
+    } catch (err) {
+      setBulkError(parseApiError(err, 'Ошибка массовой генерации кодов'));
+    } finally {
+      setBulkSaving(false);
+    }
+  };
 
   const handleSave = async (e) => {
     e?.preventDefault();
@@ -249,6 +304,17 @@ export default function ActivationCodesCatalogPage() {
           setSaveError(null);
           setEditingItem(createEmptyCode());
         }}
+        secondaryActions={[
+          {
+            label: 'Сгенерировать пачку',
+            onClick: () => {
+              setBulkError(null);
+              setBulkResult(null);
+              setBulkForm(createEmptyBulkGenerate());
+              setBulkOpen(true);
+            },
+          },
+        ]}
       />
 
       <DataTable
@@ -409,6 +475,114 @@ export default function ActivationCodesCatalogPage() {
         danger
         loading={deleting}
       />
+
+      <Modal
+        open={bulkOpen}
+        onClose={() => setBulkOpen(false)}
+        title="Массовая генерация кодов"
+        size="lg"
+      >
+        <form onSubmit={handleBulkGenerate} className="space-y-4">
+          <FormErrorAlert message={bulkError} />
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <Field label="Префикс (опционально)">
+              <TextInput
+                value={bulkForm.prefix}
+                onChange={(e) => setBulkForm((prev) => ({ ...prev, prefix: e.target.value.toUpperCase() }))}
+                placeholder="ASD"
+                maxLength={10}
+              />
+            </Field>
+
+            <Field label="Количество">
+              <TextInput
+                type="number"
+                min={1}
+                max={1000}
+                value={bulkForm.count}
+                onChange={(e) => setBulkForm((prev) => ({ ...prev, count: e.target.value }))}
+              />
+            </Field>
+          </div>
+
+          <Field label="Тип подписки">
+            <select
+              value={bulkForm.subscription_type}
+              onChange={(e) => setBulkForm((prev) => ({ ...prev, subscription_type: e.target.value }))}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+              required
+              disabled={typesLoading}
+            >
+              <option value="">Выберите тип подписки</option>
+              {subscriptionTypes.map((st) => (
+                <option key={st.id} value={st.id}>{st.name}</option>
+              ))}
+            </select>
+          </Field>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <Field label="Лимит использований (опционально)">
+              <TextInput
+                type="number"
+                min={1}
+                value={bulkForm.max_uses}
+                onChange={(e) => setBulkForm((prev) => ({ ...prev, max_uses: e.target.value }))}
+                placeholder="Пусто = без лимита"
+              />
+            </Field>
+
+            <Field label="Истекает через N дней (опционально)">
+              <TextInput
+                type="number"
+                min={1}
+                max={3650}
+                value={bulkForm.expiry_days}
+                onChange={(e) => setBulkForm((prev) => ({ ...prev, expiry_days: e.target.value }))}
+                placeholder="Пусто = бессрочно"
+              />
+            </Field>
+          </div>
+
+          <Field label="Продукт (опционально)">
+            <TextInput
+              value={bulkForm.product_name}
+              onChange={(e) => setBulkForm((prev) => ({ ...prev, product_name: e.target.value }))}
+              maxLength={200}
+            />
+          </Field>
+
+          <Field label="Описание (база)">
+            <Textarea
+              rows={3}
+              value={bulkForm.description}
+              onChange={(e) => setBulkForm((prev) => ({ ...prev, description: e.target.value }))}
+            />
+          </Field>
+
+          {bulkResult?.examples?.length ? (
+            <div className="rounded-lg border border-gray-200 bg-gray-50 p-3">
+              <div className="text-sm font-medium text-gray-800">Примеры кодов</div>
+              <div className="mt-2 flex flex-wrap gap-2">
+                {bulkResult.examples.map((c) => (
+                  <span key={c} className="font-mono text-xs px-2 py-1 rounded bg-white border border-gray-200">
+                    {c}
+                  </span>
+                ))}
+              </div>
+              <div className="mt-2 text-xs text-gray-600">
+                Сгенерировано: {bulkResult.count ?? '—'}
+              </div>
+            </div>
+          ) : null}
+
+          <FormActions
+            saving={bulkSaving}
+            saveLabel="Сгенерировать"
+            onCancel={() => setBulkOpen(false)}
+          />
+        </form>
+      </Modal>
     </Layout>
   );
 }
