@@ -108,6 +108,7 @@ export default function SessionWizard({ components = {} } = {}) {
     addAttraction,
     deleteCurrentAttr,
     saveCurrentAttr,
+    saveCityForStep1,
     updateAttrLocaleField,
     startAiContent,
     saveAiContent,
@@ -193,12 +194,19 @@ export default function SessionWizard({ components = {} } = {}) {
             ← Шаги
           </button>
           <button
-            onClick={() => saveCurrentAttr?.()}
-            disabled={saving}
+            onClick={() => {
+              if (currentStep === 1 || currentStep === 2) {
+                void saveCityForStep1?.().catch(() => { });
+                return;
+              }
+
+              void saveCurrentAttr?.();
+            }}
+            disabled={saving || attrSaving}
             title="Сохранить текущие данные"
             className="px-3 py-1.5 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors"
           >
-            {saving ? 'Сохранение...' : 'Сохранить'}
+            {saving || attrSaving ? 'Сохранение...' : 'Сохранить'}
           </button>
         </div>
       </div>

@@ -39,6 +39,90 @@ function normalizeLocaleName(value) {
   return (value || '').toString().trim().toLowerCase();
 }
 
+const normalizeAttraction = (attr = {}) => {
+  const index = Number(attr.index ?? attr.order ?? 0);
+
+  const cityId = attr.city_id ?? attr.city ?? null;
+  const sessionCityId = attr.session_city_id ?? attr.session_city ?? null;
+
+  let assignedCityType = attr.assigned_city_type ?? 'none';
+
+  if (!attr.assigned_city_type) {
+    if (cityId) {
+      assignedCityType = 'database';
+    } else if (sessionCityId) {
+      assignedCityType = 'draft';
+    }
+  }
+
+  return {
+    ...attr,
+
+    id: attr.id ?? null,
+
+    name: attr.name ?? {},
+    description: attr.description ?? {},
+
+    lat: attr.lat ?? null,
+    lon: attr.lon ?? null,
+
+    index,
+    order: index, // legacy compatibility
+    rank: Number(attr.rank ?? 0),
+
+    city: cityId,
+    city_id: cityId,
+
+    session_city: sessionCityId,
+    session_city_id: sessionCityId,
+
+    assigned_city_type: assignedCityType,
+    assigned_city_name: attr.assigned_city_name ?? null,
+
+    image_id: attr.image_id ?? attr.image ?? null,
+    image_url: attr.image_url ?? null,
+    image_copyright: attr.image_copyright ?? null,
+
+    contents: attr.contents ?? {},
+  };
+};
+
+const buildAttractionPayload = (attr, name, description) => {
+  const assignedType = attr.assigned_city_type ?? 'none';
+
+  let city = null;
+  let sessionCity = null;
+
+  if (assignedType === 'database') {
+    city = attr.city_id ?? attr.city ?? null;
+  }
+
+  if (assignedType === 'draft') {
+    sessionCity = attr.session_city_id ?? attr.session_city ?? null;
+  }
+
+  const index = Number(attr.index ?? attr.order ?? 0);
+
+  return {
+    name: name ?? attr.name ?? {},
+    description: description ?? attr.description ?? {},
+
+    lat: attr.lat === '' ? null : attr.lat,
+    lon: attr.lon === '' ? null : attr.lon,
+
+    index,
+    rank: Number(attr.rank ?? 0),
+
+    city,
+    session_city: sessionCity,
+
+    image_id: attr.image_id ?? null,
+
+    // legacy compatibility
+    order: index,
+  };
+};
+
 function resolveBackendLanguageCode(langName) {
   const normalized = normalizeLocaleName(langName);
   if (!normalized) return '';
@@ -282,7 +366,9 @@ export function useSessionWizardController({ sessionId, confirm: confirmProp } =
       if (selectedDraft) loadCityIntoForm(selectedDraft);
       else if (fallbackDraft) loadCityIntoForm(fallbackDraft);
 
-      if (Array.isArray(data?.attractions)) setAttractions(data.attractions);
+      if (Array.isArray(data?.attractions)) {
+        setAttractions(data.attractions.map(normalizeAttraction));
+      }
     } catch (err) {
       showNote('Не удалось загрузить сессию: ' + parseApiError(err, 'Ошибка загрузки'), 'error');
       navigate('/generation');
@@ -384,13 +470,13 @@ export function useSessionWizardController({ sessionId, confirm: confirmProp } =
     try {
       const res = await sessionsAPI.get(sessionId);
       const list = res?.data?.attractions || [];
-      setAttractions(list);
+      setAttractions(list.map(normalizeAttraction));  
       setAttractionsLoaded(true);
     } catch (e) {
       showNote('Не удалось загрузить достопримечательности', 'error');
     }
   }, [sessionId, showNote]);
-
+  
   useEffect(() => {
     if (currentStep === 3 && !attractionsLoaded) {
       loadAttractions();
@@ -492,17 +578,10 @@ export function useSessionWizardController({ sessionId, confirm: confirmProp } =
     }
   }, [sessionId, localeData, defaultLocale, lat, lon, cityTags, imageId, imageOriginalUrl, showNote, loadSession, syncActiveDraftRoute]);
 
-  const goToStep = useCallback(async (target) => {
+  const goToStep = useCallback((target) => {
     if (target < 1 || target > TOTAL_STEPS || target === currentStep) return;
-    if ((currentStep === 1 || currentStep === 2) && target > currentStep) {
-      try {
-        await saveCityForStep1();
-      } catch {
-        return;
-      }
-    }
     setCurrentStep(target);
-  }, [currentStep, saveCityForStep1]);
+  }, [currentStep]);
 
   const switchLocale = useCallback((key) => { setActiveLocale(key); }, []);
 
@@ -681,10 +760,31 @@ export function useSessionWizardController({ sessionId, confirm: confirmProp } =
 
   const addAttraction = useCallback(async () => {
     try {
-      const res = await attractionsAPI.create(sessionId, {});
-      const attr = res?.data?.attraction;
-      if (attr) {
-        setAttractions(prev => [...prev, attr]);
+      const nextIndex = attractions.length;
+
+      const res = await attractionsAPI.create(sessionId, {
+        name: {},
+        description: {},
+        lat: null,
+        lon: null,
+
+        index: nextIndex,
+        rank: 0,
+
+        city: null,
+        session_city: null,
+
+        image_id: null,
+
+        // legacy compatibility
+        order: nextIndex,
+      });
+
+      const rawAttr = res?.data?.attraction || res?.data;
+      const attr = normalizeAttraction(rawAttr || {});
+
+      if (attr?.id) {
+        setAttractions((prev) => [...prev, attr]);
         setCurrentAttr(attr);
         setAttrLocaleData(buildAttrLocaleData(attr));
         setAttrActiveLocale('ru-RU');
@@ -694,7 +794,7 @@ export function useSessionWizardController({ sessionId, confirm: confirmProp } =
     } catch (e) {
       showNote('Ошибка при добавлении: ' + e.message, 'error');
     }
-  }, [sessionId, buildAttrLocaleData, showNote]);
+  }, [sessionId, attractions.length, buildAttrLocaleData, showNote]);
 
   const saveCurrentAttr = useCallback(async () => {
     if (!currentAttr) return;
@@ -707,11 +807,24 @@ export function useSessionWizardController({ sessionId, confirm: confirmProp } =
           description[d.lang] = d.description || '';
         }
       });
-      const updated = await attractionsAPI.update(sessionId, currentAttr.id, { name, description });
-      if (updated?.data?.attraction) {
-        setAttractions(prev => prev.map((item) => item.id === currentAttr.id ? { ...item, ...updated.data.attraction } : item));
-        setCurrentAttr(prev => ({ ...prev, ...updated.data.attraction }));
-      }
+      const updated = await attractionsAPI.update(
+        sessionId,
+        currentAttr.id,
+        buildAttractionPayload(currentAttr, name, description)
+      );
+
+      const updatedAttr = normalizeAttraction(updated?.data?.attraction || updated?.data || {
+        ...currentAttr,
+        name,
+        description,
+      });
+
+
+      setAttractions((prev) =>
+        prev.map((item) => item.id === currentAttr.id ? updatedAttr : item)
+      );
+
+      setCurrentAttr(updatedAttr);
       await Promise.all(
         Object.values(attrLocaleData).map((d) => attractionsAPI.saveContent(sessionId, currentAttr.id, { language: d.lang, text: d.contentText || '' }))
       );
@@ -896,6 +1009,7 @@ export function useSessionWizardController({ sessionId, confirm: confirmProp } =
     setCloseOpen, setCloseMode,
     setMapContainerRef,
     loadSession, syncActiveDraftRoute, loadCityIntoForm,
+    saveCityForStep1,
     goToStep, switchLocale, addLocale, removeLocale, updateLocaleField,
     handleSelectDraft, handleCreateDraft, handleDeleteDraft,
     handlePhotoFile, handleCommonsImageSelect, getSessionUuid,
