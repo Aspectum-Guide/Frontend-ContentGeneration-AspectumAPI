@@ -7,6 +7,7 @@ import Modal, { ConfirmModal } from '../../../components/ui/Modal';
 import { useLayoutActions } from '../../../context/useLayoutActions';
 import { parseApiError } from '../../../utils/apiError';
 import { useCatalogFilters } from '../core/useCatalogFilters';
+import { useCatalogCrud } from '../core/useCatalogCrud';
 import { useCatalogResource } from '../core/useCatalogResource';
 import { useEventOptions, useTicketTypeOptions } from '../shared/bookingOptions';
 import ActiveCheckboxField from '../shared/components/ActiveCheckboxField';
@@ -190,12 +191,41 @@ export default function SlotAvailabilitiesCatalog() {
   const ticketTypeCacheRef = useRef(new Map()); // id -> { title: string, primary: string }
   const [, setTicketTypeLabelVersion] = useState(0);
 
-  const [editingAvailability, setEditingAvailability] = useState(null);
-  const [saving, setSaving] = useState(false);
-  const [saveError, setSaveError] = useState(null);
-
-  const [deleteTarget, setDeleteTarget] = useState(null);
-  const [deleting, setDeleting] = useState(false);
+  const crud = useCatalogCrud({
+    createEmpty: createEmptyAvailability,
+    createRequest: eventSlotAvailabilitiesAPI.create,
+    updateRequest: eventSlotAvailabilitiesAPI.update,
+    deleteRequest: eventSlotAvailabilitiesAPI.delete,
+    mapRowToEdit: (row) => ({
+      id: row?.id || null,
+      event: row?.event ? String(row.event) : '',
+      ticket_types: Array.isArray(row?.ticket_types) ? row.ticket_types.map((x) => String(x)) : [],
+      slot_datetime: row?.slot_datetime || '',
+      booking_closes_minutes_before: Number(row?.booking_closes_minutes_before ?? 60),
+      available_seats: Number(row?.available_seats ?? 0),
+      is_active: row?.is_active !== false,
+    }),
+    mapEditToPayload: (editingAvailability) => ({
+      event: editingAvailability.event || null,
+      ticket_types: Array.isArray(editingAvailability.ticket_types)
+        ? editingAvailability.ticket_types.filter(Boolean)
+        : [],
+      slot_datetime: editingAvailability.slot_datetime || null,
+      booking_closes_minutes_before: Number(editingAvailability.booking_closes_minutes_before || 0),
+      available_seats: Number(editingAvailability.available_seats || 0),
+      is_active: !!editingAvailability.is_active,
+    }),
+    onAfterSave: async () => {
+      await reload(page);
+    },
+    onAfterDelete: async () => {
+      await reload(page);
+    },
+    parseError: (err, fallback) => parseApiError(err, fallback),
+    createErrorMessage: 'Ошибка создания слота',
+    updateErrorMessage: 'Ошибка сохранения слота',
+    deleteErrorMessage: 'Ошибка удаления слота',
+  });
 
   const [bulkOpen, setBulkOpen] = useState(false);
   const [bulkForm, setBulkForm] = useState(createEmptyBulk());
@@ -306,12 +336,11 @@ export default function SlotAvailabilitiesCatalog() {
     const actions = [
       {
         id: 'create-slot-availability',
-        label: editingAvailability ? 'Новый слот' : 'Создать слот',
+        label: crud.editingItem ? 'Новый слот' : 'Создать слот',
         onClick: () => {
-          setSaveError(null);
-          setEditingAvailability(createEmptyAvailability());
+          crud.openCreate();
         },
-        variant: editingAvailability ? 'secondary' : 'primary',
+        variant: crud.editingItem ? 'secondary' : 'primary',
       },
       {
         id: 'bulk-create-slot-availabilities',
@@ -332,18 +361,18 @@ export default function SlotAvailabilitiesCatalog() {
       },
     ];
 
-    if (editingAvailability) {
+    if (crud.editingItem) {
       actions.push({
         id: 'close-slot-availability-editor',
         label: 'Закрыть форму',
-        onClick: () => setEditingAvailability(null),
+        onClick: () => crud.closeEdit(),
         variant: 'secondary',
       });
     }
 
     setMobileActions(actions);
     return () => setMobileActions([]);
-  }, [editingAvailability, eventFilter, ticketTypeFilter, setMobileActions]);
+  }, [crud, eventFilter, ticketTypeFilter, setMobileActions]);
 
   const handleBulkCreate = async (e) => {
     e?.preventDefault();
@@ -420,86 +449,11 @@ export default function SlotAvailabilitiesCatalog() {
   };
 
   const openEdit = useCallback(async (row) => {
-    setSaveError(null);
-    const base = {
-      id: row?.id || null,
-      event: row?.event ? String(row.event) : '',
-      ticket_types: Array.isArray(row?.ticket_types) ? row.ticket_types.map((x) => String(x)) : [],
-      slot_datetime: row?.slot_datetime || '',
-      booking_closes_minutes_before: Number(row?.booking_closes_minutes_before ?? 60),
-      available_seats: Number(row?.available_seats ?? 0),
-      is_active: row?.is_active !== false,
-    };
-
-    setEditingAvailability(base);
-    // Important: trigger ticket type options load for edit form
-    setEventFilter(base.event || '');
-    if (!row?.id) return;
-
-    try {
-      const r = await eventSlotAvailabilitiesAPI.get(row.id);
-      const d = r?.data;
-      if (d && typeof d === 'object') {
-        setEditingAvailability((prev) => ({
-          ...prev,
-          event: d.event ? String(d.event) : prev.event,
-          ticket_types: Array.isArray(d.ticket_types) ? d.ticket_types.map((x) => String(x)) : prev.ticket_types,
-          slot_datetime: d.slot_datetime || prev.slot_datetime,
-          booking_closes_minutes_before: Number(d.booking_closes_minutes_before ?? prev.booking_closes_minutes_before ?? 60),
-          available_seats: Number(d.available_seats ?? prev.available_seats ?? 0),
-          is_active: d.is_active !== false,
-        }));
-      }
-    } catch {
-      // ignore
-    }
-  }, []);
-
-  const handleSave = async (e) => {
-    e?.preventDefault();
-    if (!editingAvailability) return;
-
-    const payload = {
-      event: editingAvailability.event || null,
-      ticket_types: Array.isArray(editingAvailability.ticket_types)
-        ? editingAvailability.ticket_types.filter(Boolean)
-        : [],
-      slot_datetime: editingAvailability.slot_datetime || null,
-      booking_closes_minutes_before: Number(editingAvailability.booking_closes_minutes_before || 0),
-      available_seats: Number(editingAvailability.available_seats || 0),
-      is_active: !!editingAvailability.is_active,
-    };
-
-    try {
-      setSaving(true);
-      setSaveError(null);
-      if (editingAvailability.id) {
-        await eventSlotAvailabilitiesAPI.update(editingAvailability.id, payload);
-      } else {
-        await eventSlotAvailabilitiesAPI.create(payload);
-      }
-      setEditingAvailability(null);
-      await reload();
-    } catch (err) {
-      setSaveError(parseApiError(err, editingAvailability.id ? 'Ошибка сохранения слота' : 'Ошибка создания слота'));
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  const handleDelete = async () => {
-    if (!deleteTarget?.id) return;
-    try {
-      setDeleting(true);
-      await eventSlotAvailabilitiesAPI.delete(deleteTarget.id);
-      setDeleteTarget(null);
-      await reload();
-    } catch (err) {
-      avail.setError(parseApiError(err, 'Ошибка удаления слота'));
-    } finally {
-      setDeleting(false);
-    }
-  };
+    await crud.openEdit(row);
+    const baseEvent = row?.event ? String(row.event) : '';
+    // trigger ticket type options load for edit form
+    setEventFilter(baseEvent || '');
+  }, [crud]);
 
   const columns = [
     {
@@ -562,8 +516,7 @@ export default function SlotAvailabilitiesCatalog() {
         description="Слоты по событиям и типам билетов"
         createLabel="Создать слот"
         onCreate={() => {
-          setSaveError(null);
-          setEditingAvailability(createEmptyAvailability());
+          crud.openCreate();
         }}
         secondaryActions={[
           {
@@ -631,28 +584,28 @@ export default function SlotAvailabilitiesCatalog() {
         actions={(row) => (
           <TableRowActions
             onEdit={() => openEdit(row)}
-            onDelete={() => setDeleteTarget(row)}
+            onDelete={() => crud.askDelete(row)}
           />
         )}
       />
 
       <Modal
-        open={!!editingAvailability}
-        onClose={() => setEditingAvailability(null)}
-        title={editingAvailability?.id ? 'Редактировать слот' : 'Создать слот'}
+        open={!!crud.editingItem}
+        onClose={() => crud.closeEdit()}
+        title={crud.editingItem?.id ? 'Редактировать слот' : 'Создать слот'}
         size="lg"
       >
-        {editingAvailability && (
-          <form onSubmit={handleSave} className="space-y-4">
-            <FormErrorAlert message={saveError} />
+        {crud.editingItem && (
+          <form onSubmit={crud.save} className="space-y-4">
+            <FormErrorAlert message={crud.saveError} />
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               <Field label="Событие" required>
                 <select
-                  value={editingAvailability.event}
+                  value={crud.editingItem.event}
                   onChange={(e) => {
                     const nextEvent = e.target.value;
-                    setEditingAvailability((prev) => ({ ...prev, event: nextEvent, ticket_types: [] }));
+                    crud.setEditingItem((prev) => ({ ...prev, event: nextEvent, ticket_types: [] }));
                     setEventFilter(nextEvent);
                   }}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none"
@@ -670,15 +623,15 @@ export default function SlotAvailabilitiesCatalog() {
               <Field label="Типы билетов">
                 <select
                   multiple
-                  value={editingAvailability.ticket_types}
+                  value={crud.editingItem.ticket_types}
                   onChange={(e) => {
                     const selected = Array.from(e.target.selectedOptions).map((o) => o.value);
-                    setEditingAvailability((prev) => ({ ...prev, ticket_types: selected }));
+                    crud.setEditingItem((prev) => ({ ...prev, ticket_types: selected }));
                   }}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none"
-                  disabled={!editingAvailability.event || ticketTypesLoading}
+                  disabled={!crud.editingItem.event || ticketTypesLoading}
                 >
-                  {!editingAvailability.event ? (
+                  {!crud.editingItem.event ? (
                     <option value="" disabled>Сначала выберите событие</option>
                   ) : null}
                   {ticketTypeOptions.map((tt) => (
@@ -693,8 +646,8 @@ export default function SlotAvailabilitiesCatalog() {
             <Field label="Дата и время слота" required>
               <TextInput
                 type="datetime-local"
-                value={formatIsoForInput(editingAvailability.slot_datetime)}
-                onChange={(e) => setEditingAvailability((prev) => ({ ...prev, slot_datetime: parseInputToIso(e.target.value) }))}
+                value={formatIsoForInput(crud.editingItem.slot_datetime)}
+                onChange={(e) => crud.setEditingItem((prev) => ({ ...prev, slot_datetime: parseInputToIso(e.target.value) }))}
                 required
               />
             </Field>
@@ -704,21 +657,21 @@ export default function SlotAvailabilitiesCatalog() {
                 <TextInput
                   type="number"
                   min={0}
-                  value={editingAvailability.available_seats ?? 0}
-                  onChange={(e) => setEditingAvailability((prev) => ({ ...prev, available_seats: Number(e.target.value || 0) }))}
+                  value={crud.editingItem.available_seats ?? 0}
+                  onChange={(e) => crud.setEditingItem((prev) => ({ ...prev, available_seats: Number(e.target.value || 0) }))}
                 />
               </Field>
               <Field label="Закрытие брони (мин)">
                 <TextInput
                   type="number"
                   min={0}
-                  value={editingAvailability.booking_closes_minutes_before ?? 60}
-                  onChange={(e) => setEditingAvailability((prev) => ({ ...prev, booking_closes_minutes_before: Number(e.target.value || 0) }))}
+                  value={crud.editingItem.booking_closes_minutes_before ?? 60}
+                  onChange={(e) => crud.setEditingItem((prev) => ({ ...prev, booking_closes_minutes_before: Number(e.target.value || 0) }))}
                 />
               </Field>
               <ActiveCheckboxField
-                checked={editingAvailability.is_active}
-                onChange={(next) => setEditingAvailability((prev) => ({ ...prev, is_active: next }))}
+                checked={crud.editingItem.is_active}
+                onChange={(next) => crud.setEditingItem((prev) => ({ ...prev, is_active: next }))}
                 text="Активен"
               />
             </div>
@@ -728,23 +681,29 @@ export default function SlotAvailabilitiesCatalog() {
             </FormHint>
 
             <FormActions
-              saving={saving}
-              saveLabel={editingAvailability.id ? 'Сохранить' : 'Создать'}
-              onCancel={() => setEditingAvailability(null)}
+              saving={crud.saving}
+              saveLabel={crud.editingItem.id ? 'Сохранить' : 'Создать'}
+              onCancel={() => crud.closeEdit()}
             />
           </form>
         )}
       </Modal>
 
       <ConfirmModal
-        open={!!deleteTarget}
-        onClose={() => setDeleteTarget(null)}
-        onConfirm={handleDelete}
+        open={!!crud.deleteTarget}
+        onClose={() => crud.cancelDelete()}
+        onConfirm={async () => {
+          try {
+            await crud.confirmDelete();
+          } catch (e) {
+            avail.setError(crud.deleteError || parseApiError(e, 'Ошибка удаления слота'));
+          }
+        }}
         title="Удалить слот?"
-        message={`Слот «${deleteTarget?.id || ''}» будет удалён без возможности восстановления.`}
+        message={`Слот «${crud.deleteTarget?.id || ''}» будет удалён без возможности восстановления.`}
         confirmLabel="Удалить"
         danger
-        loading={deleting}
+        loading={crud.deleting}
       />
 
       <Modal
@@ -779,25 +738,75 @@ export default function SlotAvailabilitiesCatalog() {
             </Field>
 
             <Field label="Типы билетов (опционально)">
-              <select
-                multiple
-                value={bulkForm.ticket_types}
-                onChange={(e) => {
-                  const selected = Array.from(e.target.selectedOptions).map((o) => o.value);
-                  setBulkForm((prev) => ({ ...prev, ticket_types: selected }));
-                }}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none"
-                disabled={!bulkForm.event || ticketTypesLoading}
-              >
-                {!bulkForm.event ? (
-                  <option value="" disabled>Сначала выберите событие</option>
-                ) : null}
-                {ticketTypeOptions.map((tt) => (
-                  <option key={tt.id} value={tt.id}>
-                    {getMultiLangValue(tt.name) || tt.name_primary || tt.id}
-                  </option>
-                ))}
-              </select>
+              {!bulkForm.event ? (
+                <div className="text-sm text-gray-500">Сначала выберите событие</div>
+              ) : ticketTypesLoading ? (
+                <div className="text-sm text-gray-500">Загрузка типов билетов…</div>
+              ) : (
+                <div className="space-y-2">
+                  <div className="flex flex-wrap gap-2">
+                    <button
+                      type="button"
+                      className="px-3 py-1.5 text-xs rounded-lg border border-gray-300 bg-white hover:bg-gray-50"
+                      onClick={() =>
+                        setBulkForm((prev) => ({
+                          ...prev,
+                          ticket_types: ticketTypeOptions.map((x) => String(x.id)),
+                        }))
+                      }
+                      disabled={!ticketTypeOptions.length}
+                    >
+                      Выбрать все
+                    </button>
+                    <button
+                      type="button"
+                      className="px-3 py-1.5 text-xs rounded-lg border border-gray-300 bg-white hover:bg-gray-50"
+                      onClick={() => setBulkForm((prev) => ({ ...prev, ticket_types: [] }))}
+                      disabled={!bulkForm.ticket_types?.length}
+                    >
+                      Снять выбор
+                    </button>
+                    <div className="text-xs text-gray-500 self-center">
+                      Выбрано: {Array.isArray(bulkForm.ticket_types) ? bulkForm.ticket_types.length : 0}
+                    </div>
+                  </div>
+
+                  <div className="max-h-48 overflow-auto rounded-lg border border-gray-200 p-2 bg-white">
+                    {ticketTypeOptions.length ? (
+                      <div className="space-y-1">
+                        {ticketTypeOptions.map((tt) => {
+                          const id = String(tt.id);
+                          const label = getMultiLangValue(tt.name) || tt.name_primary || tt.id;
+                          const checked = Array.isArray(bulkForm.ticket_types)
+                            ? bulkForm.ticket_types.includes(id)
+                            : false;
+                          return (
+                            <label key={id} className="flex items-center gap-2 text-sm text-gray-700">
+                              <input
+                                type="checkbox"
+                                checked={checked}
+                                onChange={(e) => {
+                                  const nextChecked = e.target.checked;
+                                  setBulkForm((prev) => {
+                                    const curr = Array.isArray(prev.ticket_types) ? prev.ticket_types : [];
+                                    if (nextChecked) {
+                                      return { ...prev, ticket_types: Array.from(new Set([...curr, id])) };
+                                    }
+                                    return { ...prev, ticket_types: curr.filter((x) => x !== id) };
+                                  });
+                                }}
+                              />
+                              <span className="min-w-0 truncate">{label}</span>
+                            </label>
+                          );
+                        })}
+                      </div>
+                    ) : (
+                      <div className="text-sm text-gray-500">Для события нет типов билетов</div>
+                    )}
+                  </div>
+                </div>
+              )}
             </Field>
           </div>
 

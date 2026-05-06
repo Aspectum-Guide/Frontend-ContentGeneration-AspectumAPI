@@ -6,6 +6,7 @@ import { Field, FormActions, TextInput, Textarea } from '../../../components/ui/
 import Modal, { ConfirmModal } from '../../../components/ui/Modal';
 import { useLayoutActions } from '../../../context/useLayoutActions';
 import { parseApiError } from '../../../utils/apiError';
+import { useCatalogCrud } from '../core/useCatalogCrud';
 import ActiveCheckboxField from '../shared/components/ActiveCheckboxField';
 import CatalogPageHeader from '../shared/components/CatalogPageHeader';
 import FormErrorAlert from '../shared/components/FormErrorAlert';
@@ -76,12 +77,37 @@ export default function ActivationCodesCatalogPage() {
   const [subscriptionTypes, setSubscriptionTypes] = useState([]);
   const [typesLoading, setTypesLoading] = useState(true);
 
-  const [editingItem, setEditingItem] = useState(null);
-  const [saving, setSaving] = useState(false);
-  const [saveError, setSaveError] = useState(null);
-
-  const [deleteTarget, setDeleteTarget] = useState(null);
-  const [deleting, setDeleting] = useState(false);
+  const crud = useCatalogCrud({
+    createEmpty: createEmptyCode,
+    createRequest: activationCodesAPI.create,
+    updateRequest: activationCodesAPI.update,
+    deleteRequest: activationCodesAPI.delete,
+    mapRowToEdit: (row) => ({
+      id: row.id,
+      code: row.code || '',
+      subscription_type: row.subscription_type || '',
+      product_name: row.product_name || '',
+      description: row.description || '',
+      expiry_date: formatIsoForInput(row.expiry_date),
+      max_uses: row.max_uses ?? '',
+      is_active: row.is_active !== false,
+    }),
+    mapEditToPayload: (editingItem) => ({
+      code: editingItem.code?.trim() || undefined,
+      subscription_type: editingItem.subscription_type || null,
+      product_name: editingItem.product_name || '',
+      description: editingItem.description || '',
+      expiry_date: parseInputToIso(editingItem.expiry_date),
+      max_uses: editingItem.max_uses === '' ? null : Number(editingItem.max_uses),
+      is_active: !!editingItem.is_active,
+    }),
+    onAfterSave: loadItems,
+    onAfterDelete: loadItems,
+    parseError: (err, fallback) => parseApiError(err, fallback),
+    createErrorMessage: 'Ошибка создания кода',
+    updateErrorMessage: 'Ошибка сохранения кода',
+    deleteErrorMessage: 'Ошибка удаления кода',
+  });
 
   const [bulkOpen, setBulkOpen] = useState(false);
   const [bulkForm, setBulkForm] = useState(createEmptyBulkGenerate());
@@ -152,12 +178,11 @@ export default function ActivationCodesCatalogPage() {
     const actions = [
       {
         id: 'create-activation-code',
-        label: editingItem ? 'Новый код' : 'Создать код',
+        label: crud.editingItem ? 'Новый код' : 'Создать код',
         onClick: () => {
-          setSaveError(null);
-          setEditingItem(createEmptyCode());
+          crud.openCreate();
         },
-        variant: editingItem ? 'secondary' : 'primary',
+        variant: crud.editingItem ? 'secondary' : 'primary',
       },
       {
         id: 'bulk-generate-activation-codes',
@@ -172,18 +197,18 @@ export default function ActivationCodesCatalogPage() {
       },
     ];
 
-    if (editingItem) {
+    if (crud.editingItem) {
       actions.push({
         id: 'close-activation-code-editor',
         label: 'Закрыть форму',
-        onClick: () => setEditingItem(null),
+        onClick: () => crud.closeEdit(),
         variant: 'secondary',
       });
     }
 
     setMobileActions(actions);
     return () => setMobileActions([]);
-  }, [editingItem, setMobileActions]);
+  }, [crud, setMobileActions]);
 
   const handleBulkGenerate = async (e) => {
     e?.preventDefault();
@@ -208,52 +233,6 @@ export default function ActivationCodesCatalogPage() {
       setBulkError(parseApiError(err, 'Ошибка массовой генерации кодов'));
     } finally {
       setBulkSaving(false);
-    }
-  };
-
-  const handleSave = async (e) => {
-    e?.preventDefault();
-    if (!editingItem) return;
-
-    const payload = {
-      code: editingItem.code?.trim() || undefined,
-      subscription_type: editingItem.subscription_type || null,
-      product_name: editingItem.product_name || '',
-      description: editingItem.description || '',
-      expiry_date: parseInputToIso(editingItem.expiry_date),
-      max_uses: editingItem.max_uses === '' ? null : Number(editingItem.max_uses),
-      is_active: !!editingItem.is_active,
-    };
-
-    try {
-      setSaving(true);
-      setSaveError(null);
-      if (editingItem.id) {
-        await activationCodesAPI.update(editingItem.id, payload);
-      } else {
-        await activationCodesAPI.create(payload);
-      }
-      setEditingItem(null);
-      await loadItems();
-    } catch (err) {
-      setSaveError(parseApiError(err, editingItem.id ? 'Ошибка сохранения кода' : 'Ошибка создания кода'));
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  const handleDelete = async () => {
-    if (!deleteTarget?.id) return;
-
-    try {
-      setDeleting(true);
-      await activationCodesAPI.delete(deleteTarget.id);
-      setDeleteTarget(null);
-      await loadItems();
-    } catch (err) {
-      alert(parseApiError(err, 'Ошибка удаления кода'));
-    } finally {
-      setDeleting(false);
     }
   };
 
@@ -301,8 +280,7 @@ export default function ActivationCodesCatalogPage() {
         description="Коды для активации подписки"
         createLabel="Создать код"
         onCreate={() => {
-          setSaveError(null);
-          setEditingItem(createEmptyCode());
+          crud.openCreate();
         }}
         secondaryActions={[
           {
@@ -358,39 +336,27 @@ export default function ActivationCodesCatalogPage() {
         )}
         actions={(row) => (
           <TableRowActions
-            onEdit={() => {
-              setSaveError(null);
-              setEditingItem({
-                id: row.id,
-                code: row.code || '',
-                subscription_type: row.subscription_type || '',
-                product_name: row.product_name || '',
-                description: row.description || '',
-                expiry_date: formatIsoForInput(row.expiry_date),
-                max_uses: row.max_uses ?? '',
-                is_active: row.is_active !== false,
-              });
-            }}
-            onDelete={() => setDeleteTarget(row)}
+            onEdit={() => crud.openEdit(row)}
+            onDelete={() => crud.askDelete(row)}
           />
         )}
       />
 
       <Modal
-        open={!!editingItem}
-        onClose={() => setEditingItem(null)}
-        title={editingItem?.id ? 'Редактировать код активации' : 'Создать код активации'}
+        open={!!crud.editingItem}
+        onClose={() => crud.closeEdit()}
+        title={crud.editingItem?.id ? 'Редактировать код активации' : 'Создать код активации'}
         size="lg"
       >
-        {editingItem && (
-          <form onSubmit={handleSave} className="space-y-4">
-            <FormErrorAlert message={saveError} />
+        {crud.editingItem && (
+          <form onSubmit={crud.save} className="space-y-4">
+            <FormErrorAlert message={crud.saveError} />
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               <Field label="Код (опционально)">
                 <TextInput
-                  value={editingItem.code}
-                  onChange={(e) => setEditingItem((prev) => ({ ...prev, code: e.target.value.toUpperCase() }))}
+                  value={crud.editingItem.code}
+                  onChange={(e) => crud.setEditingItem((prev) => ({ ...prev, code: e.target.value.toUpperCase() }))}
                   placeholder="Оставьте пустым для авто-генерации"
                   maxLength={50}
                 />
@@ -398,8 +364,8 @@ export default function ActivationCodesCatalogPage() {
 
               <Field label="Тип подписки">
                 <select
-                  value={editingItem.subscription_type}
-                  onChange={(e) => setEditingItem((prev) => ({ ...prev, subscription_type: e.target.value }))}
+                  value={crud.editingItem.subscription_type}
+                  onChange={(e) => crud.setEditingItem((prev) => ({ ...prev, subscription_type: e.target.value }))}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none"
                 >
                   <option value="">Не выбрано</option>
@@ -413,8 +379,8 @@ export default function ActivationCodesCatalogPage() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               <Field label="Продукт">
                 <TextInput
-                  value={editingItem.product_name}
-                  onChange={(e) => setEditingItem((prev) => ({ ...prev, product_name: e.target.value }))}
+                  value={crud.editingItem.product_name}
+                  onChange={(e) => crud.setEditingItem((prev) => ({ ...prev, product_name: e.target.value }))}
                   maxLength={200}
                 />
               </Field>
@@ -423,8 +389,8 @@ export default function ActivationCodesCatalogPage() {
                 <TextInput
                   type="number"
                   min={1}
-                  value={editingItem.max_uses}
-                  onChange={(e) => setEditingItem((prev) => ({ ...prev, max_uses: e.target.value }))}
+                  value={crud.editingItem.max_uses}
+                  onChange={(e) => crud.setEditingItem((prev) => ({ ...prev, max_uses: e.target.value }))}
                   placeholder="Пусто = без лимита"
                 />
               </Field>
@@ -433,22 +399,22 @@ export default function ActivationCodesCatalogPage() {
             <Field label="Дата истечения">
               <TextInput
                 type="datetime-local"
-                value={editingItem.expiry_date || ''}
-                onChange={(e) => setEditingItem((prev) => ({ ...prev, expiry_date: e.target.value }))}
+                value={crud.editingItem.expiry_date || ''}
+                onChange={(e) => crud.setEditingItem((prev) => ({ ...prev, expiry_date: e.target.value }))}
               />
             </Field>
 
             <Field label="Описание">
               <Textarea
                 rows={3}
-                value={editingItem.description || ''}
-                onChange={(e) => setEditingItem((prev) => ({ ...prev, description: e.target.value }))}
+                value={crud.editingItem.description || ''}
+                onChange={(e) => crud.setEditingItem((prev) => ({ ...prev, description: e.target.value }))}
               />
             </Field>
 
             <ActiveCheckboxField
-              checked={editingItem.is_active}
-              onChange={(next) => setEditingItem((prev) => ({ ...prev, is_active: next }))}
+              checked={crud.editingItem.is_active}
+              onChange={(next) => crud.setEditingItem((prev) => ({ ...prev, is_active: next }))}
               text="Активный код"
             />
 
@@ -457,23 +423,29 @@ export default function ActivationCodesCatalogPage() {
             </FormHint>
 
             <FormActions
-              saving={saving}
-              saveLabel={editingItem.id ? 'Сохранить' : 'Создать'}
-              onCancel={() => setEditingItem(null)}
+              saving={crud.saving}
+              saveLabel={crud.editingItem.id ? 'Сохранить' : 'Создать'}
+              onCancel={() => crud.closeEdit()}
             />
           </form>
         )}
       </Modal>
 
       <ConfirmModal
-        open={!!deleteTarget}
-        onClose={() => setDeleteTarget(null)}
-        onConfirm={handleDelete}
+        open={!!crud.deleteTarget}
+        onClose={() => crud.cancelDelete()}
+        onConfirm={async () => {
+          try {
+            await crud.confirmDelete();
+          } catch (e) {
+            alert(crud.deleteError || parseApiError(e, 'Ошибка удаления кода'));
+          }
+        }}
         title="Удалить код активации?"
-        message={`Код «${deleteTarget?.code || deleteTarget?.id || ''}» будет удален без возможности восстановления.`}
+        message={`Код «${crud.deleteTarget?.code || crud.deleteTarget?.id || ''}» будет удален без возможности восстановления.`}
         confirmLabel="Удалить"
         danger
-        loading={deleting}
+        loading={crud.deleting}
       />
 
       <Modal
