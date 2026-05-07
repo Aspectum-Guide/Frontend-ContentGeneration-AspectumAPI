@@ -9,6 +9,7 @@ import { parseApiError } from '../../../utils/apiError';
 import { useCatalogFilters } from '../core/useCatalogFilters';
 import { useCatalogCrud } from '../core/useCatalogCrud';
 import { useCatalogResource } from '../core/useCatalogResource';
+import BulkActionModal from '../../../components/bulk/BulkActionModal';
 import { useEventOptions, useTicketTypeOptions } from '../shared/bookingOptions';
 import ActiveCheckboxField from '../shared/components/ActiveCheckboxField';
 import CatalogPageHeader from '../shared/components/CatalogPageHeader';
@@ -71,9 +72,11 @@ function createEmptyBulk() {
     is_active: true,
     // optional prices auto-create
     also_create_prices: false,
+    price_mode: 'single', // single | per_type
     price_value: '',
     price_currency: 'EUR',
     price_is_active: true,
+    price_by_ticket_type: {}, // { [ticketTypeId]: string|number }
   };
 }
 
@@ -228,10 +231,6 @@ export default function SlotAvailabilitiesCatalog() {
   });
 
   const [bulkOpen, setBulkOpen] = useState(false);
-  const [bulkForm, setBulkForm] = useState(createEmptyBulk());
-  const [bulkSaving, setBulkSaving] = useState(false);
-  const [bulkError, setBulkError] = useState(null);
-  const [bulkResult, setBulkResult] = useState(null);
 
   const eventLabelById = useMemo(() => {
     const map = new Map();
@@ -346,15 +345,6 @@ export default function SlotAvailabilitiesCatalog() {
         id: 'bulk-create-slot-availabilities',
         label: 'Массово слоты',
         onClick: () => {
-          setBulkError(null);
-          setBulkResult(null);
-          setBulkForm(() => {
-            const next = createEmptyBulk();
-            // prefill with current filters
-            next.event = eventFilter || '';
-            next.ticket_types = ticketTypeFilter ? [ticketTypeFilter] : [];
-            return next;
-          });
           setBulkOpen(true);
         },
         variant: 'secondary',
@@ -373,80 +363,6 @@ export default function SlotAvailabilitiesCatalog() {
     setMobileActions(actions);
     return () => setMobileActions([]);
   }, [crud, eventFilter, ticketTypeFilter, setMobileActions]);
-
-  const handleBulkCreate = async (e) => {
-    e?.preventDefault();
-
-    const slot_datetimes =
-      bulkForm.mode === 'interval'
-        ? buildSlotDatetimesFromInterval({
-            startIso: parseInputToIso(bulkForm.start_datetime),
-            endIso: parseInputToIso(bulkForm.end_datetime),
-            stepMinutes: bulkForm.step_minutes,
-          })
-        : bulkForm.mode === 'schedule'
-          ? buildSlotDatetimesFromSchedule({
-              startDate: bulkForm.schedule_start_date,
-              endDate: bulkForm.schedule_end_date,
-              days: bulkForm.schedule_days,
-              times: parseTimesText(bulkForm.schedule_times_text),
-            })
-          : parseSlotDatetimesText(bulkForm.datetimes_text);
-
-    const payload = {
-      event: bulkForm.event,
-      ticket_types: Array.isArray(bulkForm.ticket_types) ? bulkForm.ticket_types.filter(Boolean) : [],
-      slot_datetimes,
-      booking_closes_minutes_before: Number(bulkForm.booking_closes_minutes_before || 0),
-      available_seats: Number(bulkForm.available_seats || 0),
-      is_active: !!bulkForm.is_active,
-    };
-
-    try {
-      setBulkSaving(true);
-      setBulkError(null);
-      setBulkResult(null);
-
-      if (!payload.event) {
-        throw new Error('Выберите событие');
-      }
-      if (!payload.slot_datetimes.length) {
-        throw new Error('Нет дат/времени для создания слотов');
-      }
-
-      const resp = await eventSlotAvailabilitiesAPI.bulkCreate(payload);
-      const result = resp?.data || null;
-      setBulkResult(result);
-
-      if (bulkForm.also_create_prices) {
-        const priceNum = Number(bulkForm.price_value);
-        if (!payload.ticket_types.length) {
-          throw new Error('Для автосоздания цен выберите хотя бы один тип билета');
-        }
-        if (!Number.isFinite(priceNum) || priceNum < 0) {
-          throw new Error('Укажите корректную цену (0 или больше)');
-        }
-        const slot_ids = Array.isArray(result?.created_ids) ? result.created_ids : [];
-        if (!slot_ids.length) {
-          throw new Error('Слоты не созданы — нечего прайсить');
-        }
-        await ticketPricesAPI.bulkCreate({
-          event: payload.event,
-          slot_ids,
-          ticket_types: payload.ticket_types,
-          price: priceNum,
-          currency: (bulkForm.price_currency || 'EUR').toUpperCase(),
-          is_active: !!bulkForm.price_is_active,
-        });
-      }
-
-      await reload(page);
-    } catch (err) {
-      setBulkError(parseApiError(err, err?.message || 'Ошибка массового создания слотов'));
-    } finally {
-      setBulkSaving(false);
-    }
-  };
 
   const openEdit = useCallback(async (row) => {
     await crud.openEdit(row);
@@ -522,14 +438,6 @@ export default function SlotAvailabilitiesCatalog() {
           {
             label: 'Массово слоты',
             onClick: () => {
-              setBulkError(null);
-              setBulkResult(null);
-              setBulkForm(() => {
-                const next = createEmptyBulk();
-                next.event = eventFilter || '';
-                next.ticket_types = ticketTypeFilter ? [ticketTypeFilter] : [];
-                return next;
-              });
               setBulkOpen(true);
             },
           },
@@ -706,323 +614,491 @@ export default function SlotAvailabilitiesCatalog() {
         loading={crud.deleting}
       />
 
-      <Modal
+      <BulkActionModal
         open={bulkOpen}
         onClose={() => setBulkOpen(false)}
         title="Массовое создание слотов"
-        size="lg"
-      >
-        <form onSubmit={handleBulkCreate} className="space-y-4">
-          <FormErrorAlert message={bulkError} />
+        submitLabel="Создать слоты"
+        parseError={(err) => parseApiError(err, err?.message || 'Ошибка массового создания слотов')}
+        initialValues={(() => {
+          const next = createEmptyBulk();
+          next.event = eventFilter || '';
+          next.ticket_types = ticketTypeFilter ? [ticketTypeFilter] : [];
+          return next;
+        })()}
+        onSubmit={async (values) => {
+          const slot_datetimes =
+            values.mode === 'interval'
+              ? buildSlotDatetimesFromInterval({
+                  startIso: parseInputToIso(values.start_datetime),
+                  endIso: parseInputToIso(values.end_datetime),
+                  stepMinutes: values.step_minutes,
+                })
+              : values.mode === 'schedule'
+                ? buildSlotDatetimesFromSchedule({
+                    startDate: values.schedule_start_date,
+                    endDate: values.schedule_end_date,
+                    days: values.schedule_days,
+                    times: parseTimesText(values.schedule_times_text),
+                  })
+                : parseSlotDatetimesText(values.datetimes_text);
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-            <Field label="Событие" required>
-              <select
-                value={bulkForm.event}
-                onChange={(e) => {
-                  const nextEvent = e.target.value;
-                  setBulkForm((prev) => ({ ...prev, event: nextEvent, ticket_types: [] }));
-                  setEventFilter(nextEvent);
-                }}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none"
-                required
-                disabled={eventsLoading}
-              >
-                <option value="">Выберите событие</option>
-                {eventOptions.map((eventItem) => (
-                  <option key={eventItem.id} value={eventItem.id}>
-                    {getMultiLangValue(eventItem.title) || eventItem.id}
-                  </option>
-                ))}
-              </select>
-            </Field>
+          const payload = {
+            event: values.event,
+            ticket_types: Array.isArray(values.ticket_types) ? values.ticket_types.filter(Boolean) : [],
+            slot_datetimes,
+            booking_closes_minutes_before: Number(values.booking_closes_minutes_before || 0),
+            available_seats: Number(values.available_seats || 0),
+            is_active: !!values.is_active,
+          };
 
-            <Field label="Типы билетов (опционально)">
-              {!bulkForm.event ? (
-                <div className="text-sm text-gray-500">Сначала выберите событие</div>
-              ) : ticketTypesLoading ? (
-                <div className="text-sm text-gray-500">Загрузка типов билетов…</div>
-              ) : (
-                <div className="space-y-2">
-                  <div className="flex flex-wrap gap-2">
-                    <button
-                      type="button"
-                      className="px-3 py-1.5 text-xs rounded-lg border border-gray-300 bg-white hover:bg-gray-50"
-                      onClick={() =>
-                        setBulkForm((prev) => ({
-                          ...prev,
-                          ticket_types: ticketTypeOptions.map((x) => String(x.id)),
-                        }))
-                      }
-                      disabled={!ticketTypeOptions.length}
-                    >
-                      Выбрать все
-                    </button>
-                    <button
-                      type="button"
-                      className="px-3 py-1.5 text-xs rounded-lg border border-gray-300 bg-white hover:bg-gray-50"
-                      onClick={() => setBulkForm((prev) => ({ ...prev, ticket_types: [] }))}
-                      disabled={!bulkForm.ticket_types?.length}
-                    >
-                      Снять выбор
-                    </button>
-                    <div className="text-xs text-gray-500 self-center">
-                      Выбрано: {Array.isArray(bulkForm.ticket_types) ? bulkForm.ticket_types.length : 0}
+          if (!payload.event) throw new Error('Выберите событие');
+          if (!payload.slot_datetimes.length) throw new Error('Нет дат/времени для создания слотов');
+
+          const resp = await eventSlotAvailabilitiesAPI.bulkCreate(payload);
+          const result = resp?.data || null;
+
+          if (values.also_create_prices) {
+            if (!payload.ticket_types.length) {
+              throw new Error('Для автосоздания цен выберите хотя бы один тип билета');
+            }
+            const slot_ids = Array.isArray(result?.created_ids) ? result.created_ids : [];
+            if (!slot_ids.length) throw new Error('Слоты не созданы — нечего прайсить');
+
+            const currency = (values.price_currency || 'EUR').toUpperCase();
+            const is_active = !!values.price_is_active;
+
+            if ((values.price_mode || 'single') === 'per_type') {
+              const priceMap = values.price_by_ticket_type || {};
+              for (const ttId of payload.ticket_types) {
+                const raw = priceMap?.[ttId];
+                const priceNum = Number(raw);
+                if (!Number.isFinite(priceNum) || priceNum < 0) {
+                  throw new Error(`Укажите корректную цену для типа билета ${ttId} (0 или больше)`);
+                }
+                await ticketPricesAPI.bulkCreate({
+                  event: payload.event,
+                  slot_ids,
+                  ticket_types: [ttId],
+                  price: priceNum,
+                  currency,
+                  is_active,
+                });
+              }
+            } else {
+              const priceNum = Number(values.price_value);
+              if (!Number.isFinite(priceNum) || priceNum < 0) {
+                throw new Error('Укажите корректную цену (0 или больше)');
+              }
+              await ticketPricesAPI.bulkCreate({
+                event: payload.event,
+                slot_ids,
+                ticket_types: payload.ticket_types,
+                price: priceNum,
+                currency,
+                is_active,
+              });
+            }
+          }
+
+          await reload(page);
+          return result;
+        }}
+        renderFields={({ values, setValues, error }) => (
+          <>
+            <FormErrorAlert message={error} />
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              <Field label="Событие" required>
+                <select
+                  value={values.event}
+                  onChange={(e) => {
+                    const nextEvent = e.target.value;
+                    setValues((prev) => ({ ...prev, event: nextEvent, ticket_types: [] }));
+                    setEventFilter(nextEvent);
+                  }}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+                  required
+                  disabled={eventsLoading}
+                >
+                  <option value="">Выберите событие</option>
+                  {eventOptions.map((eventItem) => (
+                    <option key={eventItem.id} value={eventItem.id}>
+                      {getMultiLangValue(eventItem.title) || eventItem.id}
+                    </option>
+                  ))}
+                </select>
+              </Field>
+
+              <Field label="Типы билетов (опционально)">
+                {!values.event ? (
+                  <div className="text-sm text-gray-500">Сначала выберите событие</div>
+                ) : ticketTypesLoading ? (
+                  <div className="text-sm text-gray-500">Загрузка типов билетов…</div>
+                ) : (
+                  <div className="space-y-2">
+                    <div className="flex flex-wrap gap-2">
+                      <button
+                        type="button"
+                        className="px-3 py-1.5 text-xs rounded-lg border border-gray-300 bg-white hover:bg-gray-50"
+                        onClick={() =>
+                          setValues((prev) => ({
+                            ...prev,
+                            ticket_types: ticketTypeOptions.map((x) => String(x.id)),
+                          }))
+                        }
+                        disabled={!ticketTypeOptions.length}
+                      >
+                        Выбрать все
+                      </button>
+                      <button
+                        type="button"
+                        className="px-3 py-1.5 text-xs rounded-lg border border-gray-300 bg-white hover:bg-gray-50"
+                        onClick={() => setValues((prev) => ({ ...prev, ticket_types: [] }))}
+                        disabled={!values.ticket_types?.length}
+                      >
+                        Снять выбор
+                      </button>
+                      <div className="text-xs text-gray-500 self-center">
+                        Выбрано: {Array.isArray(values.ticket_types) ? values.ticket_types.length : 0}
+                      </div>
+                    </div>
+
+                    <div className="max-h-48 overflow-auto rounded-lg border border-gray-200 p-2 bg-white">
+                      {ticketTypeOptions.length ? (
+                        <div className="space-y-1">
+                          {ticketTypeOptions.map((tt) => {
+                            const id = String(tt.id);
+                            const label = getMultiLangValue(tt.name) || tt.name_primary || tt.id;
+                            const checked = Array.isArray(values.ticket_types)
+                              ? values.ticket_types.includes(id)
+                              : false;
+                            return (
+                              <label key={id} className="flex items-center gap-2 text-sm text-gray-700">
+                                <input
+                                  type="checkbox"
+                                  checked={checked}
+                                  onChange={(e) => {
+                                    const nextChecked = e.target.checked;
+                                    setValues((prev) => {
+                                      const curr = Array.isArray(prev.ticket_types) ? prev.ticket_types : [];
+                                      if (nextChecked) {
+                                        return { ...prev, ticket_types: Array.from(new Set([...curr, id])) };
+                                      }
+                                      return { ...prev, ticket_types: curr.filter((x) => x !== id) };
+                                    });
+                                  }}
+                                />
+                                <span className="min-w-0 truncate">{label}</span>
+                              </label>
+                            );
+                          })}
+                        </div>
+                      ) : (
+                        <div className="text-sm text-gray-500">Для события нет типов билетов</div>
+                      )}
                     </div>
                   </div>
-
-                  <div className="max-h-48 overflow-auto rounded-lg border border-gray-200 p-2 bg-white">
-                    {ticketTypeOptions.length ? (
-                      <div className="space-y-1">
-                        {ticketTypeOptions.map((tt) => {
-                          const id = String(tt.id);
-                          const label = getMultiLangValue(tt.name) || tt.name_primary || tt.id;
-                          const checked = Array.isArray(bulkForm.ticket_types)
-                            ? bulkForm.ticket_types.includes(id)
-                            : false;
-                          return (
-                            <label key={id} className="flex items-center gap-2 text-sm text-gray-700">
-                              <input
-                                type="checkbox"
-                                checked={checked}
-                                onChange={(e) => {
-                                  const nextChecked = e.target.checked;
-                                  setBulkForm((prev) => {
-                                    const curr = Array.isArray(prev.ticket_types) ? prev.ticket_types : [];
-                                    if (nextChecked) {
-                                      return { ...prev, ticket_types: Array.from(new Set([...curr, id])) };
-                                    }
-                                    return { ...prev, ticket_types: curr.filter((x) => x !== id) };
-                                  });
-                                }}
-                              />
-                              <span className="min-w-0 truncate">{label}</span>
-                            </label>
-                          );
-                        })}
-                      </div>
-                    ) : (
-                      <div className="text-sm text-gray-500">Для события нет типов билетов</div>
-                    )}
-                  </div>
-                </div>
-              )}
-            </Field>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-            <Field label="Мест">
-              <TextInput
-                type="number"
-                min={0}
-                value={bulkForm.available_seats ?? 0}
-                onChange={(e) => setBulkForm((prev) => ({ ...prev, available_seats: Number(e.target.value || 0) }))}
-              />
-            </Field>
-            <Field label="Закрытие брони (мин)">
-              <TextInput
-                type="number"
-                min={0}
-                value={bulkForm.booking_closes_minutes_before ?? 60}
-                onChange={(e) =>
-                  setBulkForm((prev) => ({ ...prev, booking_closes_minutes_before: Number(e.target.value || 0) }))
-                }
-              />
-            </Field>
-            <ActiveCheckboxField
-              checked={bulkForm.is_active}
-              onChange={(next) => setBulkForm((prev) => ({ ...prev, is_active: next }))}
-              text="Активны"
-            />
-          </div>
-
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={() => setBulkForm((prev) => ({ ...prev, mode: 'interval' }))}
-              className={`px-3 py-2 text-sm rounded-lg border ${bulkForm.mode === 'interval' ? 'bg-blue-50 border-blue-300 text-blue-700' : 'bg-white border-gray-300 text-gray-700'}`}
-            >
-              Интервал
-            </button>
-            <button
-              type="button"
-              onClick={() => setBulkForm((prev) => ({ ...prev, mode: 'list' }))}
-              className={`px-3 py-2 text-sm rounded-lg border ${bulkForm.mode === 'list' ? 'bg-blue-50 border-blue-300 text-blue-700' : 'bg-white border-gray-300 text-gray-700'}`}
-            >
-              Список дат
-            </button>
-            <button
-              type="button"
-              onClick={() => setBulkForm((prev) => ({ ...prev, mode: 'schedule' }))}
-              className={`px-3 py-2 text-sm rounded-lg border ${bulkForm.mode === 'schedule' ? 'bg-blue-50 border-blue-300 text-blue-700' : 'bg-white border-gray-300 text-gray-700'}`}
-            >
-              Дни + время
-            </button>
-          </div>
-
-          {bulkForm.mode === 'interval' ? (
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-              <Field label="Начало" required>
-                <TextInput
-                  type="datetime-local"
-                  value={bulkForm.start_datetime}
-                  onChange={(e) => setBulkForm((prev) => ({ ...prev, start_datetime: e.target.value }))}
-                  required
-                />
-              </Field>
-              <Field label="Конец" required>
-                <TextInput
-                  type="datetime-local"
-                  value={bulkForm.end_datetime}
-                  onChange={(e) => setBulkForm((prev) => ({ ...prev, end_datetime: e.target.value }))}
-                  required
-                />
-              </Field>
-              <Field label="Шаг (мин)" required>
-                <TextInput
-                  type="number"
-                  min={1}
-                  value={bulkForm.step_minutes}
-                  onChange={(e) => setBulkForm((prev) => ({ ...prev, step_minutes: Number(e.target.value || 0) }))}
-                  required
-                />
+                )}
               </Field>
             </div>
-          ) : bulkForm.mode === 'schedule' ? (
-            <div className="space-y-3">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                <Field label="Дата начала" required>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+              <Field label="Мест">
+                <TextInput
+                  type="number"
+                  min={0}
+                  value={values.available_seats ?? 0}
+                  onChange={(e) => setValues((prev) => ({ ...prev, available_seats: Number(e.target.value || 0) }))}
+                />
+              </Field>
+              <Field label="Закрытие брони (мин)">
+                <TextInput
+                  type="number"
+                  min={0}
+                  value={values.booking_closes_minutes_before ?? 60}
+                  onChange={(e) =>
+                    setValues((prev) => ({ ...prev, booking_closes_minutes_before: Number(e.target.value || 0) }))
+                  }
+                />
+              </Field>
+              <ActiveCheckboxField
+                checked={values.is_active}
+                onChange={(next) => setValues((prev) => ({ ...prev, is_active: next }))}
+                text="Активны"
+              />
+            </div>
+
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setValues((prev) => ({ ...prev, mode: 'interval' }))}
+                className={`px-3 py-2 text-sm rounded-lg border ${values.mode === 'interval' ? 'bg-blue-50 border-blue-300 text-blue-700' : 'bg-white border-gray-300 text-gray-700'}`}
+              >
+                Интервал
+              </button>
+              <button
+                type="button"
+                onClick={() => setValues((prev) => ({ ...prev, mode: 'list' }))}
+                className={`px-3 py-2 text-sm rounded-lg border ${values.mode === 'list' ? 'bg-blue-50 border-blue-300 text-blue-700' : 'bg-white border-gray-300 text-gray-700'}`}
+              >
+                Список дат
+              </button>
+              <button
+                type="button"
+                onClick={() => setValues((prev) => ({ ...prev, mode: 'schedule' }))}
+                className={`px-3 py-2 text-sm rounded-lg border ${values.mode === 'schedule' ? 'bg-blue-50 border-blue-300 text-blue-700' : 'bg-white border-gray-300 text-gray-700'}`}
+              >
+                Дни + время
+              </button>
+            </div>
+
+            {values.mode === 'interval' ? (
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                <Field label="Начало" required>
                   <TextInput
-                    type="date"
-                    value={bulkForm.schedule_start_date}
-                    onChange={(e) => setBulkForm((prev) => ({ ...prev, schedule_start_date: e.target.value }))}
+                    type="datetime-local"
+                    value={values.start_datetime}
+                    onChange={(e) => setValues((prev) => ({ ...prev, start_datetime: e.target.value }))}
                     required
                   />
                 </Field>
-                <Field label="Дата конца" required>
+                <Field label="Конец" required>
                   <TextInput
-                    type="date"
-                    value={bulkForm.schedule_end_date}
-                    onChange={(e) => setBulkForm((prev) => ({ ...prev, schedule_end_date: e.target.value }))}
+                    type="datetime-local"
+                    value={values.end_datetime}
+                    onChange={(e) => setValues((prev) => ({ ...prev, end_datetime: e.target.value }))}
+                    required
+                  />
+                </Field>
+                <Field label="Шаг (мин)" required>
+                  <TextInput
+                    type="number"
+                    min={1}
+                    value={values.step_minutes}
+                    onChange={(e) => setValues((prev) => ({ ...prev, step_minutes: Number(e.target.value || 0) }))}
                     required
                   />
                 </Field>
               </div>
-
-              <Field label="Дни недели">
-                <div className="flex flex-wrap gap-2">
-                  {[
-                    ['mon', 'Пн'],
-                    ['tue', 'Вт'],
-                    ['wed', 'Ср'],
-                    ['thu', 'Чт'],
-                    ['fri', 'Пт'],
-                    ['sat', 'Сб'],
-                    ['sun', 'Вс'],
-                  ].map(([k, label]) => (
-                    <label key={k} className="inline-flex items-center gap-2 text-sm text-gray-700">
-                      <input
-                        type="checkbox"
-                        checked={!!bulkForm.schedule_days?.[k]}
-                        onChange={(e) =>
-                          setBulkForm((prev) => ({
-                            ...prev,
-                            schedule_days: { ...(prev.schedule_days || {}), [k]: e.target.checked },
-                          }))
-                        }
-                      />
-                      {label}
-                    </label>
-                  ))}
+            ) : values.mode === 'schedule' ? (
+              <div className="space-y-3">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  <Field label="Дата начала" required>
+                    <TextInput
+                      type="date"
+                      value={values.schedule_start_date}
+                      onChange={(e) => setValues((prev) => ({ ...prev, schedule_start_date: e.target.value }))}
+                      required
+                    />
+                  </Field>
+                  <Field label="Дата конца" required>
+                    <TextInput
+                      type="date"
+                      value={values.schedule_end_date}
+                      onChange={(e) => setValues((prev) => ({ ...prev, schedule_end_date: e.target.value }))}
+                      required
+                    />
+                  </Field>
                 </div>
-              </Field>
 
-              <Field label="Времена (HH:mm, по строке)" required>
+                <Field label="Дни недели">
+                  <div className="flex flex-wrap gap-2">
+                    {[
+                      ['mon', 'Пн'],
+                      ['tue', 'Вт'],
+                      ['wed', 'Ср'],
+                      ['thu', 'Чт'],
+                      ['fri', 'Пт'],
+                      ['sat', 'Сб'],
+                      ['sun', 'Вс'],
+                    ].map(([k, label]) => (
+                      <label key={k} className="inline-flex items-center gap-2 text-sm text-gray-700">
+                        <input
+                          type="checkbox"
+                          checked={!!values.schedule_days?.[k]}
+                          onChange={(e) =>
+                            setValues((prev) => ({
+                              ...prev,
+                              schedule_days: { ...(prev.schedule_days || {}), [k]: e.target.checked },
+                            }))
+                          }
+                        />
+                        {label}
+                      </label>
+                    ))}
+                  </div>
+                </Field>
+
+                <Field label="Времена (HH:mm, по строке)" required>
+                  <textarea
+                    rows={5}
+                    value={values.schedule_times_text}
+                    onChange={(e) => setValues((prev) => ({ ...prev, schedule_times_text: e.target.value }))}
+                    placeholder={'Например:\n10:00\n12:30\n15:00'}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none font-mono"
+                    required
+                  />
+                </Field>
+              </div>
+            ) : (
+              <Field label="Даты/время (по одной строке)" required>
                 <textarea
-                  rows={5}
-                  value={bulkForm.schedule_times_text}
-                  onChange={(e) => setBulkForm((prev) => ({ ...prev, schedule_times_text: e.target.value }))}
-                  placeholder={'Например:\n10:00\n12:30\n15:00'}
+                  rows={6}
+                  value={values.datetimes_text}
+                  onChange={(e) => setValues((prev) => ({ ...prev, datetimes_text: e.target.value }))}
+                  placeholder={'Примеры:\n2026-05-10 10:00\n2026-05-10 12:00\n2026-05-11T09:30'}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none font-mono"
                   required
                 />
               </Field>
-            </div>
-          ) : (
-            <Field label="Даты/время (по одной строке)" required>
-              <textarea
-                rows={6}
-                value={bulkForm.datetimes_text}
-                onChange={(e) => setBulkForm((prev) => ({ ...prev, datetimes_text: e.target.value }))}
-                placeholder={'Примеры:\n2026-05-10 10:00\n2026-05-10 12:00\n2026-05-11T09:30'}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none font-mono"
-                required
-              />
-            </Field>
-          )}
+            )}
 
-          <div className="rounded-lg border border-gray-200 p-3 space-y-3">
-            <label className="inline-flex items-center gap-2 text-sm text-gray-800">
-              <input
-                type="checkbox"
-                checked={!!bulkForm.also_create_prices}
-                onChange={(e) => setBulkForm((prev) => ({ ...prev, also_create_prices: e.target.checked }))}
-              />
-              Автоматически создать цены для созданных слотов
-            </label>
-
-            {bulkForm.also_create_prices ? (
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                <Field label="Цена" required>
-                  <TextInput
-                    type="number"
-                    step="0.01"
-                    min="0"
-                    value={bulkForm.price_value}
-                    onChange={(e) => setBulkForm((prev) => ({ ...prev, price_value: e.target.value }))}
-                    placeholder="0.00"
-                    required
-                  />
-                </Field>
-                <Field label="Валюта" required>
-                  <TextInput
-                    value={bulkForm.price_currency}
-                    onChange={(e) => setBulkForm((prev) => ({ ...prev, price_currency: e.target.value }))}
-                    maxLength={3}
-                    required
-                  />
-                </Field>
-                <ActiveCheckboxField
-                  checked={bulkForm.price_is_active}
-                  onChange={(next) => setBulkForm((prev) => ({ ...prev, price_is_active: next }))}
-                  text="Цена активна"
+            <div className="rounded-lg border border-gray-200 p-3 space-y-3">
+              <label className="inline-flex items-center gap-2 text-sm text-gray-800">
+                <input
+                  type="checkbox"
+                  checked={!!values.also_create_prices}
+                  onChange={(e) => setValues((prev) => ({ ...prev, also_create_prices: e.target.checked }))}
                 />
-              </div>
-            ) : null}
-          </div>
+                Автоматически создать цены для созданных слотов
+              </label>
 
-          {bulkResult ? (
-            <div className="rounded-lg border border-gray-200 bg-gray-50 p-3 text-sm text-gray-700">
-              <div className="font-medium text-gray-800">Результат</div>
-              <div className="mt-1">
-                Создано: <span className="font-semibold">{bulkResult.created_count ?? 0}</span>, пропущено (уже было):{' '}
-                <span className="font-semibold">{bulkResult.skipped_existing ?? 0}</span>
-              </div>
-              {Array.isArray(bulkResult.errors) && bulkResult.errors.length ? (
-                <div className="mt-2 text-xs text-red-700">
-                  Ошибки: {bulkResult.errors.length} (первые показаны в ответе API)
+              {values.also_create_prices ? (
+                <div className="space-y-3">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setValues((prev) => ({ ...prev, price_mode: 'single' }))}
+                      className={`px-3 py-1.5 text-xs rounded-lg border ${
+                        (values.price_mode || 'single') === 'single'
+                          ? 'bg-blue-50 border-blue-300 text-blue-700'
+                          : 'bg-white border-gray-300 text-gray-700'
+                      }`}
+                    >
+                      Одна цена на все типы
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setValues((prev) => ({ ...prev, price_mode: 'per_type' }))}
+                      className={`px-3 py-1.5 text-xs rounded-lg border ${
+                        values.price_mode === 'per_type'
+                          ? 'bg-blue-50 border-blue-300 text-blue-700'
+                          : 'bg-white border-gray-300 text-gray-700'
+                      }`}
+                      disabled={!Array.isArray(values.ticket_types) || !values.ticket_types.length}
+                      title={
+                        Array.isArray(values.ticket_types) && values.ticket_types.length
+                          ? ''
+                          : 'Сначала выберите типы билетов'
+                      }
+                    >
+                      Разные цены по типам
+                    </button>
+                  </div>
+
+                  {values.price_mode === 'per_type' ? (
+                    <div className="rounded-lg border border-gray-200 p-2 bg-white space-y-2">
+                      {(Array.isArray(values.ticket_types) ? values.ticket_types : []).map((ttId) => {
+                        const label =
+                          getMultiLangValue(ticketTypeOptions.find((x) => String(x.id) === String(ttId))?.name) ||
+                          ticketTypeOptions.find((x) => String(x.id) === String(ttId))?.name_primary ||
+                          String(ttId);
+                        const v = values.price_by_ticket_type?.[ttId] ?? '';
+                        return (
+                          <div key={ttId} className="grid grid-cols-1 md:grid-cols-[1fr_140px] gap-2 items-center">
+                            <div className="text-sm text-gray-700 truncate" title={label}>
+                              {label}
+                            </div>
+                            <TextInput
+                              type="number"
+                              step="0.01"
+                              min="0"
+                              value={v}
+                              onChange={(e) =>
+                                setValues((prev) => ({
+                                  ...prev,
+                                  price_by_ticket_type: {
+                                    ...(prev.price_by_ticket_type || {}),
+                                    [ttId]: e.target.value,
+                                  },
+                                }))
+                              }
+                              placeholder="0.00"
+                              required
+                            />
+                          </div>
+                        );
+                      })}
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                      <Field label="Цена" required>
+                        <TextInput
+                          type="number"
+                          step="0.01"
+                          min="0"
+                          value={values.price_value}
+                          onChange={(e) => setValues((prev) => ({ ...prev, price_value: e.target.value }))}
+                          placeholder="0.00"
+                          required
+                        />
+                      </Field>
+                      <Field label="Валюта" required>
+                        <TextInput
+                          value={values.price_currency}
+                          onChange={(e) => setValues((prev) => ({ ...prev, price_currency: e.target.value }))}
+                          maxLength={3}
+                          required
+                        />
+                      </Field>
+                      <ActiveCheckboxField
+                        checked={values.price_is_active}
+                        onChange={(next) => setValues((prev) => ({ ...prev, price_is_active: next }))}
+                        text="Цена активна"
+                      />
+                    </div>
+                  )}
+
+                  {values.price_mode === 'per_type' ? (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                      <Field label="Валюта" required>
+                        <TextInput
+                          value={values.price_currency}
+                          onChange={(e) => setValues((prev) => ({ ...prev, price_currency: e.target.value }))}
+                          maxLength={3}
+                          required
+                        />
+                      </Field>
+                      <ActiveCheckboxField
+                        checked={values.price_is_active}
+                        onChange={(next) => setValues((prev) => ({ ...prev, price_is_active: next }))}
+                        text="Цена активна"
+                      />
+                    </div>
+                  ) : null}
                 </div>
               ) : null}
             </div>
-          ) : null}
-
-          <FormActions
-            saving={bulkSaving}
-            saveLabel="Создать слоты"
-            onCancel={() => setBulkOpen(false)}
-          />
-        </form>
-      </Modal>
+          </>
+        )}
+        renderResult={({ result }) =>
+          result ? (
+            <div className="rounded-lg border border-gray-200 bg-gray-50 p-3 text-sm text-gray-700">
+              <div className="font-medium text-gray-800">Результат</div>
+              <div className="mt-1">
+                Создано: <span className="font-semibold">{result.created_count ?? 0}</span>, пропущено (уже было):{' '}
+                <span className="font-semibold">{result.skipped_existing ?? 0}</span>
+              </div>
+              {Array.isArray(result.errors) && result.errors.length ? (
+                <div className="mt-2 text-xs text-red-700">
+                  Ошибки: {result.errors.length} (первые показаны в ответе API)
+                </div>
+              ) : null}
+            </div>
+          ) : null
+        }
+      />
     </Layout>
   );
 }
