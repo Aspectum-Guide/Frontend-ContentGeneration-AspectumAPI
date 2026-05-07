@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { aiAPI, attractionsAPI, cityFiltersAPI, imagesAPI, sessionsAPI } from '../../../api/generation';
+import { aiAPI, attractionsAPI, cityFiltersAPI, citiesAPI, imagesAPI, sessionsAPI } from '../../../api/generation';
 import { useLayoutActions } from '../../../context/useLayoutActions';
 import { trackEvent } from '../../../utils/analytics';
 import { parseApiError } from '../../../utils/apiError';
@@ -67,7 +67,7 @@ const normalizeAttraction = (attr = {}) => {
     lon: attr.lon ?? null,
 
     index,
-    order: index, // legacy compatibility
+    order: index,
     rank: Number(attr.rank ?? 0),
 
     city: cityId,
@@ -79,9 +79,32 @@ const normalizeAttraction = (attr = {}) => {
     assigned_city_type: assignedCityType,
     assigned_city_name: attr.assigned_city_name ?? null,
 
-    image_id: attr.image_id ?? attr.image ?? null,
-    image_url: attr.image_url ?? null,
-    image_copyright: attr.image_copyright ?? null,
+    image_id: attr.image_id ?? attr.image?.id ?? attr.image ?? null,
+
+    image_url:
+      attr.image_url ??
+      attr.imageUrl ??
+      attr.localUrl ??
+      attr.local_url ??
+      attr.image?.url ??
+      attr.image?.file ??
+      null,
+
+    image_original_url:
+      attr.image_original_url ??
+      attr.imageOriginalUrl ??
+      attr.original_image_url ??
+      attr.originalImageUrl ??
+      attr.image?.original_url ??
+      attr.image?.source_url ??
+      null,
+
+    image_copyright:
+      attr.image_copyright ??
+      attr.imageCopyright ??
+      attr.copyright ??
+      attr.image?.copyright ??
+      null,
 
     contents: attr.contents ?? {},
   };
@@ -117,6 +140,8 @@ const buildAttractionPayload = (attr, name, description) => {
     session_city: sessionCity,
 
     image_id: attr.image_id ?? null,
+    image_original_url: attr.image_original_url ?? attr.imageOriginalUrl ?? '',
+    image_copyright: attr.image_copyright ?? attr.imageCopyright ?? '',
 
     // legacy compatibility
     order: index,
@@ -170,6 +195,21 @@ function getAttrName(attr) {
   return name.ru || name.en || name.it || Object.values(name).find(Boolean) || '(без названия)';
 }
 
+function extractReferenceCities(data) {
+  if (Array.isArray(data)) return data;
+
+  if (Array.isArray(data?.cities)) return data.cities;
+  if (Array.isArray(data?.results)) return data.results;
+  if (Array.isArray(data?.items)) return data.items;
+  if (Array.isArray(data?.data)) return data.data;
+
+  if (Array.isArray(data?.data?.cities)) return data.data.cities;
+  if (Array.isArray(data?.data?.results)) return data.data.results;
+  if (Array.isArray(data?.data?.items)) return data.data.items;
+
+  return [];
+}
+
 export function useSessionWizardController({ sessionId, confirm: confirmProp } = {}) {
   const { setMobileActions } = useLayoutActions();
   const navigate = useNavigate();
@@ -189,6 +229,7 @@ export function useSessionWizardController({ sessionId, confirm: confirmProp } =
   const [loading, setLoading] = useState(true);
   const [cityDrafts, setCityDrafts] = useState([]);
   const [activeCityDraftId, setActiveCityDraftId] = useState(null);
+  const [referenceCities, setReferenceCities] = useState([]);
   const activeCityDraftIdRef = useRef(null);
   const requestedCityDraftIdRef = useRef(null);
 
@@ -288,15 +329,33 @@ export function useSessionWizardController({ sessionId, confirm: confirmProp } =
 
     const latVal = city.lat != null ? String(city.lat) : '';
     const lonVal = city.lon != null ? String(city.lon) : '';
+
     setLat(latVal);
     setLon(lonVal);
+
     if (city.lat != null) setSavedLat(city.lat);
     if (city.lon != null) setSavedLon(city.lon);
 
     setCityTags(Array.isArray(city.tags) ? city.tags.slice() : []);
+
     setImagePreview(city.image_url || '');
     setImageId(city.image_id || null);
-    setImageCopyright(city.image_copyright || '');
+
+    setImageOriginalUrl(
+      city.image_original_url ||
+      city.original_image_url ||
+      city.source_url ||
+      city.image?.original_image_url ||
+      city.image?.source_url ||
+      city.image?.file_page_url ||
+      ''
+    );
+
+    setImageCopyright(
+      city.image_copyright ||
+      city.image?.copyright ||
+      ''
+    );
 
     const nameObj = city.name || {};
     const descObj = city.description || {};
@@ -312,20 +371,33 @@ export function useSessionWizardController({ sessionId, confirm: confirmProp } =
       const lang = (rawKey.includes('-') ? rawKey.split('-')[0] : rawKey).toLowerCase().substring(0, 2);
       const info = getLocaleInfo(lang);
       const key = `${lang}-${info.code}`;
+
       if (!newLocale[key]) {
-        newLocale[key] = { code: info.code, lang, langName: info.name, isDefault: false, name: '', description: '', country: '' };
+        newLocale[key] = {
+          code: info.code,
+          lang,
+          langName: info.name,
+          isDefault: false,
+          name: '',
+          description: '',
+          country: '',
+        };
       }
+
       const resolve = (obj) => {
         const value = obj[key] ?? obj[lang] ?? obj[rawKey] ?? '';
         return typeof value === 'string' ? value : (value?.text || '');
       };
+
       newLocale[key].name = resolve(nameObj);
       newLocale[key].description = resolve(descObj);
       newLocale[key].country = resolve(countryObj);
     });
 
     setLocaleData(newLocale);
+
     const pref = newLocale['ru-RU'] ? 'ru-RU' : Object.keys(newLocale)[0] || 'ru-RU';
+
     setDefaultLocale(pref);
     setActiveLocale(pref);
   }, []);
@@ -464,6 +536,26 @@ export function useSessionWizardController({ sessionId, confirm: confirmProp } =
           : Array.isArray(data) ? data : [];
       setAvailableTags(tags);
     }).catch(() => { });
+  }, []);
+
+  useEffect(() => {
+    citiesAPI.list({ page_size: 1000, limit: 1000 })
+      .then((res) => {
+        const cities = extractReferenceCities(res?.data);
+        setReferenceCities(cities);
+
+        if (import.meta.env.DEV) {
+          console.log('🏙️ Reference cities loaded:', {
+            raw: res?.data,
+            count: cities.length,
+            cities,
+          });
+        }
+      })
+      .catch((err) => {
+        console.error('Не удалось загрузить города из базы:', err);
+        setReferenceCities([]);
+      });
   }, []);
 
   const loadAttractions = useCallback(async () => {
@@ -746,9 +838,63 @@ export function useSessionWizardController({ sessionId, confirm: confirmProp } =
 
   const openAttrDetail = useCallback(async (attrId) => {
     try {
+      const cachedAttr = attractions.find((item) => String(item.id) === String(attrId));
+
       const res = await attractionsAPI.get(sessionId, attrId);
-      const attr = res?.data?.attraction || attractions.find((item) => item.id === attrId);
-      if (!attr) return;
+      const responseAttr = res?.data?.attraction || res?.data || null;
+
+      if (!responseAttr && !cachedAttr) return;
+
+      const mergedAttr = {
+        ...(cachedAttr || {}),
+        ...(responseAttr || {}),
+
+        image_id:
+          responseAttr?.image_id ??
+          responseAttr?.image?.id ??
+          cachedAttr?.image_id ??
+          cachedAttr?.image?.id ??
+          null,
+
+        image_url:
+          responseAttr?.image_url ??
+          responseAttr?.image?.url ??
+          responseAttr?.image?.file ??
+          cachedAttr?.image_url ??
+          cachedAttr?.imagePreview ??
+          cachedAttr?.image?.url ??
+          cachedAttr?.image?.file ??
+          null,
+
+        image_original_url:
+          responseAttr?.image_original_url ??
+          responseAttr?.imageOriginalUrl ??
+          responseAttr?.original_image_url ??
+          responseAttr?.originalImageUrl ??
+          cachedAttr?.image_original_url ??
+          cachedAttr?.imageOriginalUrl ??
+          cachedAttr?.original_image_url ??
+          cachedAttr?.originalImageUrl ??
+          '',
+
+        image_copyright:
+          responseAttr?.image_copyright ??
+          responseAttr?.imageCopyright ??
+          responseAttr?.copyright ??
+          responseAttr?.image?.copyright ??
+          cachedAttr?.image_copyright ??
+          cachedAttr?.imageCopyright ??
+          cachedAttr?.copyright ??
+          cachedAttr?.image?.copyright ??
+          '',
+      };
+
+      const attr = normalizeAttraction(mergedAttr);
+
+      setAttractions((items) =>
+        items.map((item) => (String(item.id) === String(attr.id) ? attr : item))
+      );
+
       setCurrentAttr(attr);
       setAttrLocaleData(buildAttrLocaleData(attr));
       setAttrActiveLocale('ru-RU');
@@ -757,6 +903,23 @@ export function useSessionWizardController({ sessionId, confirm: confirmProp } =
       showNote('Не удалось открыть достопримечательность: ' + e.message, 'error');
     }
   }, [sessionId, attractions, buildAttrLocaleData, showNote]);
+
+  const updateCurrentAttrPatch = useCallback((patch) => {
+    setCurrentAttr((prev) => {
+      if (!prev) return prev;
+
+      const next = normalizeAttraction({
+        ...prev,
+        ...patch,
+      });
+
+      setAttractions((items) =>
+        items.map((item) => (item.id === next.id ? next : item))
+      );
+
+      return next;
+    });
+  }, []);
 
   const addAttraction = useCallback(async () => {
     try {
@@ -812,11 +975,43 @@ export function useSessionWizardController({ sessionId, confirm: confirmProp } =
         currentAttr.id,
         buildAttractionPayload(currentAttr, name, description)
       );
+      
+      const responseAttr = updated?.data?.attraction || updated?.data || {};
 
-      const updatedAttr = normalizeAttraction(updated?.data?.attraction || updated?.data || {
+      const updatedAttr = normalizeAttraction({
         ...currentAttr,
-        name,
-        description,
+        ...responseAttr,
+
+        name: responseAttr.name ?? name,
+        description: responseAttr.description ?? description,
+
+        image_id:
+          responseAttr.image_id ??
+          responseAttr.image?.id ??
+          currentAttr.image_id ??
+          null,
+
+        image_url:
+          responseAttr.image_url ??
+          responseAttr.image?.url ??
+          responseAttr.image?.file ??
+          currentAttr.image_url ??
+          currentAttr.imagePreview ??
+          null,
+
+        image_original_url:
+          responseAttr.image_original_url ??
+          responseAttr.imageOriginalUrl ??
+          currentAttr.image_original_url ??
+          currentAttr.imageOriginalUrl ??
+          '',
+
+        image_copyright:
+          responseAttr.image_copyright ??
+          responseAttr.imageCopyright ??
+          currentAttr.image_copyright ??
+          currentAttr.imageCopyright ??
+          '',
       });
 
 
@@ -996,7 +1191,7 @@ export function useSessionWizardController({ sessionId, confirm: confirmProp } =
   return {
     note, showNote,
     session, loading,
-    cityDrafts, activeCityDraftId,
+    cityDrafts, activeCityDraftId, referenceCities,
     currentStep, setCurrentStep,
     localeData, activeLocale, defaultLocale, setDefaultLocale, addLocaleOpen, setAddLocaleOpen, newLocaleCode, setNewLocaleCode, newLocaleLang, setNewLocaleLang,
     lat, lon, savedLat, savedLon, setLat, setLon, setSavedLat, setSavedLon,
@@ -1014,8 +1209,7 @@ export function useSessionWizardController({ sessionId, confirm: confirmProp } =
     handleSelectDraft, handleCreateDraft, handleDeleteDraft,
     handlePhotoFile, handleCommonsImageSelect, getSessionUuid,
     addTag, removeTag, handleTagKeyDown, handleTagBlur,
-    openAttrDetail, addAttraction, deleteCurrentAttr, saveCurrentAttr, updateAttrLocaleField,
-    startAiContent, saveAiContent,
+    openAttrDetail, addAttraction, deleteCurrentAttr, saveCurrentAttr, updateAttrLocaleField, updateCurrentAttrPatch,    startAiContent, saveAiContent,
     handleClose, handlePublish, handleTranslateSession,
     TOTAL_STEPS,
   };
