@@ -38,10 +38,25 @@ const getAttractionDisplayName = (attraction) => {
     );
   }
 
+  if (typeof attraction.title === 'string') {
+    return attraction.title || 'Без названия';
+  }
+
+  if (attraction.title && typeof attraction.title === 'object') {
+    return (
+      attraction.title.ru ||
+      attraction.title.en ||
+      attraction.title.it ||
+      Object.values(attraction.title).find(Boolean) ||
+      attraction.id ||
+      'Без названия'
+    );
+  }
+
   return (
     attraction.display_name ||
-    attraction.title ||
     attraction.name_ru ||
+    attraction.title_ru ||
     attraction.id ||
     'Без названия'
   );
@@ -68,7 +83,12 @@ const getAttractionInfoName = (info) => {
 };
 
 const getDatabaseAttractionId = (info) => {
-  return normalizeId(info?.attraction_id ?? info?.attraction);
+  return normalizeId(
+    info?.event_id ??
+      info?.event ??
+      info?.attraction_id ??
+      info?.attraction
+  );
 };
 
 const getSessionAttractionId = (info) => {
@@ -89,9 +109,11 @@ const getAttractionInfoBindingLabel = (
 
   if (assignedAttractionType === 'database') {
     const attractionFromInfo =
-      info?.attraction && typeof info.attraction === 'object'
-        ? info.attraction
-        : null;
+      info?.event && typeof info.event === 'object'
+        ? info.event
+        : info?.attraction && typeof info.attraction === 'object'
+          ? info.attraction
+          : null;
 
     const attractionId = getDatabaseAttractionId(info);
 
@@ -192,10 +214,7 @@ export default function SessionWizardAttractionInfoStep({
   attractionInfoActiveLocale = 'ru-RU',
   attractionInfoSaving = false,
 
-  // Достопримечательности из базы
   referenceAttractions = [],
-
-  // Достопримечательности из текущей сессии
   attractions = [],
 
   onOpenAttractionInfoDetail,
@@ -397,6 +416,9 @@ export default function SessionWizardAttractionInfoStep({
                 updatePatch({
                   assigned_attraction_type: type,
 
+                  event: null,
+                  event_id: null,
+
                   attraction: null,
                   attraction_id: null,
 
@@ -425,6 +447,9 @@ export default function SessionWizardAttractionInfoStep({
 
                   updatePatch({
                     assigned_attraction_type: 'database',
+
+                    event: attractionId,
+                    event_id: attractionId,
 
                     attraction: attractionId,
                     attraction_id: attractionId,
@@ -468,6 +493,9 @@ export default function SessionWizardAttractionInfoStep({
 
                     session_attraction: attractionId,
                     session_attraction_id: attractionId,
+
+                    event: null,
+                    event_id: null,
 
                     attraction: null,
                     attraction_id: null,

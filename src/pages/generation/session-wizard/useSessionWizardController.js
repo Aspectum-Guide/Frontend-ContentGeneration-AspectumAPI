@@ -1383,8 +1383,25 @@ export function useSessionWizardController({ sessionId, confirm: confirmProp } =
   const saveCurrentAttractionInfo = useCallback(async () => {
     if (!currentAttractionInfo) return;
 
-    if (!(currentAttractionInfo.attraction_id || currentAttractionInfo.attraction)) {
-      showNote('Выберите достопримечательность', 'error');
+    const assignedType = currentAttractionInfo.assigned_attraction_type || 'none';
+
+    const selectedDatabaseAttraction =
+      currentAttractionInfo.event_id ||
+      currentAttractionInfo.event ||
+      currentAttractionInfo.attraction_id ||
+      currentAttractionInfo.attraction;
+
+    const selectedSessionAttraction =
+      currentAttractionInfo.session_attraction_id ||
+      currentAttractionInfo.session_attraction;
+
+    if (assignedType === 'database' && !selectedDatabaseAttraction) {
+      showNote('Выберите достопримечательность из базы', 'error');
+      return;
+    }
+
+    if (assignedType === 'draft' && !selectedSessionAttraction) {
+      showNote('Выберите достопримечательность из сессии', 'error');
       return;
     }
 
