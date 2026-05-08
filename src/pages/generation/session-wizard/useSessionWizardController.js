@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { aiAPI, attractionsAPI, attractionInfosAPI, referenceAttractionsAPI, cityInfosAPI, cityFiltersAPI, citiesAPI, imagesAPI, sessionsAPI } from '../../../api/generation';
+import { aiAPI, attractionsAPI, attractionInfosAPI, cityInfosAPI, cityFiltersAPI, citiesAPI, imagesAPI, sessionsAPI, eventsAPI } from '../../../api/generation';
 import { useLayoutActions } from '../../../context/useLayoutActions';
 import { trackEvent } from '../../../utils/analytics';
 import { parseApiError } from '../../../utils/apiError';
@@ -804,7 +804,7 @@ export function useSessionWizardController({ sessionId, confirm: confirmProp } =
   }, []);
 
   useEffect(() => {
-    referenceAttractionsAPI.list(sessionId)
+    eventsAPI.list({ page_size: 1000, limit: 1000 })
       .then((res) => {
         const data = res?.data;
 
@@ -812,14 +812,16 @@ export function useSessionWizardController({ sessionId, confirm: confirmProp } =
           ? data.data
           : Array.isArray(data?.results)
             ? data.results
-            : Array.isArray(data)
-              ? data
-              : [];
+            : Array.isArray(data?.items)
+              ? data.items
+              : Array.isArray(data)
+                ? data
+                : [];
 
         setReferenceAttractions(items);
 
         if (import.meta.env.DEV) {
-          console.log('🏛️ Reference attractions loaded:', {
+          console.log('🏛️ Reference attractions loaded from EventsAPI:', {
             raw: data,
             count: items.length,
             items,

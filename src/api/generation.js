@@ -66,12 +66,6 @@ export const attractionInfosAPI = {
     ),
 };
 
-// ─── Attractions reference ──────────────────────────────────────────────────
-export const referenceAttractionsAPI = {
-  list: (sessionId) =>
-    apiClient.get(`${BASE}/sessions/${sessionId}/reference-attractions/`),
-};
-
 // ─── City Useful Info ────────────────────────────────────────────────────────
 export const cityInfosAPI = {
   list: (sessionId) =>
