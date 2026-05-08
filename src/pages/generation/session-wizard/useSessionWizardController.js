@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { aiAPI, attractionsAPI, attractionInfosAPI, cityInfosAPI, cityFiltersAPI, citiesAPI, imagesAPI, sessionsAPI, eventsAPI } from '../../../api/generation';
+import { aiAPI, attractionsAPI, attractionInfosAPI, referenceAttractionsAPI, cityInfosAPI, cityFiltersAPI, citiesAPI, imagesAPI, sessionsAPI, eventsAPI } from '../../../api/generation';
 import { useLayoutActions } from '../../../context/useLayoutActions';
 import { trackEvent } from '../../../utils/analytics';
 import { parseApiError } from '../../../utils/apiError';
@@ -73,14 +73,22 @@ const normalizeCityInfo = (info = {}) => {
 };
 
 const normalizeAttractionInfo = (info = {}) => {
-  const attractionId = info.attraction_id ?? info.attraction ?? null;
+  const eventId =
+    info.event_id ??
+    info.event ??
+    info.attraction_id ??
+    info.attraction ??
+    null;
+
   const sessionAttractionId =
-    info.session_attraction_id ?? info.session_attraction ?? null;
+    info.session_attraction_id ??
+    info.session_attraction ??
+    null;
 
   let assignedAttractionType = info.assigned_attraction_type ?? 'none';
 
   if (!info.assigned_attraction_type) {
-    if (attractionId) {
+    if (eventId) {
       assignedAttractionType = 'database';
     } else if (sessionAttractionId) {
       assignedAttractionType = 'draft';
@@ -92,11 +100,15 @@ const normalizeAttractionInfo = (info = {}) => {
 
     id: info.id ?? null,
 
-    name: info.name ?? info.title ?? {},
+    name: info.name ?? {},
     description: info.description ?? {},
 
-    attraction: attractionId,
-    attraction_id: attractionId,
+    event: eventId,
+    event_id: eventId,
+
+    // legacy aliases для UI, если где-то ещё используется attraction
+    attraction: eventId,
+    attraction_id: eventId,
 
     session_attraction: sessionAttractionId,
     session_attraction_id: sessionAttractionId,
@@ -203,16 +215,23 @@ const buildCityInfoPayload = (info, name, description) => {
 const buildAttractionInfoPayload = (info, name, description) => {
   const assignedType = info.assigned_attraction_type ?? 'none';
 
-  let attraction = null;
+  let event = null;
   let sessionAttraction = null;
 
   if (assignedType === 'database') {
-    attraction = info.attraction_id ?? info.attraction ?? null;
+    event =
+      info.event_id ??
+      info.event ??
+      info.attraction_id ??
+      info.attraction ??
+      null;
   }
 
   if (assignedType === 'draft') {
     sessionAttraction =
-      info.session_attraction_id ?? info.session_attraction ?? null;
+      info.session_attraction_id ??
+      info.session_attraction ??
+      null;
   }
 
   return {
@@ -221,8 +240,12 @@ const buildAttractionInfoPayload = (info, name, description) => {
 
     assigned_attraction_type: assignedType,
 
-    attraction,
-    attraction_id: attraction,
+    event,
+    event_id: event,
+
+    // legacy aliases, можно оставить для совместимости
+    attraction: event,
+    attraction_id: event,
 
     session_attraction: sessionAttraction,
     session_attraction_id: sessionAttraction,
@@ -804,24 +827,24 @@ export function useSessionWizardController({ sessionId, confirm: confirmProp } =
   }, []);
 
   useEffect(() => {
-    eventsAPI.list({ page_size: 1000, limit: 1000 })
+    referenceAttractionsAPI.list({ page_size: 1000, limit: 1000 })
       .then((res) => {
         const data = res?.data;
 
-        const items = Array.isArray(data?.data)
-          ? data.data
+        const items = Array.isArray(data)
+          ? data
           : Array.isArray(data?.results)
             ? data.results
-            : Array.isArray(data?.items)
-              ? data.items
-              : Array.isArray(data)
-                ? data
+            : Array.isArray(data?.data)
+              ? data.data
+              : Array.isArray(data?.items)
+                ? data.items
                 : [];
 
         setReferenceAttractions(items);
 
         if (import.meta.env.DEV) {
-          console.log('🏛️ Reference attractions loaded from EventsAPI:', {
+          console.log('🏛️ EventsAPI attractions loaded:', {
             raw: data,
             count: items.length,
             items,
@@ -829,7 +852,7 @@ export function useSessionWizardController({ sessionId, confirm: confirmProp } =
         }
       })
       .catch((err) => {
-        console.error('Не удалось загрузить достопримечательности из базы:', err);
+        console.error('Не удалось загрузить достопримечательности из EventsAPI:', err);
         setReferenceAttractions([]);
       });
   }, []);
@@ -1383,24 +1406,26 @@ export function useSessionWizardController({ sessionId, confirm: confirmProp } =
   const saveCurrentAttractionInfo = useCallback(async () => {
     if (!currentAttractionInfo) return;
 
-    const assignedType = currentAttractionInfo.assigned_attraction_type || 'none';
+    const assignedType = currentAttractionInfo.assigned_attraction_type ?? 'none';
 
-    const selectedDatabaseAttraction =
-      currentAttractionInfo.event_id ||
-      currentAttractionInfo.event ||
-      currentAttractionInfo.attraction_id ||
-      currentAttractionInfo.attraction;
+    const eventId =
+      currentAttractionInfo.event_id ??
+      currentAttractionInfo.event ??
+      currentAttractionInfo.attraction_id ??
+      currentAttractionInfo.attraction ??
+      null;
 
-    const selectedSessionAttraction =
-      currentAttractionInfo.session_attraction_id ||
-      currentAttractionInfo.session_attraction;
+    const sessionAttractionId =
+      currentAttractionInfo.session_attraction_id ??
+      currentAttractionInfo.session_attraction ??
+      null;
 
-    if (assignedType === 'database' && !selectedDatabaseAttraction) {
+    if (assignedType === 'database' && !eventId) {
       showNote('Выберите достопримечательность из базы', 'error');
       return;
     }
 
-    if (assignedType === 'draft' && !selectedSessionAttraction) {
+    if (assignedType === 'draft' && !sessionAttractionId) {
       showNote('Выберите достопримечательность из сессии', 'error');
       return;
     }

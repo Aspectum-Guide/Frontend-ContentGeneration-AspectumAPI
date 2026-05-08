@@ -66,6 +66,11 @@ export const attractionInfosAPI = {
     ),
 };
 
+// ─── EventsAPI / published attractions ───────────────────────────────────────
+export const referenceAttractionsAPI = {
+  list: (params = {}) => apiClient.get('/events/', { params }),
+};
+
 // ─── City Useful Info ────────────────────────────────────────────────────────
 export const cityInfosAPI = {
   list: (sessionId) =>
