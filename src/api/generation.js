@@ -45,6 +45,51 @@ export const attractionsAPI = {
     apiClient.post(`${BASE}/sessions/${sessionId}/attractions/${attrId}/content/`, data),
 };
 
+// ─── Attraction Useful Info ─────────────────────────────────────────────────
+export const attractionInfosAPI = {
+  create: (sessionId, data) =>
+    apiClient.post(`${BASE}/sessions/${sessionId}/attraction-info/`, data),
+
+  get: (sessionId, attractionInfoId) =>
+    apiClient.get(`${BASE}/sessions/${sessionId}/attraction-info/${attractionInfoId}/`),
+
+  update: (sessionId, attractionInfoId, data) =>
+    apiClient.post(
+      `${BASE}/sessions/${sessionId}/attraction-info/${attractionInfoId}/update/`,
+      data
+    ),
+
+  delete: (sessionId, attractionInfoId) =>
+    apiClient.post(
+      `${BASE}/sessions/${sessionId}/attraction-info/${attractionInfoId}/delete/`,
+      {}
+    ),
+};
+
+// ─── Attractions reference ──────────────────────────────────────────────────
+export const referenceAttractionsAPI = {
+  list: (sessionId) =>
+    apiClient.get(`${BASE}/sessions/${sessionId}/reference-attractions/`),
+};
+
+// ─── City Useful Info ────────────────────────────────────────────────────────
+export const cityInfosAPI = {
+  list: (sessionId) =>
+    apiClient.get(`${BASE}/sessions/${sessionId}/city-info/`),
+
+  create: (sessionId, data) =>
+    apiClient.post(`${BASE}/sessions/${sessionId}/city-info/`, data),
+
+  get: (sessionId, cityInfoId) =>
+    apiClient.get(`${BASE}/sessions/${sessionId}/city-info/${cityInfoId}/`),
+
+  update: (sessionId, cityInfoId, data) =>
+    apiClient.post(`${BASE}/sessions/${sessionId}/city-info/${cityInfoId}/update/`, data),
+
+  delete: (sessionId, cityInfoId) =>
+    apiClient.post(`${BASE}/sessions/${sessionId}/city-info/${cityInfoId}/delete/`, {}),
+};
+
 // ─── Cities (reference) ───────────────────────────────────────────────────────
 export const citiesAPI = {
   get: (cityId) => apiClient.get(`${BASE}/cities/${cityId}/`),

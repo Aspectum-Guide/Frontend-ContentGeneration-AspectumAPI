@@ -25,7 +25,7 @@ export default function SessionWizardPublishStep({
         <div className="flex justify-between"><span className="text-gray-500">Теги:</span><span className="font-medium">{cityTags.length > 0 ? cityTags.join(', ') : '—'}</span></div>
       </div>
       <div className="flex justify-between pt-2">
-        <button onClick={() => onGoToStep(4)} className="px-4 py-2 text-sm text-gray-600 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors">
+        <button onClick={() => onGoToStep(6)} className="px-4 py-2 text-sm text-gray-600 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors">
           ← Назад
         </button>
         <div className="flex items-center gap-2">

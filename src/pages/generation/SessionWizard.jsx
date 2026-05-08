@@ -8,6 +8,8 @@ import SessionWizardCityStep from './session-wizard/SessionWizardCityStep';
 import SessionWizardContentStep from './session-wizard/SessionWizardContentStep';
 import SessionWizardPublishStep from './session-wizard/SessionWizardPublishStep';
 import SessionWizardTagsStep from './session-wizard/SessionWizardTagsStep';
+import SessionWizardCityInfoStep from './session-wizard/SessionWizardCityInfoStep';
+import SessionWizardAttractionInfoStep from './session-wizard/SessionWizardAttractionInfoStep';
 import {
   StatusBadge as DefaultStatusBadge,
   getAttrName,
@@ -19,7 +21,7 @@ import { ConfirmModal as DefaultConfirmModal } from '../../components/ui/Modal.j
 import { useConfirmModal } from '../../components/ui/useConfirmModal.jsx';
 import DefaultSessionCloseDialog from '../../components/generation/SessionCloseDialog.jsx';
 
-const STEP_LABELS = ['Город', 'Теги', 'Достопримечательности', 'Контент', 'Публикация'];
+const STEP_LABELS = ['Город', 'Полезная информация о городе', 'Теги', 'Достопримечательности', 'Полезная информация о достопримечательности', 'Контент', 'Публикация'];
 
 export default function SessionWizard({ components = {} } = {}) {
   const StatusBadge = components.StatusBadge ?? DefaultStatusBadge;
@@ -45,6 +47,7 @@ export default function SessionWizard({ components = {} } = {}) {
     cityDrafts,
     activeCityDraftId,
     referenceCities,
+    referenceAttractions,
     currentStep,
 
     localeData,
@@ -79,13 +82,23 @@ export default function SessionWizard({ components = {} } = {}) {
     tagInput,
     setTagInput,
     availableTags,
-
+    cityInfos,
+    currentCityInfo,
+    cityInfoLocaleData,
+    cityInfoActiveLocale,
+    cityInfoSaving,
     attractions,
     attrView,
     currentAttr,
     attrLocaleData,
     attrActiveLocale,
     attrSaving,
+
+    attractionInfos,
+    currentAttractionInfo,
+    attractionInfoLocaleData,
+    attractionInfoActiveLocale,
+    attractionInfoSaving,
 
     aiGenAttrId,
     aiGenLang,
@@ -129,6 +142,15 @@ export default function SessionWizard({ components = {} } = {}) {
     handleTagKeyDown,
     handleTagBlur,
 
+    setCurrentCityInfo,
+    setCityInfoActiveLocale,
+    openCityInfoDetail,
+    addCityInfo,
+    updateCurrentCityInfoPatch,
+    updateCityInfoLocaleField,
+    saveCurrentCityInfo,
+    deleteCurrentCityInfo,
+
     openAttrDetail,
     addAttraction,
     deleteCurrentAttr,
@@ -136,6 +158,15 @@ export default function SessionWizard({ components = {} } = {}) {
     saveCityForStep1,
     updateAttrLocaleField,
     updateCurrentAttrPatch,
+
+    setCurrentAttractionInfo,
+    setAttractionInfoActiveLocale,
+    openAttractionInfoDetail,
+    addAttractionInfo,
+    updateCurrentAttractionInfoPatch,
+    updateAttractionInfoLocaleField,
+    saveCurrentAttractionInfo,
+    deleteCurrentAttractionInfo,
 
     startAiContent,
     saveAiContent,
@@ -153,7 +184,6 @@ export default function SessionWizard({ components = {} } = {}) {
     type: 'city',
     attractionId: null,
   });
-
   const commonsAttraction =
     commonsTarget.type === 'attraction'
       ? attractions.find((attr) => String(attr.id) === String(commonsTarget.attractionId)) ||
@@ -307,19 +337,32 @@ export default function SessionWizard({ components = {} } = {}) {
 
           <button
             type="button"
+            
             onClick={() => {
-              if (currentStep === 1 || currentStep === 2) {
+              if (currentStep === 1 || currentStep === 3) {
                 void saveCityForStep1?.().catch(() => {});
                 return;
               }
 
-              void saveCurrentAttr?.();
+              if (currentStep === 2) {
+                void saveCurrentCityInfo?.();
+                return;
+              }
+
+              if (currentStep === 4) {
+                void saveCurrentAttr?.();
+              }
+
+              if (currentStep === 5) {
+                void saveCurrentAttractionInfo?.();
+              }
             }}
-            disabled={saving || attrSaving}
+            disabled={saving || cityInfoSaving || attrSaving || attractionInfoSaving}
+
             title="Сохранить текущие данные"
             className="px-3 py-1.5 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors"
           >
-            {saving || attrSaving ? 'Сохранение...' : 'Сохранить'}
+            {saving || cityInfoSaving || attrSaving || attractionInfoSaving ? 'Сохранение...' : 'Сохранить'}
           </button>
         </div>
       </div>
@@ -329,7 +372,7 @@ export default function SessionWizard({ components = {} } = {}) {
           <div className="relative h-1.5 bg-gray-200 rounded-full mb-3">
             <div
               className="absolute inset-y-0 left-0 bg-blue-600 rounded-full transition-all duration-300"
-              style={{ width: `${((currentStep - 1) / 4) * 100}%` }}
+              style={{ width: `${((currentStep - 1) / (STEP_LABELS.length - 1)) * 100}%` }}
             />
           </div>
 
@@ -403,6 +446,27 @@ export default function SessionWizard({ components = {} } = {}) {
         )}
 
         {currentStep === 2 && (
+          <SessionWizardCityInfoStep
+            cityInfos={cityInfos}
+            currentCityInfo={currentCityInfo}
+            cityInfoLocaleData={cityInfoLocaleData}
+            cityInfoActiveLocale={cityInfoActiveLocale}
+            cityInfoSaving={cityInfoSaving}
+            referenceCities={referenceCities || []}
+            cityDrafts={cityDrafts || []}
+            onOpenCityInfoDetail={openCityInfoDetail}
+            onAddCityInfo={addCityInfo}
+            onSetCurrentCityInfo={setCurrentCityInfo}
+            onSetCityInfoActiveLocale={setCityInfoActiveLocale}
+            onUpdateCityInfoLocaleField={updateCityInfoLocaleField}
+            onUpdateCurrentCityInfoPatch={updateCurrentCityInfoPatch}
+            onSaveCurrentCityInfo={saveCurrentCityInfo}
+            onDeleteCurrentCityInfo={deleteCurrentCityInfo}
+            onGoToStep={goToStep}
+          />
+        )}
+
+        {currentStep === 3 && (
           <SessionWizardTagsStep
             tagInput={tagInput}
             cityTags={cityTags}
@@ -417,7 +481,7 @@ export default function SessionWizard({ components = {} } = {}) {
           />
         )}
 
-        {currentStep === 3 && (
+        {currentStep === 4 && (
           <SessionWizardAttractionsStep
             attrView={attrView}
             currentAttr={currentAttr}
@@ -441,7 +505,28 @@ export default function SessionWizard({ components = {} } = {}) {
           />
         )}
 
-        {currentStep === 4 && (
+        {currentStep === 5 && (
+          <SessionWizardAttractionInfoStep
+            attractionInfos={attractionInfos}
+            currentAttractionInfo={currentAttractionInfo}
+            attractionInfoLocaleData={attractionInfoLocaleData}
+            attractionInfoActiveLocale={attractionInfoActiveLocale}
+            attractionInfoSaving={attractionInfoSaving}
+            referenceAttractions={referenceAttractions || []}
+            attractions={attractions || []}
+            onOpenAttractionInfoDetail={openAttractionInfoDetail}
+            onAddAttractionInfo={addAttractionInfo}
+            onSetCurrentAttractionInfo={setCurrentAttractionInfo}
+            onSetAttractionInfoActiveLocale={setAttractionInfoActiveLocale}
+            onUpdateAttractionInfoLocaleField={updateAttractionInfoLocaleField}
+            onUpdateCurrentAttractionInfoPatch={updateCurrentAttractionInfoPatch}
+            onSaveCurrentAttractionInfo={saveCurrentAttractionInfo}
+            onDeleteCurrentAttractionInfo={deleteCurrentAttractionInfo}
+            onGoToStep={goToStep}
+          />
+        )}
+
+        {currentStep === 6 && (
           <SessionWizardContentStep
             attractions={attractions}
             aiGenAttrId={aiGenAttrId}
@@ -459,7 +544,7 @@ export default function SessionWizard({ components = {} } = {}) {
           />
         )}
 
-        {currentStep === 5 && (
+        {currentStep === 7 && (
           <SessionWizardPublishStep
             session={session}
             attractions={attractions}
