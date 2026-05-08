@@ -547,7 +547,10 @@ export default function SessionWizard({ components = {} } = {}) {
         {currentStep === 7 && (
           <SessionWizardPublishStep
             session={session}
+            cityDrafts={cityDrafts}
+            cityInfos={cityInfos}
             attractions={attractions}
+            attractionInfos={attractionInfos}
             cityTags={cityTags}
             translating={translating}
             publishing={publishing}

@@ -1,3 +1,4 @@
+import { useEffect, useRef, useState } from 'react';
 import { DEFAULT_LOCALE_DEFS, getAttrName, getFlag } from './sessionWizardShared.jsx';
 
 const getCityDisplayName = (city) => {
@@ -44,6 +45,26 @@ const normalizeId = (value) => {
   }
 
   return String(value);
+};
+
+const parseMapCoord = (value) => {
+  if (value === null || value === undefined || value === '') return NaN;
+
+  return parseFloat(String(value).trim().replace(',', '.'));
+};
+
+const hasValidMapCoords = (latValue, lonValue) => {
+  const parsedLat = parseMapCoord(latValue);
+  const parsedLon = parseMapCoord(lonValue);
+
+  return (
+    Number.isFinite(parsedLat) &&
+    Number.isFinite(parsedLon) &&
+    parsedLat >= -90 &&
+    parsedLat <= 90 &&
+    parsedLon >= -180 &&
+    parsedLon <= 180
+  );
 };
 
 const getAttrDatabaseCityId = (attr) => {
@@ -299,6 +320,169 @@ function AttractionPhotoPanel({
   );
 }
 
+function AttractionMapPanel({
+  lat,
+  lon,
+  onLatChange,
+  onLonChange,
+}) {
+  const mapInstanceRef = useRef(null);
+  const markerRef = useRef(null);
+  const [mapNode, setMapNode] = useState(null);
+
+  useEffect(() => {
+    if (!mapNode) return;
+
+    if (mapInstanceRef.current?.map) {
+      requestAnimationFrame(() => {
+        mapInstanceRef.current?.map?.invalidateSize();
+      });
+      return;
+    }
+
+    let cancelled = false;
+
+    import('leaflet').then(({ default: L }) => {
+      if (cancelled || !mapNode || mapInstanceRef.current?.map) return;
+
+      delete L.Icon.Default.prototype._getIconUrl;
+
+      L.Icon.Default.mergeOptions({
+        iconUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
+        iconRetinaUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png',
+        shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
+      });
+
+      const hasCoords = hasValidMapCoords(lat, lon);
+      const initialLat = parseMapCoord(lat);
+      const initialLon = parseMapCoord(lon);
+
+      const map = L.map(mapNode, {
+        zoomControl: true,
+        attributionControl: true,
+      }).setView(
+        hasCoords ? [initialLat, initialLon] : [55.75, 37.62],
+        hasCoords ? 12 : 3
+      );
+
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '© OpenStreetMap contributors',
+        maxZoom: 19,
+        minZoom: 2,
+      }).addTo(map);
+
+      const updateMarker = (latValue, lonValue) => {
+        const parsedLat = parseMapCoord(latValue);
+        const parsedLon = parseMapCoord(lonValue);
+
+        if (
+          !Number.isFinite(parsedLat) ||
+          !Number.isFinite(parsedLon) ||
+          parsedLat < -90 ||
+          parsedLat > 90 ||
+          parsedLon < -180 ||
+          parsedLon > 180
+        ) {
+          if (markerRef.current) {
+            map.removeLayer(markerRef.current);
+            markerRef.current = null;
+          }
+
+          return;
+        }
+
+        const nextLatLng = [parsedLat, parsedLon];
+
+        if (markerRef.current) {
+          markerRef.current.setLatLng(nextLatLng);
+        } else {
+          markerRef.current = L.marker(nextLatLng).addTo(map);
+        }
+
+        map.setView(nextLatLng, 12);
+        requestAnimationFrame(() => map.invalidateSize());
+      };
+
+      map.on('click', (event) => {
+        onLatChange(event.latlng.lat.toFixed(6));
+        onLonChange(event.latlng.lng.toFixed(6));
+      });
+
+      mapInstanceRef.current = {
+        map,
+        updateMarker,
+      };
+
+      setTimeout(() => {
+        map.invalidateSize();
+      }, 0);
+
+      setTimeout(() => {
+        map.invalidateSize();
+      }, 250);
+
+      if (hasCoords) {
+        updateMarker(lat, lon);
+      }
+    });
+
+    return () => {
+      cancelled = true;
+
+      if (mapInstanceRef.current?.map) {
+        mapInstanceRef.current.map.remove();
+        mapInstanceRef.current = null;
+        markerRef.current = null;
+      }
+    };
+  }, [mapNode]);
+
+  useEffect(() => {
+    if (!mapInstanceRef.current?.updateMarker) return;
+
+    mapInstanceRef.current.updateMarker(lat, lon);
+  }, [lat, lon]);
+
+  return (
+    <div>
+      <div className="flex items-center justify-between mb-1">
+        <label className="text-sm font-medium text-gray-700">
+          Координаты
+        </label>
+
+        <span className="text-xs text-gray-400">
+          Клик по карте или ввод вручную
+        </span>
+      </div>
+
+      <div
+        ref={setMapNode}
+        className="w-full h-48 rounded-lg border border-gray-200 overflow-hidden z-0"
+      />
+
+      <div className="grid grid-cols-2 gap-2 mt-2">
+        <input
+          type="number"
+          step="0.000001"
+          value={lat ?? ''}
+          onChange={(e) => onLatChange(e.target.value)}
+          placeholder="Широта"
+          className="px-3 py-1.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+        />
+
+        <input
+          type="number"
+          step="0.000001"
+          value={lon ?? ''}
+          onChange={(e) => onLonChange(e.target.value)}
+          placeholder="Долгота"
+          className="px-3 py-1.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+        />
+      </div>
+    </div>
+  );
+}
+
 export default function SessionWizardAttractionsStep({
   attrView,
   currentAttr,
@@ -334,6 +518,10 @@ export default function SessionWizardAttractionsStep({
     currentAttr?.session_city_id ?? currentAttr?.session_city
   );
 
+  const localeLabel =
+    attrCurrentLocale.lang?.toUpperCase() ||
+    attrActiveLocale.split('-')[0].toUpperCase();
+
   const updateAttractionPatch = (patch) => {
     if (typeof onUpdateCurrentAttrPatch === 'function') {
       onUpdateCurrentAttrPatch(patch);
@@ -349,6 +537,7 @@ export default function SessionWizardAttractionsStep({
               <h2 className="text-lg font-semibold text-gray-900">
                 Достопримечательности
               </h2>
+
               <p className="text-sm text-gray-500">
                 Добавьте объекты и при необходимости привяжите их к городу
               </p>
@@ -366,6 +555,7 @@ export default function SessionWizardAttractionsStep({
           {attractions.length === 0 ? (
             <div className="text-center py-12 text-gray-400">
               <div className="text-3xl mb-2">🏛️</div>
+
               <p className="text-sm">
                 Нет достопримечательностей. Нажмите «+ Добавить»
               </p>
@@ -395,6 +585,12 @@ export default function SessionWizardAttractionsStep({
                           cityDrafts
                         )}
                       </div>
+
+                      {hasValidMapCoords(attr?.lat, attr?.lon) && (
+                        <div className="text-xs text-gray-400">
+                          {attr.lat}, {attr.lon}
+                        </div>
+                      )}
                     </div>
                   </div>
 
@@ -491,167 +687,186 @@ export default function SessionWizardAttractionsStep({
             />
 
             <main className="flex-1 min-w-0 space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Название ({attrCurrentLocale.lang?.toUpperCase() || 'RU'})
-                </label>
+              <div className="grid grid-cols-2 gap-5">
+                <div className="space-y-3">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Название достопримечательности ({localeLabel})
+                    </label>
 
-                <input
-                  type="text"
-                  value={attrCurrentLocale.name || ''}
-                  onChange={(e) => onUpdateAttrLocaleField('name', e.target.value)}
-                  placeholder="Название достопримечательности"
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    <input
+                      type="text"
+                      value={attrCurrentLocale.name || ''}
+                      onChange={(e) => onUpdateAttrLocaleField('name', e.target.value)}
+                      placeholder="Название достопримечательности"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Индекс
+                      </label>
+
+                      <input
+                        type="number"
+                        value={currentAttr?.index ?? currentAttr?.order ?? 0}
+                        onChange={(e) => {
+                          const value = Number(e.target.value || 0);
+
+                          updateAttractionPatch({
+                            index: value,
+                            order: value,
+                          });
+                        }}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Ранг
+                      </label>
+
+                      <input
+                        type="number"
+                        value={currentAttr?.rank ?? 0}
+                        onChange={(e) => {
+                          updateAttractionPatch({
+                            rank: Number(e.target.value || 0),
+                          });
+                        }}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="p-3 border border-gray-200 rounded-lg bg-gray-50 space-y-3">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Привязка к городу
+                      </label>
+
+                      <select
+                        value={assignedCityType}
+                        onChange={(e) => {
+                          const type = e.target.value;
+
+                          updateAttractionPatch({
+                            assigned_city_type: type,
+
+                            city: null,
+                            city_id: null,
+
+                            session_city: null,
+                            session_city_id: null,
+                          });
+                        }}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      >
+                        <option value="none">Без города</option>
+                        <option value="database">Город из базы</option>
+                        <option value="draft">Город из сессии</option>
+                      </select>
+                    </div>
+
+                    {assignedCityType === 'database' && (
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          Город из базы
+                        </label>
+
+                        <select
+                          value={selectedDatabaseCityId}
+                          onChange={(e) => {
+                            const cityId = e.target.value || null;
+
+                            updateAttractionPatch({
+                              assigned_city_type: 'database',
+
+                              city: cityId,
+                              city_id: cityId,
+
+                              session_city: null,
+                              session_city_id: null,
+                            });
+                          }}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        >
+                          <option value="">Выберите город из базы</option>
+
+                          {referenceCities.map((city) => (
+                            <option key={city.id} value={city.id}>
+                              {getCityDisplayName(city)}
+                            </option>
+                          ))}
+                        </select>
+
+                        {referenceCities.length === 0 && (
+                          <p className="mt-1 text-xs text-amber-600">
+                            Список городов из базы не загружен.
+                          </p>
+                        )}
+                      </div>
+                    )}
+
+                    {assignedCityType === 'draft' && (
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          Город из сессии
+                        </label>
+
+                        <select
+                          value={selectedDraftCityId}
+                          onChange={(e) => {
+                            const draftId = e.target.value || null;
+
+                            updateAttractionPatch({
+                              assigned_city_type: 'draft',
+
+                              session_city: draftId,
+                              session_city_id: draftId,
+
+                              city: null,
+                              city_id: null,
+                            });
+                          }}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        >
+                          <option value="">Выберите город</option>
+
+                          {cityDrafts.map((draft) => (
+                            <option key={draft.id} value={draft.id}>
+                              {getDraftCityDisplayName(draft)}
+                            </option>
+                          ))}
+                        </select>
+
+                        {cityDrafts.length === 0 && (
+                          <p className="mt-1 text-xs text-amber-600">
+                            В текущей сессии пока нет городов.
+                          </p>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                <AttractionMapPanel
+                  lat={currentAttr?.lat ?? ''}
+                  lon={currentAttr?.lon ?? ''}
+                  onLatChange={(value) => {
+                    updateAttractionPatch({
+                      lat: value,
+                    });
+                  }}
+                  onLonChange={(value) => {
+                    updateAttractionPatch({
+                      lon: value,
+                    });
+                  }}
                 />
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Индекс
-                  </label>
-
-                  <input
-                    type="number"
-                    value={currentAttr?.index ?? currentAttr?.order ?? 0}
-                    onChange={(e) => {
-                      const value = Number(e.target.value || 0);
-
-                      updateAttractionPatch({
-                        index: value,
-                        order: value,
-                      });
-                    }}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Ранг
-                  </label>
-
-                  <input
-                    type="number"
-                    value={currentAttr?.rank ?? 0}
-                    onChange={(e) => {
-                      updateAttractionPatch({
-                        rank: Number(e.target.value || 0),
-                      });
-                    }}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  />
-                </div>
-              </div>
-
-              <div className="p-3 border border-gray-200 rounded-lg bg-gray-50 space-y-3">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Привязка к городу
-                  </label>
-
-                  <select
-                    value={assignedCityType}
-                    onChange={(e) => {
-                      const type = e.target.value;
-
-                      updateAttractionPatch({
-                        assigned_city_type: type,
-
-                        city: null,
-                        city_id: null,
-
-                        session_city: null,
-                        session_city_id: null,
-                      });
-                    }}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  >
-                    <option value="none">Без города</option>
-                    <option value="database">Город из базы</option>
-                    <option value="draft">Город из сессии</option>
-                  </select>
-                </div>
-
-                {assignedCityType === 'database' && (
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Город из базы
-                    </label>
-
-                    <select
-                      value={selectedDatabaseCityId}
-                      onChange={(e) => {
-                        const cityId = e.target.value || null;
-
-                        updateAttractionPatch({
-                          assigned_city_type: 'database',
-
-                          city: cityId,
-                          city_id: cityId,
-
-                          session_city: null,
-                          session_city_id: null,
-                        });
-                      }}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    >
-                      <option value="">Выберите город из базы</option>
-
-                      {referenceCities.map((city) => (
-                        <option key={city.id} value={city.id}>
-                          {getCityDisplayName(city)}
-                        </option>
-                      ))}
-                    </select>
-
-                    {referenceCities.length === 0 && (
-                      <p className="mt-1 text-xs text-amber-600">
-                        Список городов из базы не загружен.
-                      </p>
-                    )}
-                  </div>
-                )}
-
-                {assignedCityType === 'draft' && (
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Город из сессии
-                    </label>
-
-                    <select
-                      value={selectedDraftCityId}
-                      onChange={(e) => {
-                        const draftId = e.target.value || null;
-
-                        updateAttractionPatch({
-                          assigned_city_type: 'draft',
-
-                          session_city: draftId,
-                          session_city_id: draftId,
-
-                          city: null,
-                          city_id: null,
-                        });
-                      }}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    >
-                      <option value="">Выберите город</option>
-
-                      {cityDrafts.map((draft) => (
-                        <option key={draft.id} value={draft.id}>
-                          {getDraftCityDisplayName(draft)}
-                        </option>
-                      ))}
-                    </select>
-
-                    {cityDrafts.length === 0 && (
-                      <p className="mt-1 text-xs text-amber-600">
-                        В текущей сессии пока нет городов.
-                      </p>
-                    )}
-                  </div>
-                )}
               </div>
 
               <div>
@@ -661,7 +876,7 @@ export default function SessionWizardAttractionsStep({
                   </label>
 
                   <span className="px-1.5 py-0.5 bg-blue-100 text-blue-700 text-xs rounded font-mono">
-                    {attrCurrentLocale.lang?.toUpperCase() || 'RU'}
+                    {localeLabel}
                   </span>
                 </div>
 
