@@ -10,6 +10,7 @@ import SessionWizardPublishStep from './session-wizard/SessionWizardPublishStep'
 import SessionWizardTagsStep from './session-wizard/SessionWizardTagsStep';
 import SessionWizardCityInfoStep from './session-wizard/SessionWizardCityInfoStep';
 import SessionWizardAttractionInfoStep from './session-wizard/SessionWizardAttractionInfoStep';
+import SessionWizardAttractionFeedStep from './session-wizard/SessionWizardAttractionFeedStep.jsx';
 import {
   StatusBadge as DefaultStatusBadge,
   getAttrName,
@@ -21,7 +22,7 @@ import { ConfirmModal as DefaultConfirmModal } from '../../components/ui/Modal.j
 import { useConfirmModal } from '../../components/ui/useConfirmModal.jsx';
 import DefaultSessionCloseDialog from '../../components/generation/SessionCloseDialog.jsx';
 
-const STEP_LABELS = ['Город', 'Полезная информация о городе', 'Теги', 'Достопримечательности', 'Полезная информация о достопримечательности', 'Контент', 'Публикация'];
+const STEP_LABELS = ['Город', 'Полезная информация о городе', 'Теги', 'Достопримечательности', 'Полезная информация о достопримечательности', 'Лента', 'Контент', 'Публикация'];
 
 export default function SessionWizard({ components = {} } = {}) {
   const StatusBadge = components.StatusBadge ?? DefaultStatusBadge;
@@ -100,6 +101,14 @@ export default function SessionWizard({ components = {} } = {}) {
     attractionInfoActiveLocale,
     attractionInfoSaving,
 
+    attractionFeedItems,
+    currentAttractionFeedItem,
+    attractionFeedLocaleData,
+    attractionFeedActiveLocale,
+    attractionFeedSaving,
+    attractionFeedPhotoUploading,
+    attractionFeedPhotoFileRef,
+
     aiGenAttrId,
     aiGenLang,
     aiGenText,
@@ -168,6 +177,17 @@ export default function SessionWizard({ components = {} } = {}) {
     saveCurrentAttractionInfo,
     deleteCurrentAttractionInfo,
 
+    setCurrentAttractionFeedItem,
+    setAttractionFeedActiveLocale,
+
+    openAttractionFeedItemDetail,
+    addAttractionFeedItem,
+    updateCurrentAttractionFeedItemPatch,
+    updateAttractionFeedLocaleField,
+    saveCurrentAttractionFeedItem,
+    deleteCurrentAttractionFeedItem,
+    handleAttractionFeedPhotoFile,
+
     startAiContent,
     saveAiContent,
 
@@ -183,6 +203,7 @@ export default function SessionWizard({ components = {} } = {}) {
   const [commonsTarget, setCommonsTarget] = useState({
     type: 'city',
     attractionId: null,
+    feedItemId: null,
   });
   const commonsAttraction =
     commonsTarget.type === 'attraction'
@@ -194,6 +215,7 @@ export default function SessionWizard({ components = {} } = {}) {
     setCommonsTarget({
       type: 'city',
       attractionId: null,
+      feedItemId: null,
     });
 
     setCommonsModalOpen(true);
@@ -203,38 +225,63 @@ export default function SessionWizard({ components = {} } = {}) {
     setCommonsTarget({
       type: 'attraction',
       attractionId: attr?.id ?? currentAttr?.id ?? null,
+      feedItemId: null,
+    });
+
+    setCommonsModalOpen(true);
+  };
+
+  const openAttractionFeedCommonsModal = (item) => {
+    setCommonsTarget({
+      type: 'attraction_feed',
+      attractionId: null,
+      feedItemId: item?.id ?? currentAttractionFeedItem?.id ?? null,
     });
 
     setCommonsModalOpen(true);
   };
 
   const handleCommonsImageSelected = (image) => {
+    const selectedImageId =
+      image?.imageId ??
+      image?.image_id ??
+      image?.image?.id ??
+      image?.id ??
+      null;
+
+    const localUrl =
+      image?.localUrl ||
+      image?.local_url ||
+      image?.url ||
+      image?.image_url ||
+      image?.image?.url ||
+      '';
+
+    const originalUrl =
+      image?.originalUrl ||
+      image?.original_url ||
+      image?.originalImageUrl ||
+      image?.original_image_url ||
+      image?.sourceUrl ||
+      image?.source_url ||
+      image?.image?.original_image_url ||
+      image?.image?.source_url ||
+      '';
+
+    const copyright =
+      image?.copyright ||
+      image?.image_copyright ||
+      image?.imageCopyright ||
+      image?.image?.copyright ||
+      '';
+
     if (commonsTarget.type === 'attraction') {
-      const selectedImageId =
-        image?.imageId ??
-        image?.image_id ??
-        image?.id ??
-        null;
-
-      const localUrl =
-        image?.localUrl ||
-        image?.local_url ||
-        image?.url ||
-        image?.image_url ||
-        '';
-
-      const originalUrl =
-        image?.originalUrl ||
-        image?.original_url ||
-        image?.sourceUrl ||
-        image?.source_url ||
-        '';
-
-      const copyright = image?.copyright || '';
-
       updateCurrentAttrPatch?.({
         image_id: selectedImageId,
+        image: selectedImageId,
+
         image_url: localUrl,
+        imageUrl: localUrl,
         imagePreview: localUrl,
 
         image_original_url: originalUrl,
@@ -245,7 +292,41 @@ export default function SessionWizard({ components = {} } = {}) {
       });
 
       setCommonsModalOpen(false);
-      showNote?.('Изображение загружено из Wikimedia Commons', 'success');
+      showNote?.('Изображение достопримечательности загружено из Wikimedia Commons', 'success');
+      return;
+    }
+
+    if (commonsTarget.type === 'attraction_feed') {
+      const targetFeedItemId =
+        commonsTarget.feedItemId ?? currentAttractionFeedItem?.id ?? null;
+
+      if (!targetFeedItemId) {
+        setCommonsModalOpen(false);
+        showNote?.('Не удалось определить элемент ленты для изображения', 'error');
+        return;
+      }
+
+      updateCurrentAttractionFeedItemPatch?.({
+        item_type: 'image',
+
+        image_id: selectedImageId,
+        image: selectedImageId,
+
+        image_url: localUrl,
+        imageUrl: localUrl,
+        imagePreview: localUrl,
+
+        image_original_url: originalUrl,
+        imageOriginalUrl: originalUrl,
+
+        image_copyright: copyright,
+        imageCopyright: copyright,
+
+        text: {},
+      });
+
+      setCommonsModalOpen(false);
+      showNote?.('Изображение ленты загружено из Wikimedia Commons', 'success');
       return;
     }
 
@@ -356,13 +437,16 @@ export default function SessionWizard({ components = {} } = {}) {
               if (currentStep === 5) {
                 void saveCurrentAttractionInfo?.();
               }
+              if (currentStep === 6) {
+                void saveCurrentAttractionFeedItem?.();
+              }
             }}
-            disabled={saving || cityInfoSaving || attrSaving || attractionInfoSaving}
+            disabled={saving || cityInfoSaving || attrSaving || attractionInfoSaving || attractionFeedSaving}
 
             title="Сохранить текущие данные"
             className="px-3 py-1.5 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors"
           >
-            {saving || cityInfoSaving || attrSaving || attractionInfoSaving ? 'Сохранение...' : 'Сохранить'}
+            {saving || cityInfoSaving || attrSaving || attractionInfoSaving || attractionFeedSaving ? 'Сохранение...' : 'Сохранить'}
           </button>
         </div>
       </div>
@@ -527,6 +611,33 @@ export default function SessionWizard({ components = {} } = {}) {
         )}
 
         {currentStep === 6 && (
+          <SessionWizardAttractionFeedStep
+            attractionFeedItems={attractionFeedItems}
+            currentAttractionFeedItem={currentAttractionFeedItem}
+            attractionFeedLocaleData={attractionFeedLocaleData}
+            attractionFeedActiveLocale={attractionFeedActiveLocale}
+            attractionFeedSaving={attractionFeedSaving}
+            attractionFeedPhotoUploading={attractionFeedPhotoUploading}
+            attractionFeedPhotoFileRef={attractionFeedPhotoFileRef}
+
+            referenceAttractions={referenceAttractions}
+            attractions={attractions}
+
+            onOpenAttractionFeedItemDetail={openAttractionFeedItemDetail}
+            onOpenAttractionFeedCommonsModal={openAttractionFeedCommonsModal}
+            onAddAttractionFeedItem={addAttractionFeedItem}
+            onSetCurrentAttractionFeedItem={setCurrentAttractionFeedItem}
+            onSetAttractionFeedActiveLocale={setAttractionFeedActiveLocale}
+            onUpdateAttractionFeedLocaleField={updateAttractionFeedLocaleField}
+            onUpdateCurrentAttractionFeedItemPatch={updateCurrentAttractionFeedItemPatch}
+            onSaveCurrentAttractionFeedItem={saveCurrentAttractionFeedItem}
+            onDeleteCurrentAttractionFeedItem={deleteCurrentAttractionFeedItem}
+            onAttractionFeedPhotoFileChange={handleAttractionFeedPhotoFile}
+            onGoToStep={goToStep}
+          />
+        )}
+
+        {currentStep === 7 && (
           <SessionWizardContentStep
             attractions={attractions}
             aiGenAttrId={aiGenAttrId}
@@ -544,13 +655,14 @@ export default function SessionWizard({ components = {} } = {}) {
           />
         )}
 
-        {currentStep === 7 && (
+        {currentStep === 8 && (
           <SessionWizardPublishStep
             session={session}
             cityDrafts={cityDrafts}
             cityInfos={cityInfos}
             attractions={attractions}
             attractionInfos={attractionInfos}
+            attractionFeedItems={attractionFeedItems}
             cityTags={cityTags}
             translating={translating}
             publishing={publishing}

@@ -71,6 +71,21 @@ export const referenceAttractionsAPI = {
   list: (params = {}) => apiClient.get('/events/', { params }),
 };
 
+// ─── Attraction Feed Items ───────────────────────────────────────────────────
+export const attractionFeedAPI = {
+  create: (sessionId, data) =>
+    apiClient.post(`${BASE}/sessions/${sessionId}/attraction-feed/`, data),
+
+  get: (sessionId, itemId) =>
+    apiClient.get(`${BASE}/sessions/${sessionId}/attraction-feed/${itemId}/`),
+
+  update: (sessionId, itemId, data) =>
+    apiClient.post(`${BASE}/sessions/${sessionId}/attraction-feed/${itemId}/update/`, data),
+
+  delete: (sessionId, itemId) =>
+    apiClient.post(`${BASE}/sessions/${sessionId}/attraction-feed/${itemId}/delete/`, {}),
+};
+
 // ─── City Useful Info ────────────────────────────────────────────────────────
 export const cityInfosAPI = {
   list: (sessionId) =>

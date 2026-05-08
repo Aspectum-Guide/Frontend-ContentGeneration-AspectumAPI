@@ -1,13 +1,13 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { aiAPI, attractionsAPI, attractionInfosAPI, referenceAttractionsAPI, cityInfosAPI, cityFiltersAPI, citiesAPI, imagesAPI, sessionsAPI, eventsAPI } from '../../../api/generation';
+import { aiAPI, attractionsAPI, attractionInfosAPI, referenceAttractionsAPI, cityInfosAPI, cityFiltersAPI, citiesAPI, imagesAPI, sessionsAPI, eventsAPI, attractionFeedAPI} from '../../../api/generation';
 import { useLayoutActions } from '../../../context/useLayoutActions';
 import { trackEvent } from '../../../utils/analytics';
 import { parseApiError } from '../../../utils/apiError';
 import { useToast } from '../../../components/ui/Toast.jsx';
 import { DEFAULT_LOCALE_DEFS, getLocaleInfo } from './sessionWizardShared.jsx';
 
-const TOTAL_STEPS = 7;
+const TOTAL_STEPS = 8;
 
 function makeLocaleData() {
   return Object.fromEntries(
@@ -186,6 +186,84 @@ const normalizeAttraction = (attr = {}) => {
       null,
 
     contents: attr.contents ?? {},
+  };
+};
+
+const normalizeAttractionFeedItem = (item = {}) => {
+  const eventId = normalizeId(
+    item.event_id ??
+      item.event ??
+      item.attraction_id ??
+      item.attraction
+  ) || null;
+
+  const sessionAttractionId = normalizeId(
+    item.session_attraction_id ??
+      item.session_attraction
+  ) || null;
+
+  let assignedAttractionType = item.assigned_attraction_type ?? 'none';
+
+  if (!item.assigned_attraction_type) {
+    if (eventId) {
+      assignedAttractionType = 'database';
+    } else if (sessionAttractionId) {
+      assignedAttractionType = 'draft';
+    }
+  }
+
+  return {
+    ...item,
+
+    id: item.id ?? null,
+
+    item_type: item.item_type || 'text',
+
+    text: item.text ?? {},
+
+    image_id: item.image_id ?? item.image?.id ?? item.image ?? null,
+    image_url:
+      item.image_url ??
+      item.imageUrl ??
+      item.localUrl ??
+      item.local_url ??
+      item.image?.url ??
+      item.image?.file ??
+      null,
+
+    image_original_url:
+      item.image_original_url ??
+      item.imageOriginalUrl ??
+      item.original_image_url ??
+      item.originalImageUrl ??
+      item.image?.original_url ??
+      item.image?.source_url ??
+      item.image?.file_page_url ??
+      '',
+
+    image_copyright:
+      item.image_copyright ??
+      item.imageCopyright ??
+      item.copyright ??
+      item.image?.copyright ??
+      '',
+
+    index: Number(item.index ?? 0),
+
+    event: eventId,
+    event_id: eventId,
+
+    // legacy aliases для UI
+    attraction: eventId,
+    attraction_id: eventId,
+
+    session_attraction: sessionAttractionId,
+    session_attraction_id: sessionAttractionId,
+
+    assigned_attraction_type: assignedAttractionType,
+    assigned_attraction_name: item.assigned_attraction_name ?? null,
+
+    isNew: item.isNew ?? false,
   };
 };
 
@@ -401,6 +479,88 @@ const createEmptyAttractionInfo = () => {
   };
 };
 
+const createEmptyAttractionFeedItem = (itemType = 'text') => {
+  return {
+    id: `attraction-feed-${Date.now()}`,
+
+    item_type: itemType,
+
+    text: makeEmptyLocaleObject(),
+
+    image_id: null,
+    image_url: '',
+    image_original_url: '',
+    image_copyright: '',
+
+    index: 0,
+
+    assigned_attraction_type: 'none',
+
+    event: null,
+    event_id: null,
+
+    attraction: null,
+    attraction_id: null,
+
+    session_attraction: null,
+    session_attraction_id: null,
+
+    isNew: true,
+  };
+};
+
+const buildAttractionFeedPayload = (item, text = null) => {
+  const assignedType = item.assigned_attraction_type ?? 'none';
+
+  let event = null;
+  let sessionAttraction = null;
+
+  if (assignedType === 'database') {
+    event = item.event_id ?? item.event ?? item.attraction_id ?? item.attraction ?? null;
+  }
+
+  if (assignedType === 'draft') {
+    sessionAttraction =
+      item.session_attraction_id ??
+      item.session_attraction ??
+      null;
+  }
+
+  return {
+    item_type: item.item_type || 'text',
+
+    text: text ?? item.text ?? {},
+
+    image_id: item.image_id ?? item.image?.id ?? item.image ?? null,
+    image: item.image_id ?? item.image?.id ?? item.image ?? null,
+
+    image_original_url:
+      item.image_original_url ??
+      item.imageOriginalUrl ??
+      '',
+
+    image_copyright:
+      item.image_copyright ??
+      item.imageCopyright ??
+      item.copyright ??
+      '',
+
+    index: Number(item.index ?? 0),
+
+    assigned_attraction_type: assignedType,
+
+    event,
+    event_id: event,
+
+    // aliases
+    attraction: event,
+    attraction_id: event,
+
+    session_attraction: sessionAttraction,
+    session_attraction_id: sessionAttraction,
+  };
+};
+
 function extractReferenceCities(data) {
   if (Array.isArray(data)) return data;
 
@@ -460,6 +620,10 @@ export function useSessionWizardController({ sessionId, confirm: confirmProp } =
   const [photoUploading, setPhotoUploading] = useState(false);
   const photoFileRef = useRef(null);
   const [commonsModalOpen, setCommonsModalOpen] = useState(false);
+  const [commonsTarget, setCommonsTarget] = useState({
+    type: 'city',
+    id: null,
+  });
 
   const [cityTags, setCityTags] = useState([]);
   const [tagInput, setTagInput] = useState('');
@@ -477,6 +641,13 @@ export function useSessionWizardController({ sessionId, confirm: confirmProp } =
   const [currentAttractionInfo, setCurrentAttractionInfo] = useState(null);
   const [attractionInfoActiveLocale, setAttractionInfoActiveLocale] = useState('ru-RU');
   const [attractionInfoSaving, setAttractionInfoSaving] = useState(false);
+
+  const [attractionFeedItems, setAttractionFeedItems] = useState([]);
+  const [currentAttractionFeedItem, setCurrentAttractionFeedItem] = useState(null);
+  const [attractionFeedActiveLocale, setAttractionFeedActiveLocale] = useState('ru-RU');
+  const [attractionFeedSaving, setAttractionFeedSaving] = useState(false);
+  const [attractionFeedPhotoUploading, setAttractionFeedPhotoUploading] = useState(false);
+  const attractionFeedPhotoFileRef = useRef(null);
 
   const [cityInfos, setCityInfos] = useState([]);
   const [currentCityInfo, setCurrentCityInfo] = useState(null);
@@ -517,6 +688,23 @@ export function useSessionWizardController({ sessionId, confirm: confirmProp } =
       return acc;
     }, {});
   }, [currentAttractionInfo]);
+
+  const attractionFeedLocaleData = useMemo(() => {
+    if (!currentAttractionFeedItem) return {};
+
+    return DEFAULT_LOCALE_DEFS.reduce((acc, locale) => {
+      const lang = locale.lang || locale.key?.split('-')?.[0] || 'ru';
+
+      acc[locale.key] = {
+        lang,
+        code: locale.code,
+        langName: locale.langName,
+        text: currentAttractionFeedItem.text?.[lang] || '',
+      };
+
+      return acc;
+    }, {});
+  }, [currentAttractionFeedItem]);
 
   const [aiGenAttrId, setAiGenAttrId] = useState(null);
   const [aiGenLang, setAiGenLang] = useState('ru');
@@ -708,6 +896,14 @@ export function useSessionWizardController({ sessionId, confirm: confirmProp } =
       }
 
       setCurrentAttractionInfo(null);
+
+      if (Array.isArray(data?.attraction_feed_items)) {
+        setAttractionFeedItems(data.attraction_feed_items.map(normalizeAttractionFeedItem));
+      } else {
+        setAttractionFeedItems([]);
+      }
+
+      setCurrentAttractionFeedItem(null);
 
     } catch (err) {
       showNote('Не удалось загрузить сессию: ' + parseApiError(err, 'Ошибка загрузки'), 'error');
@@ -1097,13 +1293,498 @@ export function useSessionWizardController({ sessionId, confirm: confirmProp } =
     }
   }, [session, localeData, activeLocale, imageCopyright, showNote]);
 
-  const handleCommonsImageSelect = useCallback(({ imageId: selectedImageId, localUrl, originalUrl, sourceUrl, copyright }) => {
-    setImageId(selectedImageId || null);
-    setImagePreview(localUrl || '');
-    setImageOriginalUrl(originalUrl || sourceUrl || '');
-    setImageCopyright(copyright || '');
-    showNote('Изображение загружено из Wikimedia Commons', 'success');
-  }, [showNote]);
+  const updateCurrentAttractionFeedItemPatch = useCallback((patch) => {
+    setCurrentAttractionFeedItem((prev) => {
+      if (!prev) return prev;
+
+      const updated = normalizeAttractionFeedItem({
+        ...prev,
+        ...patch,
+      });
+
+      setAttractionFeedItems((items) =>
+        items.map((item) =>
+          normalizeId(item.id) === normalizeId(updated.id) ? updated : item
+        )
+      );
+
+      return updated;
+    });
+  }, []); 
+  
+  const updateCurrentAttrPatch = useCallback((patch) => {
+    setCurrentAttr((prev) => {
+      if (!prev) return prev;
+
+      const next = normalizeAttraction({
+        ...prev,
+        ...patch,
+      });
+
+      setAttractions((items) =>
+        items.map((item) => (item.id === next.id ? next : item))
+      );
+
+      return next;
+    });
+  }, []);
+
+  const handleCommonsImageSelect = useCallback((payload = {}) => {
+    const selectedImageId =
+      payload.imageId ??
+      payload.image_id ??
+      payload.image?.id ??
+      null;
+
+    const localUrl =
+      payload.localUrl ??
+      payload.local_url ??
+      payload.url ??
+      payload.image_url ??
+      payload.image?.url ??
+      '';
+
+    const originalUrl =
+      payload.originalUrl ??
+      payload.original_url ??
+      payload.originalImageUrl ??
+      payload.original_image_url ??
+      payload.sourceUrl ??
+      payload.source_url ??
+      payload.image?.original_image_url ??
+      payload.image?.source_url ??
+      '';
+
+    const copyright =
+      payload.copyright ??
+      payload.image_copyright ??
+      payload.imageCopyright ??
+      payload.image?.copyright ??
+      '';
+
+    if (commonsTarget.type === 'city') {
+      setImageId(selectedImageId);
+      setImagePreview(localUrl);
+      setImageOriginalUrl(originalUrl);
+      setImageCopyright(copyright);
+
+      showNote('Изображение города загружено из Wikimedia Commons', 'success');
+      return;
+    }
+
+    if (commonsTarget.type === 'attraction') {
+      const targetAttrId = commonsTarget.id ?? currentAttr?.id ?? null;
+
+      if (!targetAttrId) {
+        showNote('Не удалось определить достопримечательность для изображения', 'error');
+        return;
+      }
+
+      const patch = {
+        image_id: selectedImageId,
+        image: selectedImageId,
+
+        image_url: localUrl,
+        imageUrl: localUrl,
+
+        image_original_url: originalUrl,
+        imageOriginalUrl: originalUrl,
+
+        image_copyright: copyright,
+        imageCopyright: copyright,
+      };
+
+      setAttractions((items) =>
+        items.map((item) =>
+          normalizeId(item.id) === normalizeId(targetAttrId)
+            ? normalizeAttraction({
+                ...item,
+                ...patch,
+              })
+            : item
+        )
+      );
+
+      setCurrentAttr((prev) => {
+        if (!prev || normalizeId(prev.id) !== normalizeId(targetAttrId)) {
+          return prev;
+        }
+
+        return normalizeAttraction({
+          ...prev,
+          ...patch,
+        });
+      });
+
+      showNote('Изображение достопримечательности загружено из Wikimedia Commons', 'success');
+      return;
+    }
+
+    if (commonsTarget.type === 'attraction_feed') {
+      const targetItemId = commonsTarget.id ?? currentAttractionFeedItem?.id ?? null;
+
+      if (!targetItemId) {
+        showNote('Не удалось определить элемент ленты для изображения', 'error');
+        return;
+      }
+
+      const patch = {
+        item_type: 'image',
+
+        image_id: selectedImageId,
+        image: selectedImageId,
+
+        image_url: localUrl,
+        imageUrl: localUrl,
+
+        image_original_url: originalUrl,
+        imageOriginalUrl: originalUrl,
+
+        image_copyright: copyright,
+        imageCopyright: copyright,
+
+        text: {},
+      };
+
+      setAttractionFeedItems((items) =>
+        items.map((item) =>
+          normalizeId(item.id) === normalizeId(targetItemId)
+            ? normalizeAttractionFeedItem({
+                ...item,
+                ...patch,
+              })
+            : item
+        )
+      );
+
+      setCurrentAttractionFeedItem((prev) => {
+        if (!prev || normalizeId(prev.id) !== normalizeId(targetItemId)) {
+          return prev;
+        }
+
+        return normalizeAttractionFeedItem({
+          ...prev,
+          ...patch,
+        });
+      });
+
+      showNote('Изображение ленты загружено из Wikimedia Commons', 'success');
+      return;
+    }
+  }, [
+    commonsTarget,
+    currentAttr,
+    currentAttractionFeedItem,
+    showNote,
+  ]);
+
+  const openCityCommonsModal = useCallback(() => {
+    setCommonsTarget({
+      type: 'city',
+      id: null,
+    });
+
+    setCommonsModalOpen(true);
+  }, []);
+
+  const openAttractionCommonsModal = useCallback((attr) => {
+    setCommonsTarget({
+      type: 'attraction',
+      id: attr?.id ?? currentAttr?.id ?? null,
+    });
+
+    setCommonsModalOpen(true);
+  }, [currentAttr]);
+
+  const openAttractionFeedCommonsModal = useCallback((item) => {
+    setCommonsTarget({
+      type: 'attraction_feed',
+      id: item?.id ?? currentAttractionFeedItem?.id ?? null,
+    });
+
+    setCommonsModalOpen(true);
+  }, [currentAttractionFeedItem]);
+
+  const getAttractionFeedItemName = useCallback((item) => {
+    if (!item) return '(без названия)';
+
+    if (item.item_type === 'image') {
+      return item.image_copyright || item.image_original_url || 'Изображение';
+    }
+
+    const text = item.text || {};
+
+    if (typeof text === 'string') {
+      return text.slice(0, 60) || '(без текста)';
+    }
+
+    return (
+      text.ru ||
+      text.en ||
+      text.it ||
+      Object.values(text).find(Boolean) ||
+      '(без текста)'
+    );
+  }, []);
+
+  const addAttractionFeedItem = useCallback(async (itemType = 'text') => {
+    try {
+      const emptyItem = createEmptyAttractionFeedItem(itemType);
+
+      emptyItem.index = attractionFeedItems.length;
+
+      const res = await attractionFeedAPI.create(
+        sessionId,
+        buildAttractionFeedPayload(emptyItem)
+      );
+
+      const rawItem = res?.data?.attraction_feed_item || res?.data;
+      const item = normalizeAttractionFeedItem(rawItem || emptyItem);
+
+      if (item?.id) {
+        setAttractionFeedItems((prev) => [...prev, item]);
+        setCurrentAttractionFeedItem(item);
+        setAttractionFeedActiveLocale('ru-RU');
+
+        showNote('Элемент ленты добавлен', 'success');
+      }
+    } catch (e) {
+      showNote(
+        'Ошибка при добавлении элемента ленты: ' + parseApiError(e),
+        'error'
+      );
+    }
+  }, [sessionId, attractionFeedItems.length, showNote]);
+
+  const openAttractionFeedItemDetail = useCallback((itemId) => {
+    const target = attractionFeedItems.find(
+      (item) => normalizeId(item.id) === normalizeId(itemId)
+    );
+
+    if (!target) return;
+
+    setCurrentAttractionFeedItem(target);
+    setAttractionFeedActiveLocale('ru-RU');
+  }, [attractionFeedItems]);
+
+  const updateAttractionFeedLocaleField = useCallback((field, value) => {
+    const lang = getLocaleLang(attractionFeedActiveLocale);
+
+    setCurrentAttractionFeedItem((prev) => {
+      if (!prev) return prev;
+
+      const updated = {
+        ...prev,
+        [field]: {
+          ...(prev[field] || {}),
+          [lang]: value,
+        },
+      };
+
+      setAttractionFeedItems((items) =>
+        items.map((item) =>
+          normalizeId(item.id) === normalizeId(updated.id) ? updated : item
+        )
+      );
+
+      return updated;
+    });
+  }, [attractionFeedActiveLocale]);
+
+  const saveCurrentAttractionFeedItem = useCallback(async () => {
+    if (!currentAttractionFeedItem) return;
+
+    const assignedType = currentAttractionFeedItem.assigned_attraction_type ?? 'none';
+
+    const eventId =
+      currentAttractionFeedItem.event_id ??
+      currentAttractionFeedItem.event ??
+      currentAttractionFeedItem.attraction_id ??
+      currentAttractionFeedItem.attraction ??
+      null;
+
+    const sessionAttractionId =
+      currentAttractionFeedItem.session_attraction_id ??
+      currentAttractionFeedItem.session_attraction ??
+      null;
+
+    if (assignedType === 'database' && !eventId) {
+      showNote('Выберите достопримечательность из базы', 'error');
+      return;
+    }
+
+    if (assignedType === 'draft' && !sessionAttractionId) {
+      showNote('Выберите достопримечательность из сессии', 'error');
+      return;
+    }
+
+    if (currentAttractionFeedItem.item_type === 'image' && !currentAttractionFeedItem.image_id) {
+      showNote('Добавьте изображение для элемента ленты', 'error');
+      return;
+    }
+
+    setAttractionFeedSaving(true);
+
+    try {
+      const text = {};
+
+      Object.values(attractionFeedLocaleData).forEach((d) => {
+        if (d.text) {
+          text[d.lang] = d.text || '';
+        }
+      });
+
+      const res = await attractionFeedAPI.update(
+        sessionId,
+        currentAttractionFeedItem.id,
+        buildAttractionFeedPayload(currentAttractionFeedItem, text)
+      );
+
+      const responseItem = res?.data?.attraction_feed_item || res?.data || {};
+
+      const updatedItem = normalizeAttractionFeedItem({
+        ...currentAttractionFeedItem,
+        ...responseItem,
+        text: responseItem.text ?? text,
+      });
+
+      setAttractionFeedItems((prev) =>
+        prev.map((item) =>
+          normalizeId(item.id) === normalizeId(currentAttractionFeedItem.id)
+            ? updatedItem
+            : item
+        )
+      );
+
+      setCurrentAttractionFeedItem(updatedItem);
+
+      showNote('Элемент ленты сохранён', 'success');
+    } catch (e) {
+      showNote(
+        'Ошибка при сохранении элемента ленты: ' + parseApiError(e),
+        'error'
+      );
+    } finally {
+      setAttractionFeedSaving(false);
+    }
+  }, [
+    sessionId,
+    currentAttractionFeedItem,
+    attractionFeedLocaleData,
+    showNote,
+  ]);
+
+  const deleteCurrentAttractionFeedItem = useCallback(async () => {
+    if (!currentAttractionFeedItem) return;
+
+    const name = getAttractionFeedItemName(currentAttractionFeedItem);
+
+    if (!(await confirm({ message: `Удалить «${name}»?`, danger: true }))) {
+      return;
+    }
+
+    try {
+      await attractionFeedAPI.delete(sessionId, currentAttractionFeedItem.id);
+
+      setAttractionFeedItems((items) =>
+        items.filter(
+          (item) => normalizeId(item.id) !== normalizeId(currentAttractionFeedItem.id)
+        )
+      );
+
+      setCurrentAttractionFeedItem(null);
+
+      showNote('Элемент ленты удалён', 'success');
+    } catch (e) {
+      showNote(
+        'Ошибка при удалении элемента ленты: ' + parseApiError(e),
+        'error'
+      );
+    }
+  }, [
+    sessionId,
+    currentAttractionFeedItem,
+    getAttractionFeedItemName,
+    confirm,
+    showNote,
+  ]);
+
+
+  const handleAttractionFeedPhotoFile = useCallback(async (event, itemArg = null) => {
+    const file = event.target.files?.[0];
+
+    if (!file || !file.type.startsWith('image/')) return;
+
+    event.target.value = '';
+
+    const targetItem = itemArg || currentAttractionFeedItem;
+
+    if (!targetItem) return;
+
+    setAttractionFeedPhotoUploading(true);
+
+    try {
+      const fd = new FormData();
+
+      fd.append('file', file);
+      fd.append('session_uuid', session?.uuid || session?.session_uuid || '');
+      fd.append('temp', '1');
+
+      const copyright =
+        targetItem.image_copyright ||
+        targetItem.imageCopyright ||
+        '';
+
+      if (copyright) {
+        fd.append('copyright', copyright);
+      }
+
+      const res = await imagesAPI.upload(fd);
+      const { id, url, copyright: uploadedCopyright } = res?.data || {};
+
+      if (id && url) {
+        const patch = {
+          item_type: 'image',
+
+          image_id: id,
+          image: id,
+
+          image_url: url,
+          imageUrl: url,
+
+          image_original_url: '',
+          imageOriginalUrl: '',
+
+          image_copyright:
+            uploadedCopyright != null
+              ? uploadedCopyright || ''
+              : copyright,
+          imageCopyright:
+            uploadedCopyright != null
+              ? uploadedCopyright || ''
+              : copyright,
+
+          text: {},
+        };
+
+        updateCurrentAttractionFeedItemPatch(patch);
+
+        showNote('Изображение ленты загружено', 'success');
+      }
+    } catch (err) {
+      showNote(
+        'Ошибка загрузки изображения ленты: ' + parseApiError(err, 'Ошибка загрузки'),
+        'error'
+      );
+    } finally {
+      setAttractionFeedPhotoUploading(false);
+    }
+  }, [
+    session,
+    currentAttractionFeedItem,
+    updateCurrentAttractionFeedItemPatch,
+    showNote,
+  ]);
 
   const getSessionUuid = useCallback(() => session?.uuid || session?.session_uuid || '', [session]);
 
@@ -1519,7 +2200,7 @@ export function useSessionWizardController({ sessionId, confirm: confirmProp } =
     confirm,
     showNote,
   ]);
-  
+
   const buildAttrLocaleData = useCallback((attr) => {
     const data = {};
     DEFAULT_LOCALE_DEFS.forEach((loc) => {
@@ -1595,23 +2276,6 @@ export function useSessionWizardController({ sessionId, confirm: confirmProp } =
       showNote('Не удалось открыть достопримечательность: ' + e.message, 'error');
     }
   }, [sessionId, attractions, buildAttrLocaleData, showNote]);
-
-  const updateCurrentAttrPatch = useCallback((patch) => {
-    setCurrentAttr((prev) => {
-      if (!prev) return prev;
-
-      const next = normalizeAttraction({
-        ...prev,
-        ...patch,
-      });
-
-      setAttractions((items) =>
-        items.map((item) => (item.id === next.id ? next : item))
-      );
-
-      return next;
-    });
-  }, []);
 
   const addAttraction = useCallback(async () => {
     try {
@@ -1812,24 +2476,100 @@ export function useSessionWizardController({ sessionId, confirm: confirmProp } =
     if (!(await confirm({
       title: 'Публикация сессии',
       message: 'Опубликовать всю сессию? Данные будут записаны в основную базу.',
-    }))) return;
+    }))) {
+      return;
+    }
+
     setPublishing(true);
+
     try {
+      const hasCityDataToSave =
+        Boolean(session?.city) ||
+        (Array.isArray(cityDrafts) && cityDrafts.length > 0) ||
+        Object.values(localeData || {}).some((loc) => {
+          return (
+            loc?.name?.trim?.() ||
+            loc?.description?.trim?.() ||
+            loc?.country?.trim?.()
+          );
+        }) ||
+        Boolean(imageId) ||
+        Boolean(lat) ||
+        Boolean(lon) ||
+        (Array.isArray(cityTags) && cityTags.length > 0);
+
+      // Важно: перед публикацией сохраняем локальные изменения,
+      // иначе бэк публикует старое состояние из БД.
+      if (hasCityDataToSave) {
+        await saveCityForStep1();
+      }
+
+      if (currentStep === 2 && currentCityInfo) {
+        await saveCurrentCityInfo();
+      }
+
+      if (currentStep === 4 && currentAttr) {
+        await saveCurrentAttr();
+      }
+
+      if (currentStep === 5 && currentAttractionInfo) {
+        await saveCurrentAttractionInfo();
+      }
+
+      if (currentStep === 6 && currentAttractionFeedItem) {
+        await saveCurrentAttractionFeedItem();
+      }
+
       const res = await sessionsAPI.publish(sessionId);
+
       trackEvent('publish_session_success', {
         sessionId: String(sessionId),
-        msFromOpen: sessionOpenedAtRef.current ? (Date.now() - sessionOpenedAtRef.current) : null,
-        msFromFirstSave: firstCitySaveAtRef.current ? (Date.now() - firstCitySaveAtRef.current) : null,
+        msFromOpen: sessionOpenedAtRef.current
+          ? Date.now() - sessionOpenedAtRef.current
+          : null,
+        msFromFirstSave: firstCitySaveAtRef.current
+          ? Date.now() - firstCitySaveAtRef.current
+          : null,
       });
+
       showNote(res?.data?.message || 'Сессия опубликована', 'success');
+
       await loadSession();
     } catch (err) {
-      trackEvent('publish_session_fail', { sessionId: String(sessionId), reason: parseApiError(err, 'Ошибка публикации') });
+      trackEvent('publish_session_fail', {
+        sessionId: String(sessionId),
+        reason: parseApiError(err, 'Ошибка публикации'),
+      });
+
       showNote(parseApiError(err, 'Ошибка публикации'), 'error');
     } finally {
       setPublishing(false);
     }
-  }, [sessionId, loadSession, showNote, confirm]);
+  }, [
+    confirm,
+    session,
+    cityDrafts,
+    localeData,
+    imageId,
+    lat,
+    lon,
+    cityTags,
+    saveCityForStep1,
+
+    currentStep,
+    currentCityInfo,
+    saveCurrentCityInfo,
+    currentAttr,
+    saveCurrentAttr,
+    currentAttractionInfo,
+    saveCurrentAttractionInfo,
+    currentAttractionFeedItem,
+    saveCurrentAttractionFeedItem,
+
+    sessionId,
+    loadSession,
+    showNote,
+  ]);
 
   const handleTranslateSession = useCallback(async () => {
     const currentDraftId = activeCityDraftIdRef.current;
@@ -1887,11 +2627,12 @@ export function useSessionWizardController({ sessionId, confirm: confirmProp } =
     currentStep, setCurrentStep,
     localeData, activeLocale, defaultLocale, setDefaultLocale, addLocaleOpen, setAddLocaleOpen, newLocaleCode, setNewLocaleCode, newLocaleLang, setNewLocaleLang,
     lat, lon, savedLat, savedLon, setLat, setLon, setSavedLat, setSavedLon,
-    imageId, imagePreview, imageOriginalUrl, imageCopyright, setImageOriginalUrl, setImageCopyright, photoUploading, photoFileRef, commonsModalOpen, setCommonsModalOpen,
+    imageId, imagePreview, imageOriginalUrl, imageCopyright, setImageOriginalUrl, setImageCopyright, photoUploading, photoFileRef, commonsModalOpen, setCommonsModalOpen, openCityCommonsModal, openAttractionCommonsModal, openAttractionFeedCommonsModal, handleCommonsImageSelect,
     cityTags, tagInput, setTagInput, availableTags,
     cityInfos, currentCityInfo, cityInfoLocaleData, cityInfoActiveLocale, cityInfoSaving,
     attractions, attrView, currentAttr, attrLocaleData, attrActiveLocale, attrSaving,
     attractionInfos, currentAttractionInfo, attractionInfoLocaleData, attractionInfoActiveLocale, attractionInfoSaving,    
+    attractionFeedItems, currentAttractionFeedItem, attractionFeedLocaleData, attractionFeedActiveLocale, attractionFeedSaving, attractionFeedPhotoUploading, attractionFeedPhotoFileRef,
     aiGenAttrId, aiGenLang, aiGenText, aiGenDone, aiGenError, aiGenSaving,
     saving, closeOpen, closeMode, closing, publishing, translating,
     setAttrView, setCurrentAttr, setAttrActiveLocale, setAiGenLang, setAiGenAttrId, setAiGenText,
@@ -1905,7 +2646,9 @@ export function useSessionWizardController({ sessionId, confirm: confirmProp } =
     addTag, removeTag, handleTagKeyDown, handleTagBlur,
     setCurrentCityInfo, setCityInfoActiveLocale, openCityInfoDetail, addCityInfo, updateCurrentCityInfoPatch, updateCityInfoLocaleField, saveCurrentCityInfo, deleteCurrentCityInfo,
     setCurrentAttractionInfo, setAttractionInfoActiveLocale, openAttractionInfoDetail, addAttractionInfo, updateCurrentAttractionInfoPatch, updateAttractionInfoLocaleField, saveCurrentAttractionInfo, deleteCurrentAttractionInfo,
+    setCurrentAttractionFeedItem, setAttractionFeedActiveLocale,
     openAttrDetail, addAttraction, deleteCurrentAttr, saveCurrentAttr, updateAttrLocaleField, updateCurrentAttrPatch,    startAiContent, saveAiContent,
+    openAttractionFeedItemDetail, addAttractionFeedItem, updateCurrentAttractionFeedItemPatch, updateAttractionFeedLocaleField, saveCurrentAttractionFeedItem, deleteCurrentAttractionFeedItem, handleAttractionFeedPhotoFile, openAttractionFeedCommonsModal,
     handleClose, handlePublish, handleTranslateSession,
     TOTAL_STEPS,
   };

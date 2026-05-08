@@ -11,6 +11,7 @@ export default function SessionWizardPublishStep({
   cityInfos = [],
   attractions = [],
   attractionInfos = [],
+  attractionFeedItems = [],
   cityTags = [],
 
   translating,
@@ -28,10 +29,24 @@ export default function SessionWizardPublishStep({
   const hasCityInfos = cityInfos.length > 0;
   const hasAttractions = attractions.length > 0;
   const hasAttractionInfos = attractionInfos.length > 0;
+  const hasAttractionFeedItems = attractionFeedItems.length > 0;
   const hasTags = cityTags.length > 0;
 
   const hasAnythingToPublish =
-    hasCity || hasCityInfos || hasAttractions || hasAttractionInfos || hasTags;
+    hasCity ||
+    hasCityInfos ||
+    hasAttractions ||
+    hasAttractionInfos ||
+    hasAttractionFeedItems ||
+    hasTags;
+
+  const imageFeedItemsCount = attractionFeedItems.filter(
+    (item) => item?.item_type === 'image'
+  ).length;
+
+  const textFeedItemsCount = attractionFeedItems.filter(
+    (item) => item?.item_type !== 'image'
+  ).length;
 
   return (
     <div className="space-y-4">
@@ -40,7 +55,7 @@ export default function SessionWizardPublishStep({
 
         <p className="text-sm text-gray-500">
           Проверьте данные и опубликуйте сессию. В публикацию могут попасть город,
-          полезная информация, достопримечательности и связанные блоки.
+          полезная информация, достопримечательности, лента и связанные блоки.
         </p>
       </div>
 
@@ -107,6 +122,24 @@ export default function SessionWizardPublishStep({
         </div>
 
         <div className="flex justify-between gap-4">
+          <span className="text-gray-500">Элементы ленты:</span>
+
+          <span className="font-medium text-gray-900">
+            {getCountLabel(attractionFeedItems.length)}
+          </span>
+        </div>
+
+        {hasAttractionFeedItems && (
+          <div className="flex justify-between gap-4">
+            <span className="text-gray-500">Лента, текст / изображения:</span>
+
+            <span className="font-medium text-gray-900">
+              {textFeedItemsCount} / {imageFeedItemsCount}
+            </span>
+          </div>
+        )}
+
+        <div className="flex justify-between gap-4">
           <span className="text-gray-500">Теги:</span>
 
           <span className="font-medium text-gray-900 text-right">
@@ -121,10 +154,17 @@ export default function SessionWizardPublishStep({
         </div>
       )}
 
+      {hasAttractionFeedItems && !hasAttractions && (
+        <div className="p-3 text-sm text-amber-700 bg-amber-50 border border-amber-200 rounded-lg">
+          В сессии есть элементы ленты, но нет достопримечательностей. Лента должна быть
+          привязана к достопримечательности из базы или к достопримечательности из сессии.
+        </div>
+      )}
+
       <div className="flex justify-between pt-2">
         <button
           type="button"
-          onClick={() => onGoToStep(6)}
+          onClick={() => onGoToStep(7)}
           className="px-4 py-2 text-sm text-gray-600 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
         >
           ← Назад
