@@ -10,17 +10,17 @@ export const sessionsAPI = {
   close: (sessionId, mode = 'save') => apiClient.post(`${BASE}/sessions/${sessionId}/close/`, { mode }),
   closeAll: () => apiClient.post(`${BASE}/sessions/close-all-my-active/`, {}),
   forceClose: (sessionId) => apiClient.post(`${BASE}/sessions/${sessionId}/force-close/`, {}),
-  delete: (sessionId) => apiClient.post(`${BASE}/sessions/${sessionId}/delete/`, {}),
+  delete: (sessionId) => apiClient.delete(`${BASE}/sessions/${sessionId}/delete/`),
   publish: (sessionId) => apiClient.post(`${BASE}/sessions/${sessionId}/publish/`, {}),
   translate: (sessionId, data = {}) => apiClient.post(`${BASE}/sessions/${sessionId}/translate/`, data),
   checkConflicts: (sessionId) =>
     apiClient.get(`${BASE}/sessions/${sessionId}/publish/check-conflicts/`),
   updateCity: (sessionId, data) =>
-    apiClient.post(`${BASE}/sessions/${sessionId}/city/`, data),
+    apiClient.patch(`${BASE}/sessions/${sessionId}/city/`, data),
   createCityDraft: (sessionId, data = {}) =>
     apiClient.post(`${BASE}/sessions/${sessionId}/city-drafts/`, data),
   deleteCityDraft: (sessionId, draftId) =>
-    apiClient.post(`${BASE}/sessions/${sessionId}/city-drafts/${draftId}/delete/`, {}),
+    apiClient.delete(`${BASE}/sessions/${sessionId}/city-drafts/${draftId}/delete/`),
   setPrimaryCityDraft: (sessionId, draftId) =>
     apiClient.post(`${BASE}/sessions/${sessionId}/city-drafts/${draftId}/primary/`, {}),
   uploadFromFile: (jsonText) =>
@@ -38,9 +38,9 @@ export const attractionsAPI = {
   get: (sessionId, attrId) =>
     apiClient.get(`${BASE}/sessions/${sessionId}/attractions/${attrId}/`),
   update: (sessionId, attrId, data) =>
-    apiClient.post(`${BASE}/sessions/${sessionId}/attractions/${attrId}/update/`, data),
+    apiClient.patch(`${BASE}/sessions/${sessionId}/attractions/${attrId}/update/`, data),
   delete: (sessionId, attrId) =>
-    apiClient.post(`${BASE}/sessions/${sessionId}/attractions/${attrId}/delete/`, {}),
+    apiClient.delete(`${BASE}/sessions/${sessionId}/attractions/${attrId}/delete/`),
   saveContent: (sessionId, attrId, data) =>
     apiClient.post(`${BASE}/sessions/${sessionId}/attractions/${attrId}/content/`, data),
 };
@@ -48,8 +48,8 @@ export const attractionsAPI = {
 // ─── Cities (reference) ───────────────────────────────────────────────────────
 export const citiesAPI = {
   get: (cityId) => apiClient.get(`${BASE}/cities/${cityId}/`),
-  update: (cityId, data) => apiClient.post(`${BASE}/cities/${cityId}/update/`, data),
-  delete: (cityId) => apiClient.post(`${BASE}/cities/${cityId}/delete/`, {}),
+  update: (cityId, data) => apiClient.patch(`${BASE}/cities/${cityId}/update/`, data),
+  delete: (cityId) => apiClient.delete(`${BASE}/cities/${cityId}/delete/`),
   exportJson: () =>
     apiClient.get(`${BASE}/cities/export/`, { responseType: 'blob' }),
   // CityAPI list (used in EventGeneration, CitiesCatalog)
@@ -64,8 +64,8 @@ export const imagesAPI = {
     }),
   get: (imageId) => apiClient.get(`${BASE}/images/${imageId}/`),
   update: (imageId, data) =>
-    apiClient.post(`${BASE}/images/${imageId}/update/`, data),
-  delete: (imageId) => apiClient.post(`${BASE}/images/${imageId}/delete/`, {}),
+    apiClient.patch(`${BASE}/images/${imageId}/update/`, data),
+  delete: (imageId) => apiClient.delete(`${BASE}/images/${imageId}/delete/`),
   // Wikimedia Commons integration
   searchCommons: (query, limit = 10, page = 1) =>
     apiClient.get(`/media/commons/search/`, {
@@ -87,9 +87,9 @@ export const cityFiltersAPI = {
   get: (filterId) => apiClient.get(`${BASE}/city-filters/${filterId}/`),
   create: (data) => apiClient.post(`${BASE}/city-filters/create/`, data),
   update: (filterId, data) =>
-    apiClient.post(`${BASE}/city-filters/${filterId}/update/`, data),
+    apiClient.patch(`${BASE}/city-filters/${filterId}/update/`, data),
   delete: (filterId) =>
-    apiClient.post(`${BASE}/city-filters/${filterId}/delete/`, {}),
+    apiClient.delete(`${BASE}/city-filters/${filterId}/delete/`),
 };
 
 // ─── Event Filters ────────────────────────────────────────────────────────────
@@ -98,9 +98,9 @@ export const eventFiltersAPI = {
   get: (filterId) => apiClient.get(`${BASE}/event-filters/${filterId}/`),
   create: (data) => apiClient.post(`${BASE}/event-filters/create/`, data),
   update: (filterId, data) =>
-    apiClient.post(`${BASE}/event-filters/${filterId}/update/`, data),
+    apiClient.patch(`${BASE}/event-filters/${filterId}/update/`, data),
   delete: (filterId) =>
-    apiClient.post(`${BASE}/event-filters/${filterId}/delete/`, {}),
+    apiClient.delete(`${BASE}/event-filters/${filterId}/delete/`),
 };
 
 // ─── AI ───────────────────────────────────────────────────────────────────────
@@ -130,7 +130,7 @@ export const eventsAPI = {
   update: (eventId, data) =>
     apiClient.patch(`${BASE}/events/${eventId}/update/`, data),
   delete: (eventId) =>
-    apiClient.post(`${BASE}/events/${eventId}/delete/`, {}),
+    apiClient.delete(`${BASE}/events/${eventId}/delete/`),
   setMedia: (eventId, data) =>
     apiClient.post(`${BASE}/events/${eventId}/media/`, data),
   filtersReference: () =>

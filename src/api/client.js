@@ -3,13 +3,9 @@ import TokenManager from '../utils/TokenManager';
 
 // Определяем базовый URL для API
 // В Vite переменные окружения доступны через import.meta.env
-// Используем VITE_API_URL или dev-proxy '/api'
-const API_BASE_URL = import.meta.env.VITE_API_URL || '/api';
+// Используем VITE_API_URL или dev-proxy '/api/v1'
+const API_BASE_URL = import.meta.env.VITE_API_URL || '/api/v1';
 const IS_DEV = import.meta.env.DEV;
-const CSRF_BOOTSTRAP_URL = '/generation/csrf-token/';
-
-let csrfBootstrapPromise = null;
-let csrfTokenCache = '';
 
 if (IS_DEV) {
   console.log('🔧 API Client initialized with baseURL:', API_BASE_URL);
@@ -18,52 +14,12 @@ if (IS_DEV) {
 // Создаем экземпляр axios с базовой конфигурацией
 const apiClient = axios.create({
   baseURL: API_BASE_URL,
-  withCredentials: true,
-  xsrfCookieName: 'csrftoken',
-  xsrfHeaderName: 'X-CSRFToken',
+  // JWT-only: не используем cookie-based auth/CSRF
+  withCredentials: false,
   headers: {
     'Content-Type': 'application/json',
   },
 });
-
-function getCookie(name) {
-  if (typeof document === 'undefined') return '';
-
-  const cookies = document.cookie ? document.cookie.split('; ') : [];
-  const prefix = `${name}=`;
-  const matched = cookies.find((cookie) => cookie.startsWith(prefix));
-  return matched ? decodeURIComponent(matched.slice(prefix.length)) : '';
-}
-
-function isUnsafeMethod(method) {
-  return ['post', 'put', 'patch', 'delete'].includes((method || '').toLowerCase());
-}
-
-async function ensureCsrfCookie() {
-  const existingToken = getCookie('csrftoken') || csrfTokenCache;
-  if (existingToken) return existingToken;
-
-  if (!csrfBootstrapPromise) {
-    csrfBootstrapPromise = apiClient
-      .get(CSRF_BOOTSTRAP_URL, {
-        withCredentials: true,
-        headers: { 'X-CSRFToken': undefined },
-      })
-      .then((response) => {
-        const responseToken = response?.data?.csrf_token || '';
-        if (responseToken) {
-          csrfTokenCache = responseToken;
-        }
-        return responseToken;
-      })
-      .finally(() => {
-        csrfBootstrapPromise = null;
-      });
-  }
-
-  const bootstrappedToken = await csrfBootstrapPromise;
-  return getCookie('csrftoken') || csrfTokenCache || bootstrappedToken || '';
-}
 
 // Simple in-memory cache and in-flight dedupe for GET requests to reduce 429
 const inFlightRequests = new Map();
@@ -121,21 +77,13 @@ apiClient.get = async (url, config = {}) => {
 apiClient.interceptors.request.use(
   async (config) => {
     const tokens = TokenManager.getTokens();
-    const method = config.method?.toLowerCase() || 'get';
 
-    config.withCredentials = true;
+    config.withCredentials = false;
     config.headers = config.headers || {};
 
     if (tokens?.access) {
       // Используем формат "Bearer <access_token>" для JWT
       config.headers.Authorization = `Bearer ${tokens.access}`;
-    }
-
-    if (isUnsafeMethod(method) && config.url !== CSRF_BOOTSTRAP_URL) {
-      const csrfToken = await ensureCsrfCookie();
-      if (csrfToken) {
-        config.headers['X-CSRFToken'] = csrfToken;
-      }
     }
     
     if (IS_DEV) {
@@ -143,7 +91,6 @@ apiClient.interceptors.request.use(
         method: config.method.toUpperCase(),
         url: config.baseURL + config.url,
         hasToken: !!tokens?.access,
-        hasCsrf: !!config.headers['X-CSRFToken'],
       });
     }
     return config;
@@ -156,12 +103,6 @@ apiClient.interceptors.request.use(
 // Интерсептор для обработки ошибок и автоматического обновления токена
 apiClient.interceptors.response.use(
   (response) => {
-    if (response?.config?.url === CSRF_BOOTSTRAP_URL) {
-      const responseToken = response?.data?.csrf_token || '';
-      if (responseToken) {
-        csrfTokenCache = responseToken;
-      }
-    }
     if (IS_DEV) {
       console.log('📥 API Response:', {
         status: response.status,
