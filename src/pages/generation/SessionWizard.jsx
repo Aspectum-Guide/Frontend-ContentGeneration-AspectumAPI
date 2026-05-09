@@ -22,7 +22,7 @@ import { ConfirmModal as DefaultConfirmModal } from '../../components/ui/Modal.j
 import { useConfirmModal } from '../../components/ui/useConfirmModal.jsx';
 import DefaultSessionCloseDialog from '../../components/generation/SessionCloseDialog.jsx';
 
-const STEP_LABELS = ['Город', 'Теги', 'Достопримечательности', 'Полезная информация о достопримечательности', 'Лента', 'Контент', 'Публикация'];
+const STEP_LABELS = ['Город', 'Теги', 'Достопримечательности', 'Лента', 'Контент', 'Публикация'];
 
 export default function SessionWizard({ components = {} } = {}) {
   const StatusBadge = components.StatusBadge ?? DefaultStatusBadge;
@@ -437,7 +437,16 @@ export default function SessionWizard({ components = {} } = {}) {
               }
 
               if (currentStep === 3) {
-                void saveCurrentAttr?.();
+                void (async () => {
+                  if (currentAttr) {
+                    await saveCurrentAttr?.();
+                  }
+
+                  if (currentAttractionInfo) {
+                    await saveCurrentAttractionInfo?.();
+                  }
+                })().catch(() => {});
+
                 return;
               }
 
@@ -589,51 +598,54 @@ export default function SessionWizard({ components = {} } = {}) {
         )}
 
         {currentStep === 3 && (
-          <SessionWizardAttractionsStep
-            attrView={attrView}
-            currentAttr={currentAttr}
-            attrActiveLocale={attrActiveLocale}
-            attrLocaleData={attrLocaleData}
-            attrSaving={attrSaving}
-            attractions={attractions}
-            referenceCities={referenceCities || []}
-            cityDrafts={cityDrafts || []}
-            onUpdateCurrentAttrPatch={updateCurrentAttrPatch}
-            onOpenAttrDetail={openAttrDetail}
-            onOpenAttractionCommonsModal={openAttractionCommonsModal}
-            onAddAttraction={addAttraction}
-            onDeleteCurrentAttr={deleteCurrentAttr}
-            onSetAttrView={setAttrView}
-            onSetCurrentAttr={setCurrentAttr}
-            onSetAttrActiveLocale={setAttrActiveLocale}
-            onUpdateAttrLocaleField={updateAttrLocaleField}
-            onSaveCurrentAttr={saveCurrentAttr}
-            onGoToStep={goToStep}
-          />
+          <div className="space-y-6">
+            <SessionWizardAttractionsStep
+              attrView={attrView}
+              currentAttr={currentAttr}
+              attrActiveLocale={attrActiveLocale}
+              attrLocaleData={attrLocaleData}
+              attrSaving={attrSaving}
+              attractions={attractions}
+              referenceCities={referenceCities || []}
+              cityDrafts={cityDrafts || []}
+              onUpdateCurrentAttrPatch={updateCurrentAttrPatch}
+              onOpenAttrDetail={openAttrDetail}
+              onOpenAttractionCommonsModal={openAttractionCommonsModal}
+              onAddAttraction={addAttraction}
+              onDeleteCurrentAttr={deleteCurrentAttr}
+              onSetAttrView={setAttrView}
+              onSetCurrentAttr={setCurrentAttr}
+              onSetAttrActiveLocale={setAttrActiveLocale}
+              onUpdateAttrLocaleField={updateAttrLocaleField}
+              onSaveCurrentAttr={saveCurrentAttr}
+              onGoToStep={goToStep}
+            />
+
+            <div className="pt-5 border-t border-gray-200">
+              <SessionWizardAttractionInfoStep
+                embedded
+                attractionInfos={attractionInfos}
+                currentAttractionInfo={currentAttractionInfo}
+                attractionInfoLocaleData={attractionInfoLocaleData}
+                attractionInfoActiveLocale={attractionInfoActiveLocale}
+                attractionInfoSaving={attractionInfoSaving}
+                referenceAttractions={referenceAttractions || []}
+                attractions={attractions || []}
+                onOpenAttractionInfoDetail={openAttractionInfoDetail}
+                onAddAttractionInfo={addAttractionInfo}
+                onSetCurrentAttractionInfo={setCurrentAttractionInfo}
+                onSetAttractionInfoActiveLocale={setAttractionInfoActiveLocale}
+                onUpdateAttractionInfoLocaleField={updateAttractionInfoLocaleField}
+                onUpdateCurrentAttractionInfoPatch={updateCurrentAttractionInfoPatch}
+                onSaveCurrentAttractionInfo={saveCurrentAttractionInfo}
+                onDeleteCurrentAttractionInfo={deleteCurrentAttractionInfo}
+                onGoToStep={goToStep}
+              />
+            </div>
+          </div>
         )}
 
         {currentStep === 4 && (
-          <SessionWizardAttractionInfoStep
-            attractionInfos={attractionInfos}
-            currentAttractionInfo={currentAttractionInfo}
-            attractionInfoLocaleData={attractionInfoLocaleData}
-            attractionInfoActiveLocale={attractionInfoActiveLocale}
-            attractionInfoSaving={attractionInfoSaving}
-            referenceAttractions={referenceAttractions || []}
-            attractions={attractions || []}
-            onOpenAttractionInfoDetail={openAttractionInfoDetail}
-            onAddAttractionInfo={addAttractionInfo}
-            onSetCurrentAttractionInfo={setCurrentAttractionInfo}
-            onSetAttractionInfoActiveLocale={setAttractionInfoActiveLocale}
-            onUpdateAttractionInfoLocaleField={updateAttractionInfoLocaleField}
-            onUpdateCurrentAttractionInfoPatch={updateCurrentAttractionInfoPatch}
-            onSaveCurrentAttractionInfo={saveCurrentAttractionInfo}
-            onDeleteCurrentAttractionInfo={deleteCurrentAttractionInfo}
-            onGoToStep={goToStep}
-          />
-        )}
-
-        {currentStep === 5 && (
           <SessionWizardAttractionFeedStep
             attractionFeedItems={attractionFeedItems}
             currentAttractionFeedItem={currentAttractionFeedItem}
@@ -660,7 +672,7 @@ export default function SessionWizard({ components = {} } = {}) {
           />
         )}
 
-        {currentStep === 6 && (
+        {currentStep === 5 && (
           <SessionWizardContentStep
             attractions={attractions}
             aiGenAttrId={aiGenAttrId}
@@ -678,7 +690,7 @@ export default function SessionWizard({ components = {} } = {}) {
           />
         )}
 
-        {currentStep === 7 && (
+        {currentStep === 6 && (
           <SessionWizardPublishStep
             session={session}
             cityDrafts={cityDrafts}

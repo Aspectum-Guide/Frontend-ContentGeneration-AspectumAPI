@@ -1,4 +1,4 @@
-import { DEFAULT_LOCALE_DEFS, getAttrName, getFlag } from './sessionWizardShared.jsx';
+import { getAttrName, getFlag } from './sessionWizardShared.jsx';
 
 const normalizeId = (value) => {
   if (value == null) return '';
@@ -186,7 +186,7 @@ function AttractionInfoDraftsPanel({
                 type="button"
                 onClick={() => {
                   if (!isActive) {
-                    onSelectAttractionInfo(info.id);
+                    onSelectAttractionInfo?.(info.id);
                   }
                 }}
                 className={`flex items-center gap-1 px-2 py-1 rounded-lg border text-xs transition-colors ${
@@ -208,6 +208,8 @@ function AttractionInfoDraftsPanel({
 }
 
 export default function SessionWizardAttractionInfoStep({
+  embedded = false,
+
   attractionInfos = [],
   currentAttractionInfo,
   attractionInfoLocaleData = {},
@@ -245,8 +247,8 @@ export default function SessionWizardAttractionInfoStep({
 
   if (!currentAttractionInfo) {
     return (
-      <div className="space-y-4">
-        <div className="flex items-center justify-between">
+      <section className="space-y-4">
+        <div className="flex items-center justify-between gap-3">
           <div>
             <h2 className="text-lg font-semibold text-gray-900">
               Полезная информация о достопримечательности
@@ -261,14 +263,14 @@ export default function SessionWizardAttractionInfoStep({
           <button
             type="button"
             onClick={onAddAttractionInfo}
-            className="px-3 py-1.5 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors"
+            className="px-3 py-1.5 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors shrink-0"
           >
             + Добавить
           </button>
         </div>
 
         {attractionInfos.length === 0 ? (
-          <div className="text-center py-12 text-gray-400">
+          <div className="text-center py-10 text-gray-400 border border-dashed border-gray-200 rounded-xl bg-gray-50">
             <div className="text-3xl mb-2">💡</div>
 
             <p className="text-sm">
@@ -280,16 +282,16 @@ export default function SessionWizardAttractionInfoStep({
             {attractionInfos.map((info, idx) => (
               <div
                 key={info.id}
-                onClick={() => onOpenAttractionInfoDetail(info.id)}
+                onClick={() => onOpenAttractionInfoDetail?.(info.id)}
                 className="flex items-center justify-between p-3 bg-white border border-gray-200 rounded-lg hover:border-blue-300 hover:bg-blue-50 cursor-pointer transition-colors"
               >
-                <div className="flex items-center gap-3">
-                  <span className="w-6 h-6 flex items-center justify-center rounded-full bg-gray-100 text-xs font-medium text-gray-600">
+                <div className="flex items-center gap-3 min-w-0">
+                  <span className="w-6 h-6 flex items-center justify-center rounded-full bg-gray-100 text-xs font-medium text-gray-600 shrink-0">
                     {idx + 1}
                   </span>
 
-                  <div>
-                    <div className="text-sm font-medium text-gray-900">
+                  <div className="min-w-0">
+                    <div className="text-sm font-medium text-gray-900 truncate">
                       {getAttractionInfoName(info)}
                     </div>
 
@@ -303,7 +305,7 @@ export default function SessionWizardAttractionInfoStep({
                   </div>
                 </div>
 
-                <span className="text-xs text-blue-600 font-medium">
+                <span className="text-xs text-blue-600 font-medium shrink-0">
                   Открыть →
                 </span>
               </div>
@@ -311,33 +313,35 @@ export default function SessionWizardAttractionInfoStep({
           </div>
         )}
 
-        <div className="flex justify-between pt-2">
-          <button
-            type="button"
-            onClick={() => onGoToStep(3)}
-            className="px-4 py-2 text-sm text-gray-600 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
-          >
-            ← Назад
-          </button>
+        {!embedded && (
+          <div className="flex justify-between pt-2">
+            <button
+              type="button"
+              onClick={() => onGoToStep?.(3)}
+              className="px-4 py-2 text-sm text-gray-600 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+            >
+              ← Назад
+            </button>
 
-          <button
-            type="button"
-            onClick={() => onGoToStep(5)}
-            className="px-5 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors"
-          >
-            Далее: Лента →
-          </button>
-        </div>
-      </div>
+            <button
+              type="button"
+              onClick={() => onGoToStep?.(4)}
+              className="px-5 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors"
+            >
+              Далее: Лента →
+            </button>
+          </div>
+        )}
+      </section>
     );
   }
 
   return (
-    <div className="space-y-4">
+    <section className="space-y-4">
       <div className="flex items-center gap-3">
         <button
           type="button"
-          onClick={() => onSetCurrentAttractionInfo(null)}
+          onClick={() => onSetCurrentAttractionInfo?.(null)}
           className="w-8 h-8 flex items-center justify-center border border-gray-300 rounded-lg text-gray-500 hover:bg-gray-50 transition-colors"
         >
           ←
@@ -364,14 +368,14 @@ export default function SessionWizardAttractionInfoStep({
       />
 
       <div className="flex items-center gap-1 flex-wrap">
-        {DEFAULT_LOCALE_DEFS.map((loc) => {
-          const isActive = loc.key === attractionInfoActiveLocale;
+        {Object.entries(attractionInfoLocaleData || {}).map(([key, loc]) => {
+          const isActive = key === attractionInfoActiveLocale;
 
           return (
             <button
-              key={loc.key}
+              key={key}
               type="button"
-              onClick={() => onSetAttractionInfoActiveLocale(loc.key)}
+              onClick={() => onSetAttractionInfoActiveLocale?.(key)}
               className={`flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium border transition-all ${
                 isActive
                   ? 'bg-blue-600 text-white border-blue-600'
@@ -395,7 +399,7 @@ export default function SessionWizardAttractionInfoStep({
             type="text"
             value={currentLocale.name || ''}
             onChange={(e) =>
-              onUpdateAttractionInfoLocaleField('name', e.target.value)
+              onUpdateAttractionInfoLocaleField?.('name', e.target.value)
             }
             placeholder="Например: Часы работы, Билеты, Как добраться"
             className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -535,23 +539,15 @@ export default function SessionWizardAttractionInfoStep({
           <textarea
             value={currentLocale.description || ''}
             onChange={(e) =>
-              onUpdateAttractionInfoLocaleField('description', e.target.value)
+              onUpdateAttractionInfoLocaleField?.('description', e.target.value)
             }
-            rows={7}
+            rows={embedded ? 5 : 7}
             placeholder="Описание полезной информации для пользователя..."
             className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
           />
         </div>
 
-        <div className="flex justify-between pt-2">
-          <button
-            type="button"
-            onClick={() => onGoToStep(4)}
-            className="px-4 py-2 text-sm text-gray-600 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
-          >
-            ← Назад
-          </button>
-
+        <div className="flex justify-end">
           <button
             type="button"
             onClick={onSaveCurrentAttractionInfo}
@@ -562,6 +558,6 @@ export default function SessionWizardAttractionInfoStep({
           </button>
         </div>
       </main>
-    </div>
+    </section>
   );
 }

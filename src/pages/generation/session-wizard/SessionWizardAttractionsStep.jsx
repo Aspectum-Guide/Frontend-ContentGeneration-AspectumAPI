@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { DEFAULT_LOCALE_DEFS, getAttrName, getFlag } from './sessionWizardShared.jsx';
+import { getAttrName, getFlag } from './sessionWizardShared.jsx';
 
 const getCityDisplayName = (city) => {
   if (!city) return 'Без названия';
@@ -605,7 +605,7 @@ export default function SessionWizardAttractionsStep({
           <div className="flex justify-between pt-2">
             <button
               type="button"
-              onClick={() => onGoToStep(2)}
+              onClick={() => onGoToStep(3)}
               className="px-4 py-2 text-sm text-gray-600 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
             >
               ← Назад
@@ -613,10 +613,10 @@ export default function SessionWizardAttractionsStep({
 
             <button
               type="button"
-              onClick={() => onGoToStep(4)}
+              onClick={() => onGoToStep(5)}
               className="px-5 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors"
             >
-              Далее: Полезная информация →
+              Далее: Контент →
             </button>
           </div>
         </div>
@@ -655,14 +655,14 @@ export default function SessionWizardAttractionsStep({
           />
 
           <div className="flex items-center gap-1 flex-wrap">
-            {DEFAULT_LOCALE_DEFS.map((loc) => {
-              const isActive = loc.key === attrActiveLocale;
+            {Object.entries(attrLocaleData || {}).map(([key, loc]) => {
+              const isActive = key === attrActiveLocale;
 
               return (
                 <button
-                  key={loc.key}
+                  key={key}
                   type="button"
-                  onClick={() => onSetAttrActiveLocale(loc.key)}
+                  onClick={() => onSetAttrActiveLocale(key)}
                   className={`flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium border transition-all ${
                     isActive
                       ? 'bg-blue-600 text-white border-blue-600'

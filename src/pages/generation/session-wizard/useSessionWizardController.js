@@ -485,20 +485,26 @@ const createEmptyCityInfo = ({
   };
 };
 
-const createEmptyAttractionInfo = () => {
+const createEmptyAttractionInfo = ({
+  activeAttractionId = null,
+  sourceLocaleData = null,
+} = {}) => {
+  const normalizedAttractionId = normalizeId(activeAttractionId);
+  const shouldAttachToDraft = Boolean(normalizedAttractionId);
+
   return {
     id: `attraction-info-${Date.now()}`,
 
-    name: makeEmptyLocaleObject(),
-    description: makeEmptyLocaleObject(),
+    name: makeEmptyLocaleObject(sourceLocaleData),
+    description: makeEmptyLocaleObject(sourceLocaleData),
 
-    assigned_attraction_type: 'none',
+    assigned_attraction_type: shouldAttachToDraft ? 'draft' : 'none',
 
     attraction: null,
     attraction_id: null,
 
-    session_attraction: null,
-    session_attraction_id: null,
+    session_attraction: shouldAttachToDraft ? normalizedAttractionId : null,
+    session_attraction_id: shouldAttachToDraft ? normalizedAttractionId : null,
 
     isNew: true,
   };
@@ -601,6 +607,172 @@ function extractReferenceCities(data) {
   return [];
 }
 
+function getMultilangKeys(...objects) {
+  const keys = new Set();
+
+  objects.forEach((obj) => {
+    if (!obj || typeof obj !== 'object' || Array.isArray(obj)) return;
+
+    Object.keys(obj).forEach((key) => {
+      const lang = String(key || '').trim().toLowerCase();
+
+      if (lang) {
+        keys.add(lang);
+      }
+    });
+  });
+
+  return Array.from(keys);
+}
+
+function sortLocaleSourceEntries(entries) {
+  if (!Array.isArray(entries) || entries.length <= 1) return entries;
+
+  const defaultLangOrder = DEFAULT_LOCALE_DEFS.map((locale) =>
+    locale.lang || locale.key?.split('-')?.[0]
+  ).filter(Boolean);
+
+  const langToPair = new Map();
+  for (const [key, loc] of entries) {
+    const lang = String(loc?.lang || key?.split('-')?.[0] || '')
+      .trim()
+      .toLowerCase();
+    if (!lang) continue;
+    if (!langToPair.has(lang)) {
+      langToPair.set(lang, [key, loc]);
+    }
+  }
+
+  const normalizedLangKeys = [...langToPair.keys()];
+
+  const orderedLangKeys = [
+    ...defaultLangOrder.filter((lang) => normalizedLangKeys.includes(lang)),
+    ...normalizedLangKeys.filter((lang) => !defaultLangOrder.includes(lang)),
+  ];
+
+  return orderedLangKeys.map((lang) => langToPair.get(lang));
+}
+
+function makeLocaleEntriesFromLangKeys(langKeys = []) {
+  const normalizedLangKeys = [
+    ...new Set(
+      langKeys
+        .map((lang) => String(lang || '').trim().toLowerCase())
+        .filter(Boolean)
+    ),
+  ];
+
+  const defaultLangOrder = DEFAULT_LOCALE_DEFS.map((locale) =>
+    locale.lang || locale.key?.split('-')?.[0]
+  ).filter(Boolean);
+
+  const orderedLangKeys = [
+    ...defaultLangOrder.filter((lang) => normalizedLangKeys.includes(lang)),
+    ...normalizedLangKeys.filter((lang) => !defaultLangOrder.includes(lang)),
+  ];
+
+  return orderedLangKeys.map((lang) => {
+    const matchedDef = DEFAULT_LOCALE_DEFS.find((locale) => locale.lang === lang);
+
+    if (matchedDef) {
+      return [
+        matchedDef.key,
+        {
+          lang: matchedDef.lang,
+          code: matchedDef.code,
+          langName: matchedDef.langName,
+          isDefault: Boolean(matchedDef.isDefault),
+        },
+      ];
+    }
+
+    const info = getLocaleInfo(lang);
+    const key = `${lang}-${info.code}`;
+
+    return [
+      key,
+      {
+        lang,
+        code: info.code,
+        langName: info.name,
+        isDefault: false,
+        isCustom: true,
+      },
+    ];
+  });
+}
+
+function getAttractionLocaleSourceEntries(
+  attr = {},
+  { localeData, cityDrafts, referenceCities, activeCityDraftIdRef }
+) {
+  const assignedType = attr.assigned_city_type || 'none';
+
+  let sourceEntries = [];
+
+  if (assignedType === 'draft') {
+    const attrDraftCityId = normalizeDraftId(
+      attr.session_city_id ?? attr.session_city
+    );
+
+    const activeDraftId = normalizeDraftId(activeCityDraftIdRef?.current);
+
+    if (
+      attrDraftCityId &&
+      activeDraftId &&
+      attrDraftCityId === activeDraftId
+    ) {
+      sourceEntries = sortLocaleSourceEntries(
+        Object.entries(localeData || {}).filter(([, loc]) => loc?.lang)
+      );
+    } else if (attrDraftCityId) {
+      const draft = cityDrafts.find(
+        (item) => normalizeDraftId(item.id) === attrDraftCityId
+      );
+
+      const draftLangKeys = getMultilangKeys(
+        draft?.name,
+        draft?.description,
+        draft?.country
+      );
+
+      sourceEntries = makeLocaleEntriesFromLangKeys(draftLangKeys);
+    }
+  }
+
+  if (assignedType === 'database') {
+    const cityId = normalizeId(attr.city_id ?? attr.city);
+
+    const city = referenceCities.find(
+      (item) => normalizeId(item.id) === cityId
+    );
+
+    const cityLangKeys = getMultilangKeys(
+      city?.name,
+      city?.description,
+      city?.country
+    );
+
+    sourceEntries = makeLocaleEntriesFromLangKeys(cityLangKeys);
+  }
+
+  if (assignedType === 'none') {
+    const ownLangKeys = getMultilangKeys(
+      attr.name,
+      attr.description,
+      attr.contents
+    );
+
+    sourceEntries = makeLocaleEntriesFromLangKeys(ownLangKeys);
+  }
+
+  if (sourceEntries.length === 0) {
+    sourceEntries = DEFAULT_LOCALE_DEFS.map((locale) => [locale.key, locale]);
+  }
+
+  return sourceEntries;
+}
+
 export function useSessionWizardController({ sessionId, confirm: confirmProp } = {}) {
   const { setMobileActions } = useLayoutActions();
   const navigate = useNavigate();
@@ -661,6 +833,7 @@ export function useSessionWizardController({ sessionId, confirm: confirmProp } =
   const [attrActiveLocale, setAttrActiveLocale] = useState('ru-RU');
   const [attrSaving, setAttrSaving] = useState(false);
   const [attractionsLoaded, setAttractionsLoaded] = useState(false);
+  const attrLocaleDataAttractionIdRef = useRef(null);
 
   const [attractionInfos, setAttractionInfos] = useState([]);
   const [currentAttractionInfo, setCurrentAttractionInfo] = useState(null);
@@ -678,41 +851,6 @@ export function useSessionWizardController({ sessionId, confirm: confirmProp } =
   const [currentCityInfo, setCurrentCityInfo] = useState(null);
   const [cityInfoActiveLocale, setCityInfoActiveLocale] = useState('ru-RU');
   const [cityInfoSaving, setCityInfoSaving] = useState(false);
-
-  const getMultilangKeys = (...objects) => {
-    const keys = new Set();
-
-    objects.forEach((obj) => {
-      if (!obj || typeof obj !== 'object' || Array.isArray(obj)) return;
-
-      Object.keys(obj).forEach((key) => {
-        const lang = String(key || '').trim().toLowerCase();
-
-        if (lang) {
-          keys.add(lang);
-        }
-      });
-    });
-
-    return Array.from(keys);
-  };
-
-  const makeLocaleEntriesFromLangKeys = (langKeys = []) => {
-    return langKeys.map((lang) => {
-      const info = getLocaleInfo(lang);
-      const key = `${lang}-${info.code}`;
-
-      return [
-        key,
-        {
-          lang,
-          code: info.code,
-          langName: info.name,
-          isDefault: false,
-        },
-      ];
-    });
-  };
 
   const cityInfoLocaleData = useMemo(() => {
     if (!currentCityInfo) return {};
@@ -733,8 +871,8 @@ export function useSessionWizardController({ sessionId, confirm: confirmProp } =
         activeDraftId &&
         currentInfoDraftId === activeDraftId
       ) {
-        sourceEntries = Object.entries(localeData || {}).filter(
-          ([, loc]) => loc?.lang
+        sourceEntries = sortLocaleSourceEntries(
+          Object.entries(localeData || {}).filter(([, loc]) => loc?.lang)
         );
       } else if (currentInfoDraftId) {
         const draft = cityDrafts.find(
@@ -824,24 +962,137 @@ export function useSessionWizardController({ sessionId, confirm: confirmProp } =
     cityInfoActiveLocale,
   ]);
 
-
   const attractionInfoLocaleData = useMemo(() => {
     if (!currentAttractionInfo) return {};
 
-    return DEFAULT_LOCALE_DEFS.reduce((acc, locale) => {
-      const lang = locale.lang || locale.key?.split('-')?.[0] || 'ru';
+    const assignedType =
+      currentAttractionInfo.assigned_attraction_type || 'none';
 
-      acc[locale.key] = {
+    let sourceEntries = [];
+
+    if (assignedType === 'draft') {
+      const currentInfoAttractionId = normalizeId(
+        currentAttractionInfo.session_attraction_id ??
+          currentAttractionInfo.session_attraction
+      );
+
+      const activeAttractionId = normalizeId(currentAttr?.id);
+
+      if (
+        currentInfoAttractionId &&
+        activeAttractionId &&
+        currentInfoAttractionId === activeAttractionId
+      ) {
+        // Блок привязан к той достопримечательности,
+        // которая сейчас открыта в форме.
+        // Берём живые языки формы достопримечательности.
+        sourceEntries = sortLocaleSourceEntries(
+          Object.entries(attrLocaleData || {})
+            .filter(([, loc]) => loc?.lang)
+            .map(([key, loc]) => [
+              key,
+              {
+                lang: loc.lang,
+                code: loc.code,
+                langName: loc.langName,
+                isDefault: loc.isDefault,
+                isCustom: loc.isCustom,
+              },
+            ])
+        );
+      } else if (currentInfoAttractionId) {
+        // Блок привязан к другой достопримечательности из сессии.
+        // Не берём языки текущей открытой достопримечательности.
+        const attraction = attractions.find(
+          (item) => normalizeId(item.id) === currentInfoAttractionId
+        );
+
+        const attractionLangKeys = getMultilangKeys(
+          attraction?.name,
+          attraction?.description,
+          attraction?.contents
+        );
+
+        sourceEntries = makeLocaleEntriesFromLangKeys(attractionLangKeys);
+      }
+    }
+
+    if (assignedType === 'database') {
+      const eventId = normalizeId(
+        currentAttractionInfo.event_id ??
+          currentAttractionInfo.event ??
+          currentAttractionInfo.attraction_id ??
+          currentAttractionInfo.attraction
+      );
+
+      const attraction = referenceAttractions.find(
+        (item) => normalizeId(item.id) === eventId
+      );
+
+      const attractionLangKeys = getMultilangKeys(
+        attraction?.name,
+        attraction?.title,
+        attraction?.description
+      );
+
+      sourceEntries = makeLocaleEntriesFromLangKeys(attractionLangKeys);
+    }
+
+    if (assignedType === 'none') {
+      // Если блок не привязан — он не должен брать языки текущей достопримечательности.
+      const ownLangKeys = getMultilangKeys(
+        currentAttractionInfo.name,
+        currentAttractionInfo.description
+      );
+
+      sourceEntries = makeLocaleEntriesFromLangKeys(ownLangKeys);
+    }
+
+    if (sourceEntries.length === 0) {
+      sourceEntries = DEFAULT_LOCALE_DEFS.map((locale) => [locale.key, locale]);
+    }
+
+    return sourceEntries.reduce((acc, [key, locale]) => {
+      const lang =
+        locale.lang ||
+        key?.split('-')?.[0] ||
+        'ru';
+
+      acc[key] = {
         lang,
-        code: locale.code,
-        langName: locale.langName,
+        code: locale.code || key?.split('-')?.[1] || '',
+        langName: locale.langName || locale.name || lang.toUpperCase(),
+        isDefault: Boolean(locale.isDefault),
+        isCustom: Boolean(locale.isCustom),
+
         name: currentAttractionInfo.name?.[lang] || '',
         description: currentAttractionInfo.description?.[lang] || '',
       };
 
       return acc;
     }, {});
-  }, [currentAttractionInfo]);
+  }, [
+    currentAttractionInfo,
+    currentAttr,
+    attrLocaleData,
+    attractions,
+    referenceAttractions,
+  ]);
+  useEffect(() => {
+    if (!currentAttractionInfo) return;
+
+    const availableKeys = Object.keys(attractionInfoLocaleData || {});
+
+    if (availableKeys.length === 0) return;
+
+    if (!availableKeys.includes(attractionInfoActiveLocale)) {
+      setAttractionInfoActiveLocale(availableKeys[0]);
+    }
+  }, [
+    currentAttractionInfo,
+    attractionInfoLocaleData,
+    attractionInfoActiveLocale,
+  ]);
 
   const attractionFeedLocaleData = useMemo(() => {
     if (!currentAttractionFeedItem) return {};
@@ -1254,7 +1505,14 @@ export function useSessionWizardController({ sessionId, confirm: confirmProp } =
       const localeName = loc.name?.trim() || '';
       const localeDescription = loc.description?.trim() || '';
       const localeCountry = loc.country?.trim() || '';
-      const shouldPersistLocale = !!(localeName || localeDescription || localeCountry || loc.isCustom || key === defaultLocale);
+      const shouldPersistLocale = !!(
+        localeName ||
+        localeDescription ||
+        localeCountry ||
+        loc.isDefault ||
+        loc.isCustom ||
+        key === defaultLocale
+      );
       if (shouldPersistLocale) {
         name[loc.lang] = localeName;
         description[loc.lang] = localeDescription;
@@ -2177,7 +2435,12 @@ export function useSessionWizardController({ sessionId, confirm: confirmProp } =
 
   const addAttractionInfo = useCallback(async () => {
     try {
-      const emptyInfo = createEmptyAttractionInfo();
+      const activeAttractionId = normalizeId(currentAttr?.id);
+
+      const emptyInfo = createEmptyAttractionInfo({
+        activeAttractionId,
+        sourceLocaleData: attrLocaleData,
+      });
 
       const res = await attractionInfosAPI.create(
         sessionId,
@@ -2188,11 +2451,22 @@ export function useSessionWizardController({ sessionId, confirm: confirmProp } =
       const info = normalizeAttractionInfo(rawInfo || emptyInfo);
 
       if (info?.id) {
+        const localeKeys = Object.keys(attrLocaleData || {});
+        const nextActiveLocale =
+          localeKeys.includes(attrActiveLocale)
+            ? attrActiveLocale
+            : localeKeys[0] || 'ru-RU';
+
         setAttractionInfos((prev) => [...prev, info]);
         setCurrentAttractionInfo(info);
-        setAttractionInfoActiveLocale('ru-RU');
+        setAttractionInfoActiveLocale(nextActiveLocale);
 
-        showNote('Блок полезной информации о достопримечательности добавлен', 'success');
+        showNote(
+          activeAttractionId
+            ? 'Блок полезной информации добавлен и привязан к текущей достопримечательности'
+            : 'Блок полезной информации о достопримечательности добавлен',
+          'success'
+        );
       }
     } catch (e) {
       showNote(
@@ -2200,7 +2474,13 @@ export function useSessionWizardController({ sessionId, confirm: confirmProp } =
         'error'
       );
     }
-  }, [sessionId, showNote]);
+  }, [
+    sessionId,
+    currentAttr,
+    attrLocaleData,
+    attrActiveLocale,
+    showNote,
+  ]);
 
   const openAttractionInfoDetail = useCallback((infoId) => {
     const target = attractionInfos.find(
@@ -2233,7 +2513,9 @@ export function useSessionWizardController({ sessionId, confirm: confirmProp } =
   }, []);
 
   const updateAttractionInfoLocaleField = useCallback((field, value) => {
-    const lang = getLocaleLang(attractionInfoActiveLocale);
+    const lang =
+      attractionInfoLocaleData?.[attractionInfoActiveLocale]?.lang ||
+      getLocaleLang(attractionInfoActiveLocale);
 
     setCurrentAttractionInfo((prev) => {
       if (!prev) return prev;
@@ -2254,7 +2536,10 @@ export function useSessionWizardController({ sessionId, confirm: confirmProp } =
 
       return updated;
     });
-  }, [attractionInfoActiveLocale]);
+  }, [
+    attractionInfoActiveLocale,
+    attractionInfoLocaleData,
+  ]);
 
   const saveCurrentAttractionInfo = useCallback(async () => {
     if (!currentAttractionInfo) return;
@@ -2373,13 +2658,82 @@ export function useSessionWizardController({ sessionId, confirm: confirmProp } =
     showNote,
   ]);
 
-  const buildAttrLocaleData = useCallback((attr) => {
-    const data = {};
-    DEFAULT_LOCALE_DEFS.forEach((loc) => {
-      data[loc.key] = { lang: loc.lang, code: loc.code, langName: loc.langName, name: (attr.name && attr.name[loc.lang]) || '', description: (attr.description && attr.description[loc.lang]) || '', contentText: (attr.contents && attr.contents[loc.lang]) || '' };
+  const buildAttrLocaleData = useCallback((attr = {}, previousData = null) => {
+    const sourceEntries = getAttractionLocaleSourceEntries(attr, {
+      localeData,
+      cityDrafts,
+      referenceCities,
+      activeCityDraftIdRef,
     });
-    return data;
-  }, []);
+
+    return sourceEntries.reduce((acc, [key, locale]) => {
+      const lang =
+        locale.lang ||
+        key?.split('-')?.[0] ||
+        'ru';
+
+      const previousLocaleData = previousData?.[key];
+
+      acc[key] = {
+        lang,
+        code: locale.code || key?.split('-')?.[1] || '',
+        langName: locale.langName || locale.name || lang.toUpperCase(),
+        isDefault: Boolean(locale.isDefault),
+        isCustom: Boolean(locale.isCustom),
+
+        name:
+          previousLocaleData?.name ??
+          attr.name?.[lang] ??
+          '',
+
+        description:
+          previousLocaleData?.description ??
+          attr.description?.[lang] ??
+          '',
+
+        contentText:
+          previousLocaleData?.contentText ??
+          attr.contents?.[lang] ??
+          '',
+      };
+
+      return acc;
+    }, {});
+  }, [localeData, cityDrafts, referenceCities]);
+  useEffect(() => {
+    if (!currentAttr) return;
+
+    const currentAttrId = normalizeId(currentAttr.id);
+
+    setAttrLocaleData((prev) => {
+      const shouldPreserveValues =
+        attrLocaleDataAttractionIdRef.current === currentAttrId;
+
+      const next = buildAttrLocaleData(
+        currentAttr,
+        shouldPreserveValues ? prev : null
+      );
+
+      attrLocaleDataAttractionIdRef.current = currentAttrId;
+
+      return next;
+    });
+  }, [
+    currentAttr,
+    buildAttrLocaleData,
+  ]);
+  useEffect(() => {
+    const availableKeys = Object.keys(attrLocaleData || {});
+
+    if (availableKeys.length === 0) return;
+
+    if (!availableKeys.includes(attrActiveLocale)) {
+      setAttrActiveLocale(availableKeys[0]);
+    }
+  }, [
+    attrLocaleData,
+    attrActiveLocale,
+  ]);
 
   const openAttrDetail = useCallback(async (attrId) => {
     try {
@@ -2436,13 +2790,21 @@ export function useSessionWizardController({ sessionId, confirm: confirmProp } =
 
       const attr = normalizeAttraction(mergedAttr);
 
+      const nextAttrId = normalizeId(attr.id);
+      if (attrLocaleDataAttractionIdRef.current !== nextAttrId) {
+        attrLocaleDataAttractionIdRef.current = null;
+      }
+
       setAttractions((items) =>
         items.map((item) => (String(item.id) === String(attr.id) ? attr : item))
       );
 
+      const nextLocaleData = buildAttrLocaleData(attr);
+      const nextLocaleKeys = Object.keys(nextLocaleData);
+
       setCurrentAttr(attr);
-      setAttrLocaleData(buildAttrLocaleData(attr));
-      setAttrActiveLocale('ru-RU');
+      setAttrLocaleData(nextLocaleData);
+      setAttrActiveLocale(nextLocaleKeys[0] || 'ru-RU');
       setAttrView('detail');
     } catch (e) {
       showNote('Не удалось открыть достопримечательность: ' + e.message, 'error');
@@ -2453,17 +2815,27 @@ export function useSessionWizardController({ sessionId, confirm: confirmProp } =
     try {
       const nextIndex = attractions.length;
 
+      const activeDraftId = normalizeDraftId(activeCityDraftIdRef.current);
+      const shouldAttachToDraft =
+        activeDraftId && activeDraftId !== 'legacy';
+
       const res = await attractionsAPI.create(sessionId, {
         name: {},
         description: {},
+
         lat: null,
         lon: null,
 
         index: nextIndex,
         rank: 0,
 
+        assigned_city_type: shouldAttachToDraft ? 'draft' : 'none',
+
         city: null,
-        session_city: null,
+        city_id: null,
+
+        session_city: shouldAttachToDraft ? activeDraftId : null,
+        session_city_id: shouldAttachToDraft ? activeDraftId : null,
 
         image_id: null,
 
@@ -2472,20 +2844,57 @@ export function useSessionWizardController({ sessionId, confirm: confirmProp } =
       });
 
       const rawAttr = res?.data?.attraction || res?.data;
-      const attr = normalizeAttraction(rawAttr || {});
+
+      const attr = normalizeAttraction({
+        ...(rawAttr || {}),
+
+        assigned_city_type:
+          rawAttr?.assigned_city_type ??
+          (shouldAttachToDraft ? 'draft' : 'none'),
+
+        city: rawAttr?.city ?? null,
+        city_id: rawAttr?.city_id ?? null,
+
+        session_city:
+          rawAttr?.session_city ??
+          (shouldAttachToDraft ? activeDraftId : null),
+
+        session_city_id:
+          rawAttr?.session_city_id ??
+          (shouldAttachToDraft ? activeDraftId : null),
+      });
 
       if (attr?.id) {
+        const nextAttrId = normalizeId(attr.id);
+        if (attrLocaleDataAttractionIdRef.current !== nextAttrId) {
+          attrLocaleDataAttractionIdRef.current = null;
+        }
+
+        const nextLocaleData = buildAttrLocaleData(attr);
+        const nextLocaleKeys = Object.keys(nextLocaleData);
+
         setAttractions((prev) => [...prev, attr]);
         setCurrentAttr(attr);
-        setAttrLocaleData(buildAttrLocaleData(attr));
-        setAttrActiveLocale('ru-RU');
+        setAttrLocaleData(nextLocaleData);
+        setAttrActiveLocale(nextLocaleKeys[0] || 'ru-RU');
         setAttrView('detail');
-        showNote('Достопримечательность добавлена', 'success');
+
+        showNote(
+          shouldAttachToDraft
+            ? 'Достопримечательность добавлена и привязана к текущему городу'
+            : 'Достопримечательность добавлена',
+          'success'
+        );
       }
     } catch (e) {
-      showNote('Ошибка при добавлении: ' + e.message, 'error');
+      showNote('Ошибка при добавлении: ' + parseApiError(e, e.message), 'error');
     }
-  }, [sessionId, attractions.length, buildAttrLocaleData, showNote]);
+  }, [
+    sessionId,
+    attractions.length,
+    buildAttrLocaleData,
+    showNote,
+  ]);
 
   const saveCurrentAttr = useCallback(async () => {
     if (!currentAttr) return;
@@ -2669,15 +3078,10 @@ export function useSessionWizardController({ sessionId, confirm: confirmProp } =
         Boolean(lat) ||
         Boolean(lon);
 
-      // Важно: не включаем cityTags в hasCityDataToSave.
-      // Иначе сессия только с тегами/достопримечательностями может упасть
-      // на валидации города.
       if (hasCityDataToSave) {
         await saveCityForStep1();
       }
 
-      // Полезная информация о городе теперь внутри шага города,
-      // поэтому сохраняем ее, если она сейчас открыта.
       if (currentCityInfo) {
         await saveCurrentCityInfo();
       }
