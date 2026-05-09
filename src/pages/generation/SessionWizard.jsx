@@ -22,7 +22,7 @@ import { ConfirmModal as DefaultConfirmModal } from '../../components/ui/Modal.j
 import { useConfirmModal } from '../../components/ui/useConfirmModal.jsx';
 import DefaultSessionCloseDialog from '../../components/generation/SessionCloseDialog.jsx';
 
-const STEP_LABELS = ['Город', 'Теги', 'Достопримечательности', 'Контент', 'Публикация'];
+const STEP_LABELS = ['Город', 'Достопримечательности', 'Контент', 'Публикация'];
 
 export default function SessionWizard({ components = {} } = {}) {
   const StatusBadge = components.StatusBadge ?? DefaultStatusBadge;
@@ -583,25 +583,26 @@ export default function SessionWizard({ components = {} } = {}) {
                 onGoToStep={goToStep}
               />
             </div>
+
+            <div className="pt-5 border-t border-gray-200">
+              <SessionWizardTagsStep
+                embedded
+                tagInput={tagInput}
+                cityTags={cityTags}
+                availableTags={availableTags}
+                saving={saving}
+                onTagInputChange={setTagInput}
+                onTagKeyDown={handleTagKeyDown}
+                onTagBlur={handleTagBlur}
+                onAddTag={addTag}
+                onRemoveTag={removeTag}
+                onGoToStep={goToStep}
+              />
+            </div>
           </div>
         )}
 
         {currentStep === 2 && (
-          <SessionWizardTagsStep
-            tagInput={tagInput}
-            cityTags={cityTags}
-            availableTags={availableTags}
-            saving={saving}
-            onTagInputChange={setTagInput}
-            onTagKeyDown={handleTagKeyDown}
-            onTagBlur={handleTagBlur}
-            onAddTag={addTag}
-            onRemoveTag={removeTag}
-            onGoToStep={goToStep}
-          />
-        )}
-
-        {currentStep === 3 && (
           <div className="space-y-6">
             <SessionWizardAttractionsStep
               attrView={attrView}
@@ -675,7 +676,7 @@ export default function SessionWizard({ components = {} } = {}) {
           </div>
         )}
 
-        {currentStep === 5 && (
+        {currentStep === 3 && (
           <SessionWizardContentStep
             attractions={attractions}
             aiGenAttrId={aiGenAttrId}
@@ -693,7 +694,7 @@ export default function SessionWizard({ components = {} } = {}) {
           />
         )}
 
-        {currentStep === 6 && (
+        {currentStep === 4 && (
           <SessionWizardPublishStep
             session={session}
             cityDrafts={cityDrafts}
