@@ -312,7 +312,12 @@ export default function TagsFilters() {
       {activeTab === 'city' ? (
         <FilterTab
           key="city"
-          api={cityFiltersAPI}
+          api={{
+            list: cityFiltersAPI.list,
+            create: cityFiltersAPI.createLegacy,
+            update: cityFiltersAPI.updateLegacy,
+            delete: cityFiltersAPI.deleteLegacy,
+          }}
           icon="🏙️"
           emptyText="Тегов городов нет"
           createLabel="Создать тег города"

@@ -430,6 +430,24 @@ const normalizeId = (value) => {
   return String(value);
 };
 
+const normalizeTagIds = (value) => {
+  if (!Array.isArray(value)) return [];
+
+  return [...new Set(
+    value
+      .map((item) => {
+        if (item == null) return '';
+
+        if (typeof item === 'object') {
+          return String(item.id ?? item.uuid ?? item.pk ?? '');
+        }
+
+        return String(item);
+      })
+      .filter(Boolean)
+  )];
+};
+
 const getLocaleLang = (localeKey) => {
   const locale = DEFAULT_LOCALE_DEFS.find((item) => item.key === localeKey);
 
@@ -824,7 +842,9 @@ export function useSessionWizardController({ sessionId, confirm: confirmProp } =
 
   const [cityTags, setCityTags] = useState([]);
   const [tagInput, setTagInput] = useState('');
-  const [availableTags, setAvailableTags] = useState([]);
+  const [cityFilterTree, setCityFilterTree] = useState([]);
+  const [cityFilterTreeLoading, setCityFilterTreeLoading] = useState(false);
+  const [cityFilterTreeError, setCityFilterTreeError] = useState('');
 
   const [attractions, setAttractions] = useState([]);
   const [attrView, setAttrView] = useState('list');
@@ -1289,7 +1309,7 @@ export function useSessionWizardController({ sessionId, confirm: confirmProp } =
     );
   }, [navigate, location.pathname, location.search, location.state]);
 
-  const loadCityIntoForm = useCallback((city) => {
+  const loadCityIntoForm = useCallback((city, legacyTagsFallback = null) => {
     if (!city) return;
 
     const latVal = city.lat != null ? String(city.lat) : '';
@@ -1301,7 +1321,12 @@ export function useSessionWizardController({ sessionId, confirm: confirmProp } =
     if (city.lat != null) setSavedLat(city.lat);
     if (city.lon != null) setSavedLon(city.lon);
 
-    setCityTags(Array.isArray(city.tags) ? city.tags.slice() : []);
+    const isLegacyCityRow = normalizeDraftId(city?.id) === 'legacy';
+    const primaryTags = normalizeTagIds(city.tags ?? city.city_tags ?? []);
+    const fallbackTags = normalizeTagIds(legacyTagsFallback ?? []);
+    setCityTags(
+      isLegacyCityRow && primaryTags.length === 0 ? fallbackTags : primaryTags
+    );
 
     setImagePreview(city.image_url || '');
     setImageId(city.image_id || null);
@@ -1383,8 +1408,19 @@ export function useSessionWizardController({ sessionId, confirm: confirmProp } =
       }
 
       const drafts = Array.isArray(data?.city_drafts) && data.city_drafts.length > 0
-        ? data.city_drafts
-        : (data?.city ? [{ ...data.city, id: 'legacy', is_primary: true, order: 0 }] : []);
+        ? data.city_drafts.map((draft) => ({
+            ...draft,
+            tags: normalizeTagIds(draft.tags ?? draft.city_tags ?? []),
+          }))
+        : (data?.city
+          ? [{
+              ...data.city,
+              id: 'legacy',
+              is_primary: true,
+              order: 0,
+              tags: normalizeTagIds(data.city.tags ?? data.city.city_tags ?? []),
+            }]
+          : []);
       setCityDrafts(drafts);
 
       const requestedDraftId = normalizeDraftId(
@@ -1400,8 +1436,10 @@ export function useSessionWizardController({ sessionId, confirm: confirmProp } =
       activeCityDraftIdRef.current = resolvedDraftId;
       setActiveCityDraftId(resolvedDraftId);
 
-      if (selectedDraft) loadCityIntoForm(selectedDraft);
-      else if (fallbackDraft) loadCityIntoForm(fallbackDraft);
+      const sessionLegacyTags = data?.city?.tags ?? data?.city?.city_tags;
+
+      if (selectedDraft) loadCityIntoForm(selectedDraft, sessionLegacyTags);
+      else if (fallbackDraft) loadCityIntoForm(fallbackDraft, sessionLegacyTags);
 
       if (Array.isArray(data?.attractions)) {
         setAttractions(data.attractions.map(normalizeAttraction));
@@ -1438,7 +1476,31 @@ export function useSessionWizardController({ sessionId, confirm: confirmProp } =
     }
   }, [sessionId, navigate, showNote, loadCityIntoForm]);
 
+  const loadCityFilterTree = useCallback(async () => {
+    setCityFilterTreeLoading(true);
+    setCityFilterTreeError('');
+
+    try {
+      const res = await cityFiltersAPI.getTree();
+      const raw = res?.data?.data ?? res?.data?.results ?? res?.data;
+      const data = Array.isArray(raw)
+        ? raw
+        : Array.isArray(raw?.tree)
+          ? raw.tree
+          : [];
+
+      setCityFilterTree(Array.isArray(data) ? data : []);
+    } catch (error) {
+      setCityFilterTreeError(
+        parseApiError(error, 'Ошибка загрузки тегов города')
+      );
+    } finally {
+      setCityFilterTreeLoading(false);
+    }
+  }, []);
+
   useEffect(() => { loadSession(); }, [loadSession]);
+  useEffect(() => { loadCityFilterTree(); }, [loadCityFilterTree]);
   useEffect(() => () => clearInterval(aiPollRef.current), []);
 
   useEffect(() => {
@@ -1516,16 +1578,6 @@ export function useSessionWizardController({ sessionId, confirm: confirmProp } =
     if (!mapReadyRef.current || !mapInstanceRef.current?.updateMarker) return;
     mapInstanceRef.current.updateMarker(lat, lon);
   }, [lat, lon]);
-
-  useEffect(() => {
-    cityFiltersAPI.list().then((res) => {
-      const data = res?.data;
-      const tags = Array.isArray(data?.tags) ? data.tags
-        : Array.isArray(data?.results) ? data.results
-          : Array.isArray(data) ? data : [];
-      setAvailableTags(tags);
-    }).catch(() => { });
-  }, []);
 
   useEffect(() => {
     citiesAPI.list({ page_size: 1000, limit: 1000 })
@@ -1647,7 +1699,7 @@ export function useSessionWizardController({ sessionId, confirm: confirmProp } =
       lat: lat ? parseFloat(lat) : null,
       lon: lon ? parseFloat(lon) : null,
       default_language: localeData[defaultLocale]?.lang || null,
-      tags: cityTags,
+      tags: normalizeTagIds(cityTags),
       image_id: imageId,
       image_original_url: imageOriginalUrl || '',
       ...(activeCityDraftIdRef.current && activeCityDraftIdRef.current !== 'legacy'
@@ -1678,6 +1730,21 @@ export function useSessionWizardController({ sessionId, confirm: confirmProp } =
         setActiveCityDraftId(savedDraftId);
         syncActiveDraftRoute(savedDraftId);
       }
+
+      if (savedDraft && savedDraftId) {
+        const draftTags = normalizeTagIds(savedDraft.tags ?? savedDraft.city_tags ?? []);
+        setCityDrafts((prev) =>
+          prev.map((d) =>
+            normalizeDraftId(d.id) === savedDraftId
+              ? { ...d, ...savedDraft, tags: draftTags }
+              : d
+          )
+        );
+        if (savedDraftId === normalizeDraftId(activeCityDraftIdRef.current)) {
+          setCityTags(draftTags);
+        }
+      }
+
       await loadSession(savedDraftId);
 
       if (!firstCitySaveAtRef.current) {
@@ -2354,13 +2421,162 @@ export function useSessionWizardController({ sessionId, confirm: confirmProp } =
 
   const getSessionUuid = useCallback(() => session?.uuid || session?.session_uuid || '', [session]);
 
+  const patchActiveDraftTags = useCallback((nextTags) => {
+    const activeDraftId = normalizeDraftId(activeCityDraftIdRef.current);
+    if (!activeDraftId || activeDraftId === 'legacy') return;
+    setCityDrafts((drafts) =>
+      drafts.map((draft) =>
+        normalizeDraftId(draft.id) === activeDraftId
+          ? { ...draft, tags: [...nextTags] }
+          : draft
+      )
+    );
+  }, []);
+
+  const toggleCityTag = useCallback((tagId) => {
+    const normalizedTagId = String(tagId || '');
+
+    if (!normalizedTagId) return;
+
+    setCityTags((prev) => {
+      const normalizedPrev = normalizeTagIds(prev);
+      const nextTags = normalizedPrev.includes(normalizedTagId)
+        ? normalizedPrev.filter((item) => item !== normalizedTagId)
+        : [...normalizedPrev, normalizedTagId];
+      patchActiveDraftTags(nextTags);
+      return nextTags;
+    });
+  }, [patchActiveDraftTags]);
+
+  const uploadCityFilterImage = useCallback(async (file) => {
+    if (!file || !file.type?.startsWith('image/')) {
+      showNote('Выберите файл изображения', 'error');
+      return null;
+    }
+    try {
+      const fd = new FormData();
+      fd.append('file', file);
+      fd.append('session_uuid', session?.uuid || session?.session_uuid || '');
+      fd.append('city_name', localeData[activeLocale]?.name || '');
+      fd.append('temp', '1');
+      const res = await imagesAPI.upload(fd);
+      const { id, url } = res?.data || {};
+      if (id && url) {
+        showNote('Изображение загружено', 'success');
+        return { id, url };
+      }
+      showNote('Сервер не вернул данные изображения', 'error');
+      return null;
+    } catch (err) {
+      showNote(
+        'Ошибка загрузки изображения: ' + parseApiError(err, 'Ошибка загрузки'),
+        'error'
+      );
+      return null;
+    }
+  }, [session, localeData, activeLocale, showNote]);
+
+  const createCityFilterFolder = useCallback(async (payload) => {
+    try {
+      await cityFiltersAPI.create({
+        ...payload,
+        type: 'folder',
+        parent_id: null,
+      });
+      showNote('Папка создана', 'success');
+      await loadCityFilterTree();
+    } catch (e) {
+      showNote(parseApiError(e, 'Ошибка создания папки'), 'error');
+      throw e;
+    }
+  }, [loadCityFilterTree, showNote]);
+
+  const createCityFilterTag = useCallback(async (folderId, payload) => {
+    const parentId = normalizeId(folderId);
+    if (!parentId) {
+      showNote('Не указана папка для тега', 'error');
+      return;
+    }
+    try {
+      const res = await cityFiltersAPI.create({
+        ...payload,
+        type: 'tag',
+        parent_id: parentId,
+      });
+      const d = res?.data;
+      const created =
+        d?.id || d?.uuid
+          ? d
+          : d?.data && (d.data.id ?? d.data.uuid)
+            ? d.data
+            : d?.filter ?? d;
+      const newId = normalizeId(created?.id ?? created?.uuid);
+      if (newId) {
+        setCityTags((prev) => {
+          const next = normalizeTagIds(prev);
+          if (next.includes(newId)) return next;
+          return [...next, newId];
+        });
+      }
+      showNote('Тег создан', 'success');
+      await loadCityFilterTree();
+    } catch (e) {
+      showNote(parseApiError(e, 'Ошибка создания тега'), 'error');
+      throw e;
+    }
+  }, [loadCityFilterTree, showNote]);
+
+  const updateCityFilter = useCallback(async (filterId, payload) => {
+    const id = normalizeId(filterId);
+    if (!id) return;
+    try {
+      await cityFiltersAPI.update(id, payload);
+      showNote('Сохранено', 'success');
+      await loadCityFilterTree();
+    } catch (e) {
+      showNote(parseApiError(e, 'Ошибка сохранения'), 'error');
+      throw e;
+    }
+  }, [loadCityFilterTree, showNote]);
+
+  const deleteCityFilter = useCallback(async (filterId, opts = {}) => {
+    const id = normalizeId(filterId);
+    if (!id) return;
+    const message = opts.message || 'Удалить этот элемент?';
+    if (!(await confirm({ message, danger: true }))) return;
+    try {
+      await cityFiltersAPI.delete(id);
+      setCityTags((prev) => {
+        const next = normalizeTagIds(prev).filter((t) => t !== id);
+        patchActiveDraftTags(next);
+        return next;
+      });
+      showNote('Удалено', 'success');
+      await loadCityFilterTree();
+    } catch (e) {
+      showNote(parseApiError(e, 'Не удалось удалить'), 'error');
+    }
+  }, [confirm, loadCityFilterTree, showNote, patchActiveDraftTags]);
+
   const addTag = useCallback((text) => {
     const t = text.trim();
-    if (!t || cityTags.includes(t)) return;
-    setCityTags(prev => [...prev, t]);
-  }, [cityTags]);
+    if (!t) return;
+    setCityTags((prev) => {
+      const next = normalizeTagIds(prev);
+      if (next.includes(t)) return next;
+      const merged = [...next, t];
+      patchActiveDraftTags(merged);
+      return merged;
+    });
+  }, [patchActiveDraftTags]);
 
-  const removeTag = useCallback((tag) => { setCityTags(prev => prev.filter((item) => item !== tag)); }, []);
+  const removeTag = useCallback((tag) => {
+    setCityTags((prev) => {
+      const next = normalizeTagIds(prev).filter((item) => item !== tag);
+      patchActiveDraftTags(next);
+      return next;
+    });
+  }, [patchActiveDraftTags]);
 
   const handleTagKeyDown = useCallback((event) => {
     if (event.key === 'Enter' || event.key === ',') {
@@ -3230,7 +3446,8 @@ export function useSessionWizardController({ sessionId, confirm: confirmProp } =
         }) ||
         Boolean(imageId) ||
         Boolean(lat) ||
-        Boolean(lon);
+        Boolean(lon) ||
+        normalizeTagIds(cityTags).length > 0;
 
       if (hasCityDataToSave) {
         await saveCityForStep1();
@@ -3286,6 +3503,7 @@ export function useSessionWizardController({ sessionId, confirm: confirmProp } =
     imageId,
     lat,
     lon,
+    cityTags,
     saveCityForStep1,
 
     currentCityInfo,
@@ -3362,7 +3580,8 @@ export function useSessionWizardController({ sessionId, confirm: confirmProp } =
     localeData, activeLocale, defaultLocale, setDefaultLocale, addLocaleOpen, setAddLocaleOpen, newLocaleCode, setNewLocaleCode, newLocaleLang, setNewLocaleLang,
     lat, lon, savedLat, savedLon, setLat, setLon, setSavedLat, setSavedLon,
     imageId, imagePreview, imageOriginalUrl, imageCopyright, setImageOriginalUrl, setImageCopyright, photoUploading, photoFileRef, commonsModalOpen, setCommonsModalOpen, openCityCommonsModal, openAttractionCommonsModal, openAttractionFeedCommonsModal, handleCommonsImageSelect,
-    cityTags, tagInput, setTagInput, availableTags,
+    cityTags, tagInput, setTagInput,
+    cityFilterTree, cityFilterTreeLoading, cityFilterTreeError, loadCityFilterTree,
     cityInfos, currentCityInfo, cityInfoLocaleData, cityInfoActiveLocale, cityInfoSaving,
     attractions, attrView, currentAttr, attrLocaleData, attrActiveLocale, attrSaving,
     attractionInfos, currentAttractionInfo, attractionInfoLocaleData, attractionInfoActiveLocale, attractionInfoSaving,    
@@ -3377,7 +3596,9 @@ export function useSessionWizardController({ sessionId, confirm: confirmProp } =
     goToStep, switchLocale, addLocale, removeLocale, updateLocaleField,
     handleSelectDraft, handleCreateDraft, handleDeleteDraft,
     handlePhotoFile, handleCommonsImageSelect, getSessionUuid,
-    addTag, removeTag, handleTagKeyDown, handleTagBlur,
+    addTag, removeTag, handleTagKeyDown, handleTagBlur, toggleCityTag,
+    uploadCityFilterImage,
+    createCityFilterFolder, createCityFilterTag, updateCityFilter, deleteCityFilter,
     setCurrentCityInfo, setCityInfoActiveLocale, openCityInfoDetail, addCityInfo, updateCurrentCityInfoPatch, updateCityInfoLocaleField, saveCurrentCityInfo, deleteCurrentCityInfo,
     setCurrentAttractionInfo, setAttractionInfoActiveLocale, openAttractionInfoDetail, addAttractionInfo, updateCurrentAttractionInfoPatch, updateAttractionInfoLocaleField, saveCurrentAttractionInfo, deleteCurrentAttractionInfo,
     setCurrentAttractionFeedItem, setAttractionFeedActiveLocale,

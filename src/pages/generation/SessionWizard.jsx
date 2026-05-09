@@ -80,9 +80,10 @@ export default function SessionWizard({ components = {} } = {}) {
     setCommonsModalOpen,
 
     cityTags,
-    tagInput,
-    setTagInput,
-    availableTags,
+    cityFilterTree,
+    cityFilterTreeLoading,
+    cityFilterTreeError,
+    loadCityFilterTree,
     cityInfos,
     currentCityInfo,
     cityInfoLocaleData,
@@ -146,10 +147,12 @@ export default function SessionWizard({ components = {} } = {}) {
     handleCommonsImageSelect,
     getSessionUuid,
 
-    addTag,
-    removeTag,
-    handleTagKeyDown,
-    handleTagBlur,
+    toggleCityTag,
+    uploadCityFilterImage,
+    createCityFilterFolder,
+    createCityFilterTag,
+    updateCityFilter,
+    deleteCityFilter,
 
     setCurrentCityInfo,
     setCityInfoActiveLocale,
@@ -587,15 +590,18 @@ export default function SessionWizard({ components = {} } = {}) {
             <div className="pt-5 border-t border-gray-200">
               <SessionWizardTagsStep
                 embedded
-                tagInput={tagInput}
                 cityTags={cityTags}
-                availableTags={availableTags}
+                cityFilterTree={cityFilterTree}
+                cityFilterTreeLoading={cityFilterTreeLoading}
+                cityFilterTreeError={cityFilterTreeError}
                 saving={saving}
-                onTagInputChange={setTagInput}
-                onTagKeyDown={handleTagKeyDown}
-                onTagBlur={handleTagBlur}
-                onAddTag={addTag}
-                onRemoveTag={removeTag}
+                onToggleCityTag={toggleCityTag}
+                onReloadCityFilters={loadCityFilterTree}
+                onCreateCityFilterFolder={createCityFilterFolder}
+                onCreateCityFilterTag={createCityFilterTag}
+                onUpdateCityFilter={updateCityFilter}
+                onDeleteCityFilter={deleteCityFilter}
+                onUploadCityFilterImage={uploadCityFilterImage}
                 onGoToStep={goToStep}
               />
             </div>

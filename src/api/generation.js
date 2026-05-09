@@ -141,13 +141,19 @@ export const tasksAPI = {
 };
 
 // ─── City Filters ─────────────────────────────────────────────────────────────
+// Session wizard / tree CRUD (canonical REST under /city/filters/)
 export const cityFiltersAPI = {
+  getTree: () => apiClient.get('/city/filters/tree/'),
+  create: (payload) => apiClient.post('/city/filters/', payload),
+  update: (id, payload) => apiClient.patch(`/city/filters/${id}/`, payload),
+  delete: (id) => apiClient.delete(`/city/filters/${id}/`),
   list: () => apiClient.get(`${BASE}/city-filters/`),
   get: (filterId) => apiClient.get(`${BASE}/city-filters/${filterId}/`),
-  create: (data) => apiClient.post(`${BASE}/city-filters/create/`, data),
-  update: (filterId, data) =>
+  /** Legacy catalog admin paths (TagsFiltersCatalogPage) */
+  createLegacy: (data) => apiClient.post(`${BASE}/city-filters/create/`, data),
+  updateLegacy: (filterId, data) =>
     apiClient.patch(`${BASE}/city-filters/${filterId}/update/`, data),
-  delete: (filterId) =>
+  deleteLegacy: (filterId) =>
     apiClient.delete(`${BASE}/city-filters/${filterId}/delete/`),
 };
 

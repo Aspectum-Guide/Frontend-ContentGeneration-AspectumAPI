@@ -143,7 +143,7 @@ export default function SessionWizardPublishStep({
           <span className="text-gray-500">Теги:</span>
 
           <span className="font-medium text-gray-900 text-right">
-            {hasTags ? cityTags.join(', ') : '—'}
+            {hasTags ? `${cityTags.length} выбрано` : '—'}
           </span>
         </div>
       </div>
