@@ -1,4 +1,4 @@
-import { DEFAULT_LOCALE_DEFS, getFlag } from './sessionWizardShared.jsx';
+import { getFlag } from './sessionWizardShared.jsx';
 
 const normalizeId = (value) => {
   if (value == null) return '';
@@ -22,7 +22,9 @@ const getMultilangDisplay = (value, fallback = '') => {
       value.ru ||
       value.en ||
       value.it ||
-      Object.values(value).find((item) => typeof item === 'string' && item.trim()) ||
+      Object.values(value).find(
+        (item) => typeof item === 'string' && item.trim()
+      ) ||
       fallback
     );
   }
@@ -60,7 +62,9 @@ const getFeedItemTextPreview = (item) => {
       text.ru ||
       text.en ||
       text.it ||
-      Object.values(text).find((value) => typeof value === 'string' && value.trim()) ||
+      Object.values(text).find(
+        (value) => typeof value === 'string' && value.trim()
+      ) ||
       '(без текста)'
     );
   }
@@ -134,7 +138,9 @@ const getFeedItemBindingLabel = (
 
     const attraction =
       attractionFromItem ||
-      referenceAttractions.find((entry) => normalizeId(entry.id) === attractionId);
+      referenceAttractions.find(
+        (entry) => normalizeId(entry.id) === attractionId
+      );
 
     return attraction
       ? `Достопримечательность из базы: ${getAttractionDisplayName(attraction)}`
@@ -151,7 +157,9 @@ const getFeedItemBindingLabel = (
 
     const attraction =
       attractionFromItem ||
-      sessionAttractions.find((entry) => normalizeId(entry.id) === attractionId);
+      sessionAttractions.find(
+        (entry) => normalizeId(entry.id) === attractionId
+      );
 
     return attraction
       ? `Достопримечательность из сессии: ${getAttractionDisplayName(attraction)}`
@@ -276,7 +284,13 @@ function AttractionFeedItemsPanel({
               >
                 <span className="text-gray-400">{index + 1}.</span>
 
-                <span className={item.item_type === 'image' ? 'text-purple-600' : 'text-blue-600'}>
+                <span
+                  className={
+                    item.item_type === 'image'
+                      ? 'text-purple-600'
+                      : 'text-blue-600'
+                  }
+                >
                   {item.item_type === 'image' ? '🖼️' : '💬'}
                 </span>
 
@@ -393,6 +407,8 @@ function FeedImagePanel({
 }
 
 export default function SessionWizardAttractionFeedStep({
+  embedded = false,
+
   attractionFeedItems = [],
   currentAttractionFeedItem,
   attractionFeedLocaleData = {},
@@ -436,96 +452,101 @@ export default function SessionWizardAttractionFeedStep({
     }
   };
 
-  return (
-    <div>
-      {!currentAttractionFeedItem ? (
-        <div className="space-y-4">
-          <div className="flex items-center justify-between gap-3">
-            <div>
-              <h2 className="text-lg font-semibold text-gray-900">
-                Лента достопримечательности
-              </h2>
-            </div>
+  if (!currentAttractionFeedItem) {
+    return (
+      <section className="space-y-4">
+        <div className="flex items-center justify-between gap-3">
+          <div>
+            <h2 className="text-lg font-semibold text-gray-900">
+              Лента достопримечательности
+            </h2>
 
-            <div className="flex items-center gap-2">
-              <button
-                type="button"
-                onClick={() => onAddAttractionFeedItem?.('text')}
-                className="px-3 py-1.5 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors"
-              >
-                + Текст
-              </button>
-
-              <button
-                type="button"
-                onClick={() => onAddAttractionFeedItem?.('image')}
-                className="px-3 py-1.5 text-sm font-medium text-white bg-purple-600 rounded-lg hover:bg-purple-700 transition-colors"
-              >
-                + Изображение
-              </button>
-            </div>
+            <p className="text-sm text-gray-500">
+              Добавьте отдельные текстовые комментарии и изображения для ленты.
+              Текст и картинки не привязаны друг к другу.
+            </p>
           </div>
 
-          {attractionFeedItems.length === 0 ? (
-            <div className="text-center py-12 text-gray-400">
-              <div className="text-3xl mb-2">🖼️</div>
+          <div className="flex items-center gap-2 shrink-0">
+            <button
+              type="button"
+              onClick={() => onAddAttractionFeedItem?.('text')}
+              className="px-3 py-1.5 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors"
+            >
+              + Текст
+            </button>
 
-              <p className="text-sm">
-                Нет элементов ленты. Добавьте текст или изображение.
-              </p>
-            </div>
-          ) : (
-            <div className="space-y-2">
-              {attractionFeedItems.map((item, index) => (
-                <div
-                  key={item.id}
-                  onClick={() => onOpenAttractionFeedItemDetail?.(item.id)}
-                  className="flex items-center justify-between p-3 bg-white border border-gray-200 rounded-lg hover:border-blue-300 hover:bg-blue-50 cursor-pointer transition-colors"
-                >
-                  <div className="flex items-center gap-3 min-w-0">
-                    <span className="w-6 h-6 flex items-center justify-center rounded-full bg-gray-100 text-xs font-medium text-gray-600 shrink-0">
-                      {index + 1}
-                    </span>
+            <button
+              type="button"
+              onClick={() => onAddAttractionFeedItem?.('image')}
+              className="px-3 py-1.5 text-sm font-medium text-white bg-purple-600 rounded-lg hover:bg-purple-700 transition-colors"
+            >
+              + Изображение
+            </button>
+          </div>
+        </div>
 
-                    <div className="min-w-0">
-                      <div className="flex items-center gap-2">
-                        <span
-                          className={`px-1.5 py-0.5 rounded text-[11px] font-medium ${
-                            item.item_type === 'image'
-                              ? 'bg-purple-100 text-purple-700'
-                              : 'bg-blue-100 text-blue-700'
-                          }`}
-                        >
-                          {getFeedItemTypeLabel(item)}
-                        </span>
+        {attractionFeedItems.length === 0 ? (
+          <div className="text-center py-10 text-gray-400 border border-dashed border-gray-200 rounded-xl bg-gray-50">
+            <div className="text-3xl mb-2">🖼️</div>
 
-                        <div className="text-sm font-medium text-gray-900 truncate">
-                          {getFeedItemName(item)}
-                        </div>
-                      </div>
+            <p className="text-sm">
+              Нет элементов ленты. Добавьте текст или изображение.
+            </p>
+          </div>
+        ) : (
+          <div className="space-y-2">
+            {attractionFeedItems.map((item, index) => (
+              <div
+                key={item.id}
+                onClick={() => onOpenAttractionFeedItemDetail?.(item.id)}
+                className="flex items-center justify-between p-3 bg-white border border-gray-200 rounded-lg hover:border-blue-300 hover:bg-blue-50 cursor-pointer transition-colors"
+              >
+                <div className="flex items-center gap-3 min-w-0">
+                  <span className="w-6 h-6 flex items-center justify-center rounded-full bg-gray-100 text-xs font-medium text-gray-600 shrink-0">
+                    {index + 1}
+                  </span>
 
-                      <div className="text-xs text-gray-500 mt-0.5">
-                        {getFeedItemBindingLabel(
-                          item,
-                          referenceAttractions,
-                          attractions
-                        )}
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-2">
+                      <span
+                        className={`px-1.5 py-0.5 rounded text-[11px] font-medium ${
+                          item.item_type === 'image'
+                            ? 'bg-purple-100 text-purple-700'
+                            : 'bg-blue-100 text-blue-700'
+                        }`}
+                      >
+                        {getFeedItemTypeLabel(item)}
+                      </span>
+
+                      <div className="text-sm font-medium text-gray-900 truncate">
+                        {getFeedItemName(item)}
                       </div>
                     </div>
+
+                    <div className="text-xs text-gray-500 mt-0.5">
+                      {getFeedItemBindingLabel(
+                        item,
+                        referenceAttractions,
+                        attractions
+                      )}
+                    </div>
                   </div>
-
-                  <span className="text-xs text-blue-600 font-medium shrink-0">
-                    Открыть →
-                  </span>
                 </div>
-              ))}
-            </div>
-          )}
 
+                <span className="text-xs text-blue-600 font-medium shrink-0">
+                  Открыть →
+                </span>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {!embedded && (
           <div className="flex justify-between pt-2">
             <button
               type="button"
-              onClick={() => onGoToStep?.(4)}
+              onClick={() => onGoToStep?.(3)}
               className="px-4 py-2 text-sm text-gray-600 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
             >
               ← Назад
@@ -533,299 +554,301 @@ export default function SessionWizardAttractionFeedStep({
 
             <button
               type="button"
-              onClick={() => onGoToStep?.(6)}
+              onClick={() => onGoToStep?.(4)}
               className="px-5 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors"
             >
               Далее: Контент →
             </button>
           </div>
+        )}
+      </section>
+    );
+  }
+
+  return (
+    <section className="space-y-4">
+      <div className="flex items-center gap-3">
+        <button
+          type="button"
+          onClick={() => onSetCurrentAttractionFeedItem?.(null)}
+          className="w-8 h-8 flex items-center justify-center border border-gray-300 rounded-lg text-gray-500 hover:bg-gray-50 transition-colors"
+        >
+          ←
+        </button>
+
+        <span className="text-base font-semibold text-gray-900">
+          {getFeedItemName(currentAttractionFeedItem)}
+        </span>
+
+        <button
+          type="button"
+          onClick={onDeleteCurrentAttractionFeedItem}
+          className="ml-auto px-3 py-1 text-xs font-medium text-red-600 bg-red-50 rounded-lg hover:bg-red-100 transition-colors"
+        >
+          Удалить
+        </button>
+      </div>
+
+      <AttractionFeedItemsPanel
+        attractionFeedItems={attractionFeedItems}
+        currentAttractionFeedItem={currentAttractionFeedItem}
+        onSelectFeedItem={onOpenAttractionFeedItemDetail}
+        onAddFeedItem={onAddAttractionFeedItem}
+      />
+
+      {itemType === 'text' && (
+        <div className="flex items-center gap-1 flex-wrap">
+          {Object.entries(attractionFeedLocaleData || {}).map(([key, locale]) => {
+            const isActive = key === attractionFeedActiveLocale;
+
+            return (
+              <button
+                key={key}
+                type="button"
+                onClick={() => onSetAttractionFeedActiveLocale?.(key)}
+                className={`flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium border transition-all ${
+                  isActive
+                    ? 'bg-blue-600 text-white border-blue-600'
+                    : 'bg-white text-gray-600 border-gray-300 hover:border-blue-400'
+                }`}
+              >
+                <span>{getFlag(locale.code)}</span>
+                <span>{locale.langName}</span>
+              </button>
+            );
+          })}
         </div>
-      ) : (
-        <div className="space-y-4">
-          <div className="flex items-center gap-3">
-            <button
-              type="button"
-              onClick={() => onSetCurrentAttractionFeedItem?.(null)}
-              className="w-8 h-8 flex items-center justify-center border border-gray-300 rounded-lg text-gray-500 hover:bg-gray-50 transition-colors"
-            >
-              ←
-            </button>
+      )}
 
-            <span className="text-base font-semibold text-gray-900">
-              {getFeedItemName(currentAttractionFeedItem)}
-            </span>
+      <main className="space-y-4">
+        <div className="p-3 border border-gray-200 rounded-lg bg-gray-50 space-y-3">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Тип элемента ленты
+            </label>
 
-            <button
-              type="button"
-              onClick={onDeleteCurrentAttractionFeedItem}
-              className="ml-auto px-3 py-1 text-xs font-medium text-red-600 bg-red-50 rounded-lg hover:bg-red-100 transition-colors"
+            <select
+              value={itemType}
+              onChange={(event) => {
+                const nextType = event.target.value;
+
+                if (nextType === 'text') {
+                  updateItemPatch({
+                    item_type: 'text',
+
+                    image: null,
+                    image_id: null,
+
+                    image_url: '',
+                    imageUrl: '',
+
+                    image_original_url: '',
+                    imageOriginalUrl: '',
+
+                    image_copyright: '',
+                    imageCopyright: '',
+                  });
+                } else {
+                  updateItemPatch({
+                    item_type: 'image',
+                    text: {},
+                  });
+                }
+              }}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
             >
-              Удалить
-            </button>
+              <option value="text">Текст</option>
+              <option value="image">Изображение</option>
+            </select>
+
+            <p className="mt-1 text-xs text-gray-500">
+              Текст и изображение создаются как отдельные элементы ленты.
+            </p>
           </div>
 
-          <AttractionFeedItemsPanel
-            attractionFeedItems={attractionFeedItems}
-            currentAttractionFeedItem={currentAttractionFeedItem}
-            onSelectFeedItem={onOpenAttractionFeedItemDetail}
-            onAddFeedItem={onAddAttractionFeedItem}
-          />
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Индекс
+            </label>
 
-          {itemType === 'text' && (
-            <div className="flex items-center gap-1 flex-wrap">
-              {DEFAULT_LOCALE_DEFS.map((locale) => {
-                const isActive = locale.key === attractionFeedActiveLocale;
+            <input
+              type="number"
+              value={currentAttractionFeedItem?.index ?? 0}
+              onChange={(event) => {
+                updateItemPatch({
+                  index: Number(event.target.value || 0),
+                });
+              }}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+          </div>
+        </div>
 
-                return (
-                  <button
-                    key={locale.key}
-                    type="button"
-                    onClick={() => onSetAttractionFeedActiveLocale?.(locale.key)}
-                    className={`flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium border transition-all ${
-                      isActive
-                        ? 'bg-blue-600 text-white border-blue-600'
-                        : 'bg-white text-gray-600 border-gray-300 hover:border-blue-400'
-                    }`}
-                  >
-                    <span>{getFlag(locale.code)}</span>
-                    <span>{locale.langName}</span>
-                  </button>
-                );
-              })}
+        <div className="p-3 border border-gray-200 rounded-lg bg-gray-50 space-y-3">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Привязка к достопримечательности
+            </label>
+
+            <select
+              value={assignedAttractionType}
+              onChange={(event) => {
+                const type = event.target.value;
+
+                updateItemPatch({
+                  assigned_attraction_type: type,
+
+                  event: null,
+                  event_id: null,
+
+                  attraction: null,
+                  attraction_id: null,
+
+                  session_attraction: null,
+                  session_attraction_id: null,
+                });
+              }}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              <option value="none">Без достопримечательности</option>
+              <option value="database">Достопримечательность из базы</option>
+              <option value="draft">Достопримечательность из сессии</option>
+            </select>
+          </div>
+
+          {assignedAttractionType === 'database' && (
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Достопримечательность из базы
+              </label>
+
+              <select
+                value={selectedDatabaseAttractionId}
+                onChange={(event) => {
+                  const eventId = event.target.value || null;
+
+                  updateItemPatch({
+                    assigned_attraction_type: 'database',
+
+                    event: eventId,
+                    event_id: eventId,
+
+                    attraction: eventId,
+                    attraction_id: eventId,
+
+                    session_attraction: null,
+                    session_attraction_id: null,
+                  });
+                }}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                <option value="">Выберите достопримечательность из базы</option>
+
+                {referenceAttractions.map((attraction) => (
+                  <option key={attraction.id} value={attraction.id}>
+                    {getAttractionDisplayName(attraction)}
+                  </option>
+                ))}
+              </select>
+
+              {referenceAttractions.length === 0 && (
+                <p className="mt-1 text-xs text-amber-600">
+                  Список достопримечательностей из базы не загружен.
+                </p>
+              )}
             </div>
           )}
 
-          <main className="space-y-4">
-            <div className="p-3 border border-gray-200 rounded-lg bg-gray-50 space-y-3">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Тип элемента ленты
-                </label>
+          {assignedAttractionType === 'draft' && (
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Достопримечательность из сессии
+              </label>
 
-                <select
-                  value={itemType}
-                  onChange={(event) => {
-                    const nextType = event.target.value;
+              <select
+                value={selectedSessionAttractionId}
+                onChange={(event) => {
+                  const attractionId = event.target.value || null;
 
-                    if (nextType === 'text') {
-                      updateItemPatch({
-                        item_type: 'text',
+                  updateItemPatch({
+                    assigned_attraction_type: 'draft',
 
-                        image: null,
-                        image_id: null,
+                    session_attraction: attractionId,
+                    session_attraction_id: attractionId,
 
-                        image_url: '',
-                        imageUrl: '',
+                    event: null,
+                    event_id: null,
 
-                        image_original_url: '',
-                        imageOriginalUrl: '',
-
-                        image_copyright: '',
-                        imageCopyright: '',
-                      });
-                    } else {
-                      updateItemPatch({
-                        item_type: 'image',
-                        text: {},
-                      });
-                    }
-                  }}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-                >
-                  <option value="text">Текст</option>
-                  <option value="image">Изображение</option>
-                </select>
-
-                <p className="mt-1 text-xs text-gray-500">
-                  Текст и изображение создаются как отдельные элементы ленты.
-                </p>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Индекс
-                </label>
-
-                <input
-                  type="number"
-                  value={currentAttractionFeedItem?.index ?? 0}
-                  onChange={(event) => {
-                    updateItemPatch({
-                      index: Number(event.target.value || 0),
-                    });
-                  }}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
-              </div>
-            </div>
-
-            <div className="p-3 border border-gray-200 rounded-lg bg-gray-50 space-y-3">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Привязка к достопримечательности
-                </label>
-
-                <select
-                  value={assignedAttractionType}
-                  onChange={(event) => {
-                    const type = event.target.value;
-
-                    updateItemPatch({
-                      assigned_attraction_type: type,
-
-                      event: null,
-                      event_id: null,
-
-                      attraction: null,
-                      attraction_id: null,
-
-                      session_attraction: null,
-                      session_attraction_id: null,
-                    });
-                  }}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-                >
-                  <option value="none">Без достопримечательности</option>
-                  <option value="database">Достопримечательность из базы</option>
-                  <option value="draft">Достопримечательность из сессии</option>
-                </select>
-              </div>
-
-              {assignedAttractionType === 'database' && (
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Достопримечательность из базы
-                  </label>
-
-                  <select
-                    value={selectedDatabaseAttractionId}
-                    onChange={(event) => {
-                      const eventId = event.target.value || null;
-
-                      updateItemPatch({
-                        assigned_attraction_type: 'database',
-
-                        event: eventId,
-                        event_id: eventId,
-
-                        attraction: eventId,
-                        attraction_id: eventId,
-
-                        session_attraction: null,
-                        session_attraction_id: null,
-                      });
-                    }}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  >
-                    <option value="">Выберите достопримечательность из базы</option>
-
-                    {referenceAttractions.map((attraction) => (
-                      <option key={attraction.id} value={attraction.id}>
-                        {getAttractionDisplayName(attraction)}
-                      </option>
-                    ))}
-                  </select>
-
-                  {referenceAttractions.length === 0 && (
-                    <p className="mt-1 text-xs text-amber-600">
-                      Список достопримечательностей из базы не загружен.
-                    </p>
-                  )}
-                </div>
-              )}
-
-              {assignedAttractionType === 'draft' && (
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Достопримечательность из сессии
-                  </label>
-
-                  <select
-                    value={selectedSessionAttractionId}
-                    onChange={(event) => {
-                      const attractionId = event.target.value || null;
-
-                      updateItemPatch({
-                        assigned_attraction_type: 'draft',
-
-                        session_attraction: attractionId,
-                        session_attraction_id: attractionId,
-
-                        event: null,
-                        event_id: null,
-
-                        attraction: null,
-                        attraction_id: null,
-                      });
-                    }}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  >
-                    <option value="">Выберите достопримечательность из сессии</option>
-
-                    {attractions.map((attraction) => (
-                      <option key={attraction.id} value={attraction.id}>
-                        {getAttractionDisplayName(attraction)}
-                      </option>
-                    ))}
-                  </select>
-
-                  {attractions.length === 0 && (
-                    <p className="mt-1 text-xs text-amber-600">
-                      В текущей сессии пока нет достопримечательностей.
-                    </p>
-                  )}
-                </div>
-              )}
-            </div>
-
-            {itemType === 'text' ? (
-              <div>
-                <div className="flex items-center gap-2 mb-1">
-                  <label className="text-sm font-medium text-gray-700">
-                    Текст
-                  </label>
-
-                  <span className="px-1.5 py-0.5 bg-blue-100 text-blue-700 text-xs rounded font-mono">
-                    {currentLocale.lang?.toUpperCase() || 'RU'}
-                  </span>
-                </div>
-
-                <textarea
-                  value={currentLocale.text || ''}
-                  onChange={(event) =>
-                    onUpdateAttractionFeedLocaleField?.('text', event.target.value)
-                  }
-                  rows={8}
-                  placeholder="Комментарий для ленты достопримечательности..."
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
-                />
-              </div>
-            ) : (
-              <div className="flex gap-5 items-start">
-                <FeedImagePanel
-                  currentItem={currentAttractionFeedItem}
-                  photoUploading={attractionFeedPhotoUploading}
-                  photoFileRef={attractionFeedPhotoFileRef}
-                  onOpenCommonsModal={onOpenAttractionFeedCommonsModal}
-                  onPhotoFileChange={onAttractionFeedPhotoFileChange}
-                  onUpdateItemPatch={updateItemPatch}
-                />
-              </div>
-            )}
-
-            <div className="flex justify-end">
-              <button
-                type="button"
-                onClick={onSaveCurrentAttractionFeedItem}
-                disabled={attractionFeedSaving}
-                className="px-5 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors"
+                    attraction: null,
+                    attraction_id: null,
+                  });
+                }}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
               >
-                {attractionFeedSaving ? 'Сохранение...' : 'Сохранить'}
-              </button>
+                <option value="">Выберите достопримечательность из сессии</option>
+
+                {attractions.map((attraction) => (
+                  <option key={attraction.id} value={attraction.id}>
+                    {getAttractionDisplayName(attraction)}
+                  </option>
+                ))}
+              </select>
+
+              {attractions.length === 0 && (
+                <p className="mt-1 text-xs text-amber-600">
+                  В текущей сессии пока нет достопримечательностей.
+                </p>
+              )}
             </div>
-          </main>
+          )}
         </div>
-      )}
-    </div>
+
+        {itemType === 'text' ? (
+          <div>
+            <div className="flex items-center gap-2 mb-1">
+              <label className="text-sm font-medium text-gray-700">
+                Текст
+              </label>
+
+              <span className="px-1.5 py-0.5 bg-blue-100 text-blue-700 text-xs rounded font-mono">
+                {currentLocale.lang?.toUpperCase() || 'RU'}
+              </span>
+            </div>
+
+            <textarea
+              value={currentLocale.text || ''}
+              onChange={(event) =>
+                onUpdateAttractionFeedLocaleField?.('text', event.target.value)
+              }
+              rows={embedded ? 5 : 8}
+              placeholder="Комментарий для ленты достопримечательности..."
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
+            />
+          </div>
+        ) : (
+          <div className="flex gap-5 items-start">
+            <FeedImagePanel
+              currentItem={currentAttractionFeedItem}
+              photoUploading={attractionFeedPhotoUploading}
+              photoFileRef={attractionFeedPhotoFileRef}
+              onOpenCommonsModal={onOpenAttractionFeedCommonsModal}
+              onPhotoFileChange={onAttractionFeedPhotoFileChange}
+              onUpdateItemPatch={updateItemPatch}
+            />
+          </div>
+        )}
+
+        <div className="flex justify-end">
+          <button
+            type="button"
+            onClick={onSaveCurrentAttractionFeedItem}
+            disabled={attractionFeedSaving}
+            className="px-5 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors"
+          >
+            {attractionFeedSaving ? 'Сохранение...' : 'Сохранить'}
+          </button>
+        </div>
+      </main>
+    </section>
   );
 }

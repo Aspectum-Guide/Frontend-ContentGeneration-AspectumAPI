@@ -842,10 +842,12 @@ export function useSessionWizardController({ sessionId, confirm: confirmProp } =
 
   const [attractionFeedItems, setAttractionFeedItems] = useState([]);
   const [currentAttractionFeedItem, setCurrentAttractionFeedItem] = useState(null);
+  const [attractionFeedLocaleData, setAttractionFeedLocaleData] = useState({});
   const [attractionFeedActiveLocale, setAttractionFeedActiveLocale] = useState('ru-RU');
   const [attractionFeedSaving, setAttractionFeedSaving] = useState(false);
   const [attractionFeedPhotoUploading, setAttractionFeedPhotoUploading] = useState(false);
   const attractionFeedPhotoFileRef = useRef(null);
+  const attractionFeedLocaleDataItemIdRef = useRef(null);
 
   const [cityInfos, setCityInfos] = useState([]);
   const [currentCityInfo, setCurrentCityInfo] = useState(null);
@@ -1094,22 +1096,140 @@ export function useSessionWizardController({ sessionId, confirm: confirmProp } =
     attractionInfoActiveLocale,
   ]);
 
-  const attractionFeedLocaleData = useMemo(() => {
-    if (!currentAttractionFeedItem) return {};
+  const buildAttractionFeedLocaleData = useCallback(
+    (item, previousData = null) => {
+      if (!item || item.item_type !== 'text') return {};
 
-    return DEFAULT_LOCALE_DEFS.reduce((acc, locale) => {
-      const lang = locale.lang || locale.key?.split('-')?.[0] || 'ru';
+      const assignedType = item.assigned_attraction_type || 'none';
+      let sourceEntries = [];
 
-      acc[locale.key] = {
-        lang,
-        code: locale.code,
-        langName: locale.langName,
-        text: currentAttractionFeedItem.text?.[lang] || '',
-      };
+      if (assignedType === 'draft') {
+        const feedAttrId = normalizeId(
+          item.session_attraction_id ?? item.session_attraction
+        );
+        const activeAttrId = normalizeId(currentAttr?.id);
 
-      return acc;
-    }, {});
-  }, [currentAttractionFeedItem]);
+        if (feedAttrId && activeAttrId && feedAttrId === activeAttrId) {
+          sourceEntries = sortLocaleSourceEntries(
+            Object.entries(attrLocaleData || {}).filter(([, loc]) => loc?.lang)
+          );
+        } else if (feedAttrId) {
+          const attraction = attractions.find(
+            (a) => normalizeId(a.id) === feedAttrId
+          );
+
+          const attractionLangKeys = getMultilangKeys(
+            attraction?.name,
+            attraction?.description,
+            attraction?.contents
+          );
+
+          sourceEntries = makeLocaleEntriesFromLangKeys(attractionLangKeys);
+        }
+      } else if (assignedType === 'database') {
+        const eventId = normalizeId(
+          item.event_id ??
+            item.event ??
+            item.attraction_id ??
+            item.attraction
+        );
+
+        const refAttr = referenceAttractions.find(
+          (a) => normalizeId(a.id) === eventId
+        );
+
+        const attractionLangKeys = getMultilangKeys(
+          refAttr?.name,
+          refAttr?.title,
+          refAttr?.description
+        );
+
+        sourceEntries = makeLocaleEntriesFromLangKeys(attractionLangKeys);
+      } else if (assignedType === 'none') {
+        const ownLangKeys = getMultilangKeys(item.text);
+
+        sourceEntries = makeLocaleEntriesFromLangKeys(ownLangKeys);
+      }
+
+      if (sourceEntries.length === 0) {
+        sourceEntries = DEFAULT_LOCALE_DEFS.map((locale) => [locale.key, locale]);
+      }
+
+      return sourceEntries.reduce((acc, [key, locale]) => {
+        const lang =
+          locale.lang ||
+          key?.split('-')?.[0] ||
+          'ru';
+
+        const previousLocaleData = previousData?.[key];
+
+        acc[key] = {
+          lang,
+          code: locale.code || key?.split('-')?.[1] || '',
+          langName: locale.langName || locale.name || lang.toUpperCase(),
+          isDefault: Boolean(locale.isDefault),
+          isCustom: Boolean(locale.isCustom),
+
+          text:
+            item.text?.[lang] ??
+            previousLocaleData?.text ??
+            '',
+        };
+
+        return acc;
+      }, {});
+    },
+    [currentAttr, attrLocaleData, attractions, referenceAttractions]
+  );
+
+  useEffect(() => {
+    if (!currentAttractionFeedItem) {
+      attractionFeedLocaleDataItemIdRef.current = null;
+      setAttractionFeedLocaleData({});
+      return;
+    }
+
+    if (currentAttractionFeedItem.item_type !== 'text') {
+      attractionFeedLocaleDataItemIdRef.current = normalizeId(
+        currentAttractionFeedItem.id
+      );
+      setAttractionFeedLocaleData({});
+      return;
+    }
+
+    const itemId = normalizeId(currentAttractionFeedItem.id);
+
+    setAttractionFeedLocaleData((prev) => {
+      const shouldPreserveValues =
+        attractionFeedLocaleDataItemIdRef.current === itemId;
+
+      const next = buildAttractionFeedLocaleData(
+        currentAttractionFeedItem,
+        shouldPreserveValues ? prev : null
+      );
+
+      attractionFeedLocaleDataItemIdRef.current = itemId;
+
+      return next;
+    });
+  }, [currentAttractionFeedItem, buildAttractionFeedLocaleData]);
+
+  useEffect(() => {
+    if (!currentAttractionFeedItem) return;
+    if (currentAttractionFeedItem.item_type !== 'text') return;
+
+    const availableKeys = Object.keys(attractionFeedLocaleData || {});
+
+    if (availableKeys.length === 0) return;
+
+    if (!availableKeys.includes(attractionFeedActiveLocale)) {
+      setAttractionFeedActiveLocale(availableKeys[0]);
+    }
+  }, [
+    currentAttractionFeedItem,
+    attractionFeedLocaleData,
+    attractionFeedActiveLocale,
+  ]);
 
   const [aiGenAttrId, setAiGenAttrId] = useState(null);
   const [aiGenLang, setAiGenLang] = useState('ru');
@@ -1945,6 +2065,25 @@ export function useSessionWizardController({ sessionId, confirm: confirmProp } =
 
       emptyItem.index = attractionFeedItems.length;
 
+      const sessionAttrId = normalizeId(currentAttr?.id);
+      if (sessionAttrId) {
+        emptyItem.assigned_attraction_type = 'draft';
+        emptyItem.session_attraction = sessionAttrId;
+        emptyItem.session_attraction_id = sessionAttrId;
+        emptyItem.event = null;
+        emptyItem.event_id = null;
+        emptyItem.attraction = null;
+        emptyItem.attraction_id = null;
+      } else {
+        emptyItem.assigned_attraction_type = 'none';
+        emptyItem.session_attraction = null;
+        emptyItem.session_attraction_id = null;
+        emptyItem.event = null;
+        emptyItem.event_id = null;
+        emptyItem.attraction = null;
+        emptyItem.attraction_id = null;
+      }
+
       const res = await attractionFeedAPI.create(
         sessionId,
         buildAttractionFeedPayload(emptyItem)
@@ -1954,9 +2093,13 @@ export function useSessionWizardController({ sessionId, confirm: confirmProp } =
       const item = normalizeAttractionFeedItem(rawItem || emptyItem);
 
       if (item?.id) {
+        const nextItemId = normalizeId(item.id);
+        if (attractionFeedLocaleDataItemIdRef.current !== nextItemId) {
+          attractionFeedLocaleDataItemIdRef.current = null;
+        }
+
         setAttractionFeedItems((prev) => [...prev, item]);
         setCurrentAttractionFeedItem(item);
-        setAttractionFeedActiveLocale('ru-RU');
 
         showNote('Элемент ленты добавлен', 'success');
       }
@@ -1966,7 +2109,7 @@ export function useSessionWizardController({ sessionId, confirm: confirmProp } =
         'error'
       );
     }
-  }, [sessionId, attractionFeedItems.length, showNote]);
+  }, [sessionId, attractionFeedItems.length, showNote, currentAttr]);
 
   const openAttractionFeedItemDetail = useCallback((itemId) => {
     const target = attractionFeedItems.find(
@@ -1975,20 +2118,31 @@ export function useSessionWizardController({ sessionId, confirm: confirmProp } =
 
     if (!target) return;
 
+    const nextId = normalizeId(target.id);
+    if (attractionFeedLocaleDataItemIdRef.current !== nextId) {
+      attractionFeedLocaleDataItemIdRef.current = null;
+    }
+
     setCurrentAttractionFeedItem(target);
-    setAttractionFeedActiveLocale('ru-RU');
   }, [attractionFeedItems]);
 
   const updateAttractionFeedLocaleField = useCallback((field, value) => {
-    const lang = getLocaleLang(attractionFeedActiveLocale);
+    const lang =
+      attractionFeedLocaleData?.[attractionFeedActiveLocale]?.lang ||
+      getLocaleLang(attractionFeedActiveLocale);
 
     setCurrentAttractionFeedItem((prev) => {
       if (!prev) return prev;
 
+      const prevField =
+        prev[field] && typeof prev[field] === 'object' && !Array.isArray(prev[field])
+          ? prev[field]
+          : {};
+
       const updated = {
         ...prev,
         [field]: {
-          ...(prev[field] || {}),
+          ...prevField,
           [lang]: value,
         },
       };
@@ -2001,7 +2155,7 @@ export function useSessionWizardController({ sessionId, confirm: confirmProp } =
 
       return updated;
     });
-  }, [attractionFeedActiveLocale]);
+  }, [attractionFeedActiveLocale, attractionFeedLocaleData]);
 
   const saveCurrentAttractionFeedItem = useCallback(async () => {
     if (!currentAttractionFeedItem) return;

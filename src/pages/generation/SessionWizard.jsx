@@ -22,7 +22,7 @@ import { ConfirmModal as DefaultConfirmModal } from '../../components/ui/Modal.j
 import { useConfirmModal } from '../../components/ui/useConfirmModal.jsx';
 import DefaultSessionCloseDialog from '../../components/generation/SessionCloseDialog.jsx';
 
-const STEP_LABELS = ['Город', 'Теги', 'Достопримечательности', 'Лента', 'Контент', 'Публикация'];
+const STEP_LABELS = ['Город', 'Теги', 'Достопримечательности', 'Контент', 'Публикация'];
 
 export default function SessionWizard({ components = {} } = {}) {
   const StatusBadge = components.StatusBadge ?? DefaultStatusBadge;
@@ -445,6 +445,10 @@ export default function SessionWizard({ components = {} } = {}) {
                   if (currentAttractionInfo) {
                     await saveCurrentAttractionInfo?.();
                   }
+
+                  if (currentAttractionFeedItem) {
+                    await saveCurrentAttractionFeedItem?.();
+                  }
                 })().catch(() => {});
 
                 return;
@@ -642,34 +646,33 @@ export default function SessionWizard({ components = {} } = {}) {
                 onGoToStep={goToStep}
               />
             </div>
+
+            <div className="pt-5 border-t border-gray-200">
+              <SessionWizardAttractionFeedStep
+                embedded
+                attractionFeedItems={attractionFeedItems}
+                currentAttractionFeedItem={currentAttractionFeedItem}
+                attractionFeedLocaleData={attractionFeedLocaleData}
+                attractionFeedActiveLocale={attractionFeedActiveLocale}
+                attractionFeedSaving={attractionFeedSaving}
+                attractionFeedPhotoUploading={attractionFeedPhotoUploading}
+                attractionFeedPhotoFileRef={attractionFeedPhotoFileRef}
+                referenceAttractions={referenceAttractions || []}
+                attractions={attractions || []}
+                onOpenAttractionFeedItemDetail={openAttractionFeedItemDetail}
+                onOpenAttractionFeedCommonsModal={openAttractionFeedCommonsModal}
+                onAddAttractionFeedItem={addAttractionFeedItem}
+                onSetCurrentAttractionFeedItem={setCurrentAttractionFeedItem}
+                onSetAttractionFeedActiveLocale={setAttractionFeedActiveLocale}
+                onUpdateAttractionFeedLocaleField={updateAttractionFeedLocaleField}
+                onUpdateCurrentAttractionFeedItemPatch={updateCurrentAttractionFeedItemPatch}
+                onSaveCurrentAttractionFeedItem={saveCurrentAttractionFeedItem}
+                onDeleteCurrentAttractionFeedItem={deleteCurrentAttractionFeedItem}
+                onAttractionFeedPhotoFileChange={handleAttractionFeedPhotoFile}
+                onGoToStep={goToStep}
+              />
+            </div>
           </div>
-        )}
-
-        {currentStep === 4 && (
-          <SessionWizardAttractionFeedStep
-            attractionFeedItems={attractionFeedItems}
-            currentAttractionFeedItem={currentAttractionFeedItem}
-            attractionFeedLocaleData={attractionFeedLocaleData}
-            attractionFeedActiveLocale={attractionFeedActiveLocale}
-            attractionFeedSaving={attractionFeedSaving}
-            attractionFeedPhotoUploading={attractionFeedPhotoUploading}
-            attractionFeedPhotoFileRef={attractionFeedPhotoFileRef}
-
-            referenceAttractions={referenceAttractions}
-            attractions={attractions}
-
-            onOpenAttractionFeedItemDetail={openAttractionFeedItemDetail}
-            onOpenAttractionFeedCommonsModal={openAttractionFeedCommonsModal}
-            onAddAttractionFeedItem={addAttractionFeedItem}
-            onSetCurrentAttractionFeedItem={setCurrentAttractionFeedItem}
-            onSetAttractionFeedActiveLocale={setAttractionFeedActiveLocale}
-            onUpdateAttractionFeedLocaleField={updateAttractionFeedLocaleField}
-            onUpdateCurrentAttractionFeedItemPatch={updateCurrentAttractionFeedItemPatch}
-            onSaveCurrentAttractionFeedItem={saveCurrentAttractionFeedItem}
-            onDeleteCurrentAttractionFeedItem={deleteCurrentAttractionFeedItem}
-            onAttractionFeedPhotoFileChange={handleAttractionFeedPhotoFile}
-            onGoToStep={goToStep}
-          />
         )}
 
         {currentStep === 5 && (
