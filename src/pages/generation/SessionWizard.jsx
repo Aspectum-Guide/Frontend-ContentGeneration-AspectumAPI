@@ -22,7 +22,7 @@ import { ConfirmModal as DefaultConfirmModal } from '../../components/ui/Modal.j
 import { useConfirmModal } from '../../components/ui/useConfirmModal.jsx';
 import DefaultSessionCloseDialog from '../../components/generation/SessionCloseDialog.jsx';
 
-const STEP_LABELS = ['Город', 'Полезная информация о городе', 'Теги', 'Достопримечательности', 'Полезная информация о достопримечательности', 'Лента', 'Контент', 'Публикация'];
+const STEP_LABELS = ['Город', 'Теги', 'Достопримечательности', 'Полезная информация о достопримечательности', 'Лента', 'Контент', 'Публикация'];
 
 export default function SessionWizard({ components = {} } = {}) {
   const StatusBadge = components.StatusBadge ?? DefaultStatusBadge;
@@ -418,35 +418,55 @@ export default function SessionWizard({ components = {} } = {}) {
 
           <button
             type="button"
-            
             onClick={() => {
-              if (currentStep === 1 || currentStep === 3) {
-                void saveCityForStep1?.().catch(() => {});
+              if (currentStep === 1) {
+                void (async () => {
+                  await saveCityForStep1?.();
+
+                  if (currentCityInfo) {
+                    await saveCurrentCityInfo?.();
+                  }
+                })().catch(() => {});
+
                 return;
               }
 
               if (currentStep === 2) {
-                void saveCurrentCityInfo?.();
+                void saveCityForStep1?.().catch(() => {});
+                return;
+              }
+
+              if (currentStep === 3) {
+                void saveCurrentAttr?.();
                 return;
               }
 
               if (currentStep === 4) {
-                void saveCurrentAttr?.();
+                void saveCurrentAttractionInfo?.();
+                return;
               }
 
               if (currentStep === 5) {
-                void saveCurrentAttractionInfo?.();
-              }
-              if (currentStep === 6) {
                 void saveCurrentAttractionFeedItem?.();
               }
             }}
-            disabled={saving || cityInfoSaving || attrSaving || attractionInfoSaving || attractionFeedSaving}
-
+            disabled={
+              saving ||
+              cityInfoSaving ||
+              attrSaving ||
+              attractionInfoSaving ||
+              attractionFeedSaving
+            }
             title="Сохранить текущие данные"
             className="px-3 py-1.5 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors"
           >
-            {saving || cityInfoSaving || attrSaving || attractionInfoSaving || attractionFeedSaving ? 'Сохранение...' : 'Сохранить'}
+            {saving ||
+            cityInfoSaving ||
+            attrSaving ||
+            attractionInfoSaving ||
+            attractionFeedSaving
+              ? 'Сохранение...'
+              : 'Сохранить'}
           </button>
         </div>
       </div>
@@ -487,70 +507,73 @@ export default function SessionWizard({ components = {} } = {}) {
         </div>
 
         {currentStep === 1 && (
-          <SessionWizardCityStep
-            cityDrafts={cityDrafts}
-            activeCityDraftId={activeCityDraftId}
-            localeData={localeData}
-            activeLocale={activeLocale}
-            defaultLocale={defaultLocale}
-            currentLocale={currentLocale}
-            lat={lat}
-            lon={lon}
-            savedLat={savedLat}
-            savedLon={savedLon}
-            imagePreview={imagePreview}
-            photoUploading={photoUploading}
-            imageOriginalUrl={imageOriginalUrl}
-            imageCopyright={imageCopyright}
-            setMapContainerRef={setMapContainerRef}
-            photoFileRef={photoFileRef}
-            onOpenCommonsModal={openCityCommonsModal}
-            onPhotoFileChange={handlePhotoFile}
-            onImageOriginalUrlChange={setImageOriginalUrl}
-            onImageCopyrightChange={setImageCopyright}
-            onCreateDraft={handleCreateDraft}
-            onSelectDraft={handleSelectDraft}
-            onDeleteDraft={handleDeleteDraft}
-            onSwitchLocale={switchLocale}
-            onSetDefaultLocale={setDefaultLocale}
-            onAddLocale={() => setAddLocaleOpen(true)}
-            onRemoveLocale={removeLocale}
-            onUpdateLocaleField={updateLocaleField}
-            onLatChange={controller.setLat}
-            onLonChange={controller.setLon}
-            onRestoreSavedCoords={() => {
-              if (savedLat != null && savedLon != null) {
-                controller.setLat(String(savedLat));
-                controller.setLon(String(savedLon));
-              }
-            }}
-            onGoToStep={goToStep}
-            saving={saving}
-          />
+          <div className="space-y-6">
+            <SessionWizardCityStep
+              cityDrafts={cityDrafts}
+              activeCityDraftId={activeCityDraftId}
+              localeData={localeData}
+              activeLocale={activeLocale}
+              defaultLocale={defaultLocale}
+              currentLocale={currentLocale}
+              lat={lat}
+              lon={lon}
+              savedLat={savedLat}
+              savedLon={savedLon}
+              imagePreview={imagePreview}
+              photoUploading={photoUploading}
+              imageOriginalUrl={imageOriginalUrl}
+              imageCopyright={imageCopyright}
+              setMapContainerRef={setMapContainerRef}
+              photoFileRef={photoFileRef}
+              onOpenCommonsModal={openCityCommonsModal}
+              onPhotoFileChange={handlePhotoFile}
+              onImageOriginalUrlChange={setImageOriginalUrl}
+              onImageCopyrightChange={setImageCopyright}
+              onCreateDraft={handleCreateDraft}
+              onSelectDraft={handleSelectDraft}
+              onDeleteDraft={handleDeleteDraft}
+              onSwitchLocale={switchLocale}
+              onSetDefaultLocale={setDefaultLocale}
+              onAddLocale={() => setAddLocaleOpen(true)}
+              onRemoveLocale={removeLocale}
+              onUpdateLocaleField={updateLocaleField}
+              onLatChange={controller.setLat}
+              onLonChange={controller.setLon}
+              onRestoreSavedCoords={() => {
+                if (savedLat != null && savedLon != null) {
+                  controller.setLat(String(savedLat));
+                  controller.setLon(String(savedLon));
+                }
+              }}
+              onGoToStep={goToStep}
+              saving={saving}
+            />
+
+            <div className="pt-5 border-t border-gray-200">
+              <SessionWizardCityInfoStep
+                embedded
+                cityInfos={cityInfos}
+                currentCityInfo={currentCityInfo}
+                cityInfoLocaleData={cityInfoLocaleData}
+                cityInfoActiveLocale={cityInfoActiveLocale}
+                cityInfoSaving={cityInfoSaving}
+                referenceCities={referenceCities || []}
+                cityDrafts={cityDrafts || []}
+                onOpenCityInfoDetail={openCityInfoDetail}
+                onAddCityInfo={addCityInfo}
+                onSetCurrentCityInfo={setCurrentCityInfo}
+                onSetCityInfoActiveLocale={setCityInfoActiveLocale}
+                onUpdateCityInfoLocaleField={updateCityInfoLocaleField}
+                onUpdateCurrentCityInfoPatch={updateCurrentCityInfoPatch}
+                onSaveCurrentCityInfo={saveCurrentCityInfo}
+                onDeleteCurrentCityInfo={deleteCurrentCityInfo}
+                onGoToStep={goToStep}
+              />
+            </div>
+          </div>
         )}
 
         {currentStep === 2 && (
-          <SessionWizardCityInfoStep
-            cityInfos={cityInfos}
-            currentCityInfo={currentCityInfo}
-            cityInfoLocaleData={cityInfoLocaleData}
-            cityInfoActiveLocale={cityInfoActiveLocale}
-            cityInfoSaving={cityInfoSaving}
-            referenceCities={referenceCities || []}
-            cityDrafts={cityDrafts || []}
-            onOpenCityInfoDetail={openCityInfoDetail}
-            onAddCityInfo={addCityInfo}
-            onSetCurrentCityInfo={setCurrentCityInfo}
-            onSetCityInfoActiveLocale={setCityInfoActiveLocale}
-            onUpdateCityInfoLocaleField={updateCityInfoLocaleField}
-            onUpdateCurrentCityInfoPatch={updateCurrentCityInfoPatch}
-            onSaveCurrentCityInfo={saveCurrentCityInfo}
-            onDeleteCurrentCityInfo={deleteCurrentCityInfo}
-            onGoToStep={goToStep}
-          />
-        )}
-
-        {currentStep === 3 && (
           <SessionWizardTagsStep
             tagInput={tagInput}
             cityTags={cityTags}
@@ -565,7 +588,7 @@ export default function SessionWizard({ components = {} } = {}) {
           />
         )}
 
-        {currentStep === 4 && (
+        {currentStep === 3 && (
           <SessionWizardAttractionsStep
             attrView={attrView}
             currentAttr={currentAttr}
@@ -589,7 +612,7 @@ export default function SessionWizard({ components = {} } = {}) {
           />
         )}
 
-        {currentStep === 5 && (
+        {currentStep === 4 && (
           <SessionWizardAttractionInfoStep
             attractionInfos={attractionInfos}
             currentAttractionInfo={currentAttractionInfo}
@@ -610,7 +633,7 @@ export default function SessionWizard({ components = {} } = {}) {
           />
         )}
 
-        {currentStep === 6 && (
+        {currentStep === 5 && (
           <SessionWizardAttractionFeedStep
             attractionFeedItems={attractionFeedItems}
             currentAttractionFeedItem={currentAttractionFeedItem}
@@ -637,7 +660,7 @@ export default function SessionWizard({ components = {} } = {}) {
           />
         )}
 
-        {currentStep === 7 && (
+        {currentStep === 6 && (
           <SessionWizardContentStep
             attractions={attractions}
             aiGenAttrId={aiGenAttrId}
@@ -655,7 +678,7 @@ export default function SessionWizard({ components = {} } = {}) {
           />
         )}
 
-        {currentStep === 8 && (
+        {currentStep === 7 && (
           <SessionWizardPublishStep
             session={session}
             cityDrafts={cityDrafts}
