@@ -144,6 +144,9 @@ export const tasksAPI = {
 // Session wizard / tree CRUD (canonical REST under /city/filters/)
 export const cityFiltersAPI = {
   getTree: () => apiClient.get('/city/filters/tree/'),
+  /** Flat list; default backend: type=tag, is_show=true */
+  getTags: (params = {}) =>
+    apiClient.get('/city/filters/', { params: { type: 'tag', ...params } }),
   create: (payload) => apiClient.post('/city/filters/', payload),
   update: (id, payload) => apiClient.patch(`/city/filters/${id}/`, payload),
   delete: (id) => apiClient.delete(`/city/filters/${id}/`),
@@ -158,13 +161,19 @@ export const cityFiltersAPI = {
 };
 
 // ─── Event Filters ────────────────────────────────────────────────────────────
+// Canonical CRUD + tree (EventsAPI, JWT/session auth for writes)
 export const eventFiltersAPI = {
+  getTree: () => apiClient.get('/events/filters/tree/'),
+  create: (payload) => apiClient.post('/events/filters/', payload),
+  update: (id, payload) => apiClient.patch(`/events/filters/${id}/`, payload),
+  delete: (id) => apiClient.delete(`/events/filters/${id}/`),
+  /** Legacy ContentGeneration catalog (TagsFiltersCatalogPage) */
   list: () => apiClient.get(`${BASE}/event-filters/`),
   get: (filterId) => apiClient.get(`${BASE}/event-filters/${filterId}/`),
-  create: (data) => apiClient.post(`${BASE}/event-filters/create/`, data),
-  update: (filterId, data) =>
+  createLegacy: (data) => apiClient.post(`${BASE}/event-filters/create/`, data),
+  updateLegacy: (filterId, data) =>
     apiClient.patch(`${BASE}/event-filters/${filterId}/update/`, data),
-  delete: (filterId) =>
+  deleteLegacy: (filterId) =>
     apiClient.delete(`${BASE}/event-filters/${filterId}/delete/`),
 };
 

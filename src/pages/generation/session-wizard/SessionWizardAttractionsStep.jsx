@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { getAttrName, getFlag } from './sessionWizardShared.jsx';
+import SessionWizardAttractionTagsPicker from './SessionWizardAttractionTagsPicker.jsx';
 
 const getCityDisplayName = (city) => {
   if (!city) return 'Без названия';
@@ -509,6 +510,12 @@ export default function SessionWizardAttractionsStep({
   onUpdateAttrLocaleField,
   onSaveCurrentAttr,
   onGoToStep,
+
+  eventFilterTree = [],
+  eventFilterTreeLoading = false,
+  eventFilterTreeError = '',
+  onReloadEventFilters,
+  onToggleCurrentAttractionTag,
 }) {
   const attrCurrentLocale = attrLocaleData[attrActiveLocale] || {};
 
@@ -605,7 +612,7 @@ export default function SessionWizardAttractionsStep({
           <div className="flex justify-between pt-2">
             <button
               type="button"
-              onClick={() => onGoToStep(1)}
+              onClick={() => onGoToStep(2)}
               className="px-4 py-2 text-sm text-gray-600 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
             >
               ← Назад
@@ -613,7 +620,7 @@ export default function SessionWizardAttractionsStep({
 
             <button
               type="button"
-              onClick={() => onGoToStep(3)}
+              onClick={() => onGoToStep(4)}
               className="px-5 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors"
             >
               Далее: Контент →
@@ -741,6 +748,15 @@ export default function SessionWizardAttractionsStep({
                       />
                     </div>
                   </div>
+
+                  <SessionWizardAttractionTagsPicker
+                    selectedTags={currentAttr?.tags || []}
+                    eventFilterTree={eventFilterTree}
+                    eventFilterTreeLoading={eventFilterTreeLoading}
+                    eventFilterTreeError={eventFilterTreeError}
+                    onToggleTag={onToggleCurrentAttractionTag}
+                    onReloadEventFilters={onReloadEventFilters}
+                  />
 
                   <div className="p-3 border border-gray-200 rounded-lg bg-gray-50 space-y-3">
                     <div>

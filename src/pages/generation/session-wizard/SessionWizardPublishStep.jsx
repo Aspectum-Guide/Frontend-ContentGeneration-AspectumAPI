@@ -164,7 +164,7 @@ export default function SessionWizardPublishStep({
       <div className="flex justify-between pt-2">
         <button
           type="button"
-          onClick={() => onGoToStep(3)}
+          onClick={() => onGoToStep(4)}
           className="px-4 py-2 text-sm text-gray-600 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
         >
           ← Назад

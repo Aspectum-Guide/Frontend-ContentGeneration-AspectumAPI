@@ -1,13 +1,13 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { aiAPI, attractionsAPI, attractionInfosAPI, referenceAttractionsAPI, cityInfosAPI, cityFiltersAPI, citiesAPI, imagesAPI, sessionsAPI, eventsAPI, attractionFeedAPI} from '../../../api/generation';
+import { aiAPI, attractionsAPI, attractionInfosAPI, referenceAttractionsAPI, cityInfosAPI, cityFiltersAPI, eventFiltersAPI, citiesAPI, imagesAPI, sessionsAPI, attractionFeedAPI} from '../../../api/generation';
 import { useLayoutActions } from '../../../context/useLayoutActions';
 import { trackEvent } from '../../../utils/analytics';
 import { parseApiError } from '../../../utils/apiError';
 import { useToast } from '../../../components/ui/Toast.jsx';
 import { DEFAULT_LOCALE_DEFS, getLocaleInfo } from './sessionWizardShared.jsx';
 
-const TOTAL_STEPS = 8;
+const TOTAL_STEPS = 5;
 
 function makeLocaleData() {
   return Object.fromEntries(
@@ -186,6 +186,8 @@ const normalizeAttraction = (attr = {}) => {
       null,
 
     contents: attr.contents ?? {},
+
+    tags: normalizeTagIds(attr.tags ?? []),
   };
 };
 
@@ -370,6 +372,8 @@ const buildAttractionPayload = (attr, name, description) => {
 
     // legacy compatibility
     order: index,
+
+    tags: normalizeTagIds(attr.tags ?? []),
   };
 };
 
@@ -845,6 +849,14 @@ export function useSessionWizardController({ sessionId, confirm: confirmProp } =
   const [cityFilterTree, setCityFilterTree] = useState([]);
   const [cityFilterTreeLoading, setCityFilterTreeLoading] = useState(false);
   const [cityFilterTreeError, setCityFilterTreeError] = useState('');
+
+  const [eventFilterTree, setEventFilterTree] = useState([]);
+  const [eventFilterTreeLoading, setEventFilterTreeLoading] = useState(false);
+  const [eventFilterTreeError, setEventFilterTreeError] = useState('');
+
+  const [cityTagCatalog, setCityTagCatalog] = useState([]);
+  const [cityTagCatalogLoading, setCityTagCatalogLoading] = useState(false);
+  const [cityTagCatalogError, setCityTagCatalogError] = useState('');
 
   const [attractions, setAttractions] = useState([]);
   const [attrView, setAttrView] = useState('list');
@@ -1499,8 +1511,44 @@ export function useSessionWizardController({ sessionId, confirm: confirmProp } =
     }
   }, []);
 
+  const loadEventFilterTree = useCallback(async () => {
+    setEventFilterTreeLoading(true);
+    setEventFilterTreeError('');
+
+    try {
+      const res = await eventFiltersAPI.getTree();
+      const data = res?.data?.data || res?.data?.results || res?.data || [];
+      setEventFilterTree(Array.isArray(data) ? data : []);
+    } catch (error) {
+      setEventFilterTreeError(
+        parseApiError(error, 'Ошибка загрузки тегов достопримечательностей')
+      );
+    } finally {
+      setEventFilterTreeLoading(false);
+    }
+  }, []);
+
+  const loadCityTagCatalog = useCallback(async () => {
+    setCityTagCatalogLoading(true);
+    setCityTagCatalogError('');
+
+    try {
+      const res = await cityFiltersAPI.getTags();
+      const raw = res?.data?.data ?? res?.data?.results ?? res?.data ?? [];
+      setCityTagCatalog(Array.isArray(raw) ? raw : []);
+    } catch (error) {
+      setCityTagCatalogError(
+        parseApiError(error, 'Ошибка загрузки тегов города')
+      );
+    } finally {
+      setCityTagCatalogLoading(false);
+    }
+  }, []);
+
   useEffect(() => { loadSession(); }, [loadSession]);
   useEffect(() => { loadCityFilterTree(); }, [loadCityFilterTree]);
+  useEffect(() => { loadEventFilterTree(); }, [loadEventFilterTree]);
+  useEffect(() => { loadCityTagCatalog(); }, [loadCityTagCatalog]);
   useEffect(() => () => clearInterval(aiPollRef.current), []);
 
   useEffect(() => {
@@ -1642,7 +1690,7 @@ export function useSessionWizardController({ sessionId, confirm: confirmProp } =
   }, [sessionId, showNote]);
   
   useEffect(() => {
-    if ((currentStep === 4 || currentStep === 5) && !attractionsLoaded) {
+    if (currentStep >= 3 && currentStep <= 5 && !attractionsLoaded) {
       loadAttractions();
     }
   }, [currentStep, attractionsLoaded, loadAttractions]);
@@ -2498,33 +2546,35 @@ export function useSessionWizardController({ sessionId, confirm: confirmProp } =
       return;
     }
     try {
-      const res = await cityFiltersAPI.create({
+      await cityFiltersAPI.create({
         ...payload,
         type: 'tag',
         parent_id: parentId,
       });
-      const d = res?.data;
-      const created =
-        d?.id || d?.uuid
-          ? d
-          : d?.data && (d.data.id ?? d.data.uuid)
-            ? d.data
-            : d?.filter ?? d;
-      const newId = normalizeId(created?.id ?? created?.uuid);
-      if (newId) {
-        setCityTags((prev) => {
-          const next = normalizeTagIds(prev);
-          if (next.includes(newId)) return next;
-          return [...next, newId];
-        });
-      }
       showNote('Тег создан', 'success');
+      await loadCityFilterTree();
+      await loadCityTagCatalog();
+    } catch (e) {
+      showNote(parseApiError(e, 'Ошибка создания тега'), 'error');
+      throw e;
+    }
+  }, [loadCityFilterTree, loadCityTagCatalog, showNote]);
+
+  const createCityTag = useCallback(async (payload) => {
+    try {
+      await cityFiltersAPI.create({
+        ...payload,
+        type: 'tag',
+        parent_id: payload?.parent_id ?? null,
+      });
+      showNote('Тег города создан', 'success');
+      await loadCityTagCatalog();
       await loadCityFilterTree();
     } catch (e) {
       showNote(parseApiError(e, 'Ошибка создания тега'), 'error');
       throw e;
     }
-  }, [loadCityFilterTree, showNote]);
+  }, [loadCityTagCatalog, loadCityFilterTree, showNote]);
 
   const updateCityFilter = useCallback(async (filterId, payload) => {
     const id = normalizeId(filterId);
@@ -2533,11 +2583,12 @@ export function useSessionWizardController({ sessionId, confirm: confirmProp } =
       await cityFiltersAPI.update(id, payload);
       showNote('Сохранено', 'success');
       await loadCityFilterTree();
+      await loadCityTagCatalog();
     } catch (e) {
       showNote(parseApiError(e, 'Ошибка сохранения'), 'error');
       throw e;
     }
-  }, [loadCityFilterTree, showNote]);
+  }, [loadCityFilterTree, loadCityTagCatalog, showNote]);
 
   const deleteCityFilter = useCallback(async (filterId, opts = {}) => {
     const id = normalizeId(filterId);
@@ -2553,10 +2604,105 @@ export function useSessionWizardController({ sessionId, confirm: confirmProp } =
       });
       showNote('Удалено', 'success');
       await loadCityFilterTree();
+      await loadCityTagCatalog();
     } catch (e) {
       showNote(parseApiError(e, 'Не удалось удалить'), 'error');
     }
-  }, [confirm, loadCityFilterTree, showNote, patchActiveDraftTags]);
+  }, [confirm, loadCityFilterTree, loadCityTagCatalog, showNote, patchActiveDraftTags]);
+
+  const uploadEventFilterImage = uploadCityFilterImage;
+
+  const createEventFilterFolder = useCallback(async (payload) => {
+    try {
+      await eventFiltersAPI.create({
+        ...payload,
+        type: 'folder',
+        parent_id: null,
+      });
+      showNote('Папка создана', 'success');
+      await loadEventFilterTree();
+    } catch (e) {
+      showNote(parseApiError(e, 'Ошибка создания папки'), 'error');
+      throw e;
+    }
+  }, [loadEventFilterTree, showNote]);
+
+  const createEventFilterTag = useCallback(async (folderId, payload) => {
+    const parentId = normalizeId(folderId);
+    if (!parentId) {
+      showNote('Не указана папка для тега', 'error');
+      return;
+    }
+    try {
+      await eventFiltersAPI.create({
+        ...payload,
+        type: 'tag',
+        parent_id: parentId,
+      });
+      showNote('Тег создан', 'success');
+      await loadEventFilterTree();
+    } catch (e) {
+      showNote(parseApiError(e, 'Ошибка создания тега'), 'error');
+      throw e;
+    }
+  }, [loadEventFilterTree, showNote]);
+
+  const updateEventFilter = useCallback(async (filterId, payload) => {
+    const id = normalizeId(filterId);
+    if (!id) return;
+    try {
+      await eventFiltersAPI.update(id, payload);
+      showNote('Сохранено', 'success');
+      await loadEventFilterTree();
+    } catch (e) {
+      showNote(parseApiError(e, 'Ошибка сохранения'), 'error');
+      throw e;
+    }
+  }, [loadEventFilterTree, showNote]);
+
+  const deleteEventFilter = useCallback(async (filterId, opts = {}) => {
+    const id = normalizeId(filterId);
+    if (!id) return;
+    const message = opts.message || 'Удалить этот элемент?';
+    if (!(await confirm({ message, danger: true }))) return;
+    try {
+      await eventFiltersAPI.delete(id);
+      showNote('Удалено', 'success');
+      await loadEventFilterTree();
+    } catch (e) {
+      showNote(parseApiError(e, 'Не удалось удалить'), 'error');
+    }
+  }, [confirm, loadEventFilterTree, showNote]);
+
+  const toggleCurrentAttractionTag = useCallback((tagId) => {
+    const id = normalizeId(tagId);
+
+    if (!id) return;
+
+    setCurrentAttr((prev) => {
+      if (!prev) return prev;
+
+      const current = normalizeTagIds(prev.tags);
+      const nextTags = current.includes(id)
+        ? current.filter((item) => item !== id)
+        : [...current, id];
+
+      const updated = {
+        ...prev,
+        tags: nextTags,
+      };
+
+      setAttractions((items) =>
+        items.map((item) =>
+          normalizeId(item.id) === normalizeId(updated.id)
+            ? updated
+            : item
+        )
+      );
+
+      return updated;
+    });
+  }, []);
 
   const addTag = useCallback((text) => {
     const t = text.trim();
@@ -3156,6 +3302,8 @@ export function useSessionWizardController({ sessionId, confirm: confirmProp } =
           cachedAttr?.copyright ??
           cachedAttr?.image?.copyright ??
           '',
+
+        tags: responseAttr?.tags ?? cachedAttr?.tags ?? [],
       };
 
       const attr = normalizeAttraction(mergedAttr);
@@ -3319,6 +3467,8 @@ export function useSessionWizardController({ sessionId, confirm: confirmProp } =
           currentAttr.image_copyright ??
           currentAttr.imageCopyright ??
           '',
+
+        tags: normalizeTagIds(responseAttr.tags ?? currentAttr.tags ?? []),
       });
 
 
@@ -3582,6 +3732,8 @@ export function useSessionWizardController({ sessionId, confirm: confirmProp } =
     imageId, imagePreview, imageOriginalUrl, imageCopyright, setImageOriginalUrl, setImageCopyright, photoUploading, photoFileRef, commonsModalOpen, setCommonsModalOpen, openCityCommonsModal, openAttractionCommonsModal, openAttractionFeedCommonsModal, handleCommonsImageSelect,
     cityTags, tagInput, setTagInput,
     cityFilterTree, cityFilterTreeLoading, cityFilterTreeError, loadCityFilterTree,
+    eventFilterTree, eventFilterTreeLoading, eventFilterTreeError, loadEventFilterTree,
+    cityTagCatalog, cityTagCatalogLoading, cityTagCatalogError, loadCityTagCatalog,
     cityInfos, currentCityInfo, cityInfoLocaleData, cityInfoActiveLocale, cityInfoSaving,
     attractions, attrView, currentAttr, attrLocaleData, attrActiveLocale, attrSaving,
     attractionInfos, currentAttractionInfo, attractionInfoLocaleData, attractionInfoActiveLocale, attractionInfoSaving,    
@@ -3595,15 +3747,19 @@ export function useSessionWizardController({ sessionId, confirm: confirmProp } =
     saveCityForStep1,
     goToStep, switchLocale, addLocale, removeLocale, updateLocaleField,
     handleSelectDraft, handleCreateDraft, handleDeleteDraft,
-    handlePhotoFile, handleCommonsImageSelect, getSessionUuid,
+    handlePhotoFile, getSessionUuid,
     addTag, removeTag, handleTagKeyDown, handleTagBlur, toggleCityTag,
     uploadCityFilterImage,
-    createCityFilterFolder, createCityFilterTag, updateCityFilter, deleteCityFilter,
+    createCityFilterFolder, createCityFilterTag, createCityTag, updateCityFilter, deleteCityFilter,
+    uploadEventFilterImage,
+    createEventFilterFolder, createEventFilterTag, updateEventFilter, deleteEventFilter,
     setCurrentCityInfo, setCityInfoActiveLocale, openCityInfoDetail, addCityInfo, updateCurrentCityInfoPatch, updateCityInfoLocaleField, saveCurrentCityInfo, deleteCurrentCityInfo,
     setCurrentAttractionInfo, setAttractionInfoActiveLocale, openAttractionInfoDetail, addAttractionInfo, updateCurrentAttractionInfoPatch, updateAttractionInfoLocaleField, saveCurrentAttractionInfo, deleteCurrentAttractionInfo,
     setCurrentAttractionFeedItem, setAttractionFeedActiveLocale,
-    openAttrDetail, addAttraction, deleteCurrentAttr, saveCurrentAttr, updateAttrLocaleField, updateCurrentAttrPatch,    startAiContent, saveAiContent,
-    openAttractionFeedItemDetail, addAttractionFeedItem, updateCurrentAttractionFeedItemPatch, updateAttractionFeedLocaleField, saveCurrentAttractionFeedItem, deleteCurrentAttractionFeedItem, handleAttractionFeedPhotoFile, openAttractionFeedCommonsModal,
+    openAttrDetail, addAttraction, deleteCurrentAttr, saveCurrentAttr, updateAttrLocaleField, updateCurrentAttrPatch,
+    toggleCurrentAttractionTag,
+    startAiContent, saveAiContent,
+    openAttractionFeedItemDetail, addAttractionFeedItem, updateCurrentAttractionFeedItemPatch, updateAttractionFeedLocaleField, saveCurrentAttractionFeedItem, deleteCurrentAttractionFeedItem, handleAttractionFeedPhotoFile,
     handleClose, handlePublish, handleTranslateSession,
     TOTAL_STEPS,
   };

@@ -7,7 +7,8 @@ import SessionWizardAttractionsStep from './session-wizard/SessionWizardAttracti
 import SessionWizardCityStep from './session-wizard/SessionWizardCityStep';
 import SessionWizardContentStep from './session-wizard/SessionWizardContentStep';
 import SessionWizardPublishStep from './session-wizard/SessionWizardPublishStep';
-import SessionWizardTagsStep from './session-wizard/SessionWizardTagsStep';
+import SessionWizardTagsCatalogStep from './session-wizard/SessionWizardTagsCatalogStep';
+import SessionWizardCityTagsPicker from './session-wizard/SessionWizardCityTagsPicker';
 import SessionWizardCityInfoStep from './session-wizard/SessionWizardCityInfoStep';
 import SessionWizardAttractionInfoStep from './session-wizard/SessionWizardAttractionInfoStep';
 import SessionWizardAttractionFeedStep from './session-wizard/SessionWizardAttractionFeedStep.jsx';
@@ -22,7 +23,13 @@ import { ConfirmModal as DefaultConfirmModal } from '../../components/ui/Modal.j
 import { useConfirmModal } from '../../components/ui/useConfirmModal.jsx';
 import DefaultSessionCloseDialog from '../../components/generation/SessionCloseDialog.jsx';
 
-const STEP_LABELS = ['Город', 'Достопримечательности', 'Контент', 'Публикация'];
+const STEP_LABELS = [
+  'Город',
+  'Теги',
+  'Достопримечательности',
+  'Контент',
+  'Публикация',
+];
 
 export default function SessionWizard({ components = {} } = {}) {
   const StatusBadge = components.StatusBadge ?? DefaultStatusBadge;
@@ -84,6 +91,14 @@ export default function SessionWizard({ components = {} } = {}) {
     cityFilterTreeLoading,
     cityFilterTreeError,
     loadCityFilterTree,
+    eventFilterTree,
+    eventFilterTreeLoading,
+    eventFilterTreeError,
+    loadEventFilterTree,
+    cityTagCatalog,
+    cityTagCatalogLoading,
+    cityTagCatalogError,
+    loadCityTagCatalog,
     cityInfos,
     currentCityInfo,
     cityInfoLocaleData,
@@ -149,10 +164,14 @@ export default function SessionWizard({ components = {} } = {}) {
 
     toggleCityTag,
     uploadCityFilterImage,
-    createCityFilterFolder,
-    createCityFilterTag,
+    createCityTag,
     updateCityFilter,
     deleteCityFilter,
+    uploadEventFilterImage,
+    createEventFilterFolder,
+    createEventFilterTag,
+    updateEventFilter,
+    deleteEventFilter,
 
     setCurrentCityInfo,
     setCityInfoActiveLocale,
@@ -170,6 +189,7 @@ export default function SessionWizard({ components = {} } = {}) {
     saveCityForStep1,
     updateAttrLocaleField,
     updateCurrentAttrPatch,
+    toggleCurrentAttractionTag,
 
     setCurrentAttractionInfo,
     setAttractionInfoActiveLocale,
@@ -435,7 +455,6 @@ export default function SessionWizard({ components = {} } = {}) {
               }
 
               if (currentStep === 2) {
-                void saveCityForStep1?.().catch(() => {});
                 return;
               }
 
@@ -443,10 +462,12 @@ export default function SessionWizard({ components = {} } = {}) {
                 void (async () => {
                   if (currentAttr) {
                     await saveCurrentAttr?.();
+                    return;
                   }
 
                   if (currentAttractionInfo) {
                     await saveCurrentAttractionInfo?.();
+                    return;
                   }
 
                   if (currentAttractionFeedItem) {
@@ -457,13 +478,8 @@ export default function SessionWizard({ components = {} } = {}) {
                 return;
               }
 
-              if (currentStep === 4) {
-                void saveCurrentAttractionInfo?.();
+              if (currentStep === 4 || currentStep === 5) {
                 return;
-              }
-
-              if (currentStep === 5) {
-                void saveCurrentAttractionFeedItem?.();
               }
             }}
             disabled={
@@ -566,6 +582,21 @@ export default function SessionWizard({ components = {} } = {}) {
             />
 
             <div className="pt-5 border-t border-gray-200">
+              <SessionWizardCityTagsPicker
+                cityTags={cityTags}
+                cityTagCatalog={cityTagCatalog}
+                cityTagCatalogLoading={cityTagCatalogLoading}
+                cityTagCatalogError={cityTagCatalogError}
+                onReloadCityTagCatalog={loadCityTagCatalog}
+                cityFilterTree={cityFilterTree}
+                cityFilterTreeLoading={cityFilterTreeLoading}
+                cityFilterTreeError={cityFilterTreeError}
+                onReloadCityFilters={loadCityFilterTree}
+                onToggleCityTag={toggleCityTag}
+              />
+            </div>
+
+            <div className="pt-5 border-t border-gray-200">
               <SessionWizardCityInfoStep
                 embedded
                 cityInfos={cityInfos}
@@ -586,29 +617,34 @@ export default function SessionWizard({ components = {} } = {}) {
                 onGoToStep={goToStep}
               />
             </div>
-
-            <div className="pt-5 border-t border-gray-200">
-              <SessionWizardTagsStep
-                embedded
-                cityTags={cityTags}
-                cityFilterTree={cityFilterTree}
-                cityFilterTreeLoading={cityFilterTreeLoading}
-                cityFilterTreeError={cityFilterTreeError}
-                saving={saving}
-                onToggleCityTag={toggleCityTag}
-                onReloadCityFilters={loadCityFilterTree}
-                onCreateCityFilterFolder={createCityFilterFolder}
-                onCreateCityFilterTag={createCityFilterTag}
-                onUpdateCityFilter={updateCityFilter}
-                onDeleteCityFilter={deleteCityFilter}
-                onUploadCityFilterImage={uploadCityFilterImage}
-                onGoToStep={goToStep}
-              />
-            </div>
           </div>
         )}
 
         {currentStep === 2 && (
+          <SessionWizardTagsCatalogStep
+            cityTagCatalog={cityTagCatalog}
+            cityTagCatalogLoading={cityTagCatalogLoading}
+            cityTagCatalogError={cityTagCatalogError}
+            onReloadCityTagCatalog={loadCityTagCatalog}
+            saving={saving}
+            onCreateCityTag={createCityTag}
+            onUpdateCityFilter={updateCityFilter}
+            onDeleteCityFilter={deleteCityFilter}
+            onUploadCityFilterImage={uploadCityFilterImage}
+            eventFilterTree={eventFilterTree}
+            eventFilterTreeLoading={eventFilterTreeLoading}
+            eventFilterTreeError={eventFilterTreeError}
+            onReloadEventFilters={loadEventFilterTree}
+            onCreateEventFilterFolder={createEventFilterFolder}
+            onCreateEventFilterTag={createEventFilterTag}
+            onUpdateEventFilter={updateEventFilter}
+            onDeleteEventFilter={deleteEventFilter}
+            onUploadEventFilterImage={uploadEventFilterImage}
+            onGoToStep={goToStep}
+          />
+        )}
+
+        {currentStep === 3 && (
           <div className="space-y-6">
             <SessionWizardAttractionsStep
               attrView={attrView}
@@ -630,6 +666,11 @@ export default function SessionWizard({ components = {} } = {}) {
               onUpdateAttrLocaleField={updateAttrLocaleField}
               onSaveCurrentAttr={saveCurrentAttr}
               onGoToStep={goToStep}
+              eventFilterTree={eventFilterTree}
+              eventFilterTreeLoading={eventFilterTreeLoading}
+              eventFilterTreeError={eventFilterTreeError}
+              onReloadEventFilters={loadEventFilterTree}
+              onToggleCurrentAttractionTag={toggleCurrentAttractionTag}
             />
 
             <div className="pt-5 border-t border-gray-200">
@@ -682,7 +723,7 @@ export default function SessionWizard({ components = {} } = {}) {
           </div>
         )}
 
-        {currentStep === 3 && (
+        {currentStep === 4 && (
           <SessionWizardContentStep
             attractions={attractions}
             aiGenAttrId={aiGenAttrId}
@@ -700,7 +741,7 @@ export default function SessionWizard({ components = {} } = {}) {
           />
         )}
 
-        {currentStep === 4 && (
+        {currentStep === 5 && (
           <SessionWizardPublishStep
             session={session}
             cityDrafts={cityDrafts}

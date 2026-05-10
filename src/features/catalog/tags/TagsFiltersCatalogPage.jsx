@@ -325,7 +325,12 @@ export default function TagsFilters() {
       ) : (
         <FilterTab
           key="event"
-          api={eventFiltersAPI}
+          api={{
+            list: eventFiltersAPI.list,
+            create: eventFiltersAPI.createLegacy,
+            update: eventFiltersAPI.updateLegacy,
+            delete: eventFiltersAPI.deleteLegacy,
+          }}
           icon="🎪"
           emptyText="Тегов событий нет"
           createLabel="Создать тег ивента"
