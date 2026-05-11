@@ -57,7 +57,7 @@ export function useCitiesCatalog() {
     try {
       const r = await citiesCatalogAPI.listFilters();
       const data = r?.data;
-      const list = normalizeListResponse(data, ['tags', 'filters', 'results']);
+      const list = Array.isArray(data) ? data : normalizeListResponse(data, ['tags', 'filters', 'results']);
       setAllFilters(list);
     } catch {
       setAllFilters([]);

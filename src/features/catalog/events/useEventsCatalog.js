@@ -73,7 +73,7 @@ export function useEventsCatalog() {
       .listFilters()
       .then((r) => {
         const data = r?.data;
-        const list = normalizeListResponse(data, ['filters', 'tags', 'results']);
+        const list = Array.isArray(data) ? data : normalizeListResponse(data, ['filters', 'tags', 'results']);
         setAllEventFilters(list);
       })
       .catch(() => { });

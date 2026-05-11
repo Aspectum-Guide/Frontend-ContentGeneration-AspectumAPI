@@ -141,40 +141,26 @@ export const tasksAPI = {
 };
 
 // ─── City Filters ─────────────────────────────────────────────────────────────
-// Session wizard / tree CRUD (canonical REST under /city/filters/)
+// Canonical REST (CityAPI) — same store as Session Wizard / static reference JS
 export const cityFiltersAPI = {
   getTree: () => apiClient.get('/city/filters/tree/'),
   /** Flat list; default backend: type=tag, is_show=true */
   getTags: (params = {}) =>
     apiClient.get('/city/filters/', { params: { type: 'tag', ...params } }),
+  get: (id) => apiClient.get(`/city/filters/${id}/`),
   create: (payload) => apiClient.post('/city/filters/', payload),
   update: (id, payload) => apiClient.patch(`/city/filters/${id}/`, payload),
   delete: (id) => apiClient.delete(`/city/filters/${id}/`),
-  list: () => apiClient.get(`${BASE}/city-filters/`),
-  get: (filterId) => apiClient.get(`${BASE}/city-filters/${filterId}/`),
-  /** Legacy catalog admin paths (TagsFiltersCatalogPage) */
-  createLegacy: (data) => apiClient.post(`${BASE}/city-filters/create/`, data),
-  updateLegacy: (filterId, data) =>
-    apiClient.patch(`${BASE}/city-filters/${filterId}/update/`, data),
-  deleteLegacy: (filterId) =>
-    apiClient.delete(`${BASE}/city-filters/${filterId}/delete/`),
 };
 
 // ─── Event Filters ────────────────────────────────────────────────────────────
-// Canonical CRUD + tree (EventsAPI, JWT/session auth for writes)
+// Canonical CRUD + tree (EventsAPI) — same store as Session Wizard / static reference JS
 export const eventFiltersAPI = {
   getTree: () => apiClient.get('/events/filters/tree/'),
+  get: (id) => apiClient.get(`/events/filters/${id}/`),
   create: (payload) => apiClient.post('/events/filters/', payload),
   update: (id, payload) => apiClient.patch(`/events/filters/${id}/`, payload),
   delete: (id) => apiClient.delete(`/events/filters/${id}/`),
-  /** Legacy ContentGeneration catalog (TagsFiltersCatalogPage) */
-  list: () => apiClient.get(`${BASE}/event-filters/`),
-  get: (filterId) => apiClient.get(`${BASE}/event-filters/${filterId}/`),
-  createLegacy: (data) => apiClient.post(`${BASE}/event-filters/create/`, data),
-  updateLegacy: (filterId, data) =>
-    apiClient.patch(`${BASE}/event-filters/${filterId}/update/`, data),
-  deleteLegacy: (filterId) =>
-    apiClient.delete(`${BASE}/event-filters/${filterId}/delete/`),
 };
 
 // ─── AI ───────────────────────────────────────────────────────────────────────
