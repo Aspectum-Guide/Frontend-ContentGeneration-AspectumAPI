@@ -78,40 +78,6 @@ export default function ActivationCodesCatalogPage() {
   const [subscriptionTypes, setSubscriptionTypes] = useState([]);
   const [typesLoading, setTypesLoading] = useState(true);
 
-  const crud = useCatalogCrud({
-    createEmpty: createEmptyCode,
-    createRequest: activationCodesAPI.create,
-    updateRequest: activationCodesAPI.update,
-    deleteRequest: activationCodesAPI.delete,
-    mapRowToEdit: (row) => ({
-      id: row.id,
-      code: row.code || '',
-      subscription_type: row.subscription_type || '',
-      product_name: row.product_name || '',
-      description: row.description || '',
-      expiry_date: formatIsoForInput(row.expiry_date),
-      max_uses: row.max_uses ?? '',
-      is_active: row.is_active !== false,
-    }),
-    mapEditToPayload: (editingItem) => ({
-      code: editingItem.code?.trim() || undefined,
-      subscription_type: editingItem.subscription_type || null,
-      product_name: editingItem.product_name || '',
-      description: editingItem.description || '',
-      expiry_date: parseInputToIso(editingItem.expiry_date),
-      max_uses: editingItem.max_uses === '' ? null : Number(editingItem.max_uses),
-      is_active: !!editingItem.is_active,
-    }),
-    onAfterSave: loadItems,
-    onAfterDelete: loadItems,
-    parseError: (err, fallback) => parseApiError(err, fallback),
-    createErrorMessage: 'Ошибка создания кода',
-    updateErrorMessage: 'Ошибка сохранения кода',
-    deleteErrorMessage: 'Ошибка удаления кода',
-  });
-
-  const [bulkOpen, setBulkOpen] = useState(false);
-
   const loadSubscriptionTypes = useCallback(async () => {
     try {
       setTypesLoading(true);
@@ -125,6 +91,34 @@ export default function ActivationCodesCatalogPage() {
       setTypesLoading(false);
     }
   }, []);
+
+  const mapRowToEdit = useCallback(
+    (row) => ({
+      id: row.id,
+      code: row.code || '',
+      subscription_type: row.subscription_type || '',
+      product_name: row.product_name || '',
+      description: row.description || '',
+      expiry_date: formatIsoForInput(row.expiry_date),
+      max_uses: row.max_uses ?? '',
+      is_active: row.is_active !== false,
+    }),
+    []
+  );
+
+  const mapEditToPayload = useCallback((editingItem) => {
+    return {
+      code: editingItem.code?.trim() || undefined,
+      subscription_type: editingItem.subscription_type || null,
+      product_name: editingItem.product_name || '',
+      description: editingItem.description || '',
+      expiry_date: parseInputToIso(editingItem.expiry_date),
+      max_uses: editingItem.max_uses === '' ? null : Number(editingItem.max_uses),
+      is_active: !!editingItem.is_active,
+    };
+  }, []);
+
+  const parseCrudError = useCallback((err, fallback) => parseApiError(err, fallback), []);
 
   const loadItems = useCallback(async (paramsState) => {
     const state = paramsState || { search, statusFilter, subscriptionTypeFilter, page };
@@ -154,6 +148,23 @@ export default function ActivationCodesCatalogPage() {
       setLoading(false);
     }
   }, [search, statusFilter, subscriptionTypeFilter, page]);
+
+  const crud = useCatalogCrud({
+    createEmpty: createEmptyCode,
+    createRequest: activationCodesAPI.create,
+    updateRequest: activationCodesAPI.update,
+    deleteRequest: activationCodesAPI.delete,
+    mapRowToEdit,
+    mapEditToPayload,
+    onAfterSave: loadItems,
+    onAfterDelete: loadItems,
+    parseError: parseCrudError,
+    createErrorMessage: 'Ошибка создания кода',
+    updateErrorMessage: 'Ошибка сохранения кода',
+    deleteErrorMessage: 'Ошибка удаления кода',
+  });
+
+  const [bulkOpen, setBulkOpen] = useState(false);
 
   useEffect(() => {
     loadSubscriptionTypes();
@@ -202,7 +213,7 @@ export default function ActivationCodesCatalogPage() {
 
     setMobileActions(actions);
     return () => setMobileActions([]);
-  }, [crud, setMobileActions]);
+  }, [crud.editingItem, crud.openCreate, crud.closeEdit, setMobileActions]);
 
   const columns = [
     {
