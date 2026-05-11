@@ -9,6 +9,7 @@ const CATALOG_SECTIONS = [
     badge: 'BOOKING',
     badgeClass: 'bg-blue-100 text-blue-700',
     items: [
+      { to: '/catalog/booking-setup', title: 'Booking Setup (мастер)', description: 'Быстрое создание типов, слотов и цен', icon: '🧭' },
       { to: '/catalog/ticket-types', title: 'Типы билетов', description: 'Ticket types (booking)', icon: '🎟️' },
       { to: '/catalog/slot-availabilities', title: 'Слоты (доступность)', description: 'Доступные слоты по времени', icon: '🕒' },
       { to: '/catalog/ticket-prices', title: 'Цены билетов', description: 'Цены по слотам и типам', icon: '💶' },
