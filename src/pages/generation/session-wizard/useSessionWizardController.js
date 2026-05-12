@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { aiAPI, attractionsAPI, attractionInfosAPI, referenceAttractionsAPI, cityInfosAPI, cityFiltersAPI, eventFiltersAPI, citiesAPI, imagesAPI, sessionsAPI, attractionFeedAPI} from '../../../api/generation';
+import { aiAPI, tasksAPI, attractionsAPI, attractionInfosAPI, referenceAttractionsAPI, cityInfosAPI, cityFiltersAPI, eventFiltersAPI, citiesAPI, imagesAPI, sessionsAPI, attractionFeedAPI} from '../../../api/generation';
 import { useLayoutActions } from '../../../context/useLayoutActions';
 import { trackEvent } from '../../../utils/analytics';
 import { parseApiError } from '../../../utils/apiError';
@@ -1269,6 +1269,13 @@ export function useSessionWizardController({ sessionId, confirm: confirmProp } =
   const [aiGenDone, setAiGenDone] = useState(false);
   const [aiGenError, setAiGenError] = useState(null);
   const [aiGenSaving, setAiGenSaving] = useState(false);
+
+  const [attractionGenerationOpen, setAttractionGenerationOpen] = useState(false);
+  const [attractionGenerationPrompt, setAttractionGenerationPrompt] = useState('');
+  const [attractionGenerating, setAttractionGenerating] = useState(false);
+  const [attractionGenerationTaskId, setAttractionGenerationTaskId] = useState(null);
+  const [attractionGenerationError, setAttractionGenerationError] = useState('');
+  const attractionGenPollCancelledRef = useRef(false);
   const aiPollRef = useRef(null);
 
   const [saving, setSaving] = useState(false);
@@ -3414,6 +3421,136 @@ export function useSessionWizardController({ sessionId, confirm: confirmProp } =
     showNote,
   ]);
 
+  const openAttractionGenerationModal = useCallback(() => {
+    attractionGenPollCancelledRef.current = false;
+    setAttractionGenerationError('');
+    setAttractionGenerationPrompt('');
+    setAttractionGenerationTaskId(null);
+    setAttractionGenerationOpen(true);
+  }, []);
+
+  const closeAttractionGenerationModal = useCallback(() => {
+    attractionGenPollCancelledRef.current = true;
+    setAttractionGenerationOpen(false);
+    setAttractionGenerating(false);
+    setAttractionGenerationTaskId(null);
+    setAttractionGenerationError('');
+  }, []);
+
+  const generateAttractionsFromPrompt = useCallback(async () => {
+    const prompt = attractionGenerationPrompt.trim();
+    if (!prompt) {
+      setAttractionGenerationError('Введите запрос');
+      return;
+    }
+
+    const resolveLang = () => {
+      const loc = localeData[activeLocale];
+      const locLang = (loc?.lang || '').trim().toLowerCase();
+      if (locLang) {
+        const base = locLang.split('-')[0];
+        return base || 'ru';
+      }
+
+      const draftId = normalizeDraftId(activeCityDraftIdRef.current);
+      const draft = cityDrafts.find((d) => normalizeDraftId(d.id) === draftId);
+
+      const collect = (obj) => {
+        if (!obj || typeof obj !== 'object') return null;
+        const keys = Object.keys(obj);
+        for (let i = 0; i < keys.length; i += 1) {
+          const k = keys[i];
+          if (k && /^[a-z]{2}/i.test(k)) return k.split('-')[0].toLowerCase();
+        }
+        return null;
+      };
+
+      return (
+        collect(draft?.name) ||
+        collect(draft?.description) ||
+        collect(draft?.country) ||
+        'ru'
+      );
+    };
+
+    const lang = resolveLang();
+    const draftIdRaw = normalizeDraftId(activeCityDraftIdRef.current);
+    const session_city_id = draftIdRaw && draftIdRaw !== 'legacy' ? draftIdRaw : null;
+
+    attractionGenPollCancelledRef.current = false;
+    setAttractionGenerating(true);
+    setAttractionGenerationError('');
+    setAttractionGenerationTaskId(null);
+
+    try {
+      const startRes = await aiAPI.attractionsJsonStart({
+        session_id: sessionId,
+        session_city_id,
+        lang,
+        prompt,
+      });
+      const taskId = startRes?.data?.task_id;
+      if (!taskId) {
+        throw new Error('Сервер не вернул task_id');
+      }
+      setAttractionGenerationTaskId(taskId);
+
+      let pollDone = false;
+      while (!pollDone) {
+        if (attractionGenPollCancelledRef.current) {
+          return;
+        }
+        const tr = await tasksAPI.get(taskId);
+        const task = tr?.data;
+        if (task?.status === 'completed') {
+          pollDone = true;
+        } else if (task?.status === 'failed') {
+          const failedMsg =
+            task?.error_message ||
+            task?.result_data?.error ||
+            'Задача завершилась с ошибкой';
+          throw new Error(failedMsg);
+        } else {
+          await new Promise((r) => setTimeout(r, 1000));
+        }
+      }
+
+      if (attractionGenPollCancelledRef.current) {
+        return;
+      }
+
+      const createRes = await aiAPI.attractionsCreateFromTask(taskId, { session_id: sessionId });
+      const list = createRes?.data?.attractions || [];
+      const n = Array.isArray(list) ? list.length : 0;
+
+      const keepDraft = normalizeDraftId(activeCityDraftIdRef.current);
+      await loadSession(keepDraft);
+
+      if (!attractionGenPollCancelledRef.current) {
+        showNote(`Сгенерировано достопримечательностей: ${n}`, 'success');
+        setAttractionGenerationOpen(false);
+        setAttractionGenerationPrompt('');
+        setAttractionGenerationTaskId(null);
+      }
+    } catch (e) {
+      if (!attractionGenPollCancelledRef.current) {
+        const msg = parseApiError(e, 'Ошибка генерации');
+        setAttractionGenerationError(msg);
+        showNote(msg, 'error');
+      }
+    } finally {
+      setAttractionGenerating(false);
+    }
+  }, [
+    sessionId,
+    attractionGenerationPrompt,
+    localeData,
+    activeLocale,
+    cityDrafts,
+    loadSession,
+    showNote,
+  ]);
+
   const saveCurrentAttr = useCallback(async () => {
     if (!currentAttr) return;
     setAttrSaving(true);
@@ -3739,6 +3876,7 @@ export function useSessionWizardController({ sessionId, confirm: confirmProp } =
     attractionInfos, currentAttractionInfo, attractionInfoLocaleData, attractionInfoActiveLocale, attractionInfoSaving,    
     attractionFeedItems, currentAttractionFeedItem, attractionFeedLocaleData, attractionFeedActiveLocale, attractionFeedSaving, attractionFeedPhotoUploading, attractionFeedPhotoFileRef,
     aiGenAttrId, aiGenLang, aiGenText, aiGenDone, aiGenError, aiGenSaving,
+    attractionGenerationOpen, attractionGenerationPrompt, attractionGenerating, attractionGenerationTaskId, attractionGenerationError,
     saving, closeOpen, closeMode, closing, publishing, translating,
     setAttrView, setCurrentAttr, setAttrActiveLocale, setAiGenLang, setAiGenAttrId, setAiGenText,
     setCloseOpen, setCloseMode,
@@ -3757,7 +3895,7 @@ export function useSessionWizardController({ sessionId, confirm: confirmProp } =
     setCurrentAttractionInfo, setAttractionInfoActiveLocale, openAttractionInfoDetail, addAttractionInfo, updateCurrentAttractionInfoPatch, updateAttractionInfoLocaleField, saveCurrentAttractionInfo, deleteCurrentAttractionInfo,
     setCurrentAttractionFeedItem, setAttractionFeedActiveLocale,
     openAttrDetail, addAttraction, deleteCurrentAttr, saveCurrentAttr, updateAttrLocaleField, updateCurrentAttrPatch,
-    toggleCurrentAttractionTag,
+    openAttractionGenerationModal, closeAttractionGenerationModal, setAttractionGenerationPrompt, generateAttractionsFromPrompt, toggleCurrentAttractionTag,
     startAiContent, saveAiContent,
     openAttractionFeedItemDetail, addAttractionFeedItem, updateCurrentAttractionFeedItemPatch, updateAttractionFeedLocaleField, saveCurrentAttractionFeedItem, deleteCurrentAttractionFeedItem, handleAttractionFeedPhotoFile,
     handleClose, handlePublish, handleTranslateSession,

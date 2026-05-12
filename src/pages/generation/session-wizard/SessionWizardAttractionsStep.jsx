@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { getAttrName, getFlag } from './sessionWizardShared.jsx';
 import SessionWizardAttractionTagsPicker from './SessionWizardAttractionTagsPicker.jsx';
 
@@ -47,6 +47,32 @@ const normalizeId = (value) => {
 
   return String(value);
 };
+
+function resolveAttractionAiLang(localeData, activeLocale, cityDrafts, activeCityDraftId) {
+  const loc = localeData?.[activeLocale];
+  const locLang = (loc?.lang || '').trim().toLowerCase();
+  if (locLang) {
+    const base = locLang.split('-')[0];
+    return base || 'ru';
+  }
+
+  const nid = activeCityDraftId == null || activeCityDraftId === '' ? null : String(activeCityDraftId);
+  const draft =
+    (cityDrafts || []).find((d) => String(d.id) === nid) ||
+    (cityDrafts || []).find((d) => d.id === 'legacy');
+
+  const collect = (obj) => {
+    if (!obj || typeof obj !== 'object') return null;
+    const keys = Object.keys(obj);
+    for (let i = 0; i < keys.length; i += 1) {
+      const k = keys[i];
+      if (k && /^[a-z]{2}/i.test(k)) return k.split('-')[0].toLowerCase();
+    }
+    return null;
+  };
+
+  return collect(draft?.name) || collect(draft?.description) || collect(draft?.country) || 'ru';
+}
 
 const parseMapCoord = (value) => {
   if (value === null || value === undefined || value === '') return NaN;
@@ -492,6 +518,10 @@ export default function SessionWizardAttractionsStep({
   attrSaving,
   attractions,
 
+  activeCityDraftId = null,
+  localeData = {},
+  activeLocale = 'ru-RU',
+
   referenceCities = [],
   cityDrafts = [],
   onUpdateCurrentAttrPatch,
@@ -516,6 +546,16 @@ export default function SessionWizardAttractionsStep({
   eventFilterTreeError = '',
   onReloadEventFilters,
   onToggleCurrentAttractionTag,
+
+  attractionGenerationOpen = false,
+  attractionGenerationPrompt = '',
+  attractionGenerating = false,
+  attractionGenerationTaskId = null,
+  attractionGenerationError = '',
+  onOpenAttractionGenerationModal,
+  onCloseAttractionGenerationModal,
+  onAttractionGenerationPromptChange,
+  onGenerateAttractionsFromPrompt,
 }) {
   const attrCurrentLocale = attrLocaleData[attrActiveLocale] || {};
 
@@ -535,8 +575,111 @@ export default function SessionWizardAttractionsStep({
     }
   };
 
+  const activeCityLabel = useMemo(() => {
+    const id = normalizeId(activeCityDraftId);
+    const drafts = cityDrafts || [];
+    if (!drafts.length) return null;
+    if (id === 'legacy') {
+      const legacy = drafts.find((d) => d.id === 'legacy');
+      return legacy ? getDraftCityDisplayName(legacy) : null;
+    }
+    const d = drafts.find((x) => normalizeId(x.id) === id);
+    return d ? getDraftCityDisplayName(d) : null;
+  }, [activeCityDraftId, cityDrafts]);
+
+  const detectedAiLang = useMemo(
+    () => resolveAttractionAiLang(localeData, activeLocale, cityDrafts, activeCityDraftId),
+    [localeData, activeLocale, cityDrafts, activeCityDraftId]
+  );
+
+  const hasCityDrafts = Array.isArray(cityDrafts) && cityDrafts.length > 0;
+  const showNoCityWarning = !hasCityDrafts;
+
   return (
     <div>
+      {attractionGenerationOpen && (
+        <div
+          className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 p-4"
+          onClick={() => {
+            if (!attractionGenerating) onCloseAttractionGenerationModal?.();
+          }}
+        >
+          <div
+            className="bg-white rounded-xl max-w-lg w-full p-6 shadow-xl space-y-4 relative"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="attraction-gen-title"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {attractionGenerating && (
+              <div className="absolute inset-0 bg-white/70 rounded-xl flex items-center justify-center z-10">
+                <div className="text-sm text-gray-700 font-medium">Генерация…</div>
+              </div>
+            )}
+
+            <h2 id="attraction-gen-title" className="text-lg font-semibold text-gray-900">
+              Сгенерировать достопримечательности
+            </h2>
+
+            {showNoCityWarning ? (
+              <div className="text-sm text-amber-800 bg-amber-50 border border-amber-200 rounded-lg p-3">
+                В сессии нет выбранного города. Достопримечательности будут созданы без привязки.
+              </div>
+            ) : (
+              <div className="text-sm text-gray-700">
+                <span className="text-gray-500">Текущий город: </span>
+                <span className="font-medium text-gray-900">{activeCityLabel || '—'}</span>
+              </div>
+            )}
+
+            <div className="text-xs text-gray-500">
+              Язык сохранения полей: <span className="font-mono font-medium text-gray-800">{detectedAiLang}</span>
+              {attractionGenerationTaskId && (
+                <span className="ml-2 text-gray-400">· задача {String(attractionGenerationTaskId).slice(0, 8)}…</span>
+              )}
+            </div>
+
+            {attractionGenerationError && (
+              <div className="text-sm text-red-700 bg-red-50 border border-red-200 rounded-lg p-3">
+                {attractionGenerationError}
+              </div>
+            )}
+
+            <label className="block text-sm font-medium text-gray-700" htmlFor="attraction-gen-prompt">
+              Запрос к ИИ
+            </label>
+            <textarea
+              id="attraction-gen-prompt"
+              rows={5}
+              value={attractionGenerationPrompt}
+              onChange={(e) => onAttractionGenerationPromptChange?.(e.target.value)}
+              disabled={attractionGenerating}
+              placeholder="Например: Сгенерируй 10 достопримечательностей города, включая название, краткое описание и при возможности координаты."
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
+            />
+
+            <div className="flex justify-end gap-2 pt-2">
+              <button
+                type="button"
+                onClick={() => onCloseAttractionGenerationModal?.()}
+                disabled={attractionGenerating}
+                className="px-4 py-2 text-sm font-medium text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50"
+              >
+                Отмена
+              </button>
+              <button
+                type="button"
+                onClick={() => onGenerateAttractionsFromPrompt?.()}
+                disabled={attractionGenerating || !attractionGenerationPrompt.trim()}
+                className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-50"
+              >
+                Сгенерировать
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {attrView === 'list' ? (
         <div className="space-y-4">
           <div className="flex items-center justify-between">
@@ -550,13 +693,22 @@ export default function SessionWizardAttractionsStep({
               </p>
             </div>
 
-            <button
-              type="button"
-              onClick={onAddAttraction}
-              className="px-3 py-1.5 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors"
-            >
-              + Добавить
-            </button>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => onOpenAttractionGenerationModal?.()}
+                className="px-3 py-1.5 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors"
+              >
+                Сгенерировать
+              </button>
+              <button
+                type="button"
+                onClick={onAddAttraction}
+                className="px-3 py-1.5 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors"
+              >
+                + Добавить
+              </button>
+            </div>
           </div>
 
           {attractions.length === 0 ? (

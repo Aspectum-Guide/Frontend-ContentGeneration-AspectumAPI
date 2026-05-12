@@ -179,6 +179,11 @@ export const aiAPI = {
   citiesTaskCreateSessions: (taskId) =>
     apiClient.post(`${BASE}/ai/cities-json/tasks/${taskId}/create-sessions/`, {}),
   citiesJson: (data) => apiClient.post(`${BASE}/ai/cities-json/`, data),
+  /** Session Wizard: AI batch attractions inside existing session */
+  attractionsJsonStart: (data) =>
+    apiClient.post(`${BASE}/ai/attractions-json/start/`, data),
+  attractionsCreateFromTask: (taskId, payload = {}) =>
+    apiClient.post(`${BASE}/ai/attractions-json/tasks/${taskId}/create-attractions/`, payload),
 };
 
 // ─── Events (reference) ───────────────────────────────────────────────────────

@@ -132,6 +132,12 @@ export default function SessionWizard({ components = {} } = {}) {
     aiGenError,
     aiGenSaving,
 
+    attractionGenerationOpen,
+    attractionGenerationPrompt,
+    attractionGenerating,
+    attractionGenerationTaskId,
+    attractionGenerationError,
+
     saving,
     closeOpen,
     closeMode,
@@ -184,6 +190,10 @@ export default function SessionWizard({ components = {} } = {}) {
 
     openAttrDetail,
     addAttraction,
+    openAttractionGenerationModal,
+    closeAttractionGenerationModal,
+    setAttractionGenerationPrompt,
+    generateAttractionsFromPrompt,
     deleteCurrentAttr,
     saveCurrentAttr,
     saveCityForStep1,
@@ -653,12 +663,24 @@ export default function SessionWizard({ components = {} } = {}) {
               attrLocaleData={attrLocaleData}
               attrSaving={attrSaving}
               attractions={attractions}
+              activeCityDraftId={activeCityDraftId}
+              localeData={localeData}
+              activeLocale={activeLocale}
               referenceCities={referenceCities || []}
               cityDrafts={cityDrafts || []}
               onUpdateCurrentAttrPatch={updateCurrentAttrPatch}
               onOpenAttrDetail={openAttrDetail}
               onOpenAttractionCommonsModal={openAttractionCommonsModal}
               onAddAttraction={addAttraction}
+              attractionGenerationOpen={attractionGenerationOpen}
+              attractionGenerationPrompt={attractionGenerationPrompt}
+              attractionGenerating={attractionGenerating}
+              attractionGenerationTaskId={attractionGenerationTaskId}
+              attractionGenerationError={attractionGenerationError}
+              onOpenAttractionGenerationModal={openAttractionGenerationModal}
+              onCloseAttractionGenerationModal={closeAttractionGenerationModal}
+              onAttractionGenerationPromptChange={setAttractionGenerationPrompt}
+              onGenerateAttractionsFromPrompt={generateAttractionsFromPrompt}
               onDeleteCurrentAttr={deleteCurrentAttr}
               onSetAttrView={setAttrView}
               onSetCurrentAttr={setCurrentAttr}
