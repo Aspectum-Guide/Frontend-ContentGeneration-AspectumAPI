@@ -452,6 +452,92 @@ const normalizeTagIds = (value) => {
   )];
 };
 
+function upsertCityDraft(drafts = [], draft) {
+  const draftId = normalizeDraftId(draft?.id);
+
+  if (!draftId) return drafts;
+
+  const next = drafts
+    .filter((item) => normalizeDraftId(item?.id) !== 'legacy')
+    .filter((item) => normalizeDraftId(item?.id) !== draftId);
+
+  return [...next, draft].sort((a, b) => {
+    const orderA = Number.isFinite(Number(a?.order)) ? Number(a.order) : 0;
+    const orderB = Number.isFinite(Number(b?.order)) ? Number(b.order) : 0;
+
+    if (orderA !== orderB) return orderA - orderB;
+
+    return String(a?.created_at || '').localeCompare(String(b?.created_at || ''));
+  });
+}
+
+function normalizeCityDraft(raw) {
+  if (!raw || typeof raw !== 'object') return null;
+  const id = normalizeDraftId(raw.id);
+  if (!id) return null;
+  const next = {
+    ...raw,
+    tags: normalizeTagIds(raw.tags ?? raw.city_tags ?? []),
+  };
+  delete next.isPending;
+  return next;
+}
+
+/** Список черновиков из ответа GET сессии (до overlay). */
+function normalizeServerCityDraftsFromSessionData(data) {
+  if (!data || typeof data !== 'object') return [];
+
+  if (Array.isArray(data.city_drafts) && data.city_drafts.length > 0) {
+    return data.city_drafts.map((draft) => ({
+      ...draft,
+      tags: normalizeTagIds(draft.tags ?? draft.city_tags ?? []),
+    }));
+  }
+
+  if (data.city) {
+    return [
+      {
+        ...data.city,
+        id: 'legacy',
+        is_primary: true,
+        order: 0,
+        tags: normalizeTagIds(data.city.tags ?? data.city.city_tags ?? []),
+      },
+    ];
+  }
+
+  return [];
+}
+
+function parseCreatedCityDraftResponse(res) {
+  const d = res?.data;
+  if (!d || typeof d !== 'object') return null;
+  const nested =
+    d.draft ??
+    d.city_draft ??
+    (d.data && typeof d.data === 'object' && !Array.isArray(d.data) ? d.data : null);
+  if (nested) return nested;
+  if (
+    d.id != null &&
+    typeof d.name === 'object' &&
+    d.name !== null &&
+    !Array.isArray(d.name)
+  ) {
+    return d;
+  }
+  if (d.draft_id != null) {
+    return {
+      id: String(d.draft_id),
+      name: typeof d.name === 'object' && d.name ? d.name : {},
+      description: typeof d.description === 'object' && d.description ? d.description : {},
+      country: typeof d.country === 'object' && d.country ? d.country : {},
+      order: d.order ?? 0,
+      is_primary: Boolean(d.is_primary),
+    };
+  }
+  return null;
+}
+
 const getLocaleLang = (localeKey) => {
   const locale = DEFAULT_LOCALE_DEFS.find((item) => item.key === localeKey);
 
@@ -1277,6 +1363,73 @@ export function useSessionWizardController({ sessionId, confirm: confirmProp } =
   const [attractionGenerationError, setAttractionGenerationError] = useState('');
   const attractionGenPollCancelledRef = useRef(false);
   const aiPollRef = useRef(null);
+  const loadSessionSeqRef = useRef(0);
+  const localCreatedCityDraftsRef = useRef(new Map());
+  const localDeletedCityDraftIdsRef = useRef(new Set());
+
+  const markCityDraftCreatedLocally = useCallback((draft) => {
+    const draftId = normalizeDraftId(draft?.id);
+
+    if (!draftId) return;
+
+    localDeletedCityDraftIdsRef.current.delete(draftId);
+    localCreatedCityDraftsRef.current.set(draftId, draft);
+  }, []);
+
+  const markCityDraftDeletedLocally = useCallback((draftId) => {
+    const normalizedDraftId = normalizeDraftId(draftId);
+
+    if (!normalizedDraftId) return;
+
+    localCreatedCityDraftsRef.current.delete(normalizedDraftId);
+    localDeletedCityDraftIdsRef.current.add(normalizedDraftId);
+  }, []);
+
+  const reconcileCityDraftsWithLocalOverlay = useCallback((serverDrafts) => {
+    const deletedIds = localDeletedCityDraftIdsRef.current;
+    const createdDrafts = localCreatedCityDraftsRef.current;
+
+    const arr = Array.isArray(serverDrafts) ? serverDrafts : [];
+    const legacyRows = arr.filter((d) => normalizeDraftId(d?.id) === 'legacy');
+    const nonLegacy = arr.filter((d) => normalizeDraftId(d?.id) !== 'legacy');
+
+    let next = nonLegacy
+      .filter((draft) => !deletedIds.has(normalizeDraftId(draft?.id)))
+      .map((draft) => normalizeCityDraft(draft))
+      .filter(Boolean);
+
+    const serverIds = new Set(next.map((draft) => normalizeDraftId(draft.id)));
+
+    for (const draftId of Array.from(createdDrafts.keys())) {
+      if (serverIds.has(draftId)) {
+        createdDrafts.delete(draftId);
+      }
+    }
+
+    for (const [draftId, draft] of createdDrafts.entries()) {
+      if (!deletedIds.has(draftId) && !serverIds.has(draftId)) {
+        next = upsertCityDraft(next, draft);
+      }
+    }
+
+    const sortFn = (a, b) => {
+      const orderA = Number.isFinite(Number(a?.order)) ? Number(a.order) : 0;
+      const orderB = Number.isFinite(Number(b?.order)) ? Number(b.order) : 0;
+
+      if (orderA !== orderB) return orderA - orderB;
+
+      return String(a?.created_at || '').localeCompare(String(b?.created_at || ''));
+    };
+
+    next.sort(sortFn);
+
+    const legacyNorm = legacyRows
+      .map((d) => normalizeCityDraft(d))
+      .filter(Boolean);
+    legacyNorm.sort(sortFn);
+
+    return [...legacyNorm, ...next].sort(sortFn);
+  }, []);
 
   const [saving, setSaving] = useState(false);
   const [closeOpen, setCloseOpen] = useState(false);
@@ -1327,6 +1480,21 @@ export function useSessionWizardController({ sessionId, confirm: confirmProp } =
       }
     );
   }, [navigate, location.pathname, location.search, location.state]);
+
+  const clearCityWizardForm = useCallback(() => {
+    setLocaleData(makeLocaleData());
+    setDefaultLocale('ru-RU');
+    setActiveLocale('ru-RU');
+    setLat('');
+    setLon('');
+    setSavedLat(null);
+    setSavedLon(null);
+    setCityTags([]);
+    setImagePreview('');
+    setImageId(null);
+    setImageOriginalUrl('');
+    setImageCopyright('');
+  }, []);
 
   const loadCityIntoForm = useCallback((city, legacyTagsFallback = null) => {
     if (!city) return;
@@ -1411,10 +1579,18 @@ export function useSessionWizardController({ sessionId, confirm: confirmProp } =
     setActiveLocale(pref);
   }, []);
 
-  const loadSession = useCallback(async (preferredDraftId = null) => {
+  const loadSession = useCallback(async (preferredDraftId = null, options = {}) => {
+    const { silent = false } = options;
+    const seq = ++loadSessionSeqRef.current;
+
     try {
-      setLoading(true);
+      if (!silent) setLoading(true);
       const res = await sessionsAPI.get(sessionId);
+
+      if (seq !== loadSessionSeqRef.current) {
+        return;
+      }
+
       const data = res?.data;
       setSession(data);
       if (!sessionOpenedAtRef.current) {
@@ -1426,29 +1602,21 @@ export function useSessionWizardController({ sessionId, confirm: confirmProp } =
         });
       }
 
-      const drafts = Array.isArray(data?.city_drafts) && data.city_drafts.length > 0
-        ? data.city_drafts.map((draft) => ({
-            ...draft,
-            tags: normalizeTagIds(draft.tags ?? draft.city_tags ?? []),
-          }))
-        : (data?.city
-          ? [{
-              ...data.city,
-              id: 'legacy',
-              is_primary: true,
-              order: 0,
-              tags: normalizeTagIds(data.city.tags ?? data.city.city_tags ?? []),
-            }]
-          : []);
-      setCityDrafts(drafts);
+      const serverDrafts = normalizeServerCityDraftsFromSessionData(data);
+      const reconciledDrafts = reconcileCityDraftsWithLocalOverlay(serverDrafts);
+
+      setCityDrafts(reconciledDrafts);
 
       const requestedDraftId = normalizeDraftId(
         preferredDraftId || requestedCityDraftIdRef.current || activeCityDraftIdRef.current
       );
       const selectedDraft = requestedDraftId
-        ? drafts.find((draft) => normalizeDraftId(draft.id) === requestedDraftId)
+        ? reconciledDrafts.find((draft) => normalizeDraftId(draft.id) === requestedDraftId)
         : null;
-      const fallbackDraft = drafts.find((draft) => draft.is_primary) || drafts[0] || null;
+      const fallbackDraft =
+        reconciledDrafts.find((draft) => draft.is_primary) ||
+        reconciledDrafts[0] ||
+        null;
       const resolvedDraft = selectedDraft || fallbackDraft;
       const resolvedDraftId = normalizeDraftId(resolvedDraft?.id);
       requestedCityDraftIdRef.current = resolvedDraftId;
@@ -1488,12 +1656,14 @@ export function useSessionWizardController({ sessionId, confirm: confirmProp } =
       setCurrentAttractionFeedItem(null);
 
     } catch (err) {
-      showNote('Не удалось загрузить сессию: ' + parseApiError(err, 'Ошибка загрузки'), 'error');
-      navigate('/generation');
+      if (seq === loadSessionSeqRef.current && !silent) {
+        showNote('Не удалось загрузить сессию: ' + parseApiError(err, 'Ошибка загрузки'), 'error');
+        navigate('/generation');
+      }
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
-  }, [sessionId, navigate, showNote, loadCityIntoForm]);
+  }, [sessionId, navigate, showNote, loadCityIntoForm, reconcileCityDraftsWithLocalOverlay]);
 
   const loadCityFilterTree = useCallback(async () => {
     setCityFilterTreeLoading(true);
@@ -1885,37 +2055,160 @@ export function useSessionWizardController({ sessionId, confirm: confirmProp } =
   }, [cityDrafts, loadCityIntoForm, syncActiveDraftRoute]);
 
   const handleCreateDraft = useCallback(async () => {
+    let newDraftId = null;
+    const sessionLegacyTags = session?.city?.tags ?? session?.city?.city_tags;
+
     try {
       const res = await sessionsAPI.createCityDraft(sessionId, {});
-      const newDraftId = normalizeDraftId(res?.data?.draft?.id);
-      if (newDraftId) {
-        requestedCityDraftIdRef.current = newDraftId;
-        activeCityDraftIdRef.current = newDraftId;
-        syncActiveDraftRoute(newDraftId);
+
+      const rawDraft =
+        res?.data?.draft ||
+        res?.data?.city_draft ||
+        res?.data?.data ||
+        res?.data;
+
+      const parsed =
+        rawDraft && typeof rawDraft === 'object' && !Array.isArray(rawDraft)
+          ? rawDraft
+          : parseCreatedCityDraftResponse(res);
+
+      const normalizedDraft = normalizeCityDraft(parsed);
+      newDraftId = normalizeDraftId(normalizedDraft?.id);
+
+      if (!normalizedDraft || !newDraftId) {
+        throw new Error('no_draft_in_response');
       }
-      await loadSession(newDraftId);
+
+      markCityDraftCreatedLocally(normalizedDraft);
+
+      setCityDrafts((prev) => upsertCityDraft(prev, normalizedDraft));
+
+      requestedCityDraftIdRef.current = newDraftId;
+      activeCityDraftIdRef.current = newDraftId;
+
+      setActiveCityDraftId(newDraftId);
+      syncActiveDraftRoute(newDraftId);
+      loadCityIntoForm(normalizedDraft, sessionLegacyTags);
+
       showNote('Черновик города добавлен', 'success');
-    } catch (err) {
-      showNote(parseApiError(err, 'Ошибка добавления города'), 'error');
+    } catch (error) {
+      const msg =
+        error?.message === 'no_draft_in_response'
+          ? 'Сервер не вернул черновик'
+          : parseApiError(error, 'Ошибка создания черновика города');
+      showNote(msg, 'error');
     }
-  }, [sessionId, loadSession, syncActiveDraftRoute, showNote]);
+
+    if (newDraftId) {
+      void loadSession(newDraftId, { silent: true }).catch((error) => {
+        console.error('Silent loadSession after create draft failed', error);
+      });
+    }
+  }, [
+    sessionId,
+    session,
+    markCityDraftCreatedLocally,
+    loadSession,
+    syncActiveDraftRoute,
+    showNote,
+    loadCityIntoForm,
+  ]);
 
   const handleDeleteDraft = useCallback(async (draftId) => {
-    if (!draftId || draftId === 'legacy') return;
-    if (!(await confirm({ message: 'Удалить этот черновик города?', danger: true }))) return;
-    try {
-      await sessionsAPI.deleteCityDraft(sessionId, draftId);
-      const normalizedDraftId = normalizeDraftId(draftId);
-      const nextDraftId = normalizedDraftId === activeCityDraftIdRef.current ? null : activeCityDraftIdRef.current;
-      requestedCityDraftIdRef.current = nextDraftId;
-      activeCityDraftIdRef.current = nextDraftId;
-      syncActiveDraftRoute(nextDraftId);
-      await loadSession(nextDraftId);
-      showNote('Черновик города удален', 'success');
-    } catch (err) {
-      showNote(parseApiError(err, 'Ошибка удаления города'), 'error');
+    const normalizedDraftId = normalizeDraftId(draftId);
+
+    if (!normalizedDraftId || normalizedDraftId === 'legacy') {
+      return;
     }
-  }, [sessionId, loadSession, syncActiveDraftRoute, showNote, confirm]);
+
+    if (!(await confirm({ message: 'Удалить этот черновик города?', danger: true }))) {
+      return;
+    }
+
+    let nextDraftIdForReload = normalizeDraftId(activeCityDraftIdRef.current);
+
+    try {
+      await sessionsAPI.deleteCityDraft(sessionId, normalizedDraftId);
+
+      markCityDraftDeletedLocally(normalizedDraftId);
+
+      let nextActiveDraft = null;
+
+      setCityDrafts((prev) => {
+        const activeId = normalizeDraftId(activeCityDraftIdRef.current);
+
+        const oldIndex = prev.findIndex(
+          (d) => normalizeDraftId(d.id) === normalizedDraftId
+        );
+
+        const nextDrafts = prev.filter(
+          (d) => normalizeDraftId(d.id) !== normalizedDraftId
+        );
+
+        if (activeId === normalizedDraftId) {
+          if (nextDrafts.length === 0) {
+            nextActiveDraft = null;
+          } else {
+            const nextIndex = Math.min(
+              Math.max(oldIndex, 0),
+              nextDrafts.length - 1
+            );
+            nextActiveDraft = nextDrafts[nextIndex] || null;
+          }
+        }
+
+        return nextDrafts;
+      });
+
+      const activeId = normalizeDraftId(activeCityDraftIdRef.current);
+
+      if (activeId === normalizedDraftId) {
+        if (nextActiveDraft) {
+          const nextId = normalizeDraftId(nextActiveDraft.id);
+
+          nextDraftIdForReload = nextId;
+
+          requestedCityDraftIdRef.current = nextId;
+          activeCityDraftIdRef.current = nextId;
+
+          setActiveCityDraftId(nextId);
+          syncActiveDraftRoute(nextId);
+          const sessionLegacyTags = session?.city?.tags ?? session?.city?.city_tags;
+          loadCityIntoForm(nextActiveDraft, sessionLegacyTags);
+        } else {
+          nextDraftIdForReload = null;
+
+          requestedCityDraftIdRef.current = null;
+          activeCityDraftIdRef.current = null;
+
+          setActiveCityDraftId(null);
+          syncActiveDraftRoute(null);
+          clearCityWizardForm();
+        }
+      }
+
+      showNote('Черновик города удален', 'success');
+    } catch (error) {
+      showNote(
+        parseApiError(error, 'Ошибка удаления черновика города'),
+        'error'
+      );
+    }
+
+    void loadSession(nextDraftIdForReload, { silent: true }).catch((error) => {
+      console.error('Silent loadSession after delete draft failed', error);
+    });
+  }, [
+    sessionId,
+    session,
+    markCityDraftDeletedLocally,
+    syncActiveDraftRoute,
+    loadCityIntoForm,
+    clearCityWizardForm,
+    loadSession,
+    showNote,
+    confirm,
+  ]);
 
   const handlePhotoFile = useCallback(async (e) => {
     const f = e.target.files?.[0];

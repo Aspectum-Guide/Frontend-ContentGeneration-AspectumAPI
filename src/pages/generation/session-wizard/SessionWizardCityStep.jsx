@@ -251,7 +251,10 @@ export default function SessionWizardCityStep({
                   {draft.id !== 'legacy' && (
                     <button
                       type="button"
-                      onClick={() => onDeleteDraft(draft.id)}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onDeleteDraft(draft.id);
+                      }}
                       className="text-xs text-red-500 hover:text-red-700"
                       title="Удалить черновик"
                     >

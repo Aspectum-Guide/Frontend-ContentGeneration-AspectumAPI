@@ -64,26 +64,53 @@ function getAssigneeName(source) {
   );
 }
 
+function sessionHasCityDraftRows(session) {
+  return Array.isArray(session?.city_drafts) && session.city_drafts.length > 0;
+}
+
+/**
+ * Имя черновика только из полей этого SessionCityDraft.
+ * Не подставлять session.city_display_name / первый черновик — иначе пустой черновик B показывает данные A.
+ */
 function getDraftName(draft, session) {
-  return (
+  const fromDraft = (
     draft?.display_name ||
     draft?.city_display_name ||
     draft?.title ||
     getFirstText(draft?.name) ||
-    session?.city_display_name ||
-    session?.name ||
-    '—'
-  );
+    ''
+  ).trim();
+
+  if (fromDraft) return fromDraft;
+
+  const hasDrafts = sessionHasCityDraftRows(session);
+  const isLegacyRow = draft?.id === 'legacy';
+
+  if (!hasDrafts || isLegacyRow) {
+    return session?.city_display_name || session?.name || 'без названия';
+  }
+
+  return 'без названия';
 }
 
 function getDraftCountry(draft, session) {
-  return (
+  const fromDraft = (
     draft?.display_country ||
     draft?.city_country ||
     getFirstText(draft?.country) ||
-    session?.city_country ||
-    '—'
-  );
+    ''
+  ).trim();
+
+  if (fromDraft) return fromDraft;
+
+  const hasDrafts = sessionHasCityDraftRows(session);
+  const isLegacyRow = draft?.id === 'legacy';
+
+  if (!hasDrafts || isLegacyRow) {
+    return session?.city_country || '—';
+  }
+
+  return '—';
 }
 
 function summarizeCities(cityRows) {
