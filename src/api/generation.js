@@ -5,7 +5,7 @@ const BASE = '/generation';
 // ─── Sessions ────────────────────────────────────────────────────────────────
 export const sessionsAPI = {
   list: () => apiClient.get(`${BASE}/sessions/`),
-  get: (sessionId) => apiClient.get(`${BASE}/sessions/${sessionId}/`),
+  get: (sessionId, config = {}) => apiClient.get(`${BASE}/sessions/${sessionId}/`, config),
   create: (data = {}) => apiClient.post(`${BASE}/sessions/create/`, data),
   close: (sessionId, mode = 'save') => apiClient.post(`${BASE}/sessions/${sessionId}/close/`, { mode }),
   closeAll: () => apiClient.post(`${BASE}/sessions/close-all-my-active/`, {}),
@@ -111,7 +111,7 @@ export const citiesAPI = {
   delete: (cityId) => apiClient.delete(`${BASE}/cities/${cityId}/delete/`),
   exportJson: () =>
     apiClient.get(`${BASE}/cities/export/`, { responseType: 'blob' }),
-  // CityAPI list (used in EventGeneration, CitiesCatalog)
+  // CityAPI list (used in CitiesCatalog)
   list: (params) => apiClient.get('/city/list', { params }),
 };
 

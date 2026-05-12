@@ -48,31 +48,14 @@ const normalizeId = (value) => {
   return String(value);
 };
 
-function resolveAttractionAiLang(localeData, activeLocale, cityDrafts, activeCityDraftId) {
-  const loc = localeData?.[activeLocale];
-  const locLang = (loc?.lang || '').trim().toLowerCase();
-  if (locLang) {
-    const base = locLang.split('-')[0];
-    return base || 'ru';
-  }
-
-  const nid = activeCityDraftId == null || activeCityDraftId === '' ? null : String(activeCityDraftId);
-  const draft =
-    (cityDrafts || []).find((d) => String(d.id) === nid) ||
-    (cityDrafts || []).find((d) => d.id === 'legacy');
-
-  const collect = (obj) => {
-    if (!obj || typeof obj !== 'object') return null;
-    const keys = Object.keys(obj);
-    for (let i = 0; i < keys.length; i += 1) {
-      const k = keys[i];
-      if (k && /^[a-z]{2}/i.test(k)) return k.split('-')[0].toLowerCase();
-    }
-    return null;
-  };
-
-  return collect(draft?.name) || collect(draft?.description) || collect(draft?.country) || 'ru';
-}
+const AI_GENERATION_LANG_OPTIONS = [
+  { value: 'ru', label: 'Русский (ru)' },
+  { value: 'en', label: 'English (en)' },
+  { value: 'it', label: 'Italiano (it)' },
+  { value: 'fr', label: 'Français (fr)' },
+  { value: 'de', label: 'Deutsch (de)' },
+  { value: 'es', label: 'Español (es)' },
+];
 
 const parseMapCoord = (value) => {
   if (value === null || value === undefined || value === '') return NaN;
@@ -552,9 +535,17 @@ export default function SessionWizardAttractionsStep({
   attractionGenerating = false,
   attractionGenerationTaskId = null,
   attractionGenerationError = '',
+  attractionGenerationAssignedCityType = 'none',
+  attractionGenerationSessionCityId = '',
+  attractionGenerationDatabaseCityId = '',
+  attractionGenerationLang = 'ru',
   onOpenAttractionGenerationModal,
   onCloseAttractionGenerationModal,
   onAttractionGenerationPromptChange,
+  onAttractionGenerationAssignedCityTypeChange,
+  onAttractionGenerationSessionCityIdChange,
+  onAttractionGenerationDatabaseCityIdChange,
+  onAttractionGenerationLangChange,
   onGenerateAttractionsFromPrompt,
 }) {
   const attrCurrentLocale = attrLocaleData[attrActiveLocale] || {};
@@ -575,25 +566,43 @@ export default function SessionWizardAttractionsStep({
     }
   };
 
-  const activeCityLabel = useMemo(() => {
-    const id = normalizeId(activeCityDraftId);
-    const drafts = cityDrafts || [];
-    if (!drafts.length) return null;
-    if (id === 'legacy') {
-      const legacy = drafts.find((d) => d.id === 'legacy');
-      return legacy ? getDraftCityDisplayName(legacy) : null;
-    }
-    const d = drafts.find((x) => normalizeId(x.id) === id);
-    return d ? getDraftCityDisplayName(d) : null;
-  }, [activeCityDraftId, cityDrafts]);
-
-  const detectedAiLang = useMemo(
-    () => resolveAttractionAiLang(localeData, activeLocale, cityDrafts, activeCityDraftId),
-    [localeData, activeLocale, cityDrafts, activeCityDraftId]
+  const sessionDraftsForAi = useMemo(
+    () => (cityDrafts || []).filter((d) => d.id && d.id !== 'legacy'),
+    [cityDrafts]
   );
 
-  const hasCityDrafts = Array.isArray(cityDrafts) && cityDrafts.length > 0;
-  const showNoCityWarning = !hasCityDrafts;
+  const attractionGenBindingHint = useMemo(() => {
+    switch (attractionGenerationAssignedCityType) {
+      case 'draft':
+        return 'Достопримечательности будут привязаны к выбранному городу из сессии.';
+      case 'database':
+        return 'Достопримечательности будут привязаны к городу из базы.';
+      default:
+        return 'Достопримечательности будут созданы без привязки к городу.';
+    }
+  }, [attractionGenerationAssignedCityType]);
+
+  const attractionGenCanSubmit = useMemo(() => {
+    if (!attractionGenerationPrompt?.trim()) return false;
+    if (
+      attractionGenerationAssignedCityType === 'draft' &&
+      !attractionGenerationSessionCityId
+    ) {
+      return false;
+    }
+    if (
+      attractionGenerationAssignedCityType === 'database' &&
+      !attractionGenerationDatabaseCityId
+    ) {
+      return false;
+    }
+    return true;
+  }, [
+    attractionGenerationPrompt,
+    attractionGenerationAssignedCityType,
+    attractionGenerationSessionCityId,
+    attractionGenerationDatabaseCityId,
+  ]);
 
   return (
     <div>
@@ -621,23 +630,121 @@ export default function SessionWizardAttractionsStep({
               Сгенерировать достопримечательности
             </h2>
 
-            {showNoCityWarning ? (
-              <div className="text-sm text-amber-800 bg-amber-50 border border-amber-200 rounded-lg p-3">
-                В сессии нет выбранного города. Достопримечательности будут созданы без привязки.
+            <p className="text-sm text-gray-600">{attractionGenBindingHint}</p>
+
+            <div className="space-y-3">
+              <div>
+                <label
+                  htmlFor="attraction-gen-city-binding"
+                  className="block text-sm font-medium text-gray-700 mb-1"
+                >
+                  Привязка к городу
+                </label>
+                <select
+                  id="attraction-gen-city-binding"
+                  value={attractionGenerationAssignedCityType}
+                  onChange={(e) =>
+                    onAttractionGenerationAssignedCityTypeChange?.(e.target.value)
+                  }
+                  disabled={attractionGenerating}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
+                >
+                  <option value="none">Без города</option>
+                  <option value="draft">Город из сессии</option>
+                  <option value="database">Город из базы</option>
+                </select>
               </div>
-            ) : (
-              <div className="text-sm text-gray-700">
-                <span className="text-gray-500">Текущий город: </span>
-                <span className="font-medium text-gray-900">{activeCityLabel || '—'}</span>
+
+              {attractionGenerationAssignedCityType === 'draft' && (
+                <div>
+                  <label
+                    htmlFor="attraction-gen-session-city"
+                    className="block text-sm font-medium text-gray-700 mb-1"
+                  >
+                    Черновик города в сессии
+                  </label>
+                  <select
+                    id="attraction-gen-session-city"
+                    value={attractionGenerationSessionCityId || ''}
+                    onChange={(e) =>
+                      onAttractionGenerationSessionCityIdChange?.(e.target.value)
+                    }
+                    disabled={attractionGenerating}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
+                  >
+                    <option value="">— Выберите —</option>
+                    {sessionDraftsForAi.map((draft) => (
+                      <option key={String(draft.id)} value={String(draft.id)}>
+                        {getDraftCityDisplayName(draft)}
+                      </option>
+                    ))}
+                  </select>
+                  {sessionDraftsForAi.length === 0 && (
+                    <p className="text-xs text-amber-700 mt-1">
+                      Нет черновиков города (кроме унаследованной строки). Создайте черновик на шаге «Город».
+                    </p>
+                  )}
+                </div>
+              )}
+
+              {attractionGenerationAssignedCityType === 'database' && (
+                <div>
+                  <label
+                    htmlFor="attraction-gen-db-city"
+                    className="block text-sm font-medium text-gray-700 mb-1"
+                  >
+                    Город из базы
+                  </label>
+                  <select
+                    id="attraction-gen-db-city"
+                    value={attractionGenerationDatabaseCityId || ''}
+                    onChange={(e) =>
+                      onAttractionGenerationDatabaseCityIdChange?.(e.target.value)
+                    }
+                    disabled={attractionGenerating}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
+                  >
+                    <option value="">— Выберите —</option>
+                    {(referenceCities || []).map((city) => (
+                      <option key={normalizeId(city.id)} value={normalizeId(city.id)}>
+                        {getCityDisplayName(city)}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
+              <div>
+                <label
+                  htmlFor="attraction-gen-lang"
+                  className="block text-sm font-medium text-gray-700 mb-1"
+                >
+                  Язык генерации
+                </label>
+                <select
+                  id="attraction-gen-lang"
+                  value={attractionGenerationLang || 'ru'}
+                  onChange={(e) => onAttractionGenerationLangChange?.(e.target.value)}
+                  disabled={attractionGenerating}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
+                >
+                  {AI_GENERATION_LANG_OPTIONS.map((opt) => (
+                    <option key={opt.value} value={opt.value}>
+                      {opt.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            {attractionGenerationTaskId && (
+              <div className="text-xs text-gray-500">
+                Задача:{' '}
+                <span className="font-mono text-gray-700">
+                  {String(attractionGenerationTaskId).slice(0, 8)}…
+                </span>
               </div>
             )}
-
-            <div className="text-xs text-gray-500">
-              Язык сохранения полей: <span className="font-mono font-medium text-gray-800">{detectedAiLang}</span>
-              {attractionGenerationTaskId && (
-                <span className="ml-2 text-gray-400">· задача {String(attractionGenerationTaskId).slice(0, 8)}…</span>
-              )}
-            </div>
 
             {attractionGenerationError && (
               <div className="text-sm text-red-700 bg-red-50 border border-red-200 rounded-lg p-3">
@@ -670,7 +777,7 @@ export default function SessionWizardAttractionsStep({
               <button
                 type="button"
                 onClick={() => onGenerateAttractionsFromPrompt?.()}
-                disabled={attractionGenerating || !attractionGenerationPrompt.trim()}
+                disabled={attractionGenerating || !attractionGenCanSubmit}
                 className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-50"
               >
                 Сгенерировать
@@ -767,7 +874,7 @@ export default function SessionWizardAttractionsStep({
               onClick={() => onGoToStep(2)}
               className="px-4 py-2 text-sm text-gray-600 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
             >
-              ← Назад
+              ← Назад: Теги
             </button>
 
             <button
@@ -775,7 +882,7 @@ export default function SessionWizardAttractionsStep({
               onClick={() => onGoToStep(4)}
               className="px-5 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors"
             >
-              Далее: Контент →
+              Далее: Публикация →
             </button>
           </div>
         </div>

@@ -317,7 +317,7 @@ export default function SessionWizardAttractionInfoStep({
           <div className="flex justify-between pt-2">
             <button
               type="button"
-              onClick={() => onGoToStep?.(2)}
+              onClick={() => onGoToStep?.(3)}
               className="px-4 py-2 text-sm text-gray-600 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
             >
               ← Назад
@@ -328,7 +328,7 @@ export default function SessionWizardAttractionInfoStep({
               onClick={() => onGoToStep?.(4)}
               className="px-5 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors"
             >
-              Далее: Лента →
+              Далее: Публикация →
             </button>
           </div>
         )}

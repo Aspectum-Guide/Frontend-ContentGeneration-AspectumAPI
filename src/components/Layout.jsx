@@ -93,7 +93,6 @@ export default function Layout({ children, pageHeader = null, pageHeaderMode = '
         { label: 'Тестовый стенд', to: '/ai/playground' },
         { label: 'Поиск картинок', to: '/ai/images' },
         { label: 'Генерация городов', to: '/ai/cities', badge: 'AI' },
-        { label: 'Генерация событий', to: '/ai/events', badge: 'AI' },
       ],
     },
     {
@@ -137,7 +136,6 @@ export default function Layout({ children, pageHeader = null, pageHeaderMode = '
     { startsWith: '/ai/playground', title: 'Тестовый стенд' },
     { startsWith: '/ai/images', title: 'Поиск картинок' },
     { startsWith: '/ai/cities', title: 'Генерация городов' },
-    { startsWith: '/ai/events', title: 'Генерация событий' },
     { startsWith: '/tasks', title: 'Мои задачи' },
     { startsWith: '/catalog/cities', title: 'Справочник городов' },
     { startsWith: '/catalog/events', title: 'Справочник ивентов' },

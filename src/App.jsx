@@ -1,9 +1,8 @@
-import { BrowserRouter, Route, Routes } from 'react-router-dom';
+import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
 import ProtectedRoute from './components/ProtectedRoute';
 import { LayoutActionsProvider } from './context/LayoutActionsContext';
 import AISettings from './pages/ai/AISettings';
 import CityGeneration from './pages/ai/CityGeneration';
-import EventGeneration from './pages/ai/EventGeneration';
 import ImageGeneration from './pages/ai/ImageGeneration';
 import Playground from './pages/ai/Playground';
 import CatalogHome from './pages/catalog/CatalogHome';
@@ -61,7 +60,7 @@ function App() {
           <Route path="/ai/playground" element={<ProtectedRoute><Playground /></ProtectedRoute>} />
           <Route path="/ai/images" element={<ProtectedRoute><ImageGeneration /></ProtectedRoute>} />
           <Route path="/ai/cities" element={<ProtectedRoute><CityGeneration /></ProtectedRoute>} />
-          <Route path="/ai/events" element={<ProtectedRoute><EventGeneration /></ProtectedRoute>} />
+          <Route path="/ai/events" element={<Navigate to="/generation" replace />} />
 
           {/* Задачи генерации */}
           <Route path="/tasks" element={<ProtectedRoute><MyTasks /></ProtectedRoute>} />

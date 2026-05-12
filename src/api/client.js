@@ -32,18 +32,29 @@ const sleep = (ms) => new Promise((res) => setTimeout(res, ms));
 // Wrap GET to add dedupe/cache/retry behaviour
 const originalGet = apiClient.get.bind(apiClient);
 apiClient.get = async (url, config = {}) => {
-  const paramsKey = config.params ? JSON.stringify(config.params) : '';
+  const { skipApiGetCache, ...axiosConfig } = config;
+  const skipCache = skipApiGetCache === true;
+
+  const paramsKey = axiosConfig.params ? JSON.stringify(axiosConfig.params) : '';
   const key = `GET:${url}?${paramsKey}`;
+  const inFlightKey = skipCache ? `${key}#skip` : key;
 
-  // Return cached response if fresh
-  const cached = responseCache.get(key);
-  if (cached && Date.now() < cached.expiry) {
-    return Promise.resolve(cached.value);
-  }
+  if (!skipCache) {
+    // Return cached response if fresh
+    const cached = responseCache.get(key);
+    if (cached && Date.now() < cached.expiry) {
+      return Promise.resolve(cached.value);
+    }
 
-  // If identical request in flight, return the same promise
-  if (inFlightRequests.has(key)) {
-    return inFlightRequests.get(key);
+    // If identical request in flight, return the same promise
+    if (inFlightRequests.has(inFlightKey)) {
+      return inFlightRequests.get(inFlightKey);
+    }
+  } else {
+    responseCache.delete(key);
+    if (inFlightRequests.has(inFlightKey)) {
+      return inFlightRequests.get(inFlightKey);
+    }
   }
 
   // Make request with retry on 429
@@ -51,8 +62,8 @@ apiClient.get = async (url, config = {}) => {
     let attempt = 0;
     for (;;) {
       try {
-        const resp = await originalGet(url, config);
-        // cache shallowly
+        const resp = await originalGet(url, axiosConfig);
+        // cache shallowly (including after skipCache — replaces stale entry)
         responseCache.set(key, { value: resp, expiry: Date.now() + CACHE_TTL });
         return resp;
       } catch (err) {
@@ -68,8 +79,8 @@ apiClient.get = async (url, config = {}) => {
     }
   };
 
-  const promise = makeRequest().finally(() => inFlightRequests.delete(key));
-  inFlightRequests.set(key, promise);
+  const promise = makeRequest().finally(() => inFlightRequests.delete(inFlightKey));
+  inFlightRequests.set(inFlightKey, promise);
   return promise;
 };
 

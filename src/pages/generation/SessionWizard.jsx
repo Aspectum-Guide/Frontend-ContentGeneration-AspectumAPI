@@ -5,7 +5,6 @@ import Layout from '../../components/Layout';
 import CommonsImagePicker from '../../components/generation/CommonsImagePicker';
 import SessionWizardAttractionsStep from './session-wizard/SessionWizardAttractionsStep';
 import SessionWizardCityStep from './session-wizard/SessionWizardCityStep';
-import SessionWizardContentStep from './session-wizard/SessionWizardContentStep';
 import SessionWizardPublishStep from './session-wizard/SessionWizardPublishStep';
 import SessionWizardTagsCatalogStep from './session-wizard/SessionWizardTagsCatalogStep';
 import SessionWizardCityTagsPicker from './session-wizard/SessionWizardCityTagsPicker';
@@ -27,7 +26,6 @@ const STEP_LABELS = [
   'Город',
   'Теги',
   'Достопримечательности',
-  'Контент',
   'Публикация',
 ];
 
@@ -125,18 +123,15 @@ export default function SessionWizard({ components = {} } = {}) {
     attractionFeedPhotoUploading,
     attractionFeedPhotoFileRef,
 
-    aiGenAttrId,
-    aiGenLang,
-    aiGenText,
-    aiGenDone,
-    aiGenError,
-    aiGenSaving,
-
     attractionGenerationOpen,
     attractionGenerationPrompt,
     attractionGenerating,
     attractionGenerationTaskId,
     attractionGenerationError,
+    attractionGenerationAssignedCityType,
+    attractionGenerationSessionCityId,
+    attractionGenerationDatabaseCityId,
+    attractionGenerationLang,
 
     saving,
     closeOpen,
@@ -148,9 +143,6 @@ export default function SessionWizard({ components = {} } = {}) {
     setAttrView,
     setCurrentAttr,
     setAttrActiveLocale,
-    setAiGenLang,
-    setAiGenAttrId,
-    setAiGenText,
     setCloseOpen,
     setCloseMode,
     setMapContainerRef,
@@ -193,6 +185,10 @@ export default function SessionWizard({ components = {} } = {}) {
     openAttractionGenerationModal,
     closeAttractionGenerationModal,
     setAttractionGenerationPrompt,
+    setAttractionGenerationAssignedCityTypeSafe,
+    setAttractionGenerationSessionCityId,
+    setAttractionGenerationDatabaseCityId,
+    setAttractionGenerationLang,
     generateAttractionsFromPrompt,
     deleteCurrentAttr,
     saveCurrentAttr,
@@ -220,9 +216,6 @@ export default function SessionWizard({ components = {} } = {}) {
     saveCurrentAttractionFeedItem,
     deleteCurrentAttractionFeedItem,
     handleAttractionFeedPhotoFile,
-
-    startAiContent,
-    saveAiContent,
 
     handleClose,
     handlePublish,
@@ -395,13 +388,12 @@ export default function SessionWizard({ components = {} } = {}) {
       <ToastComp note={note} />
 
       <ProgressBanner
-        show={saving || publishing || closing || photoUploading || aiGenSaving || translating}
+        show={saving || publishing || closing || photoUploading || translating}
         message={[
           saving && 'Сохраняем данные города...',
           publishing && 'Публикуем сессию...',
           closing && 'Закрываем сессию...',
           photoUploading && 'Загружаем изображение...',
-          aiGenSaving && 'Сохраняем AI-контент...',
           translating && 'Переводим сессию на другие языки...',
         ]
           .filter(Boolean)
@@ -488,7 +480,7 @@ export default function SessionWizard({ components = {} } = {}) {
                 return;
               }
 
-              if (currentStep === 4 || currentStep === 5) {
+              if (currentStep === 4) {
                 return;
               }
             }}
@@ -677,9 +669,19 @@ export default function SessionWizard({ components = {} } = {}) {
               attractionGenerating={attractionGenerating}
               attractionGenerationTaskId={attractionGenerationTaskId}
               attractionGenerationError={attractionGenerationError}
+              attractionGenerationAssignedCityType={attractionGenerationAssignedCityType}
+              attractionGenerationSessionCityId={attractionGenerationSessionCityId}
+              attractionGenerationDatabaseCityId={attractionGenerationDatabaseCityId}
+              attractionGenerationLang={attractionGenerationLang}
               onOpenAttractionGenerationModal={openAttractionGenerationModal}
               onCloseAttractionGenerationModal={closeAttractionGenerationModal}
               onAttractionGenerationPromptChange={setAttractionGenerationPrompt}
+              onAttractionGenerationAssignedCityTypeChange={
+                setAttractionGenerationAssignedCityTypeSafe
+              }
+              onAttractionGenerationSessionCityIdChange={setAttractionGenerationSessionCityId}
+              onAttractionGenerationDatabaseCityIdChange={setAttractionGenerationDatabaseCityId}
+              onAttractionGenerationLangChange={setAttractionGenerationLang}
               onGenerateAttractionsFromPrompt={generateAttractionsFromPrompt}
               onDeleteCurrentAttr={deleteCurrentAttr}
               onSetAttrView={setAttrView}
@@ -746,24 +748,6 @@ export default function SessionWizard({ components = {} } = {}) {
         )}
 
         {currentStep === 4 && (
-          <SessionWizardContentStep
-            attractions={attractions}
-            aiGenAttrId={aiGenAttrId}
-            aiGenLang={aiGenLang}
-            aiGenText={aiGenText}
-            aiGenDone={aiGenDone}
-            aiGenError={aiGenError}
-            aiGenSaving={aiGenSaving}
-            onStartAiContent={startAiContent}
-            onSetAiGenLang={setAiGenLang}
-            onSetAiGenAttrId={setAiGenAttrId}
-            onSetAiGenText={setAiGenText}
-            onSaveAiContent={saveAiContent}
-            onGoToStep={goToStep}
-          />
-        )}
-
-        {currentStep === 5 && (
           <SessionWizardPublishStep
             session={session}
             cityDrafts={cityDrafts}

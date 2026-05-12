@@ -7,7 +7,7 @@ import { parseApiError } from '../../../utils/apiError';
 import { useToast } from '../../../components/ui/Toast.jsx';
 import { DEFAULT_LOCALE_DEFS, getLocaleInfo } from './sessionWizardShared.jsx';
 
-const TOTAL_STEPS = 5;
+const TOTAL_STEPS = 4;
 
 function makeLocaleData() {
   return Object.fromEntries(
@@ -1349,20 +1349,17 @@ export function useSessionWizardController({ sessionId, confirm: confirmProp } =
     attractionFeedActiveLocale,
   ]);
 
-  const [aiGenAttrId, setAiGenAttrId] = useState(null);
-  const [aiGenLang, setAiGenLang] = useState('ru');
-  const [aiGenText, setAiGenText] = useState('');
-  const [aiGenDone, setAiGenDone] = useState(false);
-  const [aiGenError, setAiGenError] = useState(null);
-  const [aiGenSaving, setAiGenSaving] = useState(false);
-
   const [attractionGenerationOpen, setAttractionGenerationOpen] = useState(false);
   const [attractionGenerationPrompt, setAttractionGenerationPrompt] = useState('');
   const [attractionGenerating, setAttractionGenerating] = useState(false);
   const [attractionGenerationTaskId, setAttractionGenerationTaskId] = useState(null);
   const [attractionGenerationError, setAttractionGenerationError] = useState('');
+  const [attractionGenerationAssignedCityType, setAttractionGenerationAssignedCityType] =
+    useState('none');
+  const [attractionGenerationSessionCityId, setAttractionGenerationSessionCityId] = useState('');
+  const [attractionGenerationDatabaseCityId, setAttractionGenerationDatabaseCityId] = useState('');
+  const [attractionGenerationLang, setAttractionGenerationLang] = useState('ru');
   const attractionGenPollCancelledRef = useRef(false);
-  const aiPollRef = useRef(null);
   const loadSessionSeqRef = useRef(0);
   const localCreatedCityDraftsRef = useRef(new Map());
   const localDeletedCityDraftIdsRef = useRef(new Set());
@@ -1580,14 +1577,17 @@ export function useSessionWizardController({ sessionId, confirm: confirmProp } =
   }, []);
 
   const loadSession = useCallback(async (preferredDraftId = null, options = {}) => {
-    const { silent = false } = options;
+    const { silent = false, force = false } = options;
     const seq = ++loadSessionSeqRef.current;
 
     try {
       if (!silent) setLoading(true);
-      const res = await sessionsAPI.get(sessionId);
+      const res = await sessionsAPI.get(
+        sessionId,
+        force ? { skipApiGetCache: true } : {}
+      );
 
-      if (seq !== loadSessionSeqRef.current) {
+      if (seq !== loadSessionSeqRef.current && !force) {
         return;
       }
 
@@ -1726,7 +1726,6 @@ export function useSessionWizardController({ sessionId, confirm: confirmProp } =
   useEffect(() => { loadCityFilterTree(); }, [loadCityFilterTree]);
   useEffect(() => { loadEventFilterTree(); }, [loadEventFilterTree]);
   useEffect(() => { loadCityTagCatalog(); }, [loadCityTagCatalog]);
-  useEffect(() => () => clearInterval(aiPollRef.current), []);
 
   useEffect(() => {
     if (!mapNode) return;
@@ -1867,10 +1866,18 @@ export function useSessionWizardController({ sessionId, confirm: confirmProp } =
   }, [sessionId, showNote]);
   
   useEffect(() => {
-    if (currentStep >= 3 && currentStep <= 5 && !attractionsLoaded) {
+    if (currentStep >= 3 && currentStep <= 4 && !attractionsLoaded) {
       loadAttractions();
     }
   }, [currentStep, attractionsLoaded, loadAttractions]);
+
+  useEffect(() => {
+    setCurrentStep((s) => {
+      if (s < 1) return 1;
+      if (s > TOTAL_STEPS) return TOTAL_STEPS;
+      return s;
+    });
+  }, [sessionId]);
 
   const saveCityForStep1 = useCallback(async () => {
     if (!defaultLocale || !localeData[defaultLocale]) {
@@ -1993,6 +2000,15 @@ export function useSessionWizardController({ sessionId, confirm: confirmProp } =
     if (target < 1 || target > TOTAL_STEPS || target === currentStep) return;
     setCurrentStep(target);
   }, [currentStep]);
+
+  useEffect(() => {
+    if (!session?.id) return;
+    const params = new URLSearchParams(location.search);
+    if (!params.has('step')) return;
+    const n = parseInt(params.get('step'), 10);
+    if (!Number.isFinite(n)) return;
+    goToStep(n);
+  }, [session?.id, location.search, goToStep]);
 
   const switchLocale = useCallback((key) => { setActiveLocale(key); }, []);
 
@@ -3719,25 +3735,11 @@ export function useSessionWizardController({ sessionId, confirm: confirmProp } =
     setAttractionGenerationError('');
     setAttractionGenerationPrompt('');
     setAttractionGenerationTaskId(null);
-    setAttractionGenerationOpen(true);
-  }, []);
+    setAttractionGenerationAssignedCityType('none');
+    setAttractionGenerationSessionCityId('');
+    setAttractionGenerationDatabaseCityId('');
 
-  const closeAttractionGenerationModal = useCallback(() => {
-    attractionGenPollCancelledRef.current = true;
-    setAttractionGenerationOpen(false);
-    setAttractionGenerating(false);
-    setAttractionGenerationTaskId(null);
-    setAttractionGenerationError('');
-  }, []);
-
-  const generateAttractionsFromPrompt = useCallback(async () => {
-    const prompt = attractionGenerationPrompt.trim();
-    if (!prompt) {
-      setAttractionGenerationError('Введите запрос');
-      return;
-    }
-
-    const resolveLang = () => {
+    const resolveDefaultAiLang = () => {
       const loc = localeData[activeLocale];
       const locLang = (loc?.lang || '').trim().toLowerCase();
       if (locLang) {
@@ -3766,9 +3768,57 @@ export function useSessionWizardController({ sessionId, confirm: confirmProp } =
       );
     };
 
-    const lang = resolveLang();
-    const draftIdRaw = normalizeDraftId(activeCityDraftIdRef.current);
-    const session_city_id = draftIdRaw && draftIdRaw !== 'legacy' ? draftIdRaw : null;
+    setAttractionGenerationLang(resolveDefaultAiLang());
+    setAttractionGenerationOpen(true);
+  }, [localeData, activeLocale, cityDrafts]);
+
+  const closeAttractionGenerationModal = useCallback(() => {
+    attractionGenPollCancelledRef.current = true;
+    setAttractionGenerationOpen(false);
+    setAttractionGenerating(false);
+    setAttractionGenerationTaskId(null);
+    setAttractionGenerationError('');
+  }, []);
+
+  const setAttractionGenerationAssignedCityTypeSafe = useCallback((value) => {
+    setAttractionGenerationAssignedCityType(value);
+    if (value !== 'draft') {
+      setAttractionGenerationSessionCityId('');
+    }
+    if (value !== 'database') {
+      setAttractionGenerationDatabaseCityId('');
+    }
+  }, []);
+
+  const generateAttractionsFromPrompt = useCallback(async () => {
+    const prompt = attractionGenerationPrompt.trim();
+    if (!prompt) {
+      setAttractionGenerationError('Введите запрос');
+      return;
+    }
+
+    const assigned_city_type = attractionGenerationAssignedCityType || 'none';
+    let session_city_id = null;
+    let city_id = null;
+
+    if (assigned_city_type === 'draft') {
+      const sid = normalizeDraftId(attractionGenerationSessionCityId);
+      if (!sid || sid === 'legacy') {
+        setAttractionGenerationError('Выберите город сессии');
+        return;
+      }
+      session_city_id = sid;
+    } else if (assigned_city_type === 'database') {
+      const cid = (attractionGenerationDatabaseCityId || '').trim();
+      if (!cid) {
+        setAttractionGenerationError('Выберите город из базы');
+        return;
+      }
+      city_id = cid;
+    }
+
+    const langRaw = (attractionGenerationLang || 'ru').trim().toLowerCase();
+    const lang = (langRaw.split('-')[0] || 'ru').slice(0, 8) || 'ru';
 
     attractionGenPollCancelledRef.current = false;
     setAttractionGenerating(true);
@@ -3778,9 +3828,11 @@ export function useSessionWizardController({ sessionId, confirm: confirmProp } =
     try {
       const startRes = await aiAPI.attractionsJsonStart({
         session_id: sessionId,
-        session_city_id,
-        lang,
         prompt,
+        lang,
+        assigned_city_type,
+        session_city_id: assigned_city_type === 'draft' ? session_city_id : null,
+        city_id: assigned_city_type === 'database' ? city_id : null,
       });
       const taskId = startRes?.data?.task_id;
       if (!taskId) {
@@ -3837,9 +3889,10 @@ export function useSessionWizardController({ sessionId, confirm: confirmProp } =
   }, [
     sessionId,
     attractionGenerationPrompt,
-    localeData,
-    activeLocale,
-    cityDrafts,
+    attractionGenerationAssignedCityType,
+    attractionGenerationSessionCityId,
+    attractionGenerationDatabaseCityId,
+    attractionGenerationLang,
     loadSession,
     showNote,
   ]);
@@ -3937,57 +3990,6 @@ export function useSessionWizardController({ sessionId, confirm: confirmProp } =
     setAttrLocaleData(prev => ({ ...prev, [attrActiveLocale]: { ...prev[attrActiveLocale], [field]: value } }));
   }, [attrActiveLocale]);
 
-  const startAiContent = useCallback(async (attrId, lang) => {
-    const attr = attractions.find((item) => item.id === attrId);
-    if (!attr) return;
-    const cityName = Object.values(localeData)[0]?.name || 'город';
-    const attrName = getAttrName(attr);
-    clearInterval(aiPollRef.current);
-    setAiGenAttrId(attrId);
-    setAiGenLang(lang);
-    setAiGenText('');
-    setAiGenDone(false);
-    setAiGenError(null);
-    try {
-      const r = await aiAPI.streamStart({ prompt: `Напиши подробный текст для туристического приложения о достопримечательности «${attrName}» в городе «${cityName}». Включи историю, интересные факты, что посмотреть. Язык ответа: ${lang}. Объём: 200-350 слов.`, language: lang, system_prompt: 'Ты — эксперт по туризму и культуре. Пиши живо, интересно и информативно.' });
-      const sid = r?.data?.stream_id;
-      if (!sid) { setAiGenError('Не удалось запустить генерацию'); return; }
-      aiPollRef.current = setInterval(async () => {
-        try {
-          const sr = await aiAPI.streamStatus(sid);
-          const sd = sr?.data;
-          if (sd?.text) setAiGenText(sd.text);
-          if (sd?.done) { clearInterval(aiPollRef.current); setAiGenDone(true); }
-          if (sd?.error) { clearInterval(aiPollRef.current); setAiGenError(sd.error); setAiGenDone(true); }
-        } catch {
-          clearInterval(aiPollRef.current);
-          setAiGenError('Ошибка получения результата');
-          setAiGenDone(true);
-        }
-      }, 1500);
-    } catch (e) {
-      setAiGenError(parseApiError(e, 'Ошибка запуска'));
-    }
-  }, [attractions, localeData]);
-
-  const saveAiContent = useCallback(async () => {
-    if (!aiGenAttrId || !aiGenText.trim()) return;
-    setAiGenSaving(true);
-    try {
-      await attractionsAPI.saveContent(sessionId, aiGenAttrId, { language: aiGenLang, text: aiGenText });
-      setAttractions(prev => prev.map((item) => {
-        if (item.id !== aiGenAttrId) return item;
-        const contents = { ...(item.contents || {}), [aiGenLang]: aiGenText };
-        return { ...item, contents };
-      }));
-      showNote('Контент сохранён', 'success');
-    } catch (e) {
-      showNote('Ошибка сохранения: ' + parseApiError(e, 'Ошибка сохранения'), 'error');
-    } finally {
-      setAiGenSaving(false);
-    }
-  }, [sessionId, aiGenAttrId, aiGenLang, aiGenText, showNote]);
-
   const handleClose = useCallback(async () => {
     setClosing(true);
     try {
@@ -4050,6 +4052,36 @@ export function useSessionWizardController({ sessionId, confirm: confirmProp } =
       }
 
       const res = await sessionsAPI.publish(sessionId);
+      const published = res?.data;
+
+      if (
+        published &&
+        (published.status != null ||
+          published.status_display != null ||
+          published.closed_at != null ||
+          published.closed_with_save != null)
+      ) {
+        setSession((prev) =>
+          prev
+            ? {
+                ...prev,
+                status: published.status ?? prev.status,
+                status_display: published.status_display ?? prev.status_display,
+                closed_at: published.closed_at ?? prev.closed_at,
+                closed_with_save:
+                  published.closed_with_save ?? prev.closed_with_save,
+              }
+            : prev
+        );
+      }
+
+      await loadSession(
+        normalizeDraftId(activeCityDraftIdRef.current) || undefined,
+        {
+          silent: true,
+          force: true,
+        }
+      );
 
       trackEvent('publish_session_success', {
         sessionId: String(sessionId),
@@ -4061,9 +4093,7 @@ export function useSessionWizardController({ sessionId, confirm: confirmProp } =
           : null,
       });
 
-      showNote(res?.data?.message || 'Сессия опубликована', 'success');
-
-      await loadSession();
+      showNote(published?.message || 'Сессия опубликована', 'success');
     } catch (err) {
       trackEvent('publish_session_fail', {
         sessionId: String(sessionId),
@@ -4168,10 +4198,10 @@ export function useSessionWizardController({ sessionId, confirm: confirmProp } =
     attractions, attrView, currentAttr, attrLocaleData, attrActiveLocale, attrSaving,
     attractionInfos, currentAttractionInfo, attractionInfoLocaleData, attractionInfoActiveLocale, attractionInfoSaving,    
     attractionFeedItems, currentAttractionFeedItem, attractionFeedLocaleData, attractionFeedActiveLocale, attractionFeedSaving, attractionFeedPhotoUploading, attractionFeedPhotoFileRef,
-    aiGenAttrId, aiGenLang, aiGenText, aiGenDone, aiGenError, aiGenSaving,
     attractionGenerationOpen, attractionGenerationPrompt, attractionGenerating, attractionGenerationTaskId, attractionGenerationError,
+    attractionGenerationAssignedCityType, attractionGenerationSessionCityId, attractionGenerationDatabaseCityId, attractionGenerationLang,
     saving, closeOpen, closeMode, closing, publishing, translating,
-    setAttrView, setCurrentAttr, setAttrActiveLocale, setAiGenLang, setAiGenAttrId, setAiGenText,
+    setAttrView, setCurrentAttr, setAttrActiveLocale,
     setCloseOpen, setCloseMode,
     setMapContainerRef,
     loadSession, syncActiveDraftRoute, loadCityIntoForm,
@@ -4188,8 +4218,10 @@ export function useSessionWizardController({ sessionId, confirm: confirmProp } =
     setCurrentAttractionInfo, setAttractionInfoActiveLocale, openAttractionInfoDetail, addAttractionInfo, updateCurrentAttractionInfoPatch, updateAttractionInfoLocaleField, saveCurrentAttractionInfo, deleteCurrentAttractionInfo,
     setCurrentAttractionFeedItem, setAttractionFeedActiveLocale,
     openAttrDetail, addAttraction, deleteCurrentAttr, saveCurrentAttr, updateAttrLocaleField, updateCurrentAttrPatch,
-    openAttractionGenerationModal, closeAttractionGenerationModal, setAttractionGenerationPrompt, generateAttractionsFromPrompt, toggleCurrentAttractionTag,
-    startAiContent, saveAiContent,
+    openAttractionGenerationModal, closeAttractionGenerationModal, setAttractionGenerationPrompt,
+    setAttractionGenerationAssignedCityTypeSafe, setAttractionGenerationSessionCityId,
+    setAttractionGenerationDatabaseCityId, setAttractionGenerationLang,
+    generateAttractionsFromPrompt, toggleCurrentAttractionTag,
     openAttractionFeedItemDetail, addAttractionFeedItem, updateCurrentAttractionFeedItemPatch, updateAttractionFeedLocaleField, saveCurrentAttractionFeedItem, deleteCurrentAttractionFeedItem, handleAttractionFeedPhotoFile,
     handleClose, handlePublish, handleTranslateSession,
     TOTAL_STEPS,
