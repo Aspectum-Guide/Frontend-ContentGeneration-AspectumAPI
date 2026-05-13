@@ -723,6 +723,7 @@ export default function SessionWizardTagsCatalogStep({
   onUpdateCityFilter,
   onDeleteCityFilter,
   onUploadCityFilterImage,
+  deletingCityFilterIds = new Set(),
   eventFilterTree = [],
   eventFilterTreeLoading = false,
   eventFilterTreeError = '',
@@ -732,6 +733,7 @@ export default function SessionWizardTagsCatalogStep({
   onUpdateEventFilter,
   onDeleteEventFilter,
   onUploadEventFilterImage,
+  deletingEventFilterIds = new Set(),
   onGoToStep,
 } = {}) {
   const [catalogTab, setCatalogTab] = useState('city');
@@ -1075,8 +1077,12 @@ export default function SessionWizardTagsCatalogStep({
                     </button>
                     <button
                       type="button"
-                      onClick={() => handleDeleteTag(tag)}
-                      className="text-xs text-red-600 hover:underline shrink-0"
+                      disabled={deletingCityFilterIds.has(id)}
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        handleDeleteTag(tag);
+                      }}
+                      className="text-xs text-red-600 hover:underline shrink-0 disabled:opacity-50 disabled:pointer-events-none"
                     >
                       Удалить
                     </button>
@@ -1210,8 +1216,12 @@ export default function SessionWizardTagsCatalogStep({
                         </button>
                         <button
                           type="button"
-                          onClick={() => handleDeleteEventFolder(folder)}
-                          className="text-xs text-red-600 hover:underline"
+                          disabled={deletingEventFilterIds.has(fid)}
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            handleDeleteEventFolder(folder);
+                          }}
+                          className="text-xs text-red-600 hover:underline disabled:opacity-50 disabled:pointer-events-none"
                         >
                           Удалить
                         </button>
@@ -1297,8 +1307,12 @@ export default function SessionWizardTagsCatalogStep({
                                     </button>
                                     <button
                                       type="button"
-                                      onClick={() => handleDeleteEventTag(tag)}
-                                      className="text-xs text-red-600 hover:underline shrink-0"
+                                      disabled={deletingEventFilterIds.has(tid)}
+                                      onClick={(event) => {
+                                        event.stopPropagation();
+                                        handleDeleteEventTag(tag);
+                                      }}
+                                      className="text-xs text-red-600 hover:underline shrink-0 disabled:opacity-50 disabled:pointer-events-none"
                                     >
                                       Удалить
                                     </button>

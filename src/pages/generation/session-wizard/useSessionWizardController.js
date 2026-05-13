@@ -4,6 +4,7 @@ import { aiAPI, tasksAPI, attractionsAPI, attractionInfosAPI, referenceAttractio
 import { useLayoutActions } from '../../../context/useLayoutActions';
 import { trackEvent } from '../../../utils/analytics';
 import { parseApiError } from '../../../utils/apiError';
+import { removeFilterIdsFromTree } from '../../../features/catalog/shared/normalize';
 import { useToast } from '../../../components/ui/Toast.jsx';
 import { DEFAULT_LOCALE_DEFS, getLocaleInfo } from './sessionWizardShared.jsx';
 
@@ -944,6 +945,11 @@ export function useSessionWizardController({ sessionId, confirm: confirmProp } =
   const [cityTagCatalogLoading, setCityTagCatalogLoading] = useState(false);
   const [cityTagCatalogError, setCityTagCatalogError] = useState('');
 
+  const locallyDeletedCityFilterIdsRef = useRef(new Set());
+  const locallyDeletedEventFilterIdsRef = useRef(new Set());
+  const [deletingCityFilterIds, setDeletingCityFilterIds] = useState(() => new Set());
+  const [deletingEventFilterIds, setDeletingEventFilterIds] = useState(() => new Set());
+
   const [attractions, setAttractions] = useState([]);
   const [attrView, setAttrView] = useState('list');
   const [currentAttr, setCurrentAttr] = useState(null);
@@ -1678,7 +1684,10 @@ export function useSessionWizardController({ sessionId, confirm: confirmProp } =
           ? raw.tree
           : [];
 
-      setCityFilterTree(Array.isArray(data) ? data : []);
+      const tree = Array.isArray(data) ? data : [];
+      setCityFilterTree(
+        removeFilterIdsFromTree(tree, locallyDeletedCityFilterIdsRef.current),
+      );
     } catch (error) {
       setCityFilterTreeError(
         parseApiError(error, 'Ошибка загрузки тегов города')
@@ -1695,7 +1704,10 @@ export function useSessionWizardController({ sessionId, confirm: confirmProp } =
     try {
       const res = await eventFiltersAPI.getTree();
       const data = res?.data?.data || res?.data?.results || res?.data || [];
-      setEventFilterTree(Array.isArray(data) ? data : []);
+      const tree = Array.isArray(data) ? data : [];
+      setEventFilterTree(
+        removeFilterIdsFromTree(tree, locallyDeletedEventFilterIdsRef.current),
+      );
     } catch (error) {
       setEventFilterTreeError(
         parseApiError(error, 'Ошибка загрузки тегов достопримечательностей')
@@ -1712,7 +1724,13 @@ export function useSessionWizardController({ sessionId, confirm: confirmProp } =
     try {
       const res = await cityFiltersAPI.getTags();
       const raw = res?.data?.data ?? res?.data?.results ?? res?.data ?? [];
-      setCityTagCatalog(Array.isArray(raw) ? raw : []);
+      const rows = Array.isArray(raw) ? raw : [];
+      setCityTagCatalog(
+        rows.filter(
+          (item) =>
+            !locallyDeletedCityFilterIdsRef.current.has(String(item.id)),
+        ),
+      );
     } catch (error) {
       setCityTagCatalogError(
         parseApiError(error, 'Ошибка загрузки тегов города')
@@ -2878,11 +2896,16 @@ export function useSessionWizardController({ sessionId, confirm: confirmProp } =
 
   const createCityTag = useCallback(async (payload) => {
     try {
-      await cityFiltersAPI.create({
+      const res = await cityFiltersAPI.create({
         ...payload,
         type: 'tag',
         parent_id: payload?.parent_id ?? null,
       });
+      const raw = res?.data?.data ?? res?.data;
+      const newId = raw?.id ?? raw?.uuid ?? raw?.pk;
+      if (newId != null) {
+        locallyDeletedCityFilterIdsRef.current.delete(String(newId));
+      }
       showNote('Тег города создан', 'success');
       await loadCityTagCatalog();
       await loadCityFilterTree();
@@ -2897,6 +2920,7 @@ export function useSessionWizardController({ sessionId, confirm: confirmProp } =
     if (!id) return;
     try {
       await cityFiltersAPI.update(id, payload);
+      locallyDeletedCityFilterIdsRef.current.delete(String(id));
       showNote('Сохранено', 'success');
       await loadCityFilterTree();
       await loadCityTagCatalog();
@@ -2911,18 +2935,52 @@ export function useSessionWizardController({ sessionId, confirm: confirmProp } =
     if (!id) return;
     const message = opts.message || 'Удалить этот элемент?';
     if (!(await confirm({ message, danger: true }))) return;
-    try {
-      await cityFiltersAPI.delete(id);
+
+    const idStr = String(id);
+    setDeletingCityFilterIds((prev) => {
+      const next = new Set(prev);
+      next.add(idStr);
+      return next;
+    });
+
+    const applyLocalRemove = () => {
+      locallyDeletedCityFilterIdsRef.current.add(idStr);
+      setCityTagCatalog((prev) =>
+        prev.filter((item) => String(item.id) !== idStr),
+      );
+      setCityFilterTree((prev) =>
+        removeFilterIdsFromTree(prev, locallyDeletedCityFilterIdsRef.current),
+      );
       setCityTags((prev) => {
         const next = normalizeTagIds(prev).filter((t) => t !== id);
         patchActiveDraftTags(next);
         return next;
       });
+    };
+
+    try {
+      await cityFiltersAPI.delete(id);
+      applyLocalRemove();
       showNote('Удалено', 'success');
-      await loadCityFilterTree();
-      await loadCityTagCatalog();
     } catch (e) {
-      showNote(parseApiError(e, 'Не удалось удалить'), 'error');
+      if (e?.response?.status === 404) {
+        applyLocalRemove();
+        showNote('Элемент уже удалён', 'success');
+      } else {
+        showNote(parseApiError(e, 'Не удалось удалить'), 'error');
+      }
+    } finally {
+      setDeletingCityFilterIds((prev) => {
+        const next = new Set(prev);
+        next.delete(idStr);
+        return next;
+      });
+      void loadCityFilterTree().catch((err) => {
+        console.error('Catalog reload after delete failed', err);
+      });
+      void loadCityTagCatalog().catch((err) => {
+        console.error('Catalog reload after delete failed', err);
+      });
     }
   }, [confirm, loadCityFilterTree, loadCityTagCatalog, showNote, patchActiveDraftTags]);
 
@@ -2930,11 +2988,16 @@ export function useSessionWizardController({ sessionId, confirm: confirmProp } =
 
   const createEventFilterFolder = useCallback(async (payload) => {
     try {
-      await eventFiltersAPI.create({
+      const res = await eventFiltersAPI.create({
         ...payload,
         type: 'folder',
         parent_id: null,
       });
+      const raw = res?.data?.data ?? res?.data;
+      const newId = raw?.id ?? raw?.uuid ?? raw?.pk;
+      if (newId != null) {
+        locallyDeletedEventFilterIdsRef.current.delete(String(newId));
+      }
       showNote('Папка создана', 'success');
       await loadEventFilterTree();
     } catch (e) {
@@ -2950,11 +3013,16 @@ export function useSessionWizardController({ sessionId, confirm: confirmProp } =
       return;
     }
     try {
-      await eventFiltersAPI.create({
+      const res = await eventFiltersAPI.create({
         ...payload,
         type: 'tag',
         parent_id: parentId,
       });
+      const raw = res?.data?.data ?? res?.data;
+      const newId = raw?.id ?? raw?.uuid ?? raw?.pk;
+      if (newId != null) {
+        locallyDeletedEventFilterIdsRef.current.delete(String(newId));
+      }
       showNote('Тег создан', 'success');
       await loadEventFilterTree();
     } catch (e) {
@@ -2968,6 +3036,7 @@ export function useSessionWizardController({ sessionId, confirm: confirmProp } =
     if (!id) return;
     try {
       await eventFiltersAPI.update(id, payload);
+      locallyDeletedEventFilterIdsRef.current.delete(String(id));
       showNote('Сохранено', 'success');
       await loadEventFilterTree();
     } catch (e) {
@@ -2981,12 +3050,41 @@ export function useSessionWizardController({ sessionId, confirm: confirmProp } =
     if (!id) return;
     const message = opts.message || 'Удалить этот элемент?';
     if (!(await confirm({ message, danger: true }))) return;
+
+    const idStr = String(id);
+    setDeletingEventFilterIds((prev) => {
+      const next = new Set(prev);
+      next.add(idStr);
+      return next;
+    });
+
+    const applyLocalRemove = () => {
+      locallyDeletedEventFilterIdsRef.current.add(idStr);
+      setEventFilterTree((prev) =>
+        removeFilterIdsFromTree(prev, locallyDeletedEventFilterIdsRef.current),
+      );
+    };
+
     try {
       await eventFiltersAPI.delete(id);
+      applyLocalRemove();
       showNote('Удалено', 'success');
-      await loadEventFilterTree();
     } catch (e) {
-      showNote(parseApiError(e, 'Не удалось удалить'), 'error');
+      if (e?.response?.status === 404) {
+        applyLocalRemove();
+        showNote('Элемент уже удалён', 'success');
+      } else {
+        showNote(parseApiError(e, 'Не удалось удалить'), 'error');
+      }
+    } finally {
+      setDeletingEventFilterIds((prev) => {
+        const next = new Set(prev);
+        next.delete(idStr);
+        return next;
+      });
+      void loadEventFilterTree().catch((err) => {
+        console.error('Catalog reload after delete failed', err);
+      });
     }
   }, [confirm, loadEventFilterTree, showNote]);
 
@@ -4194,6 +4292,7 @@ export function useSessionWizardController({ sessionId, confirm: confirmProp } =
     cityFilterTree, cityFilterTreeLoading, cityFilterTreeError, loadCityFilterTree,
     eventFilterTree, eventFilterTreeLoading, eventFilterTreeError, loadEventFilterTree,
     cityTagCatalog, cityTagCatalogLoading, cityTagCatalogError, loadCityTagCatalog,
+    deletingCityFilterIds, deletingEventFilterIds,
     cityInfos, currentCityInfo, cityInfoLocaleData, cityInfoActiveLocale, cityInfoSaving,
     attractions, attrView, currentAttr, attrLocaleData, attrActiveLocale, attrSaving,
     attractionInfos, currentAttractionInfo, attractionInfoLocaleData, attractionInfoActiveLocale, attractionInfoSaving,    

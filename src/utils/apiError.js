@@ -20,6 +20,10 @@ function pickFirstString(value) {
   return null;
 }
 
+export function isNotFoundError(error) {
+  return error?.response?.status === 404;
+}
+
 export function parseApiError(error, fallback = 'Произошла ошибка') {
   const data = error?.response?.data;
 

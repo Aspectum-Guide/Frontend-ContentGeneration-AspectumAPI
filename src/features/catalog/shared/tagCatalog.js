@@ -1,4 +1,5 @@
 import { getMultiLangValue } from './i18n';
+import { unwrapEnvelope } from './normalize';
 
 function makeSlug(title) {
   return String(title || '')
@@ -12,6 +13,53 @@ function makeSlug(title) {
 export function makeUniqueTagName(title, prefix = 'tag') {
   const base = makeSlug(title) || prefix;
   return `${base}-${Date.now().toString(36)}`;
+}
+
+/** Axios response → created filter object (city or event). */
+export function unwrapCreatedFilter(res) {
+  const payload = res?.data;
+  if (payload == null) return null;
+
+  const tryNode = (node) => {
+    if (node == null) return null;
+    if (Array.isArray(node)) {
+      const first = node.find((x) => x && typeof x === 'object' && x.id != null);
+      return first || null;
+    }
+    if (typeof node !== 'object') return null;
+    if (node.id != null) return node;
+    const nestedKeys = ['data', 'filter', 'city_filter', 'event_filter', 'result', 'item'];
+    for (const key of nestedKeys) {
+      const picked = tryNode(node[key]);
+      if (picked) return picked;
+    }
+    return null;
+  };
+
+  const unwrapped = unwrapEnvelope(payload);
+  return tryNode(unwrapped) || tryNode(payload);
+}
+
+export function upsertFlatFilterRow(rows = [], row) {
+  const id = String(row?.id ?? '');
+
+  if (!id) return rows;
+
+  const next = rows.filter((item) => String(item.id) !== id);
+
+  const nameKey = (r) =>
+    typeof r?.name === 'string'
+      ? r.name
+      : getMultiLangValue(r?.name) || String(r?.slug || r?.id || '');
+
+  return [...next, row].sort((a, b) => {
+    const indexA = Number.isFinite(Number(a?.index)) ? Number(a.index) : 0;
+    const indexB = Number.isFinite(Number(b?.index)) ? Number(b.index) : 0;
+
+    if (indexA !== indexB) return indexA - indexB;
+
+    return nameKey(a).localeCompare(nameKey(b));
+  });
 }
 
 export function mapCityTagCatalogRow(f) {
@@ -100,7 +148,7 @@ export function buildEventFilterCreatePayload(newFilter) {
       parent_id: null,
       name: makeUniqueTagName(ru || 'folder', 'event-folder'),
       title,
-      description: {},
+      description: newFilter?.emoji?.trim() ? { emoji: newFilter.emoji.trim() } : {},
       index: 0,
       is_show: true,
     };

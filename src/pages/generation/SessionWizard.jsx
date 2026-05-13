@@ -97,6 +97,8 @@ export default function SessionWizard({ components = {} } = {}) {
     cityTagCatalogLoading,
     cityTagCatalogError,
     loadCityTagCatalog,
+    deletingCityFilterIds,
+    deletingEventFilterIds,
     cityInfos,
     currentCityInfo,
     cityInfoLocaleData,
@@ -633,6 +635,7 @@ export default function SessionWizard({ components = {} } = {}) {
             onUpdateCityFilter={updateCityFilter}
             onDeleteCityFilter={deleteCityFilter}
             onUploadCityFilterImage={uploadCityFilterImage}
+            deletingCityFilterIds={deletingCityFilterIds}
             eventFilterTree={eventFilterTree}
             eventFilterTreeLoading={eventFilterTreeLoading}
             eventFilterTreeError={eventFilterTreeError}
@@ -642,6 +645,7 @@ export default function SessionWizard({ components = {} } = {}) {
             onUpdateEventFilter={updateEventFilter}
             onDeleteEventFilter={deleteEventFilter}
             onUploadEventFilterImage={uploadEventFilterImage}
+            deletingEventFilterIds={deletingEventFilterIds}
             onGoToStep={goToStep}
           />
         )}

@@ -69,6 +69,8 @@ export function Select({ className = '', children, ...props }) {
  *   rows    — number (for multiline)
  *   disabled — boolean
  */
+const MULTILANG_DEFAULT_LANGS = ['ru'];
+
 export function MultiLangField({
   label,
   value = {},
@@ -79,10 +81,16 @@ export function MultiLangField({
   disabled = false,
   required = false,
 }) {
-  const effectiveLangs =
+  const fromKeys = Object.keys(value || {}).filter(
+    (lang) => typeof lang === 'string' && lang.trim(),
+  );
+  const resolvedLangs =
     Array.isArray(langs) && langs.length > 0
       ? langs
-      : Object.keys(value || {}).filter((lang) => typeof lang === 'string' && lang.trim());
+      : fromKeys;
+
+  const effectiveLangs =
+    resolvedLangs.length > 0 ? resolvedLangs : MULTILANG_DEFAULT_LANGS;
 
   const handleChange = (lang, val) => {
     onChange?.({ ...value, [lang]: val });

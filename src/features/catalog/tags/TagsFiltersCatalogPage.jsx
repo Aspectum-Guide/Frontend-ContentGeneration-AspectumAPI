@@ -1,11 +1,13 @@
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import Layout from '../../../components/Layout';
 import DataTable from '../../../components/ui/DataTable';
 import Modal from '../../../components/ui/Modal';
 import { ConfirmModal } from '../../../components/ui/Modal';
-import { MultiLangField, Field, TextInput, FormActions } from '../../../components/ui/FormField';
+import { Field, TextInput, FormActions } from '../../../components/ui/FormField';
+import Toast, { useToast } from '../../../components/ui/Toast.jsx';
 import { cityFiltersAPI, eventFiltersAPI } from '../../../api/generation';
-import { extractLangCodes, getMultiLangValue } from '../shared/i18n';
+import { isNotFoundError, parseApiError } from '../../../utils/apiError';
+import { getMultiLangValue } from '../shared/i18n';
 import { flattenEventFilterTree, normalizeListResponse, unwrapEnvelope } from '../shared/normalize';
 import {
   buildCityTagCreatePayload,
@@ -14,9 +16,11 @@ import {
   buildEventFilterUpdatePayload,
   mapCityTagCatalogRow,
   mapEventFilterCatalogRow,
+  unwrapCreatedFilter,
+  upsertFlatFilterRow,
 } from '../shared/tagCatalog';
 
-function useFilters(api) {
+function useFilters(api, locallyDeletedFilterIdsRef, locallyCreatedFilterRowsRef) {
   const [filters, setFilters] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -28,17 +32,32 @@ function useFilters(api) {
       const r = await api.list();
       const data = r?.data;
       const list = Array.isArray(data) ? data : normalizeListResponse(data, ['filters', 'results', 'tags']);
-      setFilters(list);
+      const fetchedIds = new Set(list.map((item) => String(item.id)));
+
+      for (const id of [...locallyCreatedFilterRowsRef.current.keys()]) {
+        if (fetchedIds.has(id)) {
+          locallyCreatedFilterRowsRef.current.delete(id);
+        }
+      }
+
+      let merged = list;
+      for (const row of locallyCreatedFilterRowsRef.current.values()) {
+        merged = upsertFlatFilterRow(merged, row);
+      }
+      merged = merged.filter(
+        (item) => !locallyDeletedFilterIdsRef.current.has(String(item.id)),
+      );
+      setFilters(merged);
     } catch (e) {
       setError(e?.response?.data?.error || e.message || 'Ошибка загрузки');
     } finally {
       setLoading(false);
     }
-  }, [api]);
+  }, [api, locallyDeletedFilterIdsRef, locallyCreatedFilterRowsRef]);
 
   useEffect(() => { load(); }, [load]);
 
-  return { filters, loading, error, reload: load };
+  return { filters, setFilters, loading, error, reload: load };
 }
 
 function initialNewFilter(mode) {
@@ -48,19 +67,45 @@ function initialNewFilter(mode) {
   return { name: {}, emoji: '' };
 }
 
-function FilterTab({ api, mode, icon, emptyText, createLabel }) {
-  const { filters, loading, error, reload } = useFilters(api);
+function FilterTab({ api, mode, icon, emptyText, createLabel, showNote }) {
+  const locallyDeletedFilterIdsRef = useRef(new Set());
+  const locallyCreatedFilterRowsRef = useRef(new Map());
+  const { filters, setFilters, loading, error, reload } = useFilters(
+    api,
+    locallyDeletedFilterIdsRef,
+    locallyCreatedFilterRowsRef,
+  );
   const [search, setSearch] = useState('');
   const [editingFilter, setEditingFilter] = useState(null);
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState(null);
   const [deleteTarget, setDeleteTarget] = useState(null);
-  const [deleting, setDeleting] = useState(false);
+  const [deletingFilterIds, setDeletingFilterIds] = useState(() => new Set());
+
+  const markDeleting = (id) => {
+    setDeletingFilterIds((prev) => {
+      const next = new Set(prev);
+      next.add(String(id));
+      return next;
+    });
+  };
+
+  const unmarkDeleting = (id) => {
+    setDeletingFilterIds((prev) => {
+      const next = new Set(prev);
+      next.delete(String(id));
+      return next;
+    });
+  };
 
   const [createModalOpen, setCreateModalOpen] = useState(false);
   const [creating, setCreating] = useState(false);
   const [createError, setCreateError] = useState(null);
   const [newFilter, setNewFilter] = useState(() => initialNewFilter(mode));
+  const [createTitle, setCreateTitle] = useState('');
+  const [createEmoji, setCreateEmoji] = useState('');
+  const [editTitle, setEditTitle] = useState('');
+  const [editEmoji, setEditEmoji] = useState('');
 
   const folderOptions = useMemo(
     () => filters.filter((f) => f.type === 'folder'),
@@ -76,22 +121,29 @@ function FilterTab({ api, mode, icon, emptyText, createLabel }) {
     return nameMatch || slugMatch || typeMatch;
   });
 
-  const dynamicLangs = extractLangCodes(
-    [
-      ...filters.map((f) => f?.name),
-      editingFilter?.name,
-      newFilter?.name,
-    ]
-  );
-
   const handleSave = async (e) => {
     e?.preventDefault();
     if (!editingFilter?.id) return;
+    if (!editTitle.trim()) {
+      setSaveError('Введите название');
+      return;
+    }
     try {
       setSaving(true);
       setSaveError(null);
-      await api.update(editingFilter.id, editingFilter);
+      const prevName =
+        typeof editingFilter.name === 'object' && editingFilter.name
+          ? { ...editingFilter.name }
+          : {};
+      const merged = {
+        ...editingFilter,
+        name: { ...prevName, ru: editTitle.trim() },
+        emoji: editEmoji,
+      };
+      await api.update(editingFilter.id, merged);
       setEditingFilter(null);
+      setEditTitle('');
+      setEditEmoji('');
       await reload();
     } catch (err) {
       setSaveError(err?.response?.data?.error || err.message || 'Ошибка сохранения');
@@ -102,31 +154,107 @@ function FilterTab({ api, mode, icon, emptyText, createLabel }) {
 
   const handleCreate = async (e) => {
     e?.preventDefault();
+    if (!createTitle.trim()) {
+      setCreateError('Введите название');
+      return;
+    }
+    if (mode === 'event' && newFilter.kind === 'tag' && !String(newFilter.parent_folder_id || '').trim()) {
+      setCreateError('Выберите папку');
+      return;
+    }
     try {
       setCreating(true);
       setCreateError(null);
-      await api.create(newFilter);
+      const payload = {
+        ...newFilter,
+        name: { ru: createTitle.trim() },
+        emoji: createEmoji,
+      };
+      const res = await api.create(payload);
+      const raw = unwrapCreatedFilter(res);
+
+      if (raw && raw.id != null) {
+        const row =
+          mode === 'city'
+            ? mapCityTagCatalogRow(raw)
+            : mapEventFilterCatalogRow(raw);
+        const idStr = String(row.id);
+        locallyDeletedFilterIdsRef.current.delete(idStr);
+        locallyCreatedFilterRowsRef.current.set(idStr, row);
+        setFilters((prev) => upsertFlatFilterRow(prev, row));
+      }
+
       setCreateModalOpen(false);
       setNewFilter(initialNewFilter(mode));
-      await reload();
+      setCreateTitle('');
+      setCreateEmoji('');
+      showNote?.('Создано', 'success');
     } catch (err) {
       setCreateError(err?.response?.data?.error || err.message || 'Ошибка создания');
     } finally {
       setCreating(false);
+      void reload().catch((e) => {
+        console.error('Catalog reload after create failed', e);
+      });
     }
   };
 
+  const resetCreateModal = () => {
+    setCreateModalOpen(false);
+    setCreateTitle('');
+    setCreateEmoji('');
+    setCreateError(null);
+    setNewFilter(initialNewFilter(mode));
+  };
+
+  const closeEditModal = () => {
+    setEditingFilter(null);
+    setEditTitle('');
+    setEditEmoji('');
+    setSaveError(null);
+  };
+
+  const createNameLabel =
+    mode === 'city'
+      ? 'Название'
+      : newFilter.kind === 'folder'
+        ? 'Название папки'
+        : 'Название тега';
+
+  const editNameLabel =
+    mode === 'event' && editingFilter?.type === 'folder'
+      ? 'Название папки'
+      : mode === 'event'
+        ? 'Название тега'
+        : 'Название';
+
   const handleDelete = async () => {
     if (!deleteTarget) return;
+    const id = deleteTarget.id;
+    const idStr = String(id);
+    markDeleting(id);
     try {
-      setDeleting(true);
-      await api.delete(deleteTarget.id);
+      await api.delete(id);
+      locallyDeletedFilterIdsRef.current.add(idStr);
+      locallyCreatedFilterRowsRef.current.delete(idStr);
+      setFilters((prev) => prev.filter((item) => String(item.id) !== idStr));
       setDeleteTarget(null);
-      await reload();
+      showNote?.('Удалено', 'success');
     } catch (err) {
-      alert(err?.response?.data?.error || err.message || 'Ошибка удаления');
+      if (isNotFoundError(err)) {
+        locallyDeletedFilterIdsRef.current.add(idStr);
+        locallyCreatedFilterRowsRef.current.delete(idStr);
+        setFilters((prev) => prev.filter((item) => String(item.id) !== idStr));
+        setDeleteTarget(null);
+        showNote?.('Элемент уже удалён', 'success');
+      } else {
+        showNote?.(parseApiError(err, 'Ошибка удаления'), 'error');
+      }
     } finally {
-      setDeleting(false);
+      unmarkDeleting(id);
+      void reload().catch((e) => {
+        console.error('Catalog reload after delete failed', e);
+      });
     }
   };
 
@@ -171,13 +299,15 @@ function FilterTab({ api, mode, icon, emptyText, createLabel }) {
           type="button"
           onClick={() => {
             setCreateError(null);
+            setCreateTitle('');
+            setCreateEmoji('');
             setNewFilter(initialNewFilter(mode));
             setCreateModalOpen(true);
           }}
           className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50"
           disabled={creating}
         >
-          {createLabel || 'Создать тег'}
+          {creating ? 'Создание…' : (createLabel || 'Создать тег')}
         </button>
       </div>
 
@@ -195,15 +325,28 @@ function FilterTab({ api, mode, icon, emptyText, createLabel }) {
           <>
             <button
               type="button"
-              onClick={() => { setEditingFilter({ ...row }); setSaveError(null); }}
+              onClick={() => {
+                setSaveError(null);
+                setEditTitle(
+                  getMultiLangValue(row.name)
+                  || (row.name && typeof row.name === 'object' ? row.name.ru || row.name.en || '' : '')
+                  || '',
+                );
+                setEditEmoji(row.emoji || '');
+                setEditingFilter({ ...row });
+              }}
               className="px-3 py-1.5 text-xs font-medium text-blue-600 bg-blue-50 rounded-md hover:bg-blue-100 transition-colors"
             >
               Ред.
             </button>
             <button
               type="button"
-              onClick={() => setDeleteTarget(row)}
-              className="px-3 py-1.5 text-xs font-medium text-red-600 bg-red-50 rounded-md hover:bg-red-100 transition-colors"
+              disabled={deletingFilterIds.has(String(row.id))}
+              onClick={(event) => {
+                event.stopPropagation();
+                setDeleteTarget(row);
+              }}
+              className="px-3 py-1.5 text-xs font-medium text-red-600 bg-red-50 rounded-md hover:bg-red-100 transition-colors disabled:opacity-50"
             >
               Удалить
             </button>
@@ -213,7 +356,7 @@ function FilterTab({ api, mode, icon, emptyText, createLabel }) {
 
       <Modal
         open={createModalOpen}
-        onClose={() => setCreateModalOpen(false)}
+        onClose={resetCreateModal}
         title={createLabel || 'Создать тег'}
         size="md"
       >
@@ -241,8 +384,18 @@ function FilterTab({ api, mode, icon, emptyText, createLabel }) {
             </Field>
           )}
 
+          <Field label={createNameLabel} required>
+            <TextInput
+              type="text"
+              value={createTitle}
+              onChange={(e) => setCreateTitle(e.target.value)}
+              autoFocus
+              placeholder="Введите название"
+            />
+          </Field>
+
           {mode === 'event' && newFilter.kind === 'tag' && (
-            <Field label="Папка">
+            <Field label="Папка" required>
               <select
                 value={newFilter.parent_folder_id}
                 onChange={(e) => setNewFilter((p) => ({ ...p, parent_folder_id: e.target.value }))}
@@ -262,31 +415,26 @@ function FilterTab({ api, mode, icon, emptyText, createLabel }) {
             </Field>
           )}
 
-          <MultiLangField
-            label="Название"
-            value={newFilter.name}
-            onChange={(v) => setNewFilter((p) => ({ ...p, name: v }))}
-            langs={dynamicLangs}
+          <Field label="Эмодзи (опционально)">
+            <TextInput
+              value={createEmoji}
+              onChange={(e) => setCreateEmoji(e.target.value)}
+              placeholder="🏙️"
+              maxLength={4}
+            />
+          </Field>
+
+          <FormActions
+            saving={creating}
+            onCancel={resetCreateModal}
+            saveLabel={creating ? 'Создание…' : 'Создать'}
           />
-
-          {!(mode === 'event' && newFilter.kind === 'folder') && (
-            <Field label="Эмодзи (опционально)">
-              <TextInput
-                value={newFilter.emoji || ''}
-                onChange={(e) => setNewFilter((p) => ({ ...p, emoji: e.target.value }))}
-                placeholder="🏙️"
-                maxLength={4}
-              />
-            </Field>
-          )}
-
-          <FormActions saving={creating} onCancel={() => setCreateModalOpen(false)} saveLabel="Создать" />
         </form>
       </Modal>
 
       <Modal
         open={!!editingFilter}
-        onClose={() => setEditingFilter(null)}
+        onClose={closeEditModal}
         title="Редактировать фильтр"
         size="md"
       >
@@ -306,22 +454,23 @@ function FilterTab({ api, mode, icon, emptyText, createLabel }) {
                 />
               </Field>
             )}
-            <MultiLangField
-              label="Название"
-              value={typeof editingFilter.name === 'object' ? editingFilter.name : {}}
-              onChange={(v) => setEditingFilter((p) => ({ ...p, name: v }))}
-              langs={dynamicLangs}
-            />
-            {!(mode === 'event' && editingFilter.type === 'folder') && (
-              <Field label="Эмодзи (опционально)">
-                <TextInput
-                  value={editingFilter.emoji || ''}
-                  onChange={(e) => setEditingFilter((p) => ({ ...p, emoji: e.target.value }))}
-                  placeholder="🏙️"
-                  maxLength={4}
-                />
-              </Field>
-            )}
+            <Field label={editNameLabel} required>
+              <TextInput
+                type="text"
+                value={editTitle}
+                onChange={(e) => setEditTitle(e.target.value)}
+                autoFocus
+                placeholder="Введите название"
+              />
+            </Field>
+            <Field label="Эмодзи (опционально)">
+              <TextInput
+                value={editEmoji}
+                onChange={(e) => setEditEmoji(e.target.value)}
+                placeholder="🏙️"
+                maxLength={4}
+              />
+            </Field>
             <Field label="Имя (API)">
               <TextInput
                 value={editingFilter.slug || ''}
@@ -329,7 +478,7 @@ function FilterTab({ api, mode, icon, emptyText, createLabel }) {
                 className="font-mono bg-gray-50 text-gray-400 cursor-not-allowed"
               />
             </Field>
-            <FormActions saving={saving} onCancel={() => setEditingFilter(null)} />
+            <FormActions saving={saving} onCancel={closeEditModal} />
           </form>
         )}
       </Modal>
@@ -342,7 +491,7 @@ function FilterTab({ api, mode, icon, emptyText, createLabel }) {
         message={`Фильтр «${getMultiLangValue(deleteTarget?.name) || deleteTarget?.slug || deleteTarget?.id}» будет удалён.`}
         confirmLabel="Удалить"
         danger
-        loading={deleting}
+        loading={!!deleteTarget && deletingFilterIds.has(String(deleteTarget.id))}
       />
     </>
   );
@@ -350,6 +499,7 @@ function FilterTab({ api, mode, icon, emptyText, createLabel }) {
 
 export default function TagsFilters() {
   const [activeTab, setActiveTab] = useState('city');
+  const { note, showNote } = useToast();
 
   const cityCatalogApi = useMemo(() => ({
     list: async () => {
@@ -378,6 +528,7 @@ export default function TagsFilters() {
 
   return (
     <Layout>
+      <Toast note={note} />
       <div className="mb-6">
         <h1 className="text-2xl font-bold text-gray-900">Теги и фильтры</h1>
         <p className="mt-1 text-sm text-gray-500">Управление тегами городов и событий (CityAPI / EventsAPI)</p>
@@ -411,6 +562,7 @@ export default function TagsFilters() {
           icon="🏙️"
           emptyText="Тегов городов нет"
           createLabel="Создать тег города"
+          showNote={showNote}
         />
       ) : (
         <FilterTab
@@ -420,6 +572,7 @@ export default function TagsFilters() {
           icon="🎪"
           emptyText="Папок и тегов событий нет"
           createLabel="Создать папку или тег"
+          showNote={showNote}
         />
       )}
     </Layout>
