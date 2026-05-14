@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { aiAPI, tasksAPI, attractionsAPI, attractionInfosAPI, referenceAttractionsAPI, cityInfosAPI, cityFiltersAPI, eventFiltersAPI, citiesAPI, imagesAPI, sessionsAPI, attractionFeedAPI} from '../../../api/generation';
+import { aiAPI, tasksAPI, attractionsAPI, attractionInfosAPI, attractionAudioGuidesAPI, audioAPI, referenceAttractionsAPI, cityInfosAPI, cityFiltersAPI, eventFiltersAPI, citiesAPI, imagesAPI, sessionsAPI, attractionFeedAPI} from '../../../api/generation';
 import { useLayoutActions } from '../../../context/useLayoutActions';
 import { trackEvent } from '../../../utils/analytics';
 import { parseApiError } from '../../../utils/apiError';
@@ -268,6 +268,291 @@ const normalizeAttractionFeedItem = (item = {}) => {
 
     isNew: item.isNew ?? false,
   };
+};
+
+const normalizeAudioGuideTracks = (tracks) => {
+  const result = {};
+
+  if (!tracks || typeof tracks !== 'object') return result;
+
+  Object.entries(tracks).forEach(([rawLang, raw]) => {
+    const lang = String(rawLang || '').trim();
+    if (!lang) return;
+
+    const track = raw || {};
+
+    result[lang] = {
+      audio_id: track.audio_id ?? track.audioId ?? track.audio?.id ?? track.id ?? null,
+      audio_url:
+        track.audio_url ??
+        track.audioUrl ??
+        track.url ??
+        track.audio?.url ??
+        track.audio?.audio_url ??
+        '',
+      copyright:
+        track.copyright ??
+        track.audio_copyright ??
+        track.audio?.copyright ??
+        '',
+      language: lang,
+    };
+  });
+
+  return result;
+};
+
+const generateAudioGuidePlanItemId = () => {
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+    return crypto.randomUUID();
+  }
+
+  return `plan-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+};
+
+const isAudioGuidePlanUuid = (value) => {
+  if (!value || typeof value !== 'string') return false;
+
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
+    value.trim(),
+  );
+};
+
+/**
+ * Нормализует пункты плана для одного языка: legacy-строки и объекты → { id, title }.
+ */
+const normalizeAudioGuidePlanItemsForLang = (items) => {
+  const usedIds = new Set();
+  const allocId = (preferred) => {
+    const p = preferred != null ? String(preferred).trim() : '';
+    if (isAudioGuidePlanUuid(p) && !usedIds.has(p)) {
+      usedIds.add(p);
+      return p;
+    }
+    const nid = generateAudioGuidePlanItemId();
+    usedIds.add(nid);
+    return nid;
+  };
+
+  if (items == null) return [];
+
+  let list = items;
+
+  if (typeof items === 'string') {
+    list = items.trim() ? [items] : [];
+  }
+
+  if (!Array.isArray(list)) return [];
+
+  const result = [];
+
+  list.forEach((raw) => {
+    if (raw == null) return;
+
+    if (typeof raw === 'string') {
+      result.push({
+        id: allocId(null),
+        title: String(raw),
+      });
+      return;
+    }
+
+    if (typeof raw === 'object') {
+      const id = allocId(raw.id);
+      const titleVal =
+        raw.title != null ? raw.title : raw.text != null ? raw.text : '';
+      result.push({
+        id,
+        title: titleVal == null ? '' : String(titleVal),
+      });
+    }
+  });
+
+  return result;
+};
+
+const normalizeContentPlan = (plan) => {
+  if (!plan || typeof plan !== 'object') return {};
+
+  const result = {};
+
+  Object.entries(plan).forEach(([rawLang, items]) => {
+    const lang = String(rawLang || '').trim();
+    if (!lang) return;
+
+    result[lang] = normalizeAudioGuidePlanItemsForLang(items);
+  });
+
+  return result;
+};
+
+/** content_texts: { lang: { planItemId: string } } */
+const normalizeContentTexts = (value) => {
+  if (!value || typeof value !== 'object') return {};
+
+  const result = {};
+
+  Object.entries(value).forEach(([rawLang, body]) => {
+    const lang = String(rawLang || '').trim();
+    if (!lang) return;
+
+    if (!body || typeof body !== 'object' || Array.isArray(body)) {
+      result[lang] = {};
+      return;
+    }
+
+    const inner = {};
+    Object.entries(body).forEach(([pid, txt]) => {
+      const id = String(pid || '').trim();
+      if (!id) return;
+      inner[id] = txt == null ? '' : String(txt);
+    });
+    result[lang] = inner;
+  });
+
+  return result;
+};
+
+const normalizeAttractionAudioGuide = (guide = {}) => {
+  const eventId =
+    guide.event_id ??
+    guide.event ??
+    guide.attraction_id ??
+    guide.attraction ??
+    null;
+
+  const sessionAttractionId =
+    guide.session_attraction_id ?? guide.session_attraction ?? null;
+
+  let assignedAttractionType =
+    guide.assigned_attraction_type ?? 'none';
+
+  if (!guide.assigned_attraction_type) {
+    if (eventId) {
+      assignedAttractionType = 'database';
+    } else if (sessionAttractionId) {
+      assignedAttractionType = 'draft';
+    }
+  }
+
+  return {
+    ...guide,
+
+    id: guide.id ?? null,
+
+    title: guide.title ?? guide.name ?? {},
+    content_plan: normalizeContentPlan(guide.content_plan ?? guide.contentPlan ?? {}),
+    content_texts: normalizeContentTexts(
+      guide.content_texts ?? guide.contentTexts ?? {},
+    ),
+
+    index: Number(guide.index ?? 0),
+
+    event: eventId,
+    event_id: eventId,
+
+    attraction: eventId,
+    attraction_id: eventId,
+
+    session_attraction: sessionAttractionId,
+    session_attraction_id: sessionAttractionId,
+
+    assigned_attraction_type: assignedAttractionType,
+    assigned_attraction_name: guide.assigned_attraction_name ?? null,
+
+    tracks: normalizeAudioGuideTracks(guide.tracks),
+
+    isNew: guide.isNew ?? false,
+  };
+};
+
+const buildAttractionAudioGuidePayload = (
+  guide,
+  {
+    title = null,
+    contentPlan = null,
+    contentTexts = null,
+    includeTracks = false,
+    /** Языки треков для полного сохранения (локали редактора + уже существующие tracks). */
+    trackLanguages = null,
+  } = {},
+) => {
+  const assignedType = guide.assigned_attraction_type ?? 'none';
+
+  let event = null;
+  let sessionAttraction = null;
+
+  if (assignedType === 'database') {
+    event =
+      guide.event_id ??
+      guide.event ??
+      guide.attraction_id ??
+      guide.attraction ??
+      null;
+  }
+
+  if (assignedType === 'draft') {
+    sessionAttraction =
+      guide.session_attraction_id ?? guide.session_attraction ?? null;
+  }
+
+  const payload = {
+    title: title ?? guide.title ?? {},
+    content_plan: contentPlan ?? guide.content_plan ?? {},
+    content_texts: normalizeContentTexts(
+      contentTexts ?? guide.content_texts ?? {},
+    ),
+
+    index: Number(guide.index ?? 0),
+
+    assigned_attraction_type: assignedType,
+
+    event,
+    event_id: event,
+
+    attraction: event,
+    attraction_id: event,
+
+    session_attraction: sessionAttraction,
+    session_attraction_id: sessionAttraction,
+  };
+
+  if (includeTracks) {
+    const langSet = new Set();
+    if (Array.isArray(trackLanguages)) {
+      trackLanguages.forEach((raw) => {
+        const k = String(raw || '').trim();
+        if (k) langSet.add(k);
+      });
+    }
+    Object.keys(guide.tracks || {}).forEach((raw) => {
+      const k = String(raw || '').trim();
+      if (k) langSet.add(k);
+    });
+
+    const tracks = {};
+    langSet.forEach((lang) => {
+      const track = guide.tracks?.[lang];
+      if (!track) {
+        tracks[lang] = null;
+        return;
+      }
+      const audioId = track?.audio_id ?? null;
+      const audioUrl = track?.audio_url ?? '';
+      const copyright = track?.copyright ?? '';
+      if (!audioId && !audioUrl && !String(copyright).trim()) {
+        tracks[lang] = null;
+        return;
+      }
+      tracks[lang] = {
+        audio_id: audioId,
+        copyright: String(copyright).slice(0, 255),
+      };
+    });
+    payload.tracks = tracks;
+  }
+
+  return payload;
 };
 
 const buildCityInfoPayload = (info, name, description) => {
@@ -619,6 +904,64 @@ const createEmptyAttractionInfo = ({
   };
 };
 
+const createEmptyAttractionAudioGuide = ({
+  activeAttractionId = null,
+  sourceLocaleData = null,
+} = {}) => {
+  const normalizedAttractionId = normalizeId(activeAttractionId);
+  const shouldAttachToDraft = Boolean(normalizedAttractionId);
+
+  // title и content_plan мультиязычные. Для пустого гида заполняем
+  // ключи всех известных языков пустыми значениями.
+  const sourceEntries =
+    sourceLocaleData && Object.keys(sourceLocaleData).length > 0
+      ? Object.entries(sourceLocaleData).map(([key, loc]) => ({
+          key,
+          ...loc,
+        }))
+      : DEFAULT_LOCALE_DEFS;
+
+  const title = {};
+  const contentPlan = {};
+
+  sourceEntries.forEach((locale) => {
+    const lang =
+      locale.lang ||
+      locale.key?.split('-')?.[0] ||
+      'ru';
+
+    if (lang) {
+      title[lang] = '';
+      contentPlan[lang] = [];
+    }
+  });
+
+  return {
+    id: `attraction-audio-guide-${Date.now()}`,
+
+    title,
+    content_plan: contentPlan,
+    content_texts: {},
+
+    index: 0,
+
+    assigned_attraction_type: shouldAttachToDraft ? 'draft' : 'none',
+
+    event: null,
+    event_id: null,
+
+    attraction: null,
+    attraction_id: null,
+
+    session_attraction: shouldAttachToDraft ? normalizedAttractionId : null,
+    session_attraction_id: shouldAttachToDraft ? normalizedAttractionId : null,
+
+    tracks: {},
+
+    isNew: true,
+  };
+};
+
 const createEmptyAttractionFeedItem = (itemType = 'text') => {
   return {
     id: `attraction-feed-${Date.now()}`,
@@ -963,6 +1306,15 @@ export function useSessionWizardController({ sessionId, confirm: confirmProp } =
   const [currentAttractionInfo, setCurrentAttractionInfo] = useState(null);
   const [attractionInfoActiveLocale, setAttractionInfoActiveLocale] = useState('ru-RU');
   const [attractionInfoSaving, setAttractionInfoSaving] = useState(false);
+
+  const [attractionAudioGuides, setAttractionAudioGuides] = useState([]);
+  const [currentAttractionAudioGuide, setCurrentAttractionAudioGuide] = useState(null);
+  const [attractionAudioGuideActiveLocale, setAttractionAudioGuideActiveLocale] = useState('ru-RU');
+  const [attractionAudioGuideSaving, setAttractionAudioGuideSaving] = useState(false);
+  const [attractionAudioUploading, setAttractionAudioUploading] = useState(false);
+  const currentAttractionAudioGuideRef = useRef(null);
+  const attractionAudioGuideActiveLocaleRef = useRef('ru-RU');
+  const attractionAudioGuideLocaleDataRef = useRef({});
 
   const [attractionFeedItems, setAttractionFeedItems] = useState([]);
   const [currentAttractionFeedItem, setCurrentAttractionFeedItem] = useState(null);
@@ -1660,6 +2012,16 @@ export function useSessionWizardController({ sessionId, confirm: confirmProp } =
       }
 
       setCurrentAttractionFeedItem(null);
+
+      if (Array.isArray(data?.attraction_audio_guides)) {
+        setAttractionAudioGuides(
+          data.attraction_audio_guides.map(normalizeAttractionAudioGuide)
+        );
+      } else {
+        setAttractionAudioGuides([]);
+      }
+
+      setCurrentAttractionAudioGuide(null);
 
     } catch (err) {
       if (seq === loadSessionSeqRef.current && !silent) {
@@ -3588,6 +3950,794 @@ export function useSessionWizardController({ sessionId, confirm: confirmProp } =
     showNote,
   ]);
 
+  // ─── Attraction audio guides ───────────────────────────────────────────────
+  const getAttractionAudioGuideName = useCallback((guide) => {
+    const title = guide?.title || {};
+
+    if (typeof title === 'string') {
+      return title || 'Аудиогид';
+    }
+
+    return (
+      title.ru ||
+      title.en ||
+      title.it ||
+      Object.values(title).find(Boolean) ||
+      'Аудиогид'
+    );
+  }, []);
+
+  const attractionAudioGuideLocaleData = useMemo(() => {
+    if (!currentAttractionAudioGuide) return {};
+
+    const assignedType =
+      currentAttractionAudioGuide.assigned_attraction_type || 'none';
+
+    let sourceEntries = [];
+
+    if (assignedType === 'draft') {
+      const guideAttractionId = normalizeId(
+        currentAttractionAudioGuide.session_attraction_id ??
+          currentAttractionAudioGuide.session_attraction
+      );
+
+      const activeAttractionId = normalizeId(currentAttr?.id);
+
+      if (
+        guideAttractionId &&
+        activeAttractionId &&
+        guideAttractionId === activeAttractionId
+      ) {
+        sourceEntries = sortLocaleSourceEntries(
+          Object.entries(attrLocaleData || {})
+            .filter(([, loc]) => loc?.lang)
+            .map(([key, loc]) => [
+              key,
+              {
+                lang: loc.lang,
+                code: loc.code,
+                langName: loc.langName,
+                isDefault: loc.isDefault,
+                isCustom: loc.isCustom,
+              },
+            ])
+        );
+      } else if (guideAttractionId) {
+        const attraction = attractions.find(
+          (item) => normalizeId(item.id) === guideAttractionId
+        );
+
+        const attractionLangKeys = getMultilangKeys(
+          attraction?.name,
+          attraction?.description,
+          attraction?.contents
+        );
+
+        sourceEntries = makeLocaleEntriesFromLangKeys(attractionLangKeys);
+      }
+    }
+
+    if (assignedType === 'database') {
+      const eventId = normalizeId(
+        currentAttractionAudioGuide.event_id ??
+          currentAttractionAudioGuide.event ??
+          currentAttractionAudioGuide.attraction_id ??
+          currentAttractionAudioGuide.attraction
+      );
+
+      const attraction = referenceAttractions.find(
+        (item) => normalizeId(item.id) === eventId
+      );
+
+      const attractionLangKeys = getMultilangKeys(
+        attraction?.name,
+        attraction?.title,
+        attraction?.description
+      );
+
+      sourceEntries = makeLocaleEntriesFromLangKeys(attractionLangKeys);
+    }
+
+    if (assignedType === 'none') {
+      const ownLangKeys = getMultilangKeys(
+        currentAttractionAudioGuide.title,
+        currentAttractionAudioGuide.content_plan,
+        currentAttractionAudioGuide.content_texts,
+      );
+
+      sourceEntries = makeLocaleEntriesFromLangKeys(ownLangKeys);
+    }
+
+    if (sourceEntries.length === 0) {
+      sourceEntries = DEFAULT_LOCALE_DEFS.map((locale) => [locale.key, locale]);
+    }
+
+    return sourceEntries.reduce((acc, [key, locale]) => {
+      const lang =
+        locale.lang ||
+        key?.split('-')?.[0] ||
+        'ru';
+
+      const planRaw = currentAttractionAudioGuide.content_plan?.[lang];
+      const plan = normalizeAudioGuidePlanItemsForLang(planRaw);
+
+      const trackRaw = currentAttractionAudioGuide.tracks?.[lang] || {};
+
+      acc[key] = {
+        lang,
+        code: locale.code || key?.split('-')?.[1] || '',
+        langName: locale.langName || locale.name || lang.toUpperCase(),
+        isDefault: Boolean(locale.isDefault),
+        isCustom: Boolean(locale.isCustom),
+
+        title: currentAttractionAudioGuide.title?.[lang] || '',
+        contentPlan: plan,
+
+        track: {
+          audio_id: trackRaw.audio_id ?? null,
+          audio_url: trackRaw.audio_url ?? '',
+          copyright: trackRaw.copyright ?? '',
+        },
+      };
+
+      return acc;
+    }, {});
+  }, [
+    currentAttractionAudioGuide,
+    currentAttr,
+    attrLocaleData,
+    attractions,
+    referenceAttractions,
+  ]);
+
+  useEffect(() => {
+    if (!currentAttractionAudioGuide) return;
+
+    const availableKeys = Object.keys(attractionAudioGuideLocaleData || {});
+
+    if (availableKeys.length === 0) return;
+
+    if (!availableKeys.includes(attractionAudioGuideActiveLocale)) {
+      setAttractionAudioGuideActiveLocale(availableKeys[0]);
+    }
+  }, [
+    currentAttractionAudioGuide,
+    attractionAudioGuideLocaleData,
+    attractionAudioGuideActiveLocale,
+  ]);
+
+  useEffect(() => {
+    currentAttractionAudioGuideRef.current = currentAttractionAudioGuide;
+  }, [currentAttractionAudioGuide]);
+
+  useEffect(() => {
+    attractionAudioGuideActiveLocaleRef.current = attractionAudioGuideActiveLocale;
+  }, [attractionAudioGuideActiveLocale]);
+
+  useEffect(() => {
+    attractionAudioGuideLocaleDataRef.current = attractionAudioGuideLocaleData;
+  }, [attractionAudioGuideLocaleData]);
+
+  const addAttractionAudioGuide = useCallback(async () => {
+    try {
+      const activeAttractionId = normalizeId(currentAttr?.id);
+
+      const emptyGuide = createEmptyAttractionAudioGuide({
+        activeAttractionId,
+        sourceLocaleData: attrLocaleData,
+      });
+
+      const res = await attractionAudioGuidesAPI.create(
+        sessionId,
+        buildAttractionAudioGuidePayload(emptyGuide, { includeTracks: false }),
+      );
+
+      const rawGuide =
+        res?.data?.attraction_audio_guide || res?.data || emptyGuide;
+      const guide = normalizeAttractionAudioGuide(rawGuide);
+
+      if (guide?.id) {
+        const localeKeys = Object.keys(attrLocaleData || {});
+        const nextActiveLocale = localeKeys.includes(attrActiveLocale)
+          ? attrActiveLocale
+          : localeKeys[0] || 'ru-RU';
+
+        setAttractionAudioGuides((prev) => [...prev, guide]);
+        setCurrentAttractionAudioGuide(guide);
+        setAttractionAudioGuideActiveLocale(nextActiveLocale);
+
+        showNote(
+          activeAttractionId
+            ? 'Аудиогид добавлен и привязан к текущей достопримечательности'
+            : 'Аудиогид достопримечательности добавлен',
+          'success',
+        );
+      }
+    } catch (e) {
+      showNote(
+        'Ошибка при добавлении аудиогида: ' + parseApiError(e),
+        'error',
+      );
+    }
+  }, [
+    sessionId,
+    currentAttr,
+    attrLocaleData,
+    attrActiveLocale,
+    showNote,
+  ]);
+
+  const openAttractionAudioGuideDetail = useCallback(
+    (guideId) => {
+      const target = attractionAudioGuides.find(
+        (guide) => normalizeId(guide.id) === normalizeId(guideId),
+      );
+
+      if (!target) return;
+
+      setCurrentAttractionAudioGuide(target);
+      setAttractionAudioGuideActiveLocale('ru-RU');
+    },
+    [attractionAudioGuides],
+  );
+
+  const updateCurrentAttractionAudioGuidePatch = useCallback((patch) => {
+    setCurrentAttractionAudioGuide((prev) => {
+      if (!prev) return prev;
+
+      const updated = normalizeAttractionAudioGuide({
+        ...prev,
+        ...patch,
+      });
+
+      setAttractionAudioGuides((items) =>
+        items.map((item) =>
+          normalizeId(item.id) === normalizeId(updated.id) ? updated : item,
+        ),
+      );
+
+      return updated;
+    });
+  }, []);
+
+  const updateAttractionAudioGuideLocaleField = useCallback(
+    (field, value) => {
+      const lang =
+        attractionAudioGuideLocaleData?.[attractionAudioGuideActiveLocale]?.lang ||
+        getLocaleLang(attractionAudioGuideActiveLocale);
+
+      setCurrentAttractionAudioGuide((prev) => {
+        if (!prev) return prev;
+
+        const baseField = prev[field] || {};
+        const updated = {
+          ...prev,
+          [field]: {
+            ...baseField,
+            [lang]: value,
+          },
+        };
+
+        setAttractionAudioGuides((items) =>
+          items.map((item) =>
+            normalizeId(item.id) === normalizeId(updated.id) ? updated : item,
+          ),
+        );
+
+        return updated;
+      });
+    },
+    [
+      attractionAudioGuideActiveLocale,
+      attractionAudioGuideLocaleData,
+    ],
+  );
+
+  const updateAttractionAudioGuidePlanPoint = useCallback(
+    (lang, itemId, value) => {
+      const targetLang =
+        lang ||
+        attractionAudioGuideLocaleData?.[attractionAudioGuideActiveLocale]?.lang ||
+        getLocaleLang(attractionAudioGuideActiveLocale);
+
+      if (!targetLang) return;
+
+      setCurrentAttractionAudioGuide((prev) => {
+        if (!prev) return prev;
+
+        const plan = normalizeAudioGuidePlanItemsForLang(
+          prev.content_plan?.[targetLang],
+        );
+
+        const nextPlan = plan.map((item) => {
+          if (item.id !== itemId) return item;
+
+          return {
+            ...item,
+            title: value == null ? '' : String(value),
+          };
+        });
+
+        const updated = {
+          ...prev,
+          content_plan: {
+            ...(prev.content_plan || {}),
+            [targetLang]: nextPlan,
+          },
+        };
+
+        setAttractionAudioGuides((items) =>
+          items.map((item) =>
+            normalizeId(item.id) === normalizeId(updated.id) ? updated : item,
+          ),
+        );
+
+        return updated;
+      });
+    },
+    [attractionAudioGuideActiveLocale, attractionAudioGuideLocaleData],
+  );
+
+  const addAttractionAudioGuidePlanPoint = useCallback(
+    (lang) => {
+      const targetLang =
+        lang ||
+        attractionAudioGuideLocaleData?.[attractionAudioGuideActiveLocale]?.lang ||
+        getLocaleLang(attractionAudioGuideActiveLocale);
+
+      if (!targetLang) return;
+
+      setCurrentAttractionAudioGuide((prev) => {
+        if (!prev) return prev;
+
+        const plan = normalizeAudioGuidePlanItemsForLang(
+          prev.content_plan?.[targetLang],
+        );
+
+        const newId = generateAudioGuidePlanItemId();
+        const nextPlan = [
+          ...plan,
+          { id: newId, title: '' },
+        ];
+
+        const ct = { ...(prev.content_texts || {}) };
+        const langMap = { ...(ct[targetLang] || {}) };
+        langMap[newId] = '';
+        ct[targetLang] = langMap;
+
+        const updated = {
+          ...prev,
+          content_plan: {
+            ...(prev.content_plan || {}),
+            [targetLang]: nextPlan,
+          },
+          content_texts: ct,
+        };
+
+        setAttractionAudioGuides((items) =>
+          items.map((item) =>
+            normalizeId(item.id) === normalizeId(updated.id) ? updated : item,
+          ),
+        );
+
+        return updated;
+      });
+    },
+    [attractionAudioGuideActiveLocale, attractionAudioGuideLocaleData],
+  );
+
+  const removeAttractionAudioGuidePlanPoint = useCallback(
+    (lang, itemId) => {
+      const targetLang =
+        lang ||
+        attractionAudioGuideLocaleData?.[attractionAudioGuideActiveLocale]?.lang ||
+        getLocaleLang(attractionAudioGuideActiveLocale);
+
+      if (!targetLang) return;
+
+      setCurrentAttractionAudioGuide((prev) => {
+        if (!prev) return prev;
+
+        const plan = normalizeAudioGuidePlanItemsForLang(
+          prev.content_plan?.[targetLang],
+        );
+
+        const nextPlan = plan.filter((item) => item.id !== itemId);
+
+        const ct = { ...(prev.content_texts || {}) };
+        const langMap = { ...(ct[targetLang] || {}) };
+        delete langMap[itemId];
+        ct[targetLang] = langMap;
+
+        const updated = {
+          ...prev,
+          content_plan: {
+            ...(prev.content_plan || {}),
+            [targetLang]: nextPlan,
+          },
+          content_texts: ct,
+        };
+
+        setAttractionAudioGuides((items) =>
+          items.map((item) =>
+            normalizeId(item.id) === normalizeId(updated.id) ? updated : item,
+          ),
+        );
+
+        return updated;
+      });
+    },
+    [attractionAudioGuideActiveLocale, attractionAudioGuideLocaleData],
+  );
+
+  const updateAttractionAudioGuidePlanItemText = useCallback(
+    (lang, itemId, value) => {
+      const targetLang =
+        lang ||
+        attractionAudioGuideLocaleData?.[attractionAudioGuideActiveLocale]?.lang ||
+        getLocaleLang(attractionAudioGuideActiveLocale);
+
+      if (!targetLang || !itemId) return;
+
+      setCurrentAttractionAudioGuide((prev) => {
+        if (!prev) return prev;
+
+        const ct = { ...(prev.content_texts || {}) };
+        const langMap = { ...(ct[targetLang] || {}) };
+        langMap[itemId] = value == null ? '' : String(value);
+        ct[targetLang] = langMap;
+
+        const updated = {
+          ...prev,
+          content_texts: ct,
+        };
+
+        setAttractionAudioGuides((items) =>
+          items.map((item) =>
+            normalizeId(item.id) === normalizeId(updated.id) ? updated : item,
+          ),
+        );
+
+        return updated;
+      });
+    },
+    [attractionAudioGuideActiveLocale, attractionAudioGuideLocaleData],
+  );
+
+  const saveCurrentAttractionAudioGuide = useCallback(async () => {
+    if (!currentAttractionAudioGuide) return;
+
+    const assignedType =
+      currentAttractionAudioGuide.assigned_attraction_type ?? 'none';
+
+    const eventId =
+      currentAttractionAudioGuide.event_id ??
+      currentAttractionAudioGuide.event ??
+      currentAttractionAudioGuide.attraction_id ??
+      currentAttractionAudioGuide.attraction ??
+      null;
+
+    const sessionAttractionId =
+      currentAttractionAudioGuide.session_attraction_id ??
+      currentAttractionAudioGuide.session_attraction ??
+      null;
+
+    if (assignedType === 'database' && !eventId) {
+      showNote('Выберите достопримечательность из базы', 'error');
+      return;
+    }
+
+    if (assignedType === 'draft' && !sessionAttractionId) {
+      showNote('Выберите достопримечательность из сессии', 'error');
+      return;
+    }
+
+    setAttractionAudioGuideSaving(true);
+
+    try {
+      const title = {};
+      const contentPlan = {};
+
+      Object.values(attractionAudioGuideLocaleData || {}).forEach((d) => {
+        const lang = d.lang;
+        if (!lang) return;
+
+        title[lang] = d.title || '';
+
+        const rawPlan = Array.isArray(d.contentPlan) ? d.contentPlan : [];
+        contentPlan[lang] = normalizeAudioGuidePlanItemsForLang(rawPlan);
+      });
+
+      const trackLanguages = [];
+      const seenLang = new Set();
+      Object.values(attractionAudioGuideLocaleData || {}).forEach((d) => {
+        const lang = String(d?.lang || '').trim();
+        if (lang && !seenLang.has(lang)) {
+          seenLang.add(lang);
+          trackLanguages.push(lang);
+        }
+      });
+      Object.keys(currentAttractionAudioGuide.tracks || {}).forEach((raw) => {
+        const lang = String(raw || '').trim();
+        if (lang && !seenLang.has(lang)) {
+          seenLang.add(lang);
+          trackLanguages.push(lang);
+        }
+      });
+
+      const res = await attractionAudioGuidesAPI.update(
+        sessionId,
+        currentAttractionAudioGuide.id,
+        buildAttractionAudioGuidePayload(currentAttractionAudioGuide, {
+          title,
+          contentPlan,
+          contentTexts: normalizeContentTexts(
+            currentAttractionAudioGuide.content_texts ?? {},
+          ),
+          includeTracks: true,
+          trackLanguages,
+        }),
+      );
+
+      const responseGuide =
+        res?.data?.attraction_audio_guide || res?.data || {};
+
+      const updatedGuide = normalizeAttractionAudioGuide({
+        ...currentAttractionAudioGuide,
+        ...responseGuide,
+
+        title: responseGuide.title ?? title,
+        content_plan: responseGuide.content_plan ?? contentPlan,
+        content_texts: normalizeContentTexts(
+          responseGuide.content_texts ??
+            currentAttractionAudioGuide.content_texts ??
+            {},
+        ),
+
+        tracks:
+          responseGuide.tracks ?? currentAttractionAudioGuide.tracks ?? {},
+      });
+
+      setAttractionAudioGuides((prev) =>
+        prev.map((item) =>
+          normalizeId(item.id) === normalizeId(currentAttractionAudioGuide.id)
+            ? updatedGuide
+            : item,
+        ),
+      );
+
+      setCurrentAttractionAudioGuide(updatedGuide);
+
+      showNote('Аудиогид сохранён', 'success');
+    } catch (e) {
+      showNote(
+        'Ошибка при сохранении аудиогида: ' + parseApiError(e),
+        'error',
+      );
+    } finally {
+      setAttractionAudioGuideSaving(false);
+    }
+  }, [
+    sessionId,
+    currentAttractionAudioGuide,
+    attractionAudioGuideLocaleData,
+    showNote,
+  ]);
+
+  const deleteCurrentAttractionAudioGuide = useCallback(async () => {
+    if (!currentAttractionAudioGuide) return;
+
+    const name = getAttractionAudioGuideName(currentAttractionAudioGuide);
+
+    if (!(await confirm({ message: `Удалить «${name}»?`, danger: true }))) {
+      return;
+    }
+
+    try {
+      await attractionAudioGuidesAPI.delete(
+        sessionId,
+        currentAttractionAudioGuide.id,
+      );
+
+      setAttractionAudioGuides((items) =>
+        items.filter(
+          (item) =>
+            normalizeId(item.id) !== normalizeId(currentAttractionAudioGuide.id),
+        ),
+      );
+
+      setCurrentAttractionAudioGuide(null);
+
+      showNote('Аудиогид удалён', 'success');
+    } catch (e) {
+      showNote(
+        'Ошибка при удалении аудиогида: ' + parseApiError(e),
+        'error',
+      );
+    }
+  }, [
+    sessionId,
+    currentAttractionAudioGuide,
+    getAttractionAudioGuideName,
+    confirm,
+    showNote,
+  ]);
+
+  const removeAttractionAudioGuideTrack = useCallback(() => {
+    const guide = currentAttractionAudioGuideRef.current;
+    if (!guide?.id) {
+      showNote('Сначала откройте аудиогид', 'error');
+      return;
+    }
+
+    const activeLoc = attractionAudioGuideActiveLocaleRef.current;
+    const localeSnapshot = attractionAudioGuideLocaleDataRef.current;
+
+    const lang =
+      localeSnapshot?.[activeLoc]?.lang || getLocaleLang(activeLoc);
+
+    if (!lang) {
+      showNote('Не удалось определить язык трека', 'error');
+      return;
+    }
+
+    const mergeTrackIntoGuide = (base) => {
+      const nextTracks = { ...(base.tracks || {}) };
+      delete nextTracks[lang];
+
+      return normalizeAttractionAudioGuide({
+        ...base,
+        tracks: nextTracks,
+      });
+    };
+
+    setCurrentAttractionAudioGuide((prev) => {
+      if (!prev || normalizeId(prev.id) !== normalizeId(guide.id)) {
+        return prev;
+      }
+
+      return mergeTrackIntoGuide(prev);
+    });
+
+    setAttractionAudioGuides((prev) =>
+      prev.map((item) => {
+        if (normalizeId(item.id) !== normalizeId(guide.id)) {
+          return item;
+        }
+
+        return mergeTrackIntoGuide(item);
+      }),
+    );
+  }, [showNote]);
+
+  const uploadAttractionAudioGuideTrack = useCallback(
+    async (file, languageOverride = null) => {
+      if (!file) return;
+
+      const guide = currentAttractionAudioGuideRef.current;
+      if (!guide?.id) {
+        showNote('Сначала откройте аудиогид', 'error');
+        return;
+      }
+
+      const activeLoc = attractionAudioGuideActiveLocaleRef.current;
+      const localeSnapshot = attractionAudioGuideLocaleDataRef.current;
+
+      const lang =
+        languageOverride ||
+        localeSnapshot?.[activeLoc]?.lang ||
+        getLocaleLang(activeLoc);
+
+      if (!lang) {
+        showNote('Не удалось определить язык трека', 'error');
+        return;
+      }
+
+      const sessionUuid =
+        session?.uuid ?? session?.session_uuid ?? null;
+
+      const formData = new FormData();
+      formData.append('audio', file);
+      formData.append('language', lang);
+      formData.append('temp', 'true');
+      if (sessionUuid) {
+        formData.append('session_uuid', String(sessionUuid));
+      }
+
+      setAttractionAudioUploading(true);
+
+      try {
+        const res = await audioAPI.upload(formData);
+        const audioPayload = res?.data?.audio || res?.data || {};
+
+        const audioId =
+          audioPayload.id ??
+          audioPayload.audio_id ??
+          audioPayload.audio?.id ??
+          null;
+
+        const audioUrl =
+          audioPayload.audio_url ??
+          audioPayload.url ??
+          audioPayload.audio?.url ??
+          '';
+
+        const copyright =
+          audioPayload.copyright ??
+          audioPayload.audio?.copyright ??
+          '';
+
+        if (!audioId) {
+          throw new Error('Сервер не вернул id аудиофайла');
+        }
+
+        const trackPatch = {
+          audio_id: audioId,
+          audio_url: audioUrl,
+          copyright,
+        };
+
+        const mergeTrackIntoGuide = (base) =>
+          normalizeAttractionAudioGuide({
+            ...base,
+            tracks: {
+              ...(base.tracks || {}),
+              [lang]: {
+                ...(base.tracks?.[lang] || {}),
+                ...trackPatch,
+              },
+            },
+          });
+
+        setCurrentAttractionAudioGuide((prev) => {
+          if (!prev || normalizeId(prev.id) !== normalizeId(guide.id)) {
+            return prev;
+          }
+
+          return mergeTrackIntoGuide(prev);
+        });
+
+        setAttractionAudioGuides((prev) =>
+          prev.map((item) => {
+            if (normalizeId(item.id) !== normalizeId(guide.id)) {
+              return item;
+            }
+
+            return mergeTrackIntoGuide(item);
+          }),
+        );
+
+        try {
+          await attractionAudioGuidesAPI.update(sessionId, guide.id, {
+            tracks: {
+              [lang]: {
+                audio_id: audioId,
+                copyright,
+              },
+            },
+          });
+        } catch (persistErr) {
+          showNote(
+            'Файл загружен, но не сохранён в аудиогиде: ' +
+              parseApiError(persistErr),
+            'error',
+          );
+          return;
+        }
+
+        showNote('Аудиофайл загружен', 'success');
+      } catch (e) {
+        showNote(
+          'Ошибка при загрузке аудио: ' + parseApiError(e),
+          'error',
+        );
+      } finally {
+        setAttractionAudioUploading(false);
+      }
+    },
+    [sessionId, session, showNote],
+  );
+
   const buildAttrLocaleData = useCallback((attr = {}, previousData = null) => {
     const sourceEntries = getAttractionLocaleSourceEntries(attr, {
       localeData,
@@ -4149,6 +5299,10 @@ export function useSessionWizardController({ sessionId, confirm: confirmProp } =
         await saveCurrentAttractionFeedItem();
       }
 
+      if (currentAttractionAudioGuide) {
+        await saveCurrentAttractionAudioGuide();
+      }
+
       const res = await sessionsAPI.publish(sessionId);
       const published = res?.data;
 
@@ -4226,6 +5380,9 @@ export function useSessionWizardController({ sessionId, confirm: confirmProp } =
     currentAttractionFeedItem,
     saveCurrentAttractionFeedItem,
 
+    currentAttractionAudioGuide,
+    saveCurrentAttractionAudioGuide,
+
     sessionId,
     loadSession,
     showNote,
@@ -4297,6 +5454,7 @@ export function useSessionWizardController({ sessionId, confirm: confirmProp } =
     attractions, attrView, currentAttr, attrLocaleData, attrActiveLocale, attrSaving,
     attractionInfos, currentAttractionInfo, attractionInfoLocaleData, attractionInfoActiveLocale, attractionInfoSaving,    
     attractionFeedItems, currentAttractionFeedItem, attractionFeedLocaleData, attractionFeedActiveLocale, attractionFeedSaving, attractionFeedPhotoUploading, attractionFeedPhotoFileRef,
+    attractionAudioGuides, currentAttractionAudioGuide, attractionAudioGuideLocaleData, attractionAudioGuideActiveLocale, attractionAudioGuideSaving, attractionAudioUploading,
     attractionGenerationOpen, attractionGenerationPrompt, attractionGenerating, attractionGenerationTaskId, attractionGenerationError,
     attractionGenerationAssignedCityType, attractionGenerationSessionCityId, attractionGenerationDatabaseCityId, attractionGenerationLang,
     saving, closeOpen, closeMode, closing, publishing, translating,
@@ -4315,6 +5473,14 @@ export function useSessionWizardController({ sessionId, confirm: confirmProp } =
     createEventFilterFolder, createEventFilterTag, updateEventFilter, deleteEventFilter,
     setCurrentCityInfo, setCityInfoActiveLocale, openCityInfoDetail, addCityInfo, updateCurrentCityInfoPatch, updateCityInfoLocaleField, saveCurrentCityInfo, deleteCurrentCityInfo,
     setCurrentAttractionInfo, setAttractionInfoActiveLocale, openAttractionInfoDetail, addAttractionInfo, updateCurrentAttractionInfoPatch, updateAttractionInfoLocaleField, saveCurrentAttractionInfo, deleteCurrentAttractionInfo,
+    setCurrentAttractionAudioGuide, setAttractionAudioGuideActiveLocale,
+    addAttractionAudioGuide, openAttractionAudioGuideDetail,
+    updateCurrentAttractionAudioGuidePatch, updateAttractionAudioGuideLocaleField,
+    updateAttractionAudioGuidePlanPoint, addAttractionAudioGuidePlanPoint, removeAttractionAudioGuidePlanPoint,
+    updateAttractionAudioGuidePlanItemText,
+    saveCurrentAttractionAudioGuide, deleteCurrentAttractionAudioGuide,
+    uploadAttractionAudioGuideTrack,
+    removeAttractionAudioGuideTrack,
     setCurrentAttractionFeedItem, setAttractionFeedActiveLocale,
     openAttrDetail, addAttraction, deleteCurrentAttr, saveCurrentAttr, updateAttrLocaleField, updateCurrentAttrPatch,
     openAttractionGenerationModal, closeAttractionGenerationModal, setAttractionGenerationPrompt,

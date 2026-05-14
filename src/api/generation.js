@@ -86,6 +86,70 @@ export const attractionFeedAPI = {
     apiClient.post(`${BASE}/sessions/${sessionId}/attraction-feed/${itemId}/delete/`, {}),
 };
 
+// ─── Attraction Audio Guides ─────────────────────────────────────────────────
+export const attractionAudioGuidesAPI = {
+  create: (sessionId, data) =>
+    apiClient.post(`${BASE}/sessions/${sessionId}/attraction-audio-guides/`, data),
+
+  get: (sessionId, guideId) =>
+    apiClient.get(`${BASE}/sessions/${sessionId}/attraction-audio-guides/${guideId}/`),
+
+  update: (sessionId, guideId, data) =>
+    apiClient.post(
+      `${BASE}/sessions/${sessionId}/attraction-audio-guides/${guideId}/update/`,
+      data,
+    ),
+
+  delete: (sessionId, guideId) =>
+    apiClient.post(
+      `${BASE}/sessions/${sessionId}/attraction-audio-guides/${guideId}/delete/`,
+      {},
+    ),
+};
+
+// ─── Audio uploads / streaming ───────────────────────────────────────────────
+const generationAudioFilePath = (audioId) =>
+  `${BASE}/audio/${encodeURIComponent(String(audioId ?? '').trim())}/file/`;
+
+export const audioAPI = {
+  upload: (formData) =>
+    apiClient.post(`${BASE}/audio/upload/`, formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    }),
+
+  /** Authenticated binary GET (JWT via apiClient). Prefer over raw `/media/...` in <audio>. */
+  getBlobByAudioId: (audioId) =>
+    apiClient.get(generationAudioFilePath(audioId), {
+      responseType: 'blob',
+      skipApiGetCache: true,
+    }),
+
+  /**
+   * Fetch audio as blob: plain UUID, or URL/path containing `/generation/audio/<uuid>/file/`.
+   * Direct `/media/session/...` URLs are not supported here (use audio id from the track).
+   */
+  getBlob: (audioUrlOrId) => {
+    const raw = String(audioUrlOrId ?? '').trim();
+    if (!raw) {
+      return Promise.reject(new Error('Empty audio reference'));
+    }
+    const fromPath = raw.match(/\/generation\/audio\/([0-9a-f-]{36})\/file\/?/i);
+    if (fromPath) {
+      return apiClient.get(generationAudioFilePath(fromPath[1]), {
+        responseType: 'blob',
+        skipApiGetCache: true,
+      });
+    }
+    if (/^[0-9a-f-]{36}$/i.test(raw)) {
+      return apiClient.get(generationAudioFilePath(raw), {
+        responseType: 'blob',
+        skipApiGetCache: true,
+      });
+    }
+    return Promise.reject(new Error('Unsupported audio reference for authenticated fetch'));
+  },
+};
+
 // ─── City Useful Info ────────────────────────────────────────────────────────
 export const cityInfosAPI = {
   list: (sessionId) =>

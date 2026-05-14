@@ -11,6 +11,7 @@ import SessionWizardCityTagsPicker from './session-wizard/SessionWizardCityTagsP
 import SessionWizardCityInfoStep from './session-wizard/SessionWizardCityInfoStep';
 import SessionWizardAttractionInfoStep from './session-wizard/SessionWizardAttractionInfoStep';
 import SessionWizardAttractionFeedStep from './session-wizard/SessionWizardAttractionFeedStep.jsx';
+import SessionWizardAttractionAudioGuidesBlock from './session-wizard/SessionWizardAttractionAudioGuidesBlock.jsx';
 import {
   StatusBadge as DefaultStatusBadge,
   getAttrName,
@@ -125,6 +126,13 @@ export default function SessionWizard({ components = {} } = {}) {
     attractionFeedPhotoUploading,
     attractionFeedPhotoFileRef,
 
+    attractionAudioGuides,
+    currentAttractionAudioGuide,
+    attractionAudioGuideLocaleData,
+    attractionAudioGuideActiveLocale,
+    attractionAudioGuideSaving,
+    attractionAudioUploading,
+
     attractionGenerationOpen,
     attractionGenerationPrompt,
     attractionGenerating,
@@ -218,6 +226,21 @@ export default function SessionWizard({ components = {} } = {}) {
     saveCurrentAttractionFeedItem,
     deleteCurrentAttractionFeedItem,
     handleAttractionFeedPhotoFile,
+
+    setCurrentAttractionAudioGuide,
+    setAttractionAudioGuideActiveLocale,
+    addAttractionAudioGuide,
+    openAttractionAudioGuideDetail,
+    updateCurrentAttractionAudioGuidePatch,
+    updateAttractionAudioGuideLocaleField,
+    updateAttractionAudioGuidePlanPoint,
+    addAttractionAudioGuidePlanPoint,
+    removeAttractionAudioGuidePlanPoint,
+    updateAttractionAudioGuidePlanItemText,
+    saveCurrentAttractionAudioGuide,
+    deleteCurrentAttractionAudioGuide,
+    uploadAttractionAudioGuideTrack,
+    removeAttractionAudioGuideTrack,
 
     handleClose,
     handlePublish,
@@ -476,6 +499,11 @@ export default function SessionWizard({ components = {} } = {}) {
 
                   if (currentAttractionFeedItem) {
                     await saveCurrentAttractionFeedItem?.();
+                    return;
+                  }
+
+                  if (currentAttractionAudioGuide) {
+                    await saveCurrentAttractionAudioGuide?.();
                   }
                 })().catch(() => {});
 
@@ -491,7 +519,8 @@ export default function SessionWizard({ components = {} } = {}) {
               cityInfoSaving ||
               attrSaving ||
               attractionInfoSaving ||
-              attractionFeedSaving
+              attractionFeedSaving ||
+              attractionAudioGuideSaving
             }
             title="Сохранить текущие данные"
             className="px-3 py-1.5 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors"
@@ -500,7 +529,8 @@ export default function SessionWizard({ components = {} } = {}) {
             cityInfoSaving ||
             attrSaving ||
             attractionInfoSaving ||
-            attractionFeedSaving
+            attractionFeedSaving ||
+            attractionAudioGuideSaving
               ? 'Сохранение...'
               : 'Сохранить'}
           </button>
@@ -745,6 +775,36 @@ export default function SessionWizard({ components = {} } = {}) {
                 onSaveCurrentAttractionFeedItem={saveCurrentAttractionFeedItem}
                 onDeleteCurrentAttractionFeedItem={deleteCurrentAttractionFeedItem}
                 onAttractionFeedPhotoFileChange={handleAttractionFeedPhotoFile}
+                onGoToStep={goToStep}
+              />
+            </div>
+
+            <div className="pt-5 border-t border-gray-200">
+              <SessionWizardAttractionAudioGuidesBlock
+                embedded
+                attractionAudioGuides={attractionAudioGuides}
+                currentAttractionAudioGuide={currentAttractionAudioGuide}
+                attractionAudioGuideLocaleData={attractionAudioGuideLocaleData}
+                attractionAudioGuideActiveLocale={attractionAudioGuideActiveLocale}
+                attractionAudioGuideSaving={attractionAudioGuideSaving}
+                attractionAudioUploading={attractionAudioUploading}
+                referenceAttractions={referenceAttractions || []}
+                attractions={attractions || []}
+                onOpenAttractionAudioGuideDetail={openAttractionAudioGuideDetail}
+                onAddAttractionAudioGuide={addAttractionAudioGuide}
+                onSetCurrentAttractionAudioGuide={setCurrentAttractionAudioGuide}
+                onSetAttractionAudioGuideActiveLocale={setAttractionAudioGuideActiveLocale}
+                onUpdateAttractionAudioGuideLocaleField={updateAttractionAudioGuideLocaleField}
+                onUpdateCurrentAttractionAudioGuidePatch={updateCurrentAttractionAudioGuidePatch}
+                onUpdateAttractionAudioGuidePlanPoint={updateAttractionAudioGuidePlanPoint}
+                onAddAttractionAudioGuidePlanPoint={addAttractionAudioGuidePlanPoint}
+                onRemoveAttractionAudioGuidePlanPoint={removeAttractionAudioGuidePlanPoint}
+                onUpdateAttractionAudioGuidePlanItemText={updateAttractionAudioGuidePlanItemText}
+                onShowNote={showNote}
+                onSaveCurrentAttractionAudioGuide={saveCurrentAttractionAudioGuide}
+                onDeleteCurrentAttractionAudioGuide={deleteCurrentAttractionAudioGuide}
+                onUploadAttractionAudioGuideTrack={uploadAttractionAudioGuideTrack}
+                onRemoveAttractionAudioGuideTrack={removeAttractionAudioGuideTrack}
                 onGoToStep={goToStep}
               />
             </div>
