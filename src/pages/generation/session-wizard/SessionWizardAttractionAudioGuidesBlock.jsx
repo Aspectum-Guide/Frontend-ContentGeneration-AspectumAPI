@@ -534,6 +534,125 @@ export default function SessionWizardAttractionAudioGuidesBlock({
           />
         </div>
 
+        <div className="p-3 border border-gray-200 rounded-lg bg-gray-50 space-y-3">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Привязка к достопримечательности
+            </label>
+
+            <select
+              value={assignedAttractionType}
+              onChange={(e) => {
+                const type = e.target.value;
+
+                updatePatch({
+                  assigned_attraction_type: type,
+
+                  event: null,
+                  event_id: null,
+
+                  attraction: null,
+                  attraction_id: null,
+
+                  session_attraction: null,
+                  session_attraction_id: null,
+                });
+              }}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              <option value="none">Без достопримечательности</option>
+              <option value="database">Достопримечательность из базы</option>
+              <option value="draft">Достопримечательность из сессии</option>
+            </select>
+          </div>
+
+          {assignedAttractionType === 'database' && (
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Достопримечательность из базы
+              </label>
+
+              <select
+                value={selectedDatabaseAttractionId}
+                onChange={(e) => {
+                  const attractionId = e.target.value || null;
+
+                  updatePatch({
+                    assigned_attraction_type: 'database',
+
+                    event: attractionId,
+                    event_id: attractionId,
+
+                    attraction: attractionId,
+                    attraction_id: attractionId,
+
+                    session_attraction: null,
+                    session_attraction_id: null,
+                  });
+                }}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                <option value="">Выберите достопримечательность из базы</option>
+
+                {referenceAttractions.map((attraction) => (
+                  <option key={attraction.id} value={attraction.id}>
+                    {getAttractionDisplayName(attraction)}
+                  </option>
+                ))}
+              </select>
+
+              {referenceAttractions.length === 0 && (
+                <p className="mt-1 text-xs text-amber-600">
+                  Список достопримечательностей из базы не загружен.
+                </p>
+              )}
+            </div>
+          )}
+
+          {assignedAttractionType === 'draft' && (
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Достопримечательность из сессии
+              </label>
+
+              <select
+                value={selectedSessionAttractionId}
+                onChange={(e) => {
+                  const attractionId = e.target.value || null;
+
+                  updatePatch({
+                    assigned_attraction_type: 'draft',
+
+                    session_attraction: attractionId,
+                    session_attraction_id: attractionId,
+
+                    event: null,
+                    event_id: null,
+
+                    attraction: null,
+                    attraction_id: null,
+                  });
+                }}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                <option value="">Выберите достопримечательность из сессии</option>
+
+                {attractions.map((attraction) => (
+                  <option key={attraction.id} value={attraction.id}>
+                    {getAttractionDisplayName(attraction)}
+                  </option>
+                ))}
+              </select>
+
+              {attractions.length === 0 && (
+                <p className="mt-1 text-xs text-amber-600">
+                  В текущей сессии пока нет достопримечательностей.
+                </p>
+              )}
+            </div>
+          )}
+        </div>
+
         <div>
           <div className="flex items-center justify-between mb-1">
             <label className="text-sm font-medium text-gray-700">
@@ -740,125 +859,6 @@ export default function SessionWizardAttractionAudioGuidesBlock({
               </button>
             ) : null}
           </div>
-        </div>
-
-        <div className="p-3 border border-gray-200 rounded-lg bg-gray-50 space-y-3">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Привязка к достопримечательности
-            </label>
-
-            <select
-              value={assignedAttractionType}
-              onChange={(e) => {
-                const type = e.target.value;
-
-                updatePatch({
-                  assigned_attraction_type: type,
-
-                  event: null,
-                  event_id: null,
-
-                  attraction: null,
-                  attraction_id: null,
-
-                  session_attraction: null,
-                  session_attraction_id: null,
-                });
-              }}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-            >
-              <option value="none">Без достопримечательности</option>
-              <option value="database">Достопримечательность из базы</option>
-              <option value="draft">Достопримечательность из сессии</option>
-            </select>
-          </div>
-
-          {assignedAttractionType === 'database' && (
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Достопримечательность из базы
-              </label>
-
-              <select
-                value={selectedDatabaseAttractionId}
-                onChange={(e) => {
-                  const attractionId = e.target.value || null;
-
-                  updatePatch({
-                    assigned_attraction_type: 'database',
-
-                    event: attractionId,
-                    event_id: attractionId,
-
-                    attraction: attractionId,
-                    attraction_id: attractionId,
-
-                    session_attraction: null,
-                    session_attraction_id: null,
-                  });
-                }}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-              >
-                <option value="">Выберите достопримечательность из базы</option>
-
-                {referenceAttractions.map((attraction) => (
-                  <option key={attraction.id} value={attraction.id}>
-                    {getAttractionDisplayName(attraction)}
-                  </option>
-                ))}
-              </select>
-
-              {referenceAttractions.length === 0 && (
-                <p className="mt-1 text-xs text-amber-600">
-                  Список достопримечательностей из базы не загружен.
-                </p>
-              )}
-            </div>
-          )}
-
-          {assignedAttractionType === 'draft' && (
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Достопримечательность из сессии
-              </label>
-
-              <select
-                value={selectedSessionAttractionId}
-                onChange={(e) => {
-                  const attractionId = e.target.value || null;
-
-                  updatePatch({
-                    assigned_attraction_type: 'draft',
-
-                    session_attraction: attractionId,
-                    session_attraction_id: attractionId,
-
-                    event: null,
-                    event_id: null,
-
-                    attraction: null,
-                    attraction_id: null,
-                  });
-                }}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-              >
-                <option value="">Выберите достопримечательность из сессии</option>
-
-                {attractions.map((attraction) => (
-                  <option key={attraction.id} value={attraction.id}>
-                    {getAttractionDisplayName(attraction)}
-                  </option>
-                ))}
-              </select>
-
-              {attractions.length === 0 && (
-                <p className="mt-1 text-xs text-amber-600">
-                  В текущей сессии пока нет достопримечательностей.
-                </p>
-              )}
-            </div>
-          )}
         </div>
 
         <div className="flex justify-end">
