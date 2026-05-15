@@ -132,6 +132,9 @@ export default function SessionWizard({ components = {} } = {}) {
     attractionAudioGuideActiveLocale,
     attractionAudioGuideSaving,
     attractionAudioUploading,
+    audioGuideGeneratingPlan,
+    audioGuideGeneratingAllMainText,
+    audioGuideGeneratingItemTextById,
 
     attractionGenerationOpen,
     attractionGenerationPrompt,
@@ -241,6 +244,9 @@ export default function SessionWizard({ components = {} } = {}) {
     deleteCurrentAttractionAudioGuide,
     uploadAttractionAudioGuideTrack,
     removeAttractionAudioGuideTrack,
+    generateAttractionAudioGuidePlan,
+    generateAttractionAudioGuideMainText,
+    generateAttractionAudioGuideMainTextItem,
 
     handleClose,
     handlePublish,
@@ -788,6 +794,9 @@ export default function SessionWizard({ components = {} } = {}) {
                 attractionAudioGuideActiveLocale={attractionAudioGuideActiveLocale}
                 attractionAudioGuideSaving={attractionAudioGuideSaving}
                 attractionAudioUploading={attractionAudioUploading}
+                audioGuideGeneratingPlan={audioGuideGeneratingPlan}
+                audioGuideGeneratingAllMainText={audioGuideGeneratingAllMainText}
+                audioGuideGeneratingItemTextById={audioGuideGeneratingItemTextById}
                 referenceAttractions={referenceAttractions || []}
                 attractions={attractions || []}
                 onOpenAttractionAudioGuideDetail={openAttractionAudioGuideDetail}
@@ -805,6 +814,11 @@ export default function SessionWizard({ components = {} } = {}) {
                 onDeleteCurrentAttractionAudioGuide={deleteCurrentAttractionAudioGuide}
                 onUploadAttractionAudioGuideTrack={uploadAttractionAudioGuideTrack}
                 onRemoveAttractionAudioGuideTrack={removeAttractionAudioGuideTrack}
+                onGenerateAttractionAudioGuidePlan={generateAttractionAudioGuidePlan}
+                onGenerateAttractionAudioGuideMainText={generateAttractionAudioGuideMainText}
+                onGenerateAttractionAudioGuideMainTextItem={
+                  generateAttractionAudioGuideMainTextItem
+                }
                 onGoToStep={goToStep}
               />
             </div>

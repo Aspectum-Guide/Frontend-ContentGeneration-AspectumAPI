@@ -371,6 +371,16 @@ const normalizeAudioGuidePlanItemsForLang = (items) => {
   return result;
 };
 
+const langHasNonEmptyAudioGuideTexts = (guide, lang) => {
+  const key = String(lang || '').trim();
+  if (!key) return false;
+
+  const m = guide?.content_texts?.[key];
+  if (!m || typeof m !== 'object') return false;
+
+  return Object.values(m).some((t) => String(t || '').trim() !== '');
+};
+
 const normalizeContentPlan = (plan) => {
   if (!plan || typeof plan !== 'object') return {};
 
@@ -1315,6 +1325,11 @@ export function useSessionWizardController({ sessionId, confirm: confirmProp } =
   const currentAttractionAudioGuideRef = useRef(null);
   const attractionAudioGuideActiveLocaleRef = useRef('ru-RU');
   const attractionAudioGuideLocaleDataRef = useRef({});
+  const [audioGuideGeneratingPlan, setAudioGuideGeneratingPlan] = useState(false);
+  const [audioGuideGeneratingAllMainText, setAudioGuideGeneratingAllMainText] =
+    useState(false);
+  const [audioGuideGeneratingItemTextById, setAudioGuideGeneratingItemTextById] =
+    useState({});
 
   const [attractionFeedItems, setAttractionFeedItems] = useState([]);
   const [currentAttractionFeedItem, setCurrentAttractionFeedItem] = useState(null);
@@ -4738,6 +4753,305 @@ export function useSessionWizardController({ sessionId, confirm: confirmProp } =
     [sessionId, session, showNote],
   );
 
+  const generateAttractionAudioGuidePlan = useCallback(async () => {
+    const g = currentAttractionAudioGuideRef.current;
+    const activeLoc = attractionAudioGuideActiveLocaleRef.current;
+    const loc = attractionAudioGuideLocaleDataRef.current?.[activeLoc];
+    const lang = loc?.lang || getLocaleLang(activeLoc) || 'ru';
+
+    const assigned = g?.assigned_attraction_type ?? 'none';
+    const eventId =
+      g?.event_id ?? g?.event ?? g?.attraction_id ?? g?.attraction ?? null;
+    const sessionAttractionId =
+      g?.session_attraction_id ?? g?.session_attraction ?? null;
+    const guideId = g?.id;
+
+    if (!g?.id || !guideId) {
+      showNote('Сначала откройте аудиогид', 'error');
+      return;
+    }
+
+    const planItems = normalizeAudioGuidePlanItemsForLang(g.content_plan?.[lang]);
+    const hasPlan = planItems.length > 0;
+    const hasTexts = langHasNonEmptyAudioGuideTexts(g, lang);
+
+    if (hasPlan || hasTexts) {
+      const ok = await confirm({
+        message:
+          'Текущий план и связанные тексты для этого языка будут заменены. Продолжить?',
+        danger: true,
+      });
+      if (!ok) return;
+    }
+
+    const expectedGuideId = normalizeId(guideId);
+    setAudioGuideGeneratingPlan(true);
+
+    try {
+      const res = await attractionAudioGuidesAPI.generatePlan(sessionId, guideId, {
+        lang,
+        title: g.title ?? {},
+        assigned_attraction_type: assigned,
+        session_attraction_id: sessionAttractionId,
+        event_id: eventId,
+        desired_items_count: 6,
+      });
+
+      if (res?.data?.success === false) {
+        showNote(res?.data?.error || 'Не удалось сгенерировать план', 'error');
+        return;
+      }
+
+      const rawPlan = res?.data?.content_plan?.[lang];
+      const newPlan = normalizeAudioGuidePlanItemsForLang(rawPlan);
+
+      if (!newPlan.length) {
+        showNote('План не получен', 'error');
+        return;
+      }
+
+      const freshTexts = {};
+      newPlan.forEach((item) => {
+        freshTexts[item.id] = '';
+      });
+
+      setCurrentAttractionAudioGuide((prev) => {
+        if (!prev || normalizeId(prev.id) !== expectedGuideId) return prev;
+
+        const updated = normalizeAttractionAudioGuide({
+          ...prev,
+          content_plan: {
+            ...(prev.content_plan || {}),
+            [lang]: newPlan,
+          },
+          content_texts: {
+            ...(prev.content_texts || {}),
+            [lang]: freshTexts,
+          },
+        });
+
+        setAttractionAudioGuides((items) =>
+          items.map((item) =>
+            normalizeId(item.id) === expectedGuideId ? updated : item,
+          ),
+        );
+
+        return updated;
+      });
+
+      showNote('План сгенерирован', 'success');
+    } catch (e) {
+      showNote('Ошибка генерации плана: ' + parseApiError(e), 'error');
+    } finally {
+      setAudioGuideGeneratingPlan(false);
+    }
+  }, [sessionId, confirm, showNote]);
+
+  const generateAttractionAudioGuideMainText = useCallback(async () => {
+    const g = currentAttractionAudioGuideRef.current;
+    const activeLoc = attractionAudioGuideActiveLocaleRef.current;
+    const loc = attractionAudioGuideLocaleDataRef.current?.[activeLoc];
+    const lang = loc?.lang || getLocaleLang(activeLoc) || 'ru';
+
+    const assigned = g?.assigned_attraction_type ?? 'none';
+    const eventId =
+      g?.event_id ?? g?.event ?? g?.attraction_id ?? g?.attraction ?? null;
+    const sessionAttractionId =
+      g?.session_attraction_id ?? g?.session_attraction ?? null;
+    const guideId = g?.id;
+
+    if (!g?.id || !guideId) {
+      showNote('Сначала откройте аудиогид', 'error');
+      return;
+    }
+
+    const planItems = normalizeAudioGuidePlanItemsForLang(g.content_plan?.[lang]);
+    if (planItems.length === 0) {
+      showNote('Сначала добавьте или сгенерируйте план аудиогида.', 'error');
+      return;
+    }
+
+    const hasAnyText = planItems.some((p) =>
+      String(g.content_texts?.[lang]?.[p.id] || '').trim(),
+    );
+
+    if (hasAnyText) {
+      const ok = await confirm({
+        message:
+          'Существующий основной текст для этого языка будет заменён. Продолжить?',
+        danger: true,
+      });
+      if (!ok) return;
+    }
+
+    const expectedGuideId = normalizeId(guideId);
+    setAudioGuideGeneratingAllMainText(true);
+
+    try {
+      const res = await attractionAudioGuidesAPI.generateMainText(
+        sessionId,
+        guideId,
+        {
+          lang,
+          title: g.title ?? {},
+          assigned_attraction_type: assigned,
+          session_attraction_id: sessionAttractionId,
+          event_id: eventId,
+          content_plan: g.content_plan ?? {},
+          content_texts: g.content_texts ?? {},
+        },
+      );
+
+      if (res?.data?.success === false) {
+        showNote(
+          res?.data?.error || 'Не удалось сгенерировать основной текст',
+          'error',
+        );
+        return;
+      }
+
+      const incoming = res?.data?.content_texts?.[lang];
+      if (!incoming || typeof incoming !== 'object') {
+        showNote('Ответ сервера не содержит текстов', 'error');
+        return;
+      }
+
+      setCurrentAttractionAudioGuide((prev) => {
+        if (!prev || normalizeId(prev.id) !== expectedGuideId) return prev;
+
+        const mergedLang = { ...(prev.content_texts?.[lang] || {}), ...incoming };
+
+        const updated = normalizeAttractionAudioGuide({
+          ...prev,
+          content_texts: {
+            ...(prev.content_texts || {}),
+            [lang]: mergedLang,
+          },
+        });
+
+        setAttractionAudioGuides((items) =>
+          items.map((item) =>
+            normalizeId(item.id) === expectedGuideId ? updated : item,
+          ),
+        );
+
+        return updated;
+      });
+
+      showNote('Основной текст сгенерирован', 'success');
+    } catch (e) {
+      showNote(
+        'Ошибка генерации основного текста: ' + parseApiError(e),
+        'error',
+      );
+    } finally {
+      setAudioGuideGeneratingAllMainText(false);
+    }
+  }, [sessionId, confirm, showNote]);
+
+  const generateAttractionAudioGuideMainTextItem = useCallback(
+    async (planItem, additionalPrompt = '') => {
+      const g = currentAttractionAudioGuideRef.current;
+      const activeLoc = attractionAudioGuideActiveLocaleRef.current;
+      const loc = attractionAudioGuideLocaleDataRef.current?.[activeLoc];
+      const lang = loc?.lang || getLocaleLang(activeLoc) || 'ru';
+
+      const assigned = g?.assigned_attraction_type ?? 'none';
+      const eventId =
+        g?.event_id ?? g?.event ?? g?.attraction_id ?? g?.attraction ?? null;
+      const sessionAttractionId =
+        g?.session_attraction_id ?? g?.session_attraction ?? null;
+      const guideId = g?.id;
+
+      const itemId = String(planItem?.id || '').trim();
+      if (!g?.id || !guideId || !itemId) {
+        showNote('Не удалось определить пункт плана', 'error');
+        return;
+      }
+
+      const expectedGuideId = normalizeId(guideId);
+
+      setAudioGuideGeneratingItemTextById((prev) => ({
+        ...prev,
+        [itemId]: true,
+      }));
+
+      try {
+        const res = await attractionAudioGuidesAPI.generateMainTextItem(
+          sessionId,
+          guideId,
+          {
+            lang,
+            title: g.title ?? {},
+            assigned_attraction_type: assigned,
+            session_attraction_id: sessionAttractionId,
+            event_id: eventId,
+            plan_item: {
+              id: itemId,
+              title: planItem?.title != null ? String(planItem.title) : '',
+            },
+            content_plan: g.content_plan ?? {},
+            current_text: String(g.content_texts?.[lang]?.[itemId] ?? ''),
+            additional_prompt: String(additionalPrompt || ''),
+          },
+        );
+
+        if (res?.data?.success === false) {
+          showNote(
+            res?.data?.error || 'Не удалось сгенерировать текст раздела',
+            'error',
+          );
+          return;
+        }
+
+        const text = res?.data?.text;
+        const outId = String(res?.data?.plan_item_id || itemId).trim();
+
+        if (typeof text !== 'string' || !text.trim()) {
+          showNote('Пустой ответ модели', 'error');
+          return;
+        }
+
+        setCurrentAttractionAudioGuide((prev) => {
+          if (!prev || normalizeId(prev.id) !== expectedGuideId) return prev;
+
+          const langMap = { ...(prev.content_texts?.[lang] || {}) };
+          langMap[outId] = text.trim();
+
+          const updated = normalizeAttractionAudioGuide({
+            ...prev,
+            content_texts: {
+              ...(prev.content_texts || {}),
+              [lang]: langMap,
+            },
+          });
+
+          setAttractionAudioGuides((items) =>
+            items.map((item) =>
+              normalizeId(item.id) === expectedGuideId ? updated : item,
+            ),
+          );
+
+          return updated;
+        });
+
+        showNote('Текст раздела обновлён', 'success');
+      } catch (e) {
+        showNote(
+          'Ошибка генерации текста раздела: ' + parseApiError(e),
+          'error',
+        );
+      } finally {
+        setAudioGuideGeneratingItemTextById((prev) => {
+          const next = { ...prev };
+          delete next[itemId];
+          return next;
+        });
+      }
+    },
+    [sessionId, showNote],
+  );
+
   const buildAttrLocaleData = useCallback((attr = {}, previousData = null) => {
     const sourceEntries = getAttractionLocaleSourceEntries(attr, {
       localeData,
@@ -5455,6 +5769,7 @@ export function useSessionWizardController({ sessionId, confirm: confirmProp } =
     attractionInfos, currentAttractionInfo, attractionInfoLocaleData, attractionInfoActiveLocale, attractionInfoSaving,    
     attractionFeedItems, currentAttractionFeedItem, attractionFeedLocaleData, attractionFeedActiveLocale, attractionFeedSaving, attractionFeedPhotoUploading, attractionFeedPhotoFileRef,
     attractionAudioGuides, currentAttractionAudioGuide, attractionAudioGuideLocaleData, attractionAudioGuideActiveLocale, attractionAudioGuideSaving, attractionAudioUploading,
+    audioGuideGeneratingPlan, audioGuideGeneratingAllMainText, audioGuideGeneratingItemTextById,
     attractionGenerationOpen, attractionGenerationPrompt, attractionGenerating, attractionGenerationTaskId, attractionGenerationError,
     attractionGenerationAssignedCityType, attractionGenerationSessionCityId, attractionGenerationDatabaseCityId, attractionGenerationLang,
     saving, closeOpen, closeMode, closing, publishing, translating,
@@ -5481,6 +5796,9 @@ export function useSessionWizardController({ sessionId, confirm: confirmProp } =
     saveCurrentAttractionAudioGuide, deleteCurrentAttractionAudioGuide,
     uploadAttractionAudioGuideTrack,
     removeAttractionAudioGuideTrack,
+    generateAttractionAudioGuidePlan,
+    generateAttractionAudioGuideMainText,
+    generateAttractionAudioGuideMainTextItem,
     setCurrentAttractionFeedItem, setAttractionFeedActiveLocale,
     openAttrDetail, addAttraction, deleteCurrentAttr, saveCurrentAttr, updateAttrLocaleField, updateCurrentAttrPatch,
     openAttractionGenerationModal, closeAttractionGenerationModal, setAttractionGenerationPrompt,

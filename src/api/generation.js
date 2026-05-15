@@ -105,6 +105,24 @@ export const attractionAudioGuidesAPI = {
       `${BASE}/sessions/${sessionId}/attraction-audio-guides/${guideId}/delete/`,
       {},
     ),
+
+  generatePlan: (sessionId, guideId, payload) =>
+    apiClient.post(
+      `${BASE}/sessions/${sessionId}/attraction-audio-guides/${guideId}/generate-plan/`,
+      payload,
+    ),
+
+  generateMainText: (sessionId, guideId, payload) =>
+    apiClient.post(
+      `${BASE}/sessions/${sessionId}/attraction-audio-guides/${guideId}/generate-main-text/`,
+      payload,
+    ),
+
+  generateMainTextItem: (sessionId, guideId, payload) =>
+    apiClient.post(
+      `${BASE}/sessions/${sessionId}/attraction-audio-guides/${guideId}/generate-main-text-item/`,
+      payload,
+    ),
 };
 
 // ─── Audio uploads / streaming ───────────────────────────────────────────────
