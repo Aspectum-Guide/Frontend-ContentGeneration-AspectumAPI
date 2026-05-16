@@ -16,6 +16,9 @@ import {
   buildEventFilterUpdatePayload,
   mapCityTagCatalogRow,
   mapEventFilterCatalogRow,
+  applyLocalFilterDeletion,
+  mergeFlatFilterListWithLocalOverlays,
+  normalizeCreatedFilter,
   unwrapCreatedFilter,
   upsertFlatFilterRow,
 } from '../shared/tagCatalog';
@@ -32,20 +35,10 @@ function useFilters(api, locallyDeletedFilterIdsRef, locallyCreatedFilterRowsRef
       const r = await api.list();
       const data = r?.data;
       const list = Array.isArray(data) ? data : normalizeListResponse(data, ['filters', 'results', 'tags']);
-      const fetchedIds = new Set(list.map((item) => String(item.id)));
-
-      for (const id of [...locallyCreatedFilterRowsRef.current.keys()]) {
-        if (fetchedIds.has(id)) {
-          locallyCreatedFilterRowsRef.current.delete(id);
-        }
-      }
-
-      let merged = list;
-      for (const row of locallyCreatedFilterRowsRef.current.values()) {
-        merged = upsertFlatFilterRow(merged, row);
-      }
-      merged = merged.filter(
-        (item) => !locallyDeletedFilterIdsRef.current.has(String(item.id)),
+      const merged = mergeFlatFilterListWithLocalOverlays(
+        list,
+        locallyCreatedFilterRowsRef.current,
+        locallyDeletedFilterIdsRef.current,
       );
       setFilters(merged);
     } catch (e) {
@@ -100,6 +93,9 @@ function FilterTab({ api, mode, icon, emptyText, createLabel, showNote }) {
 
   const [createModalOpen, setCreateModalOpen] = useState(false);
   const [creating, setCreating] = useState(false);
+  const creatingRef = useRef(false);
+  const quickCreatePendingRef = useRef(new Set());
+  const deletePendingRef = useRef(new Set());
   const [createError, setCreateError] = useState(null);
   const [newFilter, setNewFilter] = useState(() => initialNewFilter(mode));
   const [createTitle, setCreateTitle] = useState('');
@@ -154,6 +150,9 @@ function FilterTab({ api, mode, icon, emptyText, createLabel, showNote }) {
 
   const handleCreate = async (e) => {
     e?.preventDefault();
+    if (creatingRef.current || creating) {
+      return;
+    }
     if (!createTitle.trim()) {
       setCreateError('Введите название');
       return;
@@ -162,6 +161,14 @@ function FilterTab({ api, mode, icon, emptyText, createLabel, showNote }) {
       setCreateError('Выберите папку');
       return;
     }
+
+    const scopeKey = `catalog-create:${mode}:${newFilter.kind}`;
+    if (quickCreatePendingRef.current.has(scopeKey)) {
+      return;
+    }
+
+    quickCreatePendingRef.current.add(scopeKey);
+    creatingRef.current = true;
     try {
       setCreating(true);
       setCreateError(null);
@@ -171,13 +178,13 @@ function FilterTab({ api, mode, icon, emptyText, createLabel, showNote }) {
         emoji: createEmoji,
       };
       const res = await api.create(payload);
-      const raw = unwrapCreatedFilter(res);
+      const created = normalizeCreatedFilter(unwrapCreatedFilter(res));
 
-      if (raw && raw.id != null) {
+      if (created?.id != null) {
         const row =
           mode === 'city'
-            ? mapCityTagCatalogRow(raw)
-            : mapEventFilterCatalogRow(raw);
+            ? mapCityTagCatalogRow(created)
+            : mapEventFilterCatalogRow(created);
         const idStr = String(row.id);
         locallyDeletedFilterIdsRef.current.delete(idStr);
         locallyCreatedFilterRowsRef.current.set(idStr, row);
@@ -192,11 +199,27 @@ function FilterTab({ api, mode, icon, emptyText, createLabel, showNote }) {
     } catch (err) {
       setCreateError(err?.response?.data?.error || err.message || 'Ошибка создания');
     } finally {
+      quickCreatePendingRef.current.delete(scopeKey);
+      creatingRef.current = false;
       setCreating(false);
       void reload().catch((e) => {
         console.error('Catalog reload after create failed', e);
       });
     }
+  };
+
+  const handleCreateTitleKeyDown = (event) => {
+    if (event.key !== 'Enter') {
+      return;
+    }
+
+    event.preventDefault();
+
+    if (event.repeat) {
+      return;
+    }
+
+    handleCreate(event);
   };
 
   const resetCreateModal = () => {
@@ -230,27 +253,40 @@ function FilterTab({ api, mode, icon, emptyText, createLabel, showNote }) {
 
   const handleDelete = async () => {
     if (!deleteTarget) return;
+
     const id = deleteTarget.id;
     const idStr = String(id);
-    markDeleting(id);
-    try {
-      await api.delete(id);
-      locallyDeletedFilterIdsRef.current.add(idStr);
-      locallyCreatedFilterRowsRef.current.delete(idStr);
+
+    if (deletePendingRef.current.has(idStr)) {
+      return;
+    }
+
+    const applyLocalRemove = () => {
+      applyLocalFilterDeletion(
+        idStr,
+        locallyDeletedFilterIdsRef.current,
+        locallyCreatedFilterRowsRef.current,
+      );
       setFilters((prev) => prev.filter((item) => String(item.id) !== idStr));
       setDeleteTarget(null);
+    };
+
+    deletePendingRef.current.add(idStr);
+    markDeleting(id);
+
+    try {
+      await api.delete(id);
+      applyLocalRemove();
       showNote?.('Удалено', 'success');
     } catch (err) {
       if (isNotFoundError(err)) {
-        locallyDeletedFilterIdsRef.current.add(idStr);
-        locallyCreatedFilterRowsRef.current.delete(idStr);
-        setFilters((prev) => prev.filter((item) => String(item.id) !== idStr));
-        setDeleteTarget(null);
+        applyLocalRemove();
         showNote?.('Элемент уже удалён', 'success');
       } else {
         showNote?.(parseApiError(err, 'Ошибка удаления'), 'error');
       }
     } finally {
+      deletePendingRef.current.delete(idStr);
       unmarkDeleting(id);
       void reload().catch((e) => {
         console.error('Catalog reload after delete failed', e);
@@ -389,6 +425,8 @@ function FilterTab({ api, mode, icon, emptyText, createLabel, showNote }) {
               type="text"
               value={createTitle}
               onChange={(e) => setCreateTitle(e.target.value)}
+              onKeyDown={handleCreateTitleKeyDown}
+              disabled={creating}
               autoFocus
               placeholder="Введите название"
             />

@@ -1,5 +1,10 @@
 import { getMultiLangValue } from './i18n';
-import { unwrapEnvelope } from './normalize';
+import {
+  collectIdsFromTree,
+  removeFilterIdsFromTree,
+  unwrapEnvelope,
+  upsertEventFilterInTree,
+} from './normalize';
 
 function makeSlug(title) {
   return String(title || '')
@@ -38,6 +43,154 @@ export function unwrapCreatedFilter(res) {
 
   const unwrapped = unwrapEnvelope(payload);
   return tryNode(unwrapped) || tryNode(payload);
+}
+
+/** Normalize POST response body to a consistent filter shape for local state. */
+export function normalizeCreatedFilter(raw) {
+  if (!raw || raw.id == null) return null;
+
+  const parent = raw.parent;
+  const parentId =
+    raw.parent_id != null && raw.parent_id !== ''
+      ? raw.parent_id
+      : parent?.id ?? parent ?? null;
+
+  return {
+    ...raw,
+    id: raw.id,
+    name: raw.name,
+    title: raw.title,
+    description: raw.description,
+    type: raw.type,
+    parent_id: parentId,
+    parent: typeof parent === 'object' ? parent : undefined,
+    image_url: raw.image_url ?? raw.imageUrl,
+    index: raw.index,
+    is_show: raw.is_show ?? raw.isShow,
+  };
+}
+
+export function isCityFilterItem(item) {
+  if (!item) return false;
+  const type = String(item.type || 'tag').toLowerCase();
+  return type !== 'folder';
+}
+
+export function isEventFilterItem(item) {
+  return Boolean(item?.id);
+}
+
+/**
+ * Mark id as locally deleted and remove from created overlay (Map or ref.current).
+ * @param {string|number} id
+ * @param {Set} deletedRef
+ * @param {Map} [createdRef]
+ */
+export function applyLocalFilterDeletion(id, deletedRef, createdRef) {
+  const idStr = String(id);
+  deletedRef.add(idStr);
+  createdRef?.delete(idStr);
+  return idStr;
+}
+
+/** Merge a flat filter list with local create/delete overlays. */
+export function mergeFlatFilterListWithLocalOverlays(
+  rows,
+  locallyCreatedRef,
+  locallyDeletedRef,
+  { cityTagsOnly = false } = {},
+) {
+  let nextRows = Array.isArray(rows) ? [...rows] : [];
+
+  nextRows = nextRows.filter(
+    (item) => !locallyDeletedRef.has(String(item.id)),
+  );
+
+  const fetchedIds = new Set(nextRows.map((item) => String(item.id)));
+
+  for (const [id, item] of locallyCreatedRef.entries()) {
+    if (cityTagsOnly && !isCityFilterItem(item)) continue;
+
+    if (fetchedIds.has(id)) {
+      locallyCreatedRef.delete(id);
+    } else if (!locallyDeletedRef.has(id)) {
+      nextRows = upsertFlatFilterRow(nextRows, item);
+    }
+  }
+
+  return nextRows;
+}
+
+/** Merge fetched city tag rows with local create/delete overlays. */
+export function mergeCityTagCatalogWithLocalOverlays(
+  rows,
+  locallyCreatedRef,
+  locallyDeletedRef,
+) {
+  return mergeFlatFilterListWithLocalOverlays(
+    rows,
+    locallyCreatedRef,
+    locallyDeletedRef,
+    { cityTagsOnly: true },
+  );
+}
+
+/** Merge fetched city filter tree (folders / nested tags only, not flat catalog tags). */
+export function mergeCityFilterTreeWithLocalOverlays(
+  tree,
+  locallyCreatedRef,
+  locallyDeletedRef,
+) {
+  let nextTree = Array.isArray(tree) ? tree : [];
+
+  nextTree = removeFilterIdsFromTree(nextTree, locallyDeletedRef);
+
+  const fetchedIds = collectIdsFromTree(nextTree);
+
+  for (const [id, item] of locallyCreatedRef.entries()) {
+    const type = String(item?.type || '').toLowerCase();
+    const hasParent =
+      item?.parent_id != null && String(item.parent_id) !== '';
+
+    if (type === 'tag' && !hasParent) {
+      continue;
+    }
+
+    if (fetchedIds.has(id)) {
+      locallyCreatedRef.delete(id);
+    } else if (!locallyDeletedRef.has(id)) {
+      nextTree = upsertEventFilterInTree(nextTree, item);
+      fetchedIds.add(id);
+    }
+  }
+
+  return nextTree;
+}
+
+/** Merge fetched event filter tree with local create/delete overlays. */
+export function mergeEventFilterTreeWithLocalOverlays(
+  tree,
+  locallyCreatedRef,
+  locallyDeletedRef,
+) {
+  let nextTree = Array.isArray(tree) ? tree : [];
+
+  nextTree = removeFilterIdsFromTree(nextTree, locallyDeletedRef);
+
+  const fetchedIds = collectIdsFromTree(nextTree);
+
+  for (const [id, item] of locallyCreatedRef.entries()) {
+    if (!isEventFilterItem(item)) continue;
+
+    if (fetchedIds.has(id)) {
+      locallyCreatedRef.delete(id);
+    } else if (!locallyDeletedRef.has(id)) {
+      nextTree = upsertEventFilterInTree(nextTree, item);
+      fetchedIds.add(id);
+    }
+  }
+
+  return nextTree;
 }
 
 export function upsertFlatFilterRow(rows = [], row) {

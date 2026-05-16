@@ -188,6 +188,7 @@ function CityFilterForm({
   initialValue = null,
   folderOptions = [],
   flatCatalog = false,
+  pendingScope = 'filter-form',
   onCreateCityFilterFolder,
   onCreateCityFilterTag,
   onCreateCityTag,
@@ -259,6 +260,8 @@ function CityFilterForm({
   const [submitting, setSubmitting] = useState(false);
   const [uploading, setUploading] = useState(false);
   const fileRef = useRef(null);
+  const submittingRef = useRef(false);
+  const quickCreatePendingRef = useRef(new Set());
 
   const openAdvanced = () => {
     const prefix = mode === 'create-folder' ? 'folder' : 'tag';
@@ -315,15 +318,24 @@ function CityFilterForm({
 
   const handleSubmit = async (e) => {
     e?.preventDefault?.();
+    if (submittingRef.current || submitting) {
+      return;
+    }
     setError('');
 
     if (isCreate && !advancedOpen) {
-      if (!quickTitle.trim()) {
+      const title = quickTitle.trim();
+      if (!title) {
         setError('Введите название.');
         return;
       }
       if (mode === 'create-tag' && !flatCatalog && !normalizeId(folderId)) {
         setError('Тег можно создать только внутри папки.');
+        return;
+      }
+
+      const scopeKey = pendingScope;
+      if (quickCreatePendingRef.current.has(scopeKey)) {
         return;
       }
 
@@ -336,13 +348,15 @@ function CityFilterForm({
               ? null
               : normalizeId(folderId)
             : null,
-        name: makeUniqueName(quickTitle.trim(), flatCatalog && mode === 'create-tag' ? 'city-tag' : prefix),
-        title: { ru: quickTitle.trim() },
+        name: makeUniqueName(title, flatCatalog && mode === 'create-tag' ? 'city-tag' : prefix),
+        title: { ru: title },
         description: {},
         index: 0,
         is_show: true,
       };
 
+      quickCreatePendingRef.current.add(scopeKey);
+      submittingRef.current = true;
       setSubmitting(true);
       try {
         if (mode === 'create-folder') {
@@ -352,10 +366,13 @@ function CityFilterForm({
         } else {
           await doCreateTagInFolder?.(folderId, payload);
         }
+        setQuickTitle('');
         onCancel?.();
       } catch {
         /* toast в контроллере */
       } finally {
+        quickCreatePendingRef.current.delete(scopeKey);
+        submittingRef.current = false;
         setSubmitting(false);
       }
       return;
@@ -389,6 +406,13 @@ function CityFilterForm({
       }
     }
 
+    const scopeKey = `${pendingScope}:advanced`;
+    if (quickCreatePendingRef.current.has(scopeKey)) {
+      return;
+    }
+
+    quickCreatePendingRef.current.add(scopeKey);
+    submittingRef.current = true;
     setSubmitting(true);
     try {
       const body = buildFullPayload();
@@ -407,15 +431,24 @@ function CityFilterForm({
     } catch {
       /* toast в контроллере */
     } finally {
+      quickCreatePendingRef.current.delete(scopeKey);
+      submittingRef.current = false;
       setSubmitting(false);
     }
   };
 
   const handleQuickKeyDown = (event) => {
-    if (event.key === 'Enter' && isCreate && !advancedOpen) {
-      event.preventDefault();
-      handleSubmit(event);
+    if (event.key !== 'Enter' || !isCreate || advancedOpen) {
+      return;
     }
+
+    event.preventDefault();
+
+    if (event.repeat) {
+      return;
+    }
+
+    handleSubmit(event);
   };
 
   const handleFile = async (event) => {
@@ -474,11 +507,12 @@ function CityFilterForm({
               value={quickTitle}
               onChange={(ev) => setQuickTitle(ev.target.value)}
               onKeyDown={handleQuickKeyDown}
+              disabled={submitting}
               autoFocus
               placeholder={
                 mode === 'create-folder' ? 'Например: Атмосфера' : 'Например: Романтичный'
               }
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm disabled:opacity-50"
             />
           </div>
 
@@ -492,10 +526,10 @@ function CityFilterForm({
           <div className="flex flex-wrap items-center gap-2 pt-1">
             <button
               type="submit"
-              disabled={submitting}
+              disabled={submitting || !quickTitle.trim()}
               className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-50"
             >
-              {submitLabel}
+              {submitting ? 'Добавление...' : submitLabel}
             </button>
             <button
               type="button"
@@ -740,12 +774,35 @@ export default function SessionWizardTagsCatalogStep({
   const [searchQuery, setSearchQuery] = useState('');
   const [quickName, setQuickName] = useState('');
   const [modal, setModal] = useState(null);
+  const [creatingCityTagQuick, setCreatingCityTagQuick] = useState(false);
+  const [creatingEventFolderQuick, setCreatingEventFolderQuick] = useState(false);
+  const [creatingTagByFolderId, setCreatingTagByFolderId] = useState(() => new Set());
+  const quickCreatePendingRef = useRef(new Set());
 
   const [eventSearchQuery, setEventSearchQuery] = useState('');
   const [eventQuickFolder, setEventQuickFolder] = useState('');
   const [eventQuickTagByFolder, setEventQuickTagByFolder] = useState({});
   const [collapsedFolders, setCollapsedFolders] = useState({});
   const [eventModal, setEventModal] = useState(null);
+
+  const isCreatingInFolder = (folderId) =>
+    creatingTagByFolderId.has(String(folderId));
+
+  const markCreatingInFolder = (folderId) => {
+    setCreatingTagByFolderId((prev) => {
+      const next = new Set(prev);
+      next.add(String(folderId));
+      return next;
+    });
+  };
+
+  const unmarkCreatingInFolder = (folderId) => {
+    setCreatingTagByFolderId((prev) => {
+      const next = new Set(prev);
+      next.delete(String(folderId));
+      return next;
+    });
+  };
 
   useEffect(() => {
     if (catalogTab !== 'attraction') return;
@@ -804,7 +861,17 @@ export default function SessionWizardTagsCatalogStep({
   const handleEventQuickFolderSubmit = async (e) => {
     e?.preventDefault?.();
     const title = eventQuickFolder.trim();
-    if (!title) return;
+    if (!title || creatingEventFolderQuick) {
+      return;
+    }
+
+    const scopeKey = 'event-folder';
+    if (quickCreatePendingRef.current.has(scopeKey)) {
+      return;
+    }
+
+    quickCreatePendingRef.current.add(scopeKey);
+    setCreatingEventFolderQuick(true);
     try {
       await onCreateEventFilterFolder?.({
         type: 'folder',
@@ -818,13 +885,40 @@ export default function SessionWizardTagsCatalogStep({
       setEventQuickFolder('');
     } catch {
       /* уведомление в контроллере */
+    } finally {
+      quickCreatePendingRef.current.delete(scopeKey);
+      setCreatingEventFolderQuick(false);
     }
+  };
+
+  const handleEventQuickFolderKeyDown = (event) => {
+    if (event.key !== 'Enter') {
+      return;
+    }
+
+    event.preventDefault();
+
+    if (event.repeat) {
+      return;
+    }
+
+    handleEventQuickFolderSubmit(event);
   };
 
   const handleEventQuickTagSubmit = async (folderId) => {
     const fid = normalizeId(folderId);
     const title = (eventQuickTagByFolder[fid] || '').trim();
-    if (!fid || !title) return;
+    if (!fid || !title || isCreatingInFolder(fid)) {
+      return;
+    }
+
+    const scopeKey = `event-tag:${fid}`;
+    if (quickCreatePendingRef.current.has(scopeKey)) {
+      return;
+    }
+
+    quickCreatePendingRef.current.add(scopeKey);
+    markCreatingInFolder(fid);
     try {
       await onCreateEventFilterTag?.(fid, {
         type: 'tag',
@@ -837,7 +931,24 @@ export default function SessionWizardTagsCatalogStep({
       setEventQuickTagByFolder((p) => ({ ...p, [fid]: '' }));
     } catch {
       /* уведомление в контроллере */
+    } finally {
+      quickCreatePendingRef.current.delete(scopeKey);
+      unmarkCreatingInFolder(fid);
     }
+  };
+
+  const handleEventQuickTagKeyDown = (event, folderId) => {
+    if (event.key !== 'Enter') {
+      return;
+    }
+
+    event.preventDefault();
+
+    if (event.repeat) {
+      return;
+    }
+
+    handleEventQuickTagSubmit(folderId);
   };
 
   const openCreateEventFolderModal = () =>
@@ -925,7 +1036,17 @@ export default function SessionWizardTagsCatalogStep({
   const handleQuickSubmit = async (e) => {
     e?.preventDefault?.();
     const title = quickName.trim();
-    if (!title) return;
+    if (!title || creatingCityTagQuick) {
+      return;
+    }
+
+    const scopeKey = 'city-tag';
+    if (quickCreatePendingRef.current.has(scopeKey)) {
+      return;
+    }
+
+    quickCreatePendingRef.current.add(scopeKey);
+    setCreatingCityTagQuick(true);
     try {
       await onCreateCityTag?.({
         type: 'tag',
@@ -939,7 +1060,24 @@ export default function SessionWizardTagsCatalogStep({
       setQuickName('');
     } catch {
       /* уведомление в контроллере */
+    } finally {
+      quickCreatePendingRef.current.delete(scopeKey);
+      setCreatingCityTagQuick(false);
     }
+  };
+
+  const handleQuickKeyDown = (event) => {
+    if (event.key !== 'Enter') {
+      return;
+    }
+
+    event.preventDefault();
+
+    if (event.repeat) {
+      return;
+    }
+
+    handleQuickSubmit(event);
   };
 
   const tabBtn = (id, label) => (
@@ -988,16 +1126,18 @@ export default function SessionWizardTagsCatalogStep({
                   type="text"
                   value={quickName}
                   onChange={(ev) => setQuickName(ev.target.value)}
+                  onKeyDown={handleQuickKeyDown}
+                  disabled={creatingCityTagQuick}
                   placeholder="Введите название тега…"
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm disabled:opacity-50"
                 />
               </div>
               <button
                 type="submit"
-                disabled={cityTagCatalogLoading || !quickName.trim()}
+                disabled={cityTagCatalogLoading || creatingCityTagQuick || !quickName.trim()}
                 className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-50"
               >
-                Добавить
+                {creatingCityTagQuick ? 'Добавление...' : 'Добавить'}
               </button>
               <button
                 type="button"
@@ -1114,16 +1254,20 @@ export default function SessionWizardTagsCatalogStep({
                   type="text"
                   value={eventQuickFolder}
                   onChange={(ev) => setEventQuickFolder(ev.target.value)}
+                  onKeyDown={handleEventQuickFolderKeyDown}
+                  disabled={creatingEventFolderQuick}
                   placeholder="Название папки…"
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm disabled:opacity-50"
                 />
               </div>
               <button
                 type="submit"
-                disabled={eventFilterTreeLoading || !eventQuickFolder.trim()}
+                disabled={
+                  eventFilterTreeLoading || creatingEventFolderQuick || !eventQuickFolder.trim()
+                }
                 className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-50"
               >
-                Создать
+                {creatingEventFolderQuick ? 'Добавление...' : 'Создать'}
               </button>
               <button
                 type="button"
@@ -1243,23 +1387,22 @@ export default function SessionWizardTagsCatalogStep({
                                     [fid]: ev.target.value,
                                   }))
                                 }
-                                onKeyDown={(ev) => {
-                                  if (ev.key === 'Enter') {
-                                    ev.preventDefault();
-                                    handleEventQuickTagSubmit(fid);
-                                  }
-                                }}
+                                onKeyDown={(ev) => handleEventQuickTagKeyDown(ev, fid)}
+                                disabled={isCreatingInFolder(fid)}
                                 placeholder="Название тега…"
-                                className="w-full px-3 py-1.5 border border-gray-300 rounded-lg text-sm"
+                                className="w-full px-3 py-1.5 border border-gray-300 rounded-lg text-sm disabled:opacity-50"
                               />
                             </div>
                             <button
                               type="button"
                               onClick={() => handleEventQuickTagSubmit(fid)}
-                              disabled={!((eventQuickTagByFolder[fid] || '').trim())}
+                              disabled={
+                                isCreatingInFolder(fid)
+                                || !((eventQuickTagByFolder[fid] || '').trim())
+                              }
                               className="px-3 py-1.5 text-xs font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-50"
                             >
-                              Добавить
+                              {isCreatingInFolder(fid) ? 'Добавление...' : 'Добавить'}
                             </button>
                             <button
                               type="button"
@@ -1369,6 +1512,7 @@ export default function SessionWizardTagsCatalogStep({
               initialValue={modal.initial}
               folderOptions={[]}
               flatCatalog={Boolean(modal.flatCatalog)}
+              pendingScope="city-modal"
               onCreateCityTag={onCreateCityTag}
               onUpdateCityFilter={onUpdateCityFilter}
               onCancel={closeModal}
@@ -1397,6 +1541,11 @@ export default function SessionWizardTagsCatalogStep({
               initialValue={eventModal.initial}
               folderOptions={eventFolderOptions}
               flatCatalog={false}
+              pendingScope={
+                eventModal.mode === 'create-folder'
+                  ? 'event-modal-folder'
+                  : `event-modal-tag:${eventModal.folderId || 'none'}`
+              }
               onCancel={closeEventModal}
               onCreateFilterFolder={onCreateEventFilterFolder}
               onCreateFilterTagInFolder={onCreateEventFilterTag}

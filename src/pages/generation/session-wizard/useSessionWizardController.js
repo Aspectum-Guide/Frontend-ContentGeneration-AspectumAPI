@@ -3,8 +3,20 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import { aiAPI, tasksAPI, attractionsAPI, attractionInfosAPI, attractionAudioGuidesAPI, audioAPI, referenceAttractionsAPI, cityInfosAPI, cityFiltersAPI, eventFiltersAPI, citiesAPI, imagesAPI, sessionsAPI, attractionFeedAPI} from '../../../api/generation';
 import { useLayoutActions } from '../../../context/useLayoutActions';
 import { trackEvent } from '../../../utils/analytics';
-import { parseApiError } from '../../../utils/apiError';
-import { removeFilterIdsFromTree } from '../../../features/catalog/shared/normalize';
+import { isNotFoundError, parseApiError } from '../../../utils/apiError';
+import {
+  removeFilterIdsFromTree,
+  upsertEventFilterInTree,
+} from '../../../features/catalog/shared/normalize';
+import {
+  applyLocalFilterDeletion,
+  mergeCityFilterTreeWithLocalOverlays,
+  mergeCityTagCatalogWithLocalOverlays,
+  mergeEventFilterTreeWithLocalOverlays,
+  normalizeCreatedFilter,
+  unwrapCreatedFilter,
+  upsertFlatFilterRow,
+} from '../../../features/catalog/shared/tagCatalog';
 import { useToast } from '../../../components/ui/Toast.jsx';
 import { DEFAULT_LOCALE_DEFS, getLocaleInfo } from './sessionWizardShared.jsx';
 
@@ -1300,6 +1312,10 @@ export function useSessionWizardController({ sessionId, confirm: confirmProp } =
 
   const locallyDeletedCityFilterIdsRef = useRef(new Set());
   const locallyDeletedEventFilterIdsRef = useRef(new Set());
+  const locallyCreatedCityFiltersRef = useRef(new Map());
+  const locallyCreatedEventFiltersRef = useRef(new Map());
+  const deletingCityFilterPendingRef = useRef(new Set());
+  const deletingEventFilterPendingRef = useRef(new Set());
   const [deletingCityFilterIds, setDeletingCityFilterIds] = useState(() => new Set());
   const [deletingEventFilterIds, setDeletingEventFilterIds] = useState(() => new Set());
 
@@ -2063,7 +2079,11 @@ export function useSessionWizardController({ sessionId, confirm: confirmProp } =
 
       const tree = Array.isArray(data) ? data : [];
       setCityFilterTree(
-        removeFilterIdsFromTree(tree, locallyDeletedCityFilterIdsRef.current),
+        mergeCityFilterTreeWithLocalOverlays(
+          tree,
+          locallyCreatedCityFiltersRef.current,
+          locallyDeletedCityFilterIdsRef.current,
+        ),
       );
     } catch (error) {
       setCityFilterTreeError(
@@ -2083,7 +2103,11 @@ export function useSessionWizardController({ sessionId, confirm: confirmProp } =
       const data = res?.data?.data || res?.data?.results || res?.data || [];
       const tree = Array.isArray(data) ? data : [];
       setEventFilterTree(
-        removeFilterIdsFromTree(tree, locallyDeletedEventFilterIdsRef.current),
+        mergeEventFilterTreeWithLocalOverlays(
+          tree,
+          locallyCreatedEventFiltersRef.current,
+          locallyDeletedEventFilterIdsRef.current,
+        ),
       );
     } catch (error) {
       setEventFilterTreeError(
@@ -2103,9 +2127,10 @@ export function useSessionWizardController({ sessionId, confirm: confirmProp } =
       const raw = res?.data?.data ?? res?.data?.results ?? res?.data ?? [];
       const rows = Array.isArray(raw) ? raw : [];
       setCityTagCatalog(
-        rows.filter(
-          (item) =>
-            !locallyDeletedCityFilterIdsRef.current.has(String(item.id)),
+        mergeCityTagCatalogWithLocalOverlays(
+          rows,
+          locallyCreatedCityFiltersRef.current,
+          locallyDeletedCityFilterIdsRef.current,
         ),
       );
     } catch (error) {
@@ -3237,13 +3262,22 @@ export function useSessionWizardController({ sessionId, confirm: confirmProp } =
 
   const createCityFilterFolder = useCallback(async (payload) => {
     try {
-      await cityFiltersAPI.create({
+      const res = await cityFiltersAPI.create({
         ...payload,
         type: 'folder',
         parent_id: null,
       });
+      const created = normalizeCreatedFilter(unwrapCreatedFilter(res));
+      if (created?.id != null) {
+        const idStr = String(created.id);
+        locallyDeletedCityFilterIdsRef.current.delete(idStr);
+        locallyCreatedCityFiltersRef.current.set(idStr, created);
+        setCityFilterTree((prev) => upsertEventFilterInTree(prev, created));
+      }
       showNote('Папка создана', 'success');
-      await loadCityFilterTree();
+      void loadCityFilterTree().catch((err) => {
+        console.error('City filter tree reload failed', err);
+      });
     } catch (e) {
       showNote(parseApiError(e, 'Ошибка создания папки'), 'error');
       throw e;
@@ -3257,19 +3291,27 @@ export function useSessionWizardController({ sessionId, confirm: confirmProp } =
       return;
     }
     try {
-      await cityFiltersAPI.create({
+      const res = await cityFiltersAPI.create({
         ...payload,
         type: 'tag',
         parent_id: parentId,
       });
+      const created = normalizeCreatedFilter(unwrapCreatedFilter(res));
+      if (created?.id != null) {
+        const idStr = String(created.id);
+        locallyDeletedCityFilterIdsRef.current.delete(idStr);
+        locallyCreatedCityFiltersRef.current.set(idStr, created);
+        setCityFilterTree((prev) => upsertEventFilterInTree(prev, created));
+      }
       showNote('Тег создан', 'success');
-      await loadCityFilterTree();
-      await loadCityTagCatalog();
+      void loadCityFilterTree().catch((err) => {
+        console.error('City filter tree reload failed', err);
+      });
     } catch (e) {
       showNote(parseApiError(e, 'Ошибка создания тега'), 'error');
       throw e;
     }
-  }, [loadCityFilterTree, loadCityTagCatalog, showNote]);
+  }, [loadCityFilterTree, showNote]);
 
   const createCityTag = useCallback(async (payload) => {
     try {
@@ -3278,14 +3320,20 @@ export function useSessionWizardController({ sessionId, confirm: confirmProp } =
         type: 'tag',
         parent_id: payload?.parent_id ?? null,
       });
-      const raw = res?.data?.data ?? res?.data;
-      const newId = raw?.id ?? raw?.uuid ?? raw?.pk;
-      if (newId != null) {
-        locallyDeletedCityFilterIdsRef.current.delete(String(newId));
+      const created = normalizeCreatedFilter(unwrapCreatedFilter(res));
+      if (created?.id != null) {
+        const idStr = String(created.id);
+        locallyDeletedCityFilterIdsRef.current.delete(idStr);
+        locallyCreatedCityFiltersRef.current.set(idStr, created);
+        setCityTagCatalog((prev) => upsertFlatFilterRow(prev, created));
       }
       showNote('Тег города создан', 'success');
-      await loadCityTagCatalog();
-      await loadCityFilterTree();
+      void loadCityTagCatalog().catch((err) => {
+        console.error('City tag catalog reload failed', err);
+      });
+      void loadCityFilterTree().catch((err) => {
+        console.error('City filter tree reload failed', err);
+      });
     } catch (e) {
       showNote(parseApiError(e, 'Ошибка создания тега'), 'error');
       throw e;
@@ -3314,6 +3362,11 @@ export function useSessionWizardController({ sessionId, confirm: confirmProp } =
     if (!(await confirm({ message, danger: true }))) return;
 
     const idStr = String(id);
+    if (deletingCityFilterPendingRef.current.has(idStr)) {
+      return;
+    }
+
+    deletingCityFilterPendingRef.current.add(idStr);
     setDeletingCityFilterIds((prev) => {
       const next = new Set(prev);
       next.add(idStr);
@@ -3321,7 +3374,11 @@ export function useSessionWizardController({ sessionId, confirm: confirmProp } =
     });
 
     const applyLocalRemove = () => {
-      locallyDeletedCityFilterIdsRef.current.add(idStr);
+      applyLocalFilterDeletion(
+        idStr,
+        locallyDeletedCityFilterIdsRef.current,
+        locallyCreatedCityFiltersRef.current,
+      );
       setCityTagCatalog((prev) =>
         prev.filter((item) => String(item.id) !== idStr),
       );
@@ -3340,13 +3397,14 @@ export function useSessionWizardController({ sessionId, confirm: confirmProp } =
       applyLocalRemove();
       showNote('Удалено', 'success');
     } catch (e) {
-      if (e?.response?.status === 404) {
+      if (isNotFoundError(e)) {
         applyLocalRemove();
         showNote('Элемент уже удалён', 'success');
       } else {
         showNote(parseApiError(e, 'Не удалось удалить'), 'error');
       }
     } finally {
+      deletingCityFilterPendingRef.current.delete(idStr);
       setDeletingCityFilterIds((prev) => {
         const next = new Set(prev);
         next.delete(idStr);
@@ -3370,13 +3428,17 @@ export function useSessionWizardController({ sessionId, confirm: confirmProp } =
         type: 'folder',
         parent_id: null,
       });
-      const raw = res?.data?.data ?? res?.data;
-      const newId = raw?.id ?? raw?.uuid ?? raw?.pk;
-      if (newId != null) {
-        locallyDeletedEventFilterIdsRef.current.delete(String(newId));
+      const created = normalizeCreatedFilter(unwrapCreatedFilter(res));
+      if (created?.id != null) {
+        const idStr = String(created.id);
+        locallyDeletedEventFilterIdsRef.current.delete(idStr);
+        locallyCreatedEventFiltersRef.current.set(idStr, created);
+        setEventFilterTree((prev) => upsertEventFilterInTree(prev, created));
       }
       showNote('Папка создана', 'success');
-      await loadEventFilterTree();
+      void loadEventFilterTree().catch((err) => {
+        console.error('Event filter tree reload failed', err);
+      });
     } catch (e) {
       showNote(parseApiError(e, 'Ошибка создания папки'), 'error');
       throw e;
@@ -3395,13 +3457,27 @@ export function useSessionWizardController({ sessionId, confirm: confirmProp } =
         type: 'tag',
         parent_id: parentId,
       });
-      const raw = res?.data?.data ?? res?.data;
-      const newId = raw?.id ?? raw?.uuid ?? raw?.pk;
-      if (newId != null) {
-        locallyDeletedEventFilterIdsRef.current.delete(String(newId));
+      const created = normalizeCreatedFilter(
+        unwrapCreatedFilter(res) || { ...payload, parent_id: parentId },
+      );
+      if (created?.id != null) {
+        const idStr = String(created.id);
+        locallyDeletedEventFilterIdsRef.current.delete(idStr);
+        locallyCreatedEventFiltersRef.current.set(idStr, {
+          ...created,
+          parent_id: created.parent_id ?? parentId,
+        });
+        setEventFilterTree((prev) =>
+          upsertEventFilterInTree(prev, {
+            ...created,
+            parent_id: created.parent_id ?? parentId,
+          }),
+        );
       }
       showNote('Тег создан', 'success');
-      await loadEventFilterTree();
+      void loadEventFilterTree().catch((err) => {
+        console.error('Event filter tree reload failed', err);
+      });
     } catch (e) {
       showNote(parseApiError(e, 'Ошибка создания тега'), 'error');
       throw e;
@@ -3429,6 +3505,11 @@ export function useSessionWizardController({ sessionId, confirm: confirmProp } =
     if (!(await confirm({ message, danger: true }))) return;
 
     const idStr = String(id);
+    if (deletingEventFilterPendingRef.current.has(idStr)) {
+      return;
+    }
+
+    deletingEventFilterPendingRef.current.add(idStr);
     setDeletingEventFilterIds((prev) => {
       const next = new Set(prev);
       next.add(idStr);
@@ -3436,7 +3517,11 @@ export function useSessionWizardController({ sessionId, confirm: confirmProp } =
     });
 
     const applyLocalRemove = () => {
-      locallyDeletedEventFilterIdsRef.current.add(idStr);
+      applyLocalFilterDeletion(
+        idStr,
+        locallyDeletedEventFilterIdsRef.current,
+        locallyCreatedEventFiltersRef.current,
+      );
       setEventFilterTree((prev) =>
         removeFilterIdsFromTree(prev, locallyDeletedEventFilterIdsRef.current),
       );
@@ -3447,13 +3532,14 @@ export function useSessionWizardController({ sessionId, confirm: confirmProp } =
       applyLocalRemove();
       showNote('Удалено', 'success');
     } catch (e) {
-      if (e?.response?.status === 404) {
+      if (isNotFoundError(e)) {
         applyLocalRemove();
         showNote('Элемент уже удалён', 'success');
       } else {
         showNote(parseApiError(e, 'Не удалось удалить'), 'error');
       }
     } finally {
+      deletingEventFilterPendingRef.current.delete(idStr);
       setDeletingEventFilterIds((prev) => {
         const next = new Set(prev);
         next.delete(idStr);
