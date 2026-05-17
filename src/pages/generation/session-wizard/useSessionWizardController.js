@@ -5806,24 +5806,62 @@ export function useSessionWizardController({ sessionId, confirm: confirmProp } =
       return Array.from(keys);
     };
 
+    const collectMultilangFieldKeys = (value) => {
+      const keys = new Set();
+      if (!value || typeof value !== 'object' || Array.isArray(value)) return [];
+      Object.keys(value).forEach((key) => {
+        const lang = String(key || '').trim().toLowerCase();
+        if (lang) keys.add(lang);
+      });
+      return Array.from(keys);
+    };
+
     const languagesFromLocaleData = Object.values(localeData || {})
       .map((loc) => (loc?.lang || '').trim().toLowerCase())
       .filter(Boolean);
     const languagesFromDrafts = (Array.isArray(cityDrafts) ? cityDrafts : []).flatMap((draft) => collectLanguageKeys(draft));
     const languagesFromLegacyCity = collectLanguageKeys(session?.city || {});
-    const targetLanguages = [...new Set([...languagesFromLocaleData, ...languagesFromDrafts, ...languagesFromLegacyCity])];
+    const languagesFromCityInfos = (Array.isArray(cityInfos) ? cityInfos : []).flatMap((info) => [
+      ...collectMultilangFieldKeys(info?.name),
+      ...collectMultilangFieldKeys(info?.description),
+    ]);
+    const languagesFromAttractionInfos = (Array.isArray(attractionInfos) ? attractionInfos : []).flatMap((info) => [
+      ...collectMultilangFieldKeys(info?.name),
+      ...collectMultilangFieldKeys(info?.description),
+    ]);
+    const languagesFromFeedItems = (Array.isArray(attractionFeedItems) ? attractionFeedItems : [])
+      .filter((item) => item?.item_type === 'text')
+      .flatMap((item) => collectMultilangFieldKeys(item?.text));
+    const languagesFromAudioGuides = (Array.isArray(attractionAudioGuides) ? attractionAudioGuides : []).flatMap(
+      (guide) => [
+        ...collectMultilangFieldKeys(guide?.title),
+        ...collectMultilangFieldKeys(guide?.content_plan),
+        ...collectMultilangFieldKeys(guide?.content_texts),
+      ],
+    );
+    const targetLanguages = [
+      ...new Set([
+        ...languagesFromLocaleData,
+        ...languagesFromDrafts,
+        ...languagesFromLegacyCity,
+        ...languagesFromCityInfos,
+        ...languagesFromAttractionInfos,
+        ...languagesFromFeedItems,
+        ...languagesFromAudioGuides,
+      ]),
+    ];
 
     setTranslating(true);
     try {
       const res = await sessionsAPI.translate(sessionId, { target_languages: targetLanguages, scope: 'all_drafts' });
       showNote(res?.data?.message || 'Перевод всех городов завершен', 'success');
-      await loadSession(currentDraftId);
+      await loadSession(currentDraftId, { force: true });
     } catch (err) {
       showNote(parseApiError(err, 'Ошибка перевода'), 'error');
     } finally {
       setTranslating(false);
     }
-  }, [sessionId, cityDrafts, session, localeData, loadSession, showNote]);
+  }, [sessionId, cityDrafts, session, localeData, cityInfos, attractionInfos, attractionFeedItems, attractionAudioGuides, loadSession, showNote]);
 
   useEffect(() => {
     const actions = [{ id: 'save-city-data', label: saving ? 'Сохранение...' : 'Сохранить город', onClick: () => { if (!saving) saveCityForStep1(); }, disabled: saving, variant: 'primary' }];
