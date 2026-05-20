@@ -209,6 +209,7 @@ function AttractionInfoDraftsPanel({
 
 export default function SessionWizardAttractionInfoStep({
   embedded = false,
+  scopedToAttractionId = '',
 
   attractionInfos = [],
   currentAttractionInfo,
@@ -274,7 +275,9 @@ export default function SessionWizardAttractionInfoStep({
             <div className="text-3xl mb-2">💡</div>
 
             <p className="text-sm">
-              Нет полезной информации. Нажмите «+ Добавить»
+              {scopedToAttractionId
+                ? 'Для этой достопримечательности пока нет полезной информации.'
+                : 'Нет полезной информации. Нажмите «+ Добавить»'}
             </p>
           </div>
         ) : (

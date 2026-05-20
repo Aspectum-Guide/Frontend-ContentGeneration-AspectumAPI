@@ -408,6 +408,7 @@ function FeedImagePanel({
 
 export default function SessionWizardAttractionFeedStep({
   embedded = false,
+  scopedToAttractionId = '',
 
   attractionFeedItems = [],
   currentAttractionFeedItem,
@@ -491,7 +492,9 @@ export default function SessionWizardAttractionFeedStep({
             <div className="text-3xl mb-2">🖼️</div>
 
             <p className="text-sm">
-              Нет элементов ленты. Добавьте текст или изображение.
+              {scopedToAttractionId
+                ? 'Для этой достопримечательности пока нет элементов ленты.'
+                : 'Нет элементов ленты. Добавьте текст или изображение.'}
             </p>
           </div>
         ) : (

@@ -173,6 +173,7 @@ function CityInfoDraftsPanel({
 
 export default function SessionWizardCityInfoStep({
   embedded = false,
+  scopedToCityDraftId = '',
 
   cityInfos = [],
   currentCityInfo,
@@ -240,7 +241,9 @@ export default function SessionWizardCityInfoStep({
               <div className="text-3xl mb-2">ℹ️</div>
 
               <p className="text-sm">
-                Нет полезной информации. Нажмите «+ Добавить»
+                {scopedToCityDraftId
+                  ? 'Для этого города пока нет полезной информации.'
+                  : 'Нет полезной информации. Нажмите «+ Добавить»'}
               </p>
             </div>
           ) : (

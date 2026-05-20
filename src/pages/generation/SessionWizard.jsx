@@ -1,5 +1,5 @@
 import 'leaflet/dist/leaflet.css';
-import { useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import Layout from '../../components/Layout';
 import CommonsImagePicker from '../../components/generation/CommonsImagePicker';
@@ -14,7 +14,12 @@ import SessionWizardAttractionFeedStep from './session-wizard/SessionWizardAttra
 import SessionWizardAttractionAudioGuidesBlock from './session-wizard/SessionWizardAttractionAudioGuidesBlock.jsx';
 import {
   StatusBadge as DefaultStatusBadge,
+  filterCityInfosForActiveDraft,
+  filterItemsForActiveAttraction,
   getAttrName,
+  itemBelongsToActiveAttraction,
+  itemBelongsToActiveCityDraft,
+  normalizeId,
 } from './session-wizard/sessionWizardShared.jsx';
 import { useSessionWizardController } from './session-wizard/useSessionWizardController';
 import DefaultToast from '../../components/ui/Toast.jsx';
@@ -245,6 +250,9 @@ export default function SessionWizard({ components = {} } = {}) {
     uploadAttractionAudioGuideTrack,
     removeAttractionAudioGuideTrack,
     generateAttractionAudioGuidePlan,
+    audioGuidePlanGenerationState,
+    setAttractionAudioGuidePlanGenerationPrompt,
+    setAttractionAudioGuidePlanItemsCount,
     generateAttractionAudioGuideMainText,
     generateAttractionAudioGuideMainTextItem,
 
@@ -256,6 +264,125 @@ export default function SessionWizard({ components = {} } = {}) {
   } = controller;
 
   const currentLocale = localeData[activeLocale] || {};
+
+  const openedCityDraftFilter = useMemo(() => {
+    const activeCityDraftIdNormalized = normalizeId(activeCityDraftId);
+
+    if (!activeCityDraftIdNormalized || activeCityDraftIdNormalized === 'legacy') {
+      return { activeCityDraftId: '', activeDatabaseCityId: '' };
+    }
+
+    const activeDraft = (cityDrafts || []).find(
+      (draft) => normalizeId(draft.id) === activeCityDraftIdNormalized
+    );
+
+    return {
+      activeCityDraftId: activeCityDraftIdNormalized,
+      activeDatabaseCityId: normalizeId(activeDraft?.city_id ?? activeDraft?.city),
+    };
+  }, [activeCityDraftId, cityDrafts]);
+
+  const { activeCityDraftId: scopedCityDraftId, activeDatabaseCityId: scopedDatabaseCityId } =
+    openedCityDraftFilter;
+
+  const visibleCityInfos = useMemo(
+    () => filterCityInfosForActiveDraft(cityInfos, openedCityDraftFilter),
+    [cityInfos, openedCityDraftFilter]
+  );
+
+  useEffect(() => {
+    if (!scopedCityDraftId && !scopedDatabaseCityId) return;
+
+    if (
+      currentCityInfo &&
+      !itemBelongsToActiveCityDraft(currentCityInfo, openedCityDraftFilter)
+    ) {
+      setCurrentCityInfo(null);
+    }
+  }, [
+    scopedCityDraftId,
+    scopedDatabaseCityId,
+    openedCityDraftFilter,
+    currentCityInfo,
+    setCurrentCityInfo,
+  ]);
+
+  const openedAttractionFilter = useMemo(() => {
+    if (attrView !== 'detail' || !currentAttr) {
+      return { activeAttractionId: '', activeEventId: '' };
+    }
+
+    return {
+      activeAttractionId: normalizeId(currentAttr.id),
+      activeEventId: normalizeId(
+        currentAttr.event_id ??
+          currentAttr.event ??
+          currentAttr.source_event_id ??
+          currentAttr.sourceEventId
+      ),
+    };
+  }, [attrView, currentAttr]);
+
+  const { activeAttractionId, activeEventId } = openedAttractionFilter;
+
+  const visibleAttractionInfos = useMemo(
+    () =>
+      filterItemsForActiveAttraction(attractionInfos, openedAttractionFilter),
+    [attractionInfos, openedAttractionFilter]
+  );
+
+  const visibleAttractionFeedItems = useMemo(
+    () =>
+      filterItemsForActiveAttraction(attractionFeedItems, openedAttractionFilter),
+    [attractionFeedItems, openedAttractionFilter]
+  );
+
+  const visibleAttractionAudioGuides = useMemo(
+    () =>
+      filterItemsForActiveAttraction(
+        attractionAudioGuides,
+        openedAttractionFilter
+      ),
+    [attractionAudioGuides, openedAttractionFilter]
+  );
+
+  useEffect(() => {
+    if (!activeAttractionId && !activeEventId) return;
+
+    if (
+      currentAttractionInfo &&
+      !itemBelongsToActiveAttraction(currentAttractionInfo, openedAttractionFilter)
+    ) {
+      setCurrentAttractionInfo(null);
+    }
+
+    if (
+      currentAttractionFeedItem &&
+      !itemBelongsToActiveAttraction(currentAttractionFeedItem, openedAttractionFilter)
+    ) {
+      setCurrentAttractionFeedItem(null);
+    }
+
+    if (
+      currentAttractionAudioGuide &&
+      !itemBelongsToActiveAttraction(
+        currentAttractionAudioGuide,
+        openedAttractionFilter
+      )
+    ) {
+      setCurrentAttractionAudioGuide(null);
+    }
+  }, [
+    activeAttractionId,
+    activeEventId,
+    openedAttractionFilter,
+    currentAttractionInfo,
+    currentAttractionFeedItem,
+    currentAttractionAudioGuide,
+    setCurrentAttractionInfo,
+    setCurrentAttractionFeedItem,
+    setCurrentAttractionAudioGuide,
+  ]);
 
   const [commonsTarget, setCommonsTarget] = useState({
     type: 'city',
@@ -639,7 +766,8 @@ export default function SessionWizard({ components = {} } = {}) {
             <div className="pt-5 border-t border-gray-200">
               <SessionWizardCityInfoStep
                 embedded
-                cityInfos={cityInfos}
+                scopedToCityDraftId={scopedCityDraftId || scopedDatabaseCityId || ''}
+                cityInfos={visibleCityInfos}
                 currentCityInfo={currentCityInfo}
                 cityInfoLocaleData={cityInfoLocaleData}
                 cityInfoActiveLocale={cityInfoActiveLocale}
@@ -740,7 +868,8 @@ export default function SessionWizard({ components = {} } = {}) {
             <div className="pt-5 border-t border-gray-200">
               <SessionWizardAttractionInfoStep
                 embedded
-                attractionInfos={attractionInfos}
+                scopedToAttractionId={activeAttractionId || activeEventId || ''}
+                attractionInfos={visibleAttractionInfos}
                 currentAttractionInfo={currentAttractionInfo}
                 attractionInfoLocaleData={attractionInfoLocaleData}
                 attractionInfoActiveLocale={attractionInfoActiveLocale}
@@ -762,7 +891,8 @@ export default function SessionWizard({ components = {} } = {}) {
             <div className="pt-5 border-t border-gray-200">
               <SessionWizardAttractionFeedStep
                 embedded
-                attractionFeedItems={attractionFeedItems}
+                scopedToAttractionId={activeAttractionId || activeEventId || ''}
+                attractionFeedItems={visibleAttractionFeedItems}
                 currentAttractionFeedItem={currentAttractionFeedItem}
                 attractionFeedLocaleData={attractionFeedLocaleData}
                 attractionFeedActiveLocale={attractionFeedActiveLocale}
@@ -788,7 +918,8 @@ export default function SessionWizard({ components = {} } = {}) {
             <div className="pt-5 border-t border-gray-200">
               <SessionWizardAttractionAudioGuidesBlock
                 embedded
-                attractionAudioGuides={attractionAudioGuides}
+                scopedToAttractionId={activeAttractionId || activeEventId || ''}
+                attractionAudioGuides={visibleAttractionAudioGuides}
                 currentAttractionAudioGuide={currentAttractionAudioGuide}
                 attractionAudioGuideLocaleData={attractionAudioGuideLocaleData}
                 attractionAudioGuideActiveLocale={attractionAudioGuideActiveLocale}
@@ -797,6 +928,7 @@ export default function SessionWizard({ components = {} } = {}) {
                 audioGuideGeneratingPlan={audioGuideGeneratingPlan}
                 audioGuideGeneratingAllMainText={audioGuideGeneratingAllMainText}
                 audioGuideGeneratingItemTextById={audioGuideGeneratingItemTextById}
+                audioGuidePlanGenerationState={audioGuidePlanGenerationState}
                 referenceAttractions={referenceAttractions || []}
                 attractions={attractions || []}
                 onOpenAttractionAudioGuideDetail={openAttractionAudioGuideDetail}
@@ -815,6 +947,12 @@ export default function SessionWizard({ components = {} } = {}) {
                 onUploadAttractionAudioGuideTrack={uploadAttractionAudioGuideTrack}
                 onRemoveAttractionAudioGuideTrack={removeAttractionAudioGuideTrack}
                 onGenerateAttractionAudioGuidePlan={generateAttractionAudioGuidePlan}
+                onSetAttractionAudioGuidePlanGenerationPrompt={
+                  setAttractionAudioGuidePlanGenerationPrompt
+                }
+                onSetAttractionAudioGuidePlanItemsCount={
+                  setAttractionAudioGuidePlanItemsCount
+                }
                 onGenerateAttractionAudioGuideMainText={generateAttractionAudioGuideMainText}
                 onGenerateAttractionAudioGuideMainTextItem={
                   generateAttractionAudioGuideMainTextItem

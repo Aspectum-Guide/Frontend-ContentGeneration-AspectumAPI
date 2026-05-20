@@ -333,6 +333,19 @@ const isAudioGuidePlanUuid = (value) => {
 /**
  * Нормализует пункты плана для одного языка: legacy-строки и объекты → { id, title }.
  */
+const DEFAULT_AUDIO_GUIDE_PLAN_ITEMS_COUNT = 6;
+
+const emptyAudioGuidePlanGenerationLocaleState = () => ({
+  prompt: '',
+  desiredItemsCount: DEFAULT_AUDIO_GUIDE_PLAN_ITEMS_COUNT,
+});
+
+const normalizeAudioGuidePlanItemsCount = (value) => {
+  const n = Number.parseInt(String(value), 10);
+  if (!Number.isFinite(n)) return DEFAULT_AUDIO_GUIDE_PLAN_ITEMS_COUNT;
+  return Math.max(1, Math.min(n, 20));
+};
+
 const normalizeAudioGuidePlanItemsForLang = (items) => {
   const usedIds = new Set();
   const allocId = (preferred) => {
@@ -1346,6 +1359,13 @@ export function useSessionWizardController({ sessionId, confirm: confirmProp } =
     useState(false);
   const [audioGuideGeneratingItemTextById, setAudioGuideGeneratingItemTextById] =
     useState({});
+  /**
+   * UI-only: настройки «Сгенерировать план» по guideId/lang, не сохраняются в аудиогид.
+   * { [guideId]: { [lang]: { prompt, desiredItemsCount } } }
+   */
+  const [audioGuidePlanGenerationState, setAudioGuidePlanGenerationState] =
+    useState({});
+  const audioGuidePlanGenerationStateRef = useRef({});
 
   const [attractionFeedItems, setAttractionFeedItems] = useState([]);
   const [currentAttractionFeedItem, setCurrentAttractionFeedItem] = useState(null);
@@ -4219,6 +4239,63 @@ export function useSessionWizardController({ sessionId, confirm: confirmProp } =
     attractionAudioGuideLocaleDataRef.current = attractionAudioGuideLocaleData;
   }, [attractionAudioGuideLocaleData]);
 
+  useEffect(() => {
+    audioGuidePlanGenerationStateRef.current = audioGuidePlanGenerationState;
+  }, [audioGuidePlanGenerationState]);
+
+  const patchAudioGuidePlanGenerationState = useCallback((guideId, lang, patch) => {
+    const gid = normalizeId(guideId);
+    const langKey = String(lang || '').trim();
+    if (!gid || !langKey) return;
+
+    setAudioGuidePlanGenerationState((prev) => {
+      const rawPrev = prev[gid]?.[langKey];
+      const base =
+        typeof rawPrev === 'object' && rawPrev !== null && !Array.isArray(rawPrev)
+          ? { ...emptyAudioGuidePlanGenerationLocaleState(), ...rawPrev }
+          : {
+              ...emptyAudioGuidePlanGenerationLocaleState(),
+              prompt: typeof rawPrev === 'string' ? rawPrev : '',
+            };
+
+      const nextLocale = {
+        ...base,
+        ...patch,
+      };
+      if (Object.prototype.hasOwnProperty.call(patch, 'desiredItemsCount')) {
+        nextLocale.desiredItemsCount = normalizeAudioGuidePlanItemsCount(
+          patch.desiredItemsCount,
+        );
+      }
+
+      const next = {
+        ...prev,
+        [gid]: {
+          ...(prev[gid] || {}),
+          [langKey]: nextLocale,
+        },
+      };
+      audioGuidePlanGenerationStateRef.current = next;
+      return next;
+    });
+  }, []);
+
+  const setAttractionAudioGuidePlanGenerationPrompt = useCallback(
+    (guideId, lang, value) => {
+      patchAudioGuidePlanGenerationState(guideId, lang, { prompt: value });
+    },
+    [patchAudioGuidePlanGenerationState],
+  );
+
+  const setAttractionAudioGuidePlanItemsCount = useCallback(
+    (guideId, lang, value) => {
+      patchAudioGuidePlanGenerationState(guideId, lang, {
+        desiredItemsCount: value,
+      });
+    },
+    [patchAudioGuidePlanGenerationState],
+  );
+
   const addAttractionAudioGuide = useCallback(async () => {
     try {
       const activeAttractionId = normalizeId(currentAttr?.id);
@@ -4871,17 +4948,32 @@ export function useSessionWizardController({ sessionId, confirm: confirmProp } =
     }
 
     const expectedGuideId = normalizeId(guideId);
+    const planGenState =
+      audioGuidePlanGenerationStateRef.current[expectedGuideId]?.[lang] ?? {};
+    const planGenerationPrompt = String(planGenState.prompt ?? '').trim();
+    const desiredItemsCount = normalizeAudioGuidePlanItemsCount(
+      planGenState.desiredItemsCount,
+    );
     setAudioGuideGeneratingPlan(true);
 
     try {
-      const res = await attractionAudioGuidesAPI.generatePlan(sessionId, guideId, {
+      const planPayload = {
         lang,
         title: g.title ?? {},
         assigned_attraction_type: assigned,
         session_attraction_id: sessionAttractionId,
         event_id: eventId,
-        desired_items_count: 6,
-      });
+        desired_items_count: desiredItemsCount,
+      };
+      if (planGenerationPrompt) {
+        planPayload.prompt = planGenerationPrompt;
+      }
+
+      const res = await attractionAudioGuidesAPI.generatePlan(
+        sessionId,
+        guideId,
+        planPayload,
+      );
 
       if (res?.data?.success === false) {
         showNote(res?.data?.error || 'Не удалось сгенерировать план', 'error');
@@ -5894,6 +5986,7 @@ export function useSessionWizardController({ sessionId, confirm: confirmProp } =
     attractionFeedItems, currentAttractionFeedItem, attractionFeedLocaleData, attractionFeedActiveLocale, attractionFeedSaving, attractionFeedPhotoUploading, attractionFeedPhotoFileRef,
     attractionAudioGuides, currentAttractionAudioGuide, attractionAudioGuideLocaleData, attractionAudioGuideActiveLocale, attractionAudioGuideSaving, attractionAudioUploading,
     audioGuideGeneratingPlan, audioGuideGeneratingAllMainText, audioGuideGeneratingItemTextById,
+    audioGuidePlanGenerationState,
     attractionGenerationOpen, attractionGenerationPrompt, attractionGenerating, attractionGenerationTaskId, attractionGenerationError,
     attractionGenerationAssignedCityType, attractionGenerationSessionCityId, attractionGenerationDatabaseCityId, attractionGenerationLang,
     saving, closeOpen, closeMode, closing, publishing, translating,
@@ -5921,6 +6014,8 @@ export function useSessionWizardController({ sessionId, confirm: confirmProp } =
     uploadAttractionAudioGuideTrack,
     removeAttractionAudioGuideTrack,
     generateAttractionAudioGuidePlan,
+    setAttractionAudioGuidePlanGenerationPrompt,
+    setAttractionAudioGuidePlanItemsCount,
     generateAttractionAudioGuideMainText,
     generateAttractionAudioGuideMainTextItem,
     setCurrentAttractionFeedItem, setAttractionFeedActiveLocale,

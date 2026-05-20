@@ -301,6 +301,7 @@ function AudioGuideDraftsPanel({
 
 export default function SessionWizardAttractionAudioGuidesBlock({
   embedded = false,
+  scopedToAttractionId = '',
 
   attractionAudioGuides = [],
   currentAttractionAudioGuide,
@@ -311,6 +312,7 @@ export default function SessionWizardAttractionAudioGuidesBlock({
   audioGuideGeneratingPlan = false,
   audioGuideGeneratingAllMainText = false,
   audioGuideGeneratingItemTextById = {},
+  audioGuidePlanGenerationState = {},
 
   referenceAttractions = [],
   attractions = [],
@@ -331,6 +333,8 @@ export default function SessionWizardAttractionAudioGuidesBlock({
   onUploadAttractionAudioGuideTrack,
   onRemoveAttractionAudioGuideTrack,
   onGenerateAttractionAudioGuidePlan,
+  onSetAttractionAudioGuidePlanGenerationPrompt,
+  onSetAttractionAudioGuidePlanItemsCount,
   onGenerateAttractionAudioGuideMainText,
   onGenerateAttractionAudioGuideMainTextItem,
   onGoToStep,
@@ -397,7 +401,9 @@ export default function SessionWizardAttractionAudioGuidesBlock({
             <div className="text-3xl mb-2">🎧</div>
 
             <p className="text-sm">
-              Нет аудиогидов. Нажмите «+ Добавить»
+              {scopedToAttractionId
+                ? 'Для этой достопримечательности пока нет аудиогидов.'
+                : 'Нет аудиогидов. Нажмите «+ Добавить»'}
             </p>
           </div>
         ) : (
@@ -462,6 +468,25 @@ export default function SessionWizardAttractionAudioGuidesBlock({
   const planPoints = Array.isArray(currentLocale.contentPlan)
     ? currentLocale.contentPlan
     : [];
+
+  const currentGuideId = normalizeId(currentAttractionAudioGuide?.id);
+  const planContentLang = currentLocale.lang || 'ru';
+  const planGenLocaleState =
+    audioGuidePlanGenerationState?.[currentGuideId]?.[planContentLang];
+  const planGenerationPrompt =
+    (typeof planGenLocaleState === 'object' && planGenLocaleState !== null
+      ? planGenLocaleState.prompt
+      : typeof planGenLocaleState === 'string'
+        ? planGenLocaleState
+        : '') ?? '';
+  const planItemsCountRaw =
+    typeof planGenLocaleState === 'object' && planGenLocaleState !== null
+      ? planGenLocaleState.desiredItemsCount
+      : 6;
+  const planGenerationControlsDisabled =
+    audioGuideGeneratingPlan ||
+    attractionAudioGuideSaving ||
+    audioGuideGeneratingAllMainText;
 
   const trackAudioId = currentLocale.track?.audio_id || null;
   const trackAudioUrl = currentLocale.track?.audio_url || '';
@@ -668,15 +693,48 @@ export default function SessionWizardAttractionAudioGuidesBlock({
 
           </div>
 
+          <label className="block text-xs font-medium text-gray-600 mb-1">
+            Количество пунктов плана
+          </label>
+          <input
+            type="number"
+            min={1}
+            max={20}
+            value={planItemsCountRaw ?? 6}
+            onChange={(e) =>
+              onSetAttractionAudioGuidePlanItemsCount?.(
+                currentGuideId,
+                planContentLang,
+                e.target.value,
+              )
+            }
+            disabled={planGenerationControlsDisabled}
+            className="mb-3 w-24 px-3 py-1.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
+          />
+
+          <label className="block text-xs font-medium text-gray-600 mb-1">
+            Дополнительный промпт
+          </label>
+          <textarea
+            value={planGenerationPrompt}
+            onChange={(e) =>
+              onSetAttractionAudioGuidePlanGenerationPrompt?.(
+                currentGuideId,
+                planContentLang,
+                e.target.value,
+              )
+            }
+            disabled={planGenerationControlsDisabled}
+            rows={2}
+            placeholder="Например: сделай стиль живым, для туристов, акцент на архитектуре"
+            className="mb-3 w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-y min-h-[56px] disabled:opacity-50 disabled:cursor-not-allowed"
+          />
+
           <button
             type="button"
             onClick={() => onGenerateAttractionAudioGuidePlan?.()}
-            disabled={
-              audioGuideGeneratingPlan ||
-              attractionAudioGuideSaving ||
-              audioGuideGeneratingAllMainText
-            }
-            className="mb-2 px-3 py-1.5 text-xs font-medium text-gray-700 bg-gray-100 border border-gray-200 rounded-lg hover:bg-gray-200 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            disabled={planGenerationControlsDisabled}
+            className="mb-3 px-3 py-1.5 text-xs font-medium text-gray-700 bg-gray-100 border border-gray-200 rounded-lg hover:bg-gray-200 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {audioGuideGeneratingPlan ? 'Генерация...' : 'Сгенерировать план'}
           </button>
