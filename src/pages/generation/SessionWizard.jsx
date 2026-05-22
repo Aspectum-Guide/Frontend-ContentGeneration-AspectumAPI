@@ -110,6 +110,13 @@ export default function SessionWizard({ components = {} } = {}) {
     cityInfoLocaleData,
     cityInfoActiveLocale,
     cityInfoSaving,
+    cityInfoGenerateModalOpen,
+    cityInfoGeneratePrompt,
+    cityInfoGenerateCount,
+    cityInfoGenerating,
+    cityInfoGenerationError,
+    cityInfoGenerationTaskId,
+    cityInfoGenerationLang,
     attractions,
     attrView,
     currentAttr,
@@ -197,6 +204,12 @@ export default function SessionWizard({ components = {} } = {}) {
     updateCityInfoLocaleField,
     saveCurrentCityInfo,
     deleteCurrentCityInfo,
+    openCityInfoGenerateModal,
+    closeCityInfoGenerateModal,
+    setCityInfoGeneratePrompt,
+    setCityInfoGenerateCount,
+    setCityInfoGenerationLang,
+    generateCityInfoFromPrompt,
 
     openAttrDetail,
     addAttraction,
@@ -783,6 +796,19 @@ export default function SessionWizard({ components = {} } = {}) {
                 onSaveCurrentCityInfo={saveCurrentCityInfo}
                 onDeleteCurrentCityInfo={deleteCurrentCityInfo}
                 onGoToStep={goToStep}
+                cityInfoGenerateModalOpen={cityInfoGenerateModalOpen}
+                cityInfoGeneratePrompt={cityInfoGeneratePrompt}
+                cityInfoGenerateCount={cityInfoGenerateCount}
+                cityInfoGenerating={cityInfoGenerating}
+                cityInfoGenerationError={cityInfoGenerationError}
+                cityInfoGenerationTaskId={cityInfoGenerationTaskId}
+                cityInfoGenerationLang={cityInfoGenerationLang}
+                onOpenCityInfoGenerateModal={openCityInfoGenerateModal}
+                onCloseCityInfoGenerateModal={closeCityInfoGenerateModal}
+                onCityInfoGeneratePromptChange={setCityInfoGeneratePrompt}
+                onCityInfoGenerateCountChange={setCityInfoGenerateCount}
+                onCityInfoGenerationLangChange={setCityInfoGenerationLang}
+                onGenerateCityInfoFromPrompt={generateCityInfoFromPrompt}
               />
             </div>
           </div>

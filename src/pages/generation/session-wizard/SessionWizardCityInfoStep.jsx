@@ -1,4 +1,14 @@
+import { useMemo } from 'react';
 import { getFlag } from './sessionWizardShared.jsx';
+
+const AI_GENERATION_LANG_OPTIONS = [
+  { value: 'ru', label: 'Русский (ru)' },
+  { value: 'en', label: 'English (en)' },
+  { value: 'it', label: 'Italiano (it)' },
+  { value: 'fr', label: 'Français (fr)' },
+  { value: 'de', label: 'Deutsch (de)' },
+  { value: 'es', label: 'Español (es)' },
+];
 
 const normalizeId = (value) => {
   if (value == null) return '';
@@ -115,6 +125,8 @@ function CityInfoDraftsPanel({
   currentCityInfo,
   onSelectCityInfo,
   onAddCityInfo,
+  onOpenCityInfoGenerateModal,
+  showGenerateButton = false,
 }) {
   const currentCityInfoId = normalizeId(currentCityInfo?.id);
 
@@ -125,13 +137,25 @@ function CityInfoDraftsPanel({
           Черновики полезной информации в сессии
         </p>
 
-        <button
-          type="button"
-          onClick={onAddCityInfo}
-          className="px-2.5 py-1 text-xs font-medium text-blue-700 bg-blue-100 rounded-md hover:bg-blue-200 transition-colors"
-        >
-          + Добавить
-        </button>
+        <div className="flex items-center gap-2">
+          {showGenerateButton && (
+            <button
+              type="button"
+              onClick={onOpenCityInfoGenerateModal}
+              className="px-2.5 py-1 text-xs font-medium text-blue-700 bg-blue-100 rounded-md hover:bg-blue-200 transition-colors"
+            >
+              Сгенерировать
+            </button>
+          )}
+
+          <button
+            type="button"
+            onClick={onAddCityInfo}
+            className="px-2.5 py-1 text-xs font-medium text-blue-700 bg-blue-100 rounded-md hover:bg-blue-200 transition-colors"
+          >
+            + Добавить
+          </button>
+        </div>
       </div>
 
       <div className="flex flex-wrap gap-2">
@@ -193,8 +217,38 @@ export default function SessionWizardCityInfoStep({
   onSaveCurrentCityInfo,
   onDeleteCurrentCityInfo,
   onGoToStep,
+
+  cityInfoGenerateModalOpen = false,
+  cityInfoGeneratePrompt = '',
+  cityInfoGenerateCount = 5,
+  cityInfoGenerating = false,
+  cityInfoGenerationError = '',
+  cityInfoGenerationTaskId = null,
+  cityInfoGenerationLang = 'ru',
+  onOpenCityInfoGenerateModal,
+  onCloseCityInfoGenerateModal,
+  onCityInfoGeneratePromptChange,
+  onCityInfoGenerateCountChange,
+  onCityInfoGenerationLangChange,
+  onGenerateCityInfoFromPrompt,
 }) {
   const currentLocale = cityInfoLocaleData[cityInfoActiveLocale] || {};
+
+  const showGenerateButton = Boolean(scopedToCityDraftId);
+
+  const activeCityDraft = useMemo(() => {
+    if (!scopedToCityDraftId) return null;
+
+    return (
+      cityDrafts.find(
+        (draft) => normalizeId(draft.id) === normalizeId(scopedToCityDraftId)
+      ) || null
+    );
+  }, [cityDrafts, scopedToCityDraftId]);
+
+  const activeCityDraftDisplayName = activeCityDraft
+    ? getDraftCityDisplayName(activeCityDraft)
+    : null;
 
   const assignedCityType = currentCityInfo?.assigned_city_type || 'none';
 
@@ -214,6 +268,148 @@ export default function SessionWizardCityInfoStep({
 
   return (
     <section className={embedded ? 'space-y-4' : ''}>
+      {cityInfoGenerateModalOpen && (
+        <div
+          className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 p-4"
+          onClick={() => {
+            if (!cityInfoGenerating) onCloseCityInfoGenerateModal?.();
+          }}
+        >
+          <div
+            className="bg-white rounded-xl max-w-lg w-full p-6 shadow-xl space-y-4 relative"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="city-info-gen-title"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {cityInfoGenerating && (
+              <div className="absolute inset-0 bg-white/70 rounded-xl flex items-center justify-center z-10">
+                <div className="text-sm text-gray-700 font-medium">
+                  Генерация…
+                </div>
+              </div>
+            )}
+
+            <h2
+              id="city-info-gen-title"
+              className="text-lg font-semibold text-gray-900"
+            >
+              Сгенерировать полезную информацию о городе
+            </h2>
+
+            {activeCityDraftDisplayName ? (
+              <p className="text-sm text-gray-600">
+                Город:{' '}
+                <span className="font-medium">
+                  {activeCityDraftDisplayName}
+                </span>
+              </p>
+            ) : (
+              <p className="text-sm text-amber-700 bg-amber-50 border border-amber-200 rounded-lg p-3">
+                Город не выбран. Информация будет создана без привязки.
+              </p>
+            )}
+
+            <div>
+              <label
+                htmlFor="city-info-gen-lang"
+                className="block text-sm font-medium text-gray-700 mb-1"
+              >
+                Язык
+              </label>
+
+              <select
+                id="city-info-gen-lang"
+                value={cityInfoGenerationLang || 'ru'}
+                onChange={(e) => onCityInfoGenerationLangChange?.(e.target.value)}
+                disabled={cityInfoGenerating}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
+              >
+                {AI_GENERATION_LANG_OPTIONS.map((opt) => (
+                  <option key={opt.value} value={opt.value}>
+                    {opt.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <label
+                htmlFor="city-info-gen-count"
+                className="block text-sm font-medium text-gray-700 mb-1"
+              >
+                Количество пунктов
+              </label>
+
+              <input
+                id="city-info-gen-count"
+                type="number"
+                min={1}
+                max={20}
+                value={cityInfoGenerateCount}
+                onChange={(e) => onCityInfoGenerateCountChange?.(e.target.value)}
+                disabled={cityInfoGenerating}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
+              />
+            </div>
+
+            {cityInfoGenerationTaskId && (
+              <div className="text-xs text-gray-500">
+                Задача:{' '}
+                <span className="font-mono text-gray-700">
+                  {String(cityInfoGenerationTaskId).slice(0, 8)}…
+                </span>
+              </div>
+            )}
+
+            {cityInfoGenerationError && (
+              <div className="text-sm text-red-700 bg-red-50 border border-red-200 rounded-lg p-3">
+                {cityInfoGenerationError}
+              </div>
+            )}
+
+            <div>
+              <label
+                htmlFor="city-info-gen-prompt"
+                className="block text-sm font-medium text-gray-700 mb-1"
+              >
+                Дополнительный промпт
+              </label>
+
+              <textarea
+                id="city-info-gen-prompt"
+                rows={4}
+                value={cityInfoGeneratePrompt}
+                onChange={(e) => onCityInfoGeneratePromptChange?.(e.target.value)}
+                disabled={cityInfoGenerating}
+                placeholder="Например: для туристов, с акцентом на транспорт и безопасность"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 resize-none"
+              />
+            </div>
+
+            <div className="flex justify-end gap-2 pt-2">
+              <button
+                type="button"
+                onClick={() => onCloseCityInfoGenerateModal?.()}
+                disabled={cityInfoGenerating}
+                className="px-4 py-2 text-sm font-medium text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50"
+              >
+                Отмена
+              </button>
+
+              <button
+                type="button"
+                onClick={() => onGenerateCityInfoFromPrompt?.()}
+                disabled={cityInfoGenerating}
+                className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-50"
+              >
+                Сгенерировать
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {!currentCityInfo ? (
         <div className="space-y-4">
           <div className="flex items-center justify-between gap-3">
@@ -227,13 +423,25 @@ export default function SessionWizardCityInfoStep({
               </p>
             </div>
 
-            <button
-              type="button"
-              onClick={onAddCityInfo}
-              className="px-3 py-1.5 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors shrink-0"
-            >
-              + Добавить
-            </button>
+            <div className="flex items-center gap-2 shrink-0">
+              {showGenerateButton && (
+                <button
+                  type="button"
+                  onClick={onOpenCityInfoGenerateModal}
+                  className="px-3 py-1.5 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors"
+                >
+                  Сгенерировать
+                </button>
+              )}
+
+              <button
+                type="button"
+                onClick={onAddCityInfo}
+                className="px-3 py-1.5 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors"
+              >
+                + Добавить
+              </button>
+            </div>
           </div>
 
           {cityInfos.length === 0 ? (
@@ -331,6 +539,8 @@ export default function SessionWizardCityInfoStep({
             currentCityInfo={currentCityInfo}
             onSelectCityInfo={onOpenCityInfoDetail}
             onAddCityInfo={onAddCityInfo}
+            onOpenCityInfoGenerateModal={onOpenCityInfoGenerateModal}
+            showGenerateButton={showGenerateButton}
           />
 
           <div className="flex items-center gap-1 flex-wrap">

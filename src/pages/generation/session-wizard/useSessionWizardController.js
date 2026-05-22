@@ -1769,6 +1769,15 @@ export function useSessionWizardController({ sessionId, confirm: confirmProp } =
   const [attractionGenerationDatabaseCityId, setAttractionGenerationDatabaseCityId] = useState('');
   const [attractionGenerationLang, setAttractionGenerationLang] = useState('ru');
   const attractionGenPollCancelledRef = useRef(false);
+
+  const [cityInfoGenerateModalOpen, setCityInfoGenerateModalOpen] = useState(false);
+  const [cityInfoGeneratePrompt, setCityInfoGeneratePrompt] = useState('');
+  const [cityInfoGenerateCount, setCityInfoGenerateCount] = useState(5);
+  const [cityInfoGenerating, setCityInfoGenerating] = useState(false);
+  const [cityInfoGenerationError, setCityInfoGenerationError] = useState('');
+  const [cityInfoGenerationTaskId, setCityInfoGenerationTaskId] = useState(null);
+  const [cityInfoGenerationLang, setCityInfoGenerationLang] = useState('ru');
+  const cityInfoGenPollCancelledRef = useRef(false);
   const loadSessionSeqRef = useRef(0);
   const localCreatedCityDraftsRef = useRef(new Map());
   const localDeletedCityDraftIdsRef = useRef(new Set());
@@ -5637,6 +5646,154 @@ export function useSessionWizardController({ sessionId, confirm: confirmProp } =
     showNote,
   ]);
 
+  const resolveDefaultCityInfoAiLang = useCallback(() => {
+    const loc = localeData[activeLocale];
+    const locLang = (loc?.lang || '').trim().toLowerCase();
+    if (locLang) {
+      const base = locLang.split('-')[0];
+      return base || 'ru';
+    }
+
+    const draftId = normalizeDraftId(activeCityDraftIdRef.current);
+    const draft = cityDrafts.find((d) => normalizeDraftId(d.id) === draftId);
+
+    const collect = (obj) => {
+      if (!obj || typeof obj !== 'object') return null;
+      const keys = Object.keys(obj);
+      for (let i = 0; i < keys.length; i += 1) {
+        const k = keys[i];
+        if (k && /^[a-z]{2}/i.test(k)) return k.split('-')[0].toLowerCase();
+      }
+      return null;
+    };
+
+    return (
+      collect(draft?.name) ||
+      collect(draft?.description) ||
+      collect(draft?.country) ||
+      'ru'
+    );
+  }, [localeData, activeLocale, cityDrafts]);
+
+  const openCityInfoGenerateModal = useCallback(() => {
+    cityInfoGenPollCancelledRef.current = false;
+    setCityInfoGenerationError('');
+    setCityInfoGeneratePrompt('');
+    setCityInfoGenerateCount(5);
+    setCityInfoGenerationTaskId(null);
+    setCityInfoGenerationLang(resolveDefaultCityInfoAiLang());
+    setCityInfoGenerateModalOpen(true);
+  }, [resolveDefaultCityInfoAiLang]);
+
+  const closeCityInfoGenerateModal = useCallback(() => {
+    cityInfoGenPollCancelledRef.current = true;
+    setCityInfoGenerateModalOpen(false);
+    setCityInfoGenerating(false);
+    setCityInfoGenerationTaskId(null);
+    setCityInfoGenerationError('');
+  }, []);
+
+  const generateCityInfoFromPrompt = useCallback(async () => {
+    const prompt = cityInfoGeneratePrompt.trim();
+    const userPrompt = prompt || 'Сгенерируй полезную информацию для туристов';
+
+    const draftId = normalizeDraftId(activeCityDraftIdRef.current);
+    let assigned_city_type = 'none';
+    let session_city_id = null;
+
+    if (draftId && draftId !== 'legacy') {
+      assigned_city_type = 'draft';
+      session_city_id = draftId;
+    }
+
+    const langRaw = (cityInfoGenerationLang || 'ru').trim().toLowerCase();
+    const lang = (langRaw.split('-')[0] || 'ru').slice(0, 8) || 'ru';
+
+    let desired_items_count = parseInt(String(cityInfoGenerateCount), 10);
+    if (Number.isNaN(desired_items_count)) desired_items_count = 5;
+    desired_items_count = Math.max(1, Math.min(20, desired_items_count));
+
+    cityInfoGenPollCancelledRef.current = false;
+    setCityInfoGenerating(true);
+    setCityInfoGenerationError('');
+    setCityInfoGenerationTaskId(null);
+
+    try {
+      const startRes = await aiAPI.cityInfoJsonStart({
+        session_id: sessionId,
+        prompt: userPrompt,
+        lang,
+        desired_items_count,
+        assigned_city_type,
+        session_city_id: assigned_city_type === 'draft' ? session_city_id : null,
+        city_id: null,
+      });
+      const taskId = startRes?.data?.task_id;
+      if (!taskId) {
+        throw new Error('Сервер не вернул task_id');
+      }
+      setCityInfoGenerationTaskId(taskId);
+
+      let pollDone = false;
+      while (!pollDone) {
+        if (cityInfoGenPollCancelledRef.current) {
+          return;
+        }
+        const tr = await tasksAPI.get(taskId);
+        const task = tr?.data;
+        if (task?.status === 'completed') {
+          pollDone = true;
+        } else if (task?.status === 'failed') {
+          const failedMsg =
+            task?.error_message ||
+            task?.result_data?.error ||
+            'Задача завершилась с ошибкой';
+          throw new Error(failedMsg);
+        } else {
+          await new Promise((r) => setTimeout(r, 1000));
+        }
+      }
+
+      if (cityInfoGenPollCancelledRef.current) {
+        return;
+      }
+
+      const createRes = await aiAPI.cityInfoCreateFromTask(taskId, { session_id: sessionId });
+      const createdRaw = createRes?.data?.city_infos || [];
+      const created = (Array.isArray(createdRaw) ? createdRaw : []).map(normalizeCityInfo);
+      const n = created.length || createRes?.data?.created_count || 0;
+
+      if (created.length > 0) {
+        setCityInfos((prev) => {
+          const existingIds = new Set(prev.map((item) => String(item.id)));
+          const toAdd = created.filter((item) => item.id && !existingIds.has(String(item.id)));
+          return [...prev, ...toAdd];
+        });
+      }
+
+      if (!cityInfoGenPollCancelledRef.current) {
+        showNote(`Сгенерировано блоков полезной информации: ${n}`, 'success');
+        setCityInfoGenerateModalOpen(false);
+        setCityInfoGeneratePrompt('');
+        setCityInfoGenerationTaskId(null);
+      }
+    } catch (e) {
+      if (!cityInfoGenPollCancelledRef.current) {
+        const msg = parseApiError(e, 'Ошибка генерации');
+        setCityInfoGenerationError(msg);
+        showNote(msg, 'error');
+      }
+    } finally {
+      setCityInfoGenerating(false);
+    }
+  }, [
+    sessionId,
+    cityInfoGeneratePrompt,
+    cityInfoGenerateCount,
+    cityInfoGenerationLang,
+    showNote,
+  ]);
+
   const saveCurrentAttr = useCallback(async () => {
     if (!currentAttr) return;
     setAttrSaving(true);
@@ -5981,6 +6138,8 @@ export function useSessionWizardController({ sessionId, confirm: confirmProp } =
     cityTagCatalog, cityTagCatalogLoading, cityTagCatalogError, loadCityTagCatalog,
     deletingCityFilterIds, deletingEventFilterIds,
     cityInfos, currentCityInfo, cityInfoLocaleData, cityInfoActiveLocale, cityInfoSaving,
+    cityInfoGenerateModalOpen, cityInfoGeneratePrompt, cityInfoGenerateCount, cityInfoGenerating,
+    cityInfoGenerationError, cityInfoGenerationTaskId, cityInfoGenerationLang,
     attractions, attrView, currentAttr, attrLocaleData, attrActiveLocale, attrSaving,
     attractionInfos, currentAttractionInfo, attractionInfoLocaleData, attractionInfoActiveLocale, attractionInfoSaving,    
     attractionFeedItems, currentAttractionFeedItem, attractionFeedLocaleData, attractionFeedActiveLocale, attractionFeedSaving, attractionFeedPhotoUploading, attractionFeedPhotoFileRef,
@@ -6004,6 +6163,8 @@ export function useSessionWizardController({ sessionId, confirm: confirmProp } =
     uploadEventFilterImage,
     createEventFilterFolder, createEventFilterTag, updateEventFilter, deleteEventFilter,
     setCurrentCityInfo, setCityInfoActiveLocale, openCityInfoDetail, addCityInfo, updateCurrentCityInfoPatch, updateCityInfoLocaleField, saveCurrentCityInfo, deleteCurrentCityInfo,
+    openCityInfoGenerateModal, closeCityInfoGenerateModal, setCityInfoGeneratePrompt, setCityInfoGenerateCount, setCityInfoGenerationLang,
+    generateCityInfoFromPrompt,
     setCurrentAttractionInfo, setAttractionInfoActiveLocale, openAttractionInfoDetail, addAttractionInfo, updateCurrentAttractionInfoPatch, updateAttractionInfoLocaleField, saveCurrentAttractionInfo, deleteCurrentAttractionInfo,
     setCurrentAttractionAudioGuide, setAttractionAudioGuideActiveLocale,
     addAttractionAudioGuide, openAttractionAudioGuideDetail,
