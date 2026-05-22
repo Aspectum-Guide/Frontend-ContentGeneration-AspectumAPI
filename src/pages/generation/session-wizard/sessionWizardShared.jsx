@@ -28,6 +28,35 @@ export function getFlag(code) {
   return LOCALE_FLAGS[(code || '').toUpperCase()] || '🌍';
 }
 
+/** True when locale field has real words, not only punctuation/whitespace. */
+export function isMeaningfulLocaleText(value) {
+  const text = String(value ?? '').trim();
+  if (!text) return false;
+  return /[^\s.,!?;:\-—–_~*()[\]{}'"«»/\\|]+/u.test(text);
+}
+
+/** True when country value equals locale UI code (US/ES/DE), not a real country name. */
+export function isLocaleCodeUsedAsCountry(countryValue, localeCode) {
+  const country = String(countryValue ?? '').trim().toUpperCase();
+  const code = String(localeCode ?? '').trim().toUpperCase();
+  return Boolean(country && code && country === code);
+}
+
+/** Country text safe to persist: empty if missing or only a locale code placeholder. */
+export function normalizeLocaleCountryForSave(countryValue, localeCode) {
+  const trimmed = String(countryValue ?? '').trim();
+  if (!trimmed || isLocaleCodeUsedAsCountry(trimmed, localeCode)) {
+    return '';
+  }
+  return trimmed;
+}
+
+/** Description text safe to persist: empty if punctuation-only. */
+export function normalizeLocaleDescriptionForSave(value) {
+  const trimmed = String(value ?? '').trim();
+  return isMeaningfulLocaleText(trimmed) ? trimmed : '';
+}
+
 export function getCityDraftName(draft) {
   const name = draft?.name || {};
   return name.ru || name.en || name.it || Object.values(name).find(Boolean) || 'Новый город';

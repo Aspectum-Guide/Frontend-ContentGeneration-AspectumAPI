@@ -18,7 +18,14 @@ import {
   upsertFlatFilterRow,
 } from '../../../features/catalog/shared/tagCatalog';
 import { useToast } from '../../../components/ui/Toast.jsx';
-import { DEFAULT_LOCALE_DEFS, getLocaleInfo } from './sessionWizardShared.jsx';
+import {
+  DEFAULT_LOCALE_DEFS,
+  getLocaleInfo,
+  isLocaleCodeUsedAsCountry,
+  isMeaningfulLocaleText,
+  normalizeLocaleCountryForSave,
+  normalizeLocaleDescriptionForSave,
+} from './sessionWizardShared.jsx';
 
 const TOTAL_STEPS = 4;
 
@@ -1981,9 +1988,17 @@ export function useSessionWizardController({ sessionId, confirm: confirmProp } =
         return typeof value === 'string' ? value : (value?.text || '');
       };
 
-      newLocale[key].name = resolve(nameObj);
-      newLocale[key].description = resolve(descObj);
-      newLocale[key].country = resolve(countryObj);
+      const resolvedName = resolve(nameObj);
+      const resolvedDescription = resolve(descObj);
+      const resolvedCountry = resolve(countryObj);
+
+      newLocale[key].name = resolvedName;
+      newLocale[key].description = isMeaningfulLocaleText(resolvedDescription)
+        ? resolvedDescription
+        : '';
+      newLocale[key].country = isLocaleCodeUsedAsCountry(resolvedCountry, info.code)
+        ? ''
+        : String(resolvedCountry || '').trim();
     });
 
     setLocaleData(newLocale);
@@ -2356,8 +2371,8 @@ export function useSessionWizardController({ sessionId, confirm: confirmProp } =
     Object.entries(localeData).forEach(([key, loc]) => {
       if (!loc?.lang) return;
       const localeName = loc.name?.trim() || '';
-      const localeDescription = loc.description?.trim() || '';
-      const localeCountry = loc.country?.trim() || '';
+      const localeDescription = normalizeLocaleDescriptionForSave(loc.description);
+      const localeCountry = normalizeLocaleCountryForSave(loc.country, loc.code);
       const shouldPersistLocale = !!(
         localeName ||
         localeDescription ||
@@ -2369,7 +2384,7 @@ export function useSessionWizardController({ sessionId, confirm: confirmProp } =
       if (shouldPersistLocale) {
         name[loc.lang] = localeName;
         description[loc.lang] = localeDescription;
-        country[loc.lang] = localeCountry || loc.code || '';
+        country[loc.lang] = localeCountry;
       }
     });
 
@@ -2482,7 +2497,16 @@ export function useSessionWizardController({ sessionId, confirm: confirmProp } =
     const key = `${lang}-${code}`;
     setLocaleData(prev => ({
       ...prev,
-      [key]: { code, lang, langName, isDefault: false, isCustom: true, name: '', description: '', country: code },
+      [key]: {
+        code,
+        lang,
+        langName,
+        isDefault: false,
+        isCustom: true,
+        name: '',
+        description: '',
+        country: '',
+      },
     }));
     setActiveLocale(key);
     setAddLocaleOpen(false);
