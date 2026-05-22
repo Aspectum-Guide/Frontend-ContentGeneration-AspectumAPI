@@ -1,3 +1,75 @@
+export const DEFAULT_APP_LANGUAGES = [
+  { code: 'en', label: 'English' },
+  { code: 'ru', label: 'Russian' },
+  { code: 'it', label: 'Italian' },
+  { code: 'fr', label: 'French' },
+  { code: 'de', label: 'German' },
+  { code: 'es', label: 'Spanish' },
+];
+
+/**
+ * Ensure a multilingual object has every app language key (missing → '').
+ * Preserves existing values; does not add keys outside appLanguages unless already present.
+ */
+export const ensureAppLanguages = (value, appLanguages, defaultLang = 'ru') => {
+  const langs = Array.isArray(appLanguages) && appLanguages.length
+    ? appLanguages
+    : DEFAULT_APP_LANGUAGES;
+  const out = Object.fromEntries(langs.map((lang) => [lang.code, '']));
+
+  if (value && typeof value === 'object' && !Array.isArray(value)) {
+    Object.entries(value).forEach(([key, val]) => {
+      const lang = String(key || '').trim().toLowerCase();
+      if (!lang) return;
+      if (Object.prototype.hasOwnProperty.call(out, lang)) {
+        out[lang] = val == null ? '' : String(val);
+      }
+    });
+    return out;
+  }
+
+  if (typeof value === 'string') {
+    const lang = out[defaultLang] !== undefined ? defaultLang : langs[0]?.code;
+    if (lang) out[lang] = value;
+  }
+
+  return out;
+};
+
+/** Map API `{ code, label }` to MultiLangInput `{ code, name }` (preferred language first). */
+export function mapAppLanguagesForMultiLangInput(appLanguages, preferredFirst = 'ru') {
+  const langs = Array.isArray(appLanguages) && appLanguages.length
+    ? appLanguages
+    : DEFAULT_APP_LANGUAGES;
+  const sorted = [...langs].sort((a, b) => {
+    if (a.code === preferredFirst) return -1;
+    if (b.code === preferredFirst) return 1;
+    return 0;
+  });
+  return sorted.map(({ code, label, name }) => ({
+    code,
+    name: label || name || code,
+  }));
+}
+
+/** Parse GET /generation/app-languages/ (or fallback). */
+export function parseAppLanguagesResponse(res) {
+  const payload = res?.data;
+  if (Array.isArray(payload?.languages) && payload.languages.length) {
+    return payload.languages.map(({ code, label }) => ({
+      code: String(code || '').trim().toLowerCase(),
+      label: String(label || code || ''),
+    })).filter((row) => row.code);
+  }
+  if (payload?.success && Array.isArray(payload.languages)) {
+    return payload.languages.map(({ code, label }) => ({
+      code: String(code || '').trim().toLowerCase(),
+      label: String(label || code || ''),
+    })).filter((row) => row.code);
+  }
+  return DEFAULT_APP_LANGUAGES;
+}
+
 /** Unwrap `{ status: 'ok', data }` from EventsAPI / CityAPI JSON envelopes. */
 export function unwrapEnvelope(payload) {
   if (payload != null && typeof payload === 'object' && payload.status === 'ok' && 'data' in payload) {

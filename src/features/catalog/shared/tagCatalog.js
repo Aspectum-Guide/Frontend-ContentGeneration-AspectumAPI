@@ -1,6 +1,7 @@
 import { getMultiLangValue } from './i18n';
 import {
   collectIdsFromTree,
+  ensureAppLanguages,
   removeFilterIdsFromTree,
   unwrapEnvelope,
   upsertEventFilterInTree,
@@ -46,7 +47,7 @@ export function unwrapCreatedFilter(res) {
 }
 
 /** Normalize POST response body to a consistent filter shape for local state. */
-export function normalizeCreatedFilter(raw) {
+export function normalizeCreatedFilter(raw, appLanguages) {
   if (!raw || raw.id == null) return null;
 
   const parent = raw.parent;
@@ -55,11 +56,15 @@ export function normalizeCreatedFilter(raw) {
       ? raw.parent_id
       : parent?.id ?? parent ?? null;
 
+  const title = appLanguages?.length
+    ? ensureAppLanguages(raw.title, appLanguages)
+    : raw.title;
+
   return {
     ...raw,
     id: raw.id,
-    name: raw.name,
-    title: raw.title,
+    name: typeof raw.name === 'object' ? raw.name : raw.name,
+    title,
     description: raw.description,
     type: raw.type,
     parent_id: parentId,
@@ -215,30 +220,44 @@ export function upsertFlatFilterRow(rows = [], row) {
   });
 }
 
-export function mapCityTagCatalogRow(f) {
-  const title = f?.title && typeof f.title === 'object' ? f.title : {};
+export function mapCityTagCatalogRow(f, appLanguages) {
+  const rawTitle = f?.title && typeof f.title === 'object' ? f.title : {};
+  const fallbackTitle = typeof f?.name === 'string' && f.name && !rawTitle.ru && !rawTitle.en
+    ? { ru: f.name }
+    : {};
+  const title = Object.keys(rawTitle).length ? rawTitle : fallbackTitle;
   const desc = f?.description && typeof f.description === 'object' ? f.description : {};
-  const name = Object.keys(title).length ? title : (typeof f?.name === 'string' ? { ru: f.name } : {});
+  const name = appLanguages?.length
+    ? ensureAppLanguages(title, appLanguages)
+    : title;
   return {
     ...f,
     id: f.id,
     name,
-    slug: f.name || String(f.id),
+    title: name,
+    slug: typeof f?.name === 'string' ? f.name : String(f.id),
     emoji: typeof desc.emoji === 'string' ? desc.emoji : '',
     description: f.description,
     type: 'tag',
   };
 }
 
-export function mapEventFilterCatalogRow(f) {
-  const title = f?.title && typeof f.title === 'object' ? f.title : {};
+export function mapEventFilterCatalogRow(f, appLanguages) {
+  const rawTitle = f?.title && typeof f.title === 'object' ? f.title : {};
+  const fallbackTitle = typeof f?.name === 'string' && f.name && !rawTitle.ru && !rawTitle.en
+    ? { ru: f.name }
+    : {};
+  const title = Object.keys(rawTitle).length ? rawTitle : fallbackTitle;
   const desc = f?.description && typeof f.description === 'object' ? f.description : {};
-  const name = Object.keys(title).length ? title : (typeof f?.name === 'string' ? { ru: f.name } : {});
+  const name = appLanguages?.length
+    ? ensureAppLanguages(title, appLanguages)
+    : title;
   return {
     ...f,
     id: f.id,
     name,
-    slug: f.name || String(f.id),
+    title: name,
+    slug: typeof f?.name === 'string' ? f.name : String(f.id),
     emoji: typeof desc.emoji === 'string' ? desc.emoji : '',
     type: f.type || (f.parent_id ? 'tag' : 'folder'),
   };
@@ -261,25 +280,31 @@ export function mapEventTagForEventEditor(f) {
   };
 }
 
-export function buildCityTagCreatePayload(newFilter) {
+export function buildCityTagCreatePayload(newFilter, appLanguages, defaultLang = 'ru') {
   const titleObj = newFilter?.name && typeof newFilter.name === 'object' ? newFilter.name : {};
-  const ru = titleObj.ru || getMultiLangValue(titleObj) || '';
+  const normalized = appLanguages?.length
+    ? ensureAppLanguages(titleObj, appLanguages, defaultLang)
+    : titleObj;
+  const ru = normalized.ru || getMultiLangValue(normalized) || '';
   return {
     type: 'tag',
     parent_id: null,
     name: makeUniqueTagName(ru, 'city-tag'),
-    title: Object.keys(titleObj).length ? titleObj : (ru ? { ru } : {}),
+    title: normalized,
     description: newFilter?.emoji?.trim() ? { emoji: newFilter.emoji.trim() } : {},
     index: 0,
     is_show: true,
   };
 }
 
-export function buildCityTagUpdatePayload(editingFilter) {
+export function buildCityTagUpdatePayload(editingFilter, appLanguages) {
+  const title = appLanguages?.length
+    ? ensureAppLanguages(editingFilter.name, appLanguages)
+    : editingFilter.name;
   const payload = {
     type: 'tag',
     parent_id: null,
-    title: editingFilter.name,
+    title,
   };
   const desc = typeof editingFilter.description === 'object' && editingFilter.description
     ? { ...editingFilter.description }
@@ -290,10 +315,12 @@ export function buildCityTagUpdatePayload(editingFilter) {
   return payload;
 }
 
-export function buildEventFilterCreatePayload(newFilter) {
+export function buildEventFilterCreatePayload(newFilter, appLanguages, defaultLang = 'ru') {
   const titleObj = newFilter?.name && typeof newFilter.name === 'object' ? newFilter.name : {};
-  const ru = titleObj.ru || getMultiLangValue(titleObj) || '';
-  const title = Object.keys(titleObj).length ? titleObj : (ru ? { ru } : {});
+  const title = appLanguages?.length
+    ? ensureAppLanguages(titleObj, appLanguages, defaultLang)
+    : (Object.keys(titleObj).length ? titleObj : (titleObj.ru ? titleObj : {}));
+  const ru = title.ru || getMultiLangValue(title) || '';
   const isFolder = newFilter.kind !== 'tag';
   if (isFolder) {
     return {
@@ -323,10 +350,13 @@ export function buildEventFilterCreatePayload(newFilter) {
   };
 }
 
-export function buildEventFilterUpdatePayload(editingFilter) {
+export function buildEventFilterUpdatePayload(editingFilter, appLanguages) {
+  const title = appLanguages?.length
+    ? ensureAppLanguages(editingFilter.name, appLanguages)
+    : editingFilter.name;
   const payload = {
     type: editingFilter.type,
-    title: editingFilter.name,
+    title,
     parent_id: editingFilter.type === 'tag' ? (editingFilter.parent_id || null) : null,
   };
   const desc = typeof editingFilter.description === 'object' && editingFilter.description

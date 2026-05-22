@@ -5,10 +5,19 @@ import Modal from '../../../components/ui/Modal';
 import { ConfirmModal } from '../../../components/ui/Modal';
 import { Field, TextInput, FormActions } from '../../../components/ui/FormField';
 import Toast, { useToast } from '../../../components/ui/Toast.jsx';
-import { cityFiltersAPI, eventFiltersAPI } from '../../../api/generation';
+import { appLanguagesAPI, cityFiltersAPI, eventFiltersAPI } from '../../../api/generation';
 import { isNotFoundError, parseApiError } from '../../../utils/apiError';
+import MultiLangInput from '../../../components/forms/MultiLangInput';
 import { getMultiLangValue } from '../shared/i18n';
-import { flattenEventFilterTree, normalizeListResponse, unwrapEnvelope } from '../shared/normalize';
+import {
+  DEFAULT_APP_LANGUAGES,
+  ensureAppLanguages,
+  flattenEventFilterTree,
+  mapAppLanguagesForMultiLangInput,
+  normalizeListResponse,
+  parseAppLanguagesResponse,
+  unwrapEnvelope,
+} from '../shared/normalize';
 import {
   buildCityTagCreatePayload,
   buildCityTagUpdatePayload,
@@ -22,6 +31,13 @@ import {
   unwrapCreatedFilter,
   upsertFlatFilterRow,
 } from '../shared/tagCatalog';
+
+const DEFAULT_TAG_LANG = 'ru';
+
+function hasAnyTitleText(titleObj) {
+  if (!titleObj || typeof titleObj !== 'object') return false;
+  return Object.values(titleObj).some((v) => String(v ?? '').trim());
+}
 
 function useFilters(api, locallyDeletedFilterIdsRef, locallyCreatedFilterRowsRef) {
   const [filters, setFilters] = useState([]);
@@ -60,7 +76,20 @@ function initialNewFilter(mode) {
   return { name: {}, emoji: '' };
 }
 
-function FilterTab({ api, mode, icon, emptyText, createLabel, showNote }) {
+function FilterTab({
+  api,
+  mode,
+  icon,
+  emptyText,
+  createLabel,
+  showNote,
+  appLanguages,
+  defaultLang = DEFAULT_TAG_LANG,
+}) {
+  const multiLangLanguages = useMemo(
+    () => mapAppLanguagesForMultiLangInput(appLanguages),
+    [appLanguages],
+  );
   const locallyDeletedFilterIdsRef = useRef(new Set());
   const locallyCreatedFilterRowsRef = useRef(new Map());
   const { filters, setFilters, loading, error, reload } = useFilters(
@@ -100,7 +129,6 @@ function FilterTab({ api, mode, icon, emptyText, createLabel, showNote }) {
   const [newFilter, setNewFilter] = useState(() => initialNewFilter(mode));
   const [createTitle, setCreateTitle] = useState('');
   const [createEmoji, setCreateEmoji] = useState('');
-  const [editTitle, setEditTitle] = useState('');
   const [editEmoji, setEditEmoji] = useState('');
 
   const folderOptions = useMemo(
@@ -120,25 +148,20 @@ function FilterTab({ api, mode, icon, emptyText, createLabel, showNote }) {
   const handleSave = async (e) => {
     e?.preventDefault();
     if (!editingFilter?.id) return;
-    if (!editTitle.trim()) {
-      setSaveError('Введите название');
+    if (!hasAnyTitleText(editingFilter.name)) {
+      setSaveError('Введите название хотя бы на одном языке');
       return;
     }
     try {
       setSaving(true);
       setSaveError(null);
-      const prevName =
-        typeof editingFilter.name === 'object' && editingFilter.name
-          ? { ...editingFilter.name }
-          : {};
       const merged = {
         ...editingFilter,
-        name: { ...prevName, ru: editTitle.trim() },
+        name: ensureAppLanguages(editingFilter.name, appLanguages, defaultLang),
         emoji: editEmoji,
       };
       await api.update(editingFilter.id, merged);
       setEditingFilter(null);
-      setEditTitle('');
       setEditEmoji('');
       await reload();
     } catch (err) {
@@ -174,17 +197,21 @@ function FilterTab({ api, mode, icon, emptyText, createLabel, showNote }) {
       setCreateError(null);
       const payload = {
         ...newFilter,
-        name: { ru: createTitle.trim() },
+        name: ensureAppLanguages(
+          { [defaultLang]: createTitle.trim() },
+          appLanguages,
+          defaultLang,
+        ),
         emoji: createEmoji,
       };
       const res = await api.create(payload);
-      const created = normalizeCreatedFilter(unwrapCreatedFilter(res));
+      const created = normalizeCreatedFilter(unwrapCreatedFilter(res), appLanguages);
 
       if (created?.id != null) {
         const row =
           mode === 'city'
-            ? mapCityTagCatalogRow(created)
-            : mapEventFilterCatalogRow(created);
+            ? mapCityTagCatalogRow(created, appLanguages)
+            : mapEventFilterCatalogRow(created, appLanguages);
         const idStr = String(row.id);
         locallyDeletedFilterIdsRef.current.delete(idStr);
         locallyCreatedFilterRowsRef.current.set(idStr, row);
@@ -232,7 +259,6 @@ function FilterTab({ api, mode, icon, emptyText, createLabel, showNote }) {
 
   const closeEditModal = () => {
     setEditingFilter(null);
-    setEditTitle('');
     setEditEmoji('');
     setSaveError(null);
   };
@@ -304,7 +330,10 @@ function FilterTab({ api, mode, icon, emptyText, createLabel, showNote }) {
             <div className="font-medium text-gray-900 text-sm">{getMultiLangValue(name) || '—'}</div>
             {name && typeof name === 'object' && (
               <div className="text-xs text-gray-400 mt-0.5">
-                {Object.entries(name).filter(([, v]) => v).map(([k, v]) => `${k}: ${v}`).join(' · ')}
+                {appLanguages
+                  .filter(({ code }) => name[code])
+                  .map(({ code, label }) => `${label || code}: ${name[code]}`)
+                  .join(' · ')}
               </div>
             )}
           </div>
@@ -326,7 +355,7 @@ function FilterTab({ api, mode, icon, emptyText, createLabel, showNote }) {
       render: (v) => v || '—',
     });
     return base;
-  }, [mode]);
+  }, [mode, appLanguages]);
 
   return (
     <>
@@ -363,13 +392,11 @@ function FilterTab({ api, mode, icon, emptyText, createLabel, showNote }) {
               type="button"
               onClick={() => {
                 setSaveError(null);
-                setEditTitle(
-                  getMultiLangValue(row.name)
-                  || (row.name && typeof row.name === 'object' ? row.name.ru || row.name.en || '' : '')
-                  || '',
-                );
                 setEditEmoji(row.emoji || '');
-                setEditingFilter({ ...row });
+                setEditingFilter({
+                  ...row,
+                  name: ensureAppLanguages(row.name, appLanguages, defaultLang),
+                });
               }}
               className="px-3 py-1.5 text-xs font-medium text-blue-600 bg-blue-50 rounded-md hover:bg-blue-100 transition-colors"
             >
@@ -492,15 +519,13 @@ function FilterTab({ api, mode, icon, emptyText, createLabel, showNote }) {
                 />
               </Field>
             )}
-            <Field label={editNameLabel} required>
-              <TextInput
-                type="text"
-                value={editTitle}
-                onChange={(e) => setEditTitle(e.target.value)}
-                autoFocus
-                placeholder="Введите название"
-              />
-            </Field>
+            <MultiLangInput
+              label={editNameLabel}
+              required
+              languages={multiLangLanguages}
+              value={editingFilter.name || {}}
+              onChange={(name) => setEditingFilter((prev) => ({ ...prev, name }))}
+            />
             <Field label="Эмодзи (опционально)">
               <TextInput
                 value={editEmoji}
@@ -537,19 +562,35 @@ function FilterTab({ api, mode, icon, emptyText, createLabel, showNote }) {
 
 export default function TagsFilters() {
   const [activeTab, setActiveTab] = useState('city');
+  const [appLanguages, setAppLanguages] = useState(DEFAULT_APP_LANGUAGES);
   const { note, showNote } = useToast();
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await appLanguagesAPI.list();
+        if (!cancelled) {
+          setAppLanguages(parseAppLanguagesResponse(res));
+        }
+      } catch (e) {
+        console.error('Failed to load app languages', e);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, []);
 
   const cityCatalogApi = useMemo(() => ({
     list: async () => {
       const r = await cityFiltersAPI.getTags({ type: 'tag' });
       const raw = unwrapEnvelope(r?.data);
       const arr = Array.isArray(raw) ? raw : [];
-      return { data: arr.map(mapCityTagCatalogRow) };
+      return { data: arr.map((row) => mapCityTagCatalogRow(row, appLanguages)) };
     },
-    create: (nf) => cityFiltersAPI.create(buildCityTagCreatePayload(nf)),
-    update: (id, row) => cityFiltersAPI.update(id, buildCityTagUpdatePayload(row)),
+    create: (nf) => cityFiltersAPI.create(buildCityTagCreatePayload(nf, appLanguages, DEFAULT_TAG_LANG)),
+    update: (id, row) => cityFiltersAPI.update(id, buildCityTagUpdatePayload(row, appLanguages)),
     delete: (id) => cityFiltersAPI.delete(id),
-  }), []);
+  }), [appLanguages]);
 
   const eventCatalogApi = useMemo(() => ({
     list: async () => {
@@ -557,12 +598,12 @@ export default function TagsFilters() {
       const raw = unwrapEnvelope(r?.data);
       const tree = Array.isArray(raw) ? raw : [];
       const flat = flattenEventFilterTree(tree);
-      return { data: flat.map(mapEventFilterCatalogRow) };
+      return { data: flat.map((row) => mapEventFilterCatalogRow(row, appLanguages)) };
     },
-    create: (nf) => eventFiltersAPI.create(buildEventFilterCreatePayload(nf)),
-    update: (id, row) => eventFiltersAPI.update(id, buildEventFilterUpdatePayload(row)),
+    create: (nf) => eventFiltersAPI.create(buildEventFilterCreatePayload(nf, appLanguages, DEFAULT_TAG_LANG)),
+    update: (id, row) => eventFiltersAPI.update(id, buildEventFilterUpdatePayload(row, appLanguages)),
     delete: (id) => eventFiltersAPI.delete(id),
-  }), []);
+  }), [appLanguages]);
 
   return (
     <Layout>
@@ -601,6 +642,8 @@ export default function TagsFilters() {
           emptyText="Тегов городов нет"
           createLabel="Создать тег города"
           showNote={showNote}
+          appLanguages={appLanguages}
+          defaultLang={DEFAULT_TAG_LANG}
         />
       ) : (
         <FilterTab
@@ -611,6 +654,8 @@ export default function TagsFilters() {
           emptyText="Папок и тегов событий нет"
           createLabel="Создать папку или тег"
           showNote={showNote}
+          appLanguages={appLanguages}
+          defaultLang={DEFAULT_TAG_LANG}
         />
       )}
     </Layout>

@@ -2,6 +2,11 @@ import apiClient from './client';
 
 const BASE = '/generation';
 
+/** App-wide languages from settings.LANGUAGES (tags catalog, forms). */
+export const appLanguagesAPI = {
+  list: () => apiClient.get(`${BASE}/app-languages/`),
+};
+
 // ─── Sessions ────────────────────────────────────────────────────────────────
 export const sessionsAPI = {
   list: () => apiClient.get(`${BASE}/sessions/`),
