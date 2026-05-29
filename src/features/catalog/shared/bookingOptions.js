@@ -27,6 +27,24 @@ export function useEventOptions(pageSize = 500) {
   return { eventOptions, eventsLoading, reloadEvents: loadEvents };
 }
 
+export function useBookableEventOptions(pageSize = 500) {
+  const [bookableEvents, setBookableEvents] = useState([]);
+  const [bookableLoading, setBookableLoading] = useState(true);
+
+  useEffect(() => {
+    setBookableLoading(true);
+    bookingReferenceAPI.events({ page_size: pageSize, is_bookable: true })
+      .then((r) => {
+        const list = normalizeListResponse(r?.data, ['events', 'results', 'data']);
+        setBookableEvents(list);
+      })
+      .catch(() => setBookableEvents([]))
+      .finally(() => setBookableLoading(false));
+  }, [pageSize]);
+
+  return { bookableEvents, bookableLoading };
+}
+
 export function useTicketTypeOptions(eventId, pageSize = 500) {
   const [ticketTypeOptions, setTicketTypeOptions] = useState([]);
   const [ticketTypesLoading, setTicketTypesLoading] = useState(false);

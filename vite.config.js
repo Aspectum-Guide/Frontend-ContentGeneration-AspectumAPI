@@ -16,7 +16,7 @@ export default defineConfig(({ mode }) => {
     },
     server: {
       port: 17000,
-      allowedHosts: ['admin.dev2.aspectum-guide.com'],
+      allowedHosts: ['admin.dev.aspectum-guide.com'],
       proxy: {
         '/api': {
           target: apiTarget,

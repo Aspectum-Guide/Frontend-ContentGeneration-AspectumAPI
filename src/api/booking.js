@@ -10,6 +10,7 @@ export const ticketTypesAPI = {
 
 export const bookingReferenceAPI = {
   events: (params) => apiClient.get('/events/', { params }),
+  bookableEvents: (params) => apiClient.get('/generation/events/reference/', { params: { ...params, is_bookable: true, page_size: 500 } }),
 };
 
 export const eventSlotAvailabilitiesAPI = {

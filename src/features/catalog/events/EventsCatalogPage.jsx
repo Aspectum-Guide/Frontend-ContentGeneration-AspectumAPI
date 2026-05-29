@@ -42,12 +42,28 @@ export default function EventsCatalogPage() {
     },
     {
       key: 'is_show',
-      label: 'Статус',
-      render: (v) => (
-        <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${v ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'
-          }`}>
-          {v ? 'Активно' : 'Скрыто'}
-        </span>
+      label: 'Виден',
+      render: (v, row) => (
+        <button
+          onClick={() => e.toggleFlag(row.id, 'is_show', !v)}
+          title={v ? 'Скрыть' : 'Показать'}
+          className={`relative w-9 h-5 rounded-full transition-colors focus:outline-none ${v ? 'bg-blue-500' : 'bg-gray-300'}`}
+        >
+          <span className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-all ${v ? 'left-4' : 'left-0.5'}`} />
+        </button>
+      ),
+    },
+    {
+      key: 'is_bookable',
+      label: 'В сторе',
+      render: (v, row) => (
+        <button
+          onClick={() => e.toggleFlag(row.id, 'is_bookable', !v)}
+          title={v ? 'Убрать из стора' : 'Добавить в стор'}
+          className={`relative w-9 h-5 rounded-full transition-colors focus:outline-none ${v ? 'bg-green-500' : 'bg-gray-300'}`}
+        >
+          <span className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-all ${v ? 'left-4' : 'left-0.5'}`} />
+        </button>
       ),
     },
     {

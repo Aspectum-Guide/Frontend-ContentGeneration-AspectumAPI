@@ -192,14 +192,28 @@ export default function EventEditorModal({
                     <label className="flex items-center gap-2 cursor-pointer select-none">
                       <div
                         onClick={() => setEvent((p) => ({ ...p, is_show: !p.is_show }))}
-                        className={`relative w-10 h-5 rounded-full transition-colors cursor-pointer ${event?.is_show ? 'bg-blue-600' : 'bg-gray-300'
-                          }`}
+                        className={`relative w-10 h-5 rounded-full transition-colors cursor-pointer ${event?.is_show ? 'bg-blue-600' : 'bg-gray-300'}`}
                       >
-                        <span className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-all ${event?.is_show ? 'left-5' : 'left-0.5'
-                          }`} />
+                        <span className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-all ${event?.is_show ? 'left-5' : 'left-0.5'}`} />
                       </div>
                       <span className="text-sm text-gray-700">
                         {event?.is_show ? 'Показывается' : 'Скрыто'}
+                      </span>
+                    </label>
+                  </div>
+                </Field>
+
+                <Field label="В сторе">
+                  <div className="flex items-center h-full pt-1">
+                    <label className="flex items-center gap-2 cursor-pointer select-none">
+                      <div
+                        onClick={() => setEvent((p) => ({ ...p, is_bookable: !p.is_bookable }))}
+                        className={`relative w-10 h-5 rounded-full transition-colors cursor-pointer ${event?.is_bookable ? 'bg-green-500' : 'bg-gray-300'}`}
+                      >
+                        <span className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-all ${event?.is_bookable ? 'left-5' : 'left-0.5'}`} />
+                      </div>
+                      <span className="text-sm text-gray-700">
+                        {event?.is_bookable ? 'Продажи открыты' : 'Не в продаже'}
                       </span>
                     </label>
                   </div>

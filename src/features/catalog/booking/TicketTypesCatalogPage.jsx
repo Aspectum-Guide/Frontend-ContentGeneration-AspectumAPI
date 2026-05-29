@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { ticketTypesAPI } from '../../../api/booking';
 import Layout from '../../../components/Layout';
 import DataTable from '../../../components/ui/DataTable';
+import AssignTicketTypeModal from './AssignTicketTypeModal';
 import { Field, FormActions, TextInput } from '../../../components/ui/FormField';
 import Modal, { ConfirmModal } from '../../../components/ui/Modal';
 import { useLayoutActions } from '../../../context/useLayoutActions';
@@ -21,6 +22,7 @@ function createEmptyTicketType() {
   return {
     id: null,
     event: '',
+    code: '',
     name: {},
     name_primary: '',
     description: {},
@@ -51,6 +53,8 @@ export default function TicketTypesCatalog() {
 
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [deleting, setDeleting] = useState(false);
+
+  const [assignTarget, setAssignTarget] = useState(null);
 
   const eventMap = useMemo(() => {
     const map = new Map();
@@ -158,6 +162,7 @@ export default function TicketTypesCatalog() {
     setEditingType({
       id: row.id,
       event: row.event || '',
+      code: row.code || '',
       name: typeof row.name === 'object' && row.name ? row.name : (row.name ? { ru: String(row.name) } : {}),
       name_primary: row.name_primary || '',
       description: typeof row.description === 'object' && row.description ? row.description : (row.description ? { ru: String(row.description) } : {}),
@@ -172,9 +177,9 @@ export default function TicketTypesCatalog() {
 
     const payload = {
       event: editingType.event,
+      code: (editingType.code || '').trim().toLowerCase(),
       name: editingType.name || {},
       description: editingType.description || {},
-      name_primary: (editingType.name_primary || '').trim(),
       sort_order: Number(editingType.sort_order || 0),
       is_active: !!editingType.is_active,
     };
@@ -220,6 +225,9 @@ export default function TicketTypesCatalog() {
           <div className="text-sm font-medium text-gray-900">
             {getMultiLangValue(row?.name) || row?.name_primary || value || '—'}
           </div>
+          {row.code ? (
+            <div className="text-xs text-gray-400 mt-0.5 font-mono">{row.code}</div>
+          ) : null}
           {row.description ? (
             <div className="text-xs text-gray-500 mt-0.5 line-clamp-2">
               {getMultiLangValue(row.description) || (typeof row.description === 'string' ? row.description : '')}
@@ -314,10 +322,19 @@ export default function TicketTypesCatalog() {
           </>
         )}
         actions={(row) => (
-          <TableRowActions
-            onEdit={() => openEdit(row)}
-            onDelete={() => setDeleteTarget(row)}
-          />
+          <div className="flex items-center gap-1">
+            <button
+              onClick={() => setAssignTarget(row)}
+              title="Назначить ивентам"
+              className="px-2 py-1.5 text-xs font-medium text-purple-600 bg-purple-50 rounded-md hover:bg-purple-100 transition-colors"
+            >
+              Ивенты
+            </button>
+            <TableRowActions
+              onEdit={() => openEdit(row)}
+              onDelete={() => setDeleteTarget(row)}
+            />
+          </div>
         )}
       />
 
@@ -351,13 +368,13 @@ export default function TicketTypesCatalog() {
               </Field>
 
               <Field
-                label="Ключ (name_primary)"
-                hint="Используется для сортировки/поиска/фильтрации. Если оставить пустым — будет взят из переводов."
+                label="Код"
+                hint="Стабильный идентификатор для аналитики между ивентами. Например: adult, child, vip."
               >
                 <TextInput
-                  value={editingType.name_primary || ''}
-                  onChange={(e) => setEditingType((prev) => ({ ...prev, name_primary: e.target.value }))}
-                  placeholder="Например: adult / child / vip"
+                  value={editingType.code || ''}
+                  onChange={(e) => setEditingType((prev) => ({ ...prev, code: e.target.value }))}
+                  placeholder="adult / child / vip"
                 />
               </Field>
 
@@ -452,6 +469,13 @@ export default function TicketTypesCatalog() {
         confirmLabel="Удалить"
         danger
         loading={deleting}
+      />
+
+      <AssignTicketTypeModal
+        open={!!assignTarget}
+        ticketType={assignTarget}
+        onClose={() => setAssignTarget(null)}
+        onDone={() => loadTicketTypes()}
       />
     </Layout>
   );

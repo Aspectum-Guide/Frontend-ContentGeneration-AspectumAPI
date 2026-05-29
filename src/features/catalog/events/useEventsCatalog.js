@@ -158,6 +158,15 @@ export function useEventsCatalog() {
     }
   }, [editingEvent, loadEvents, page, debouncedSearch, cityFilter]);
 
+  const toggleFlag = useCallback(async (eventId, field, value) => {
+    setEvents((prev) => prev.map((ev) => ev.id === eventId ? { ...ev, [field]: value } : ev));
+    try {
+      await eventsCatalogAPI.update(eventId, { [field]: value });
+    } catch {
+      setEvents((prev) => prev.map((ev) => ev.id === eventId ? { ...ev, [field]: !value } : ev));
+    }
+  }, []);
+
   const requestDelete = useCallback((row) => {
     setDeleteError(null);
     setDeleteTarget(row);
@@ -233,6 +242,8 @@ export function useEventsCatalog() {
     deleteError,
     requestDelete,
     confirmDelete,
+
+    toggleFlag,
 
     // shortcuts
     openTags,
