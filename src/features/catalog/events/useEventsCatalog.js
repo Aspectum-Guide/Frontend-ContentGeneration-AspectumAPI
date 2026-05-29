@@ -15,7 +15,9 @@ export function useEventsCatalog() {
 
   const [cityFilter, setCityFilter] = useState('');
   const [cityOptions, setCityOptions] = useState([]);
+  const [cityOptionsError, setCityOptionsError] = useState(null);
   const [allEventFilters, setAllEventFilters] = useState([]);
+  const [filtersError, setFiltersError] = useState(null);
 
   const [events, setEvents] = useState([]);
   const [totalCount, setTotalCount] = useState(0);
@@ -66,8 +68,9 @@ export function useEventsCatalog() {
         const data = r?.data;
         const list = normalizeListResponse(data, ['data', 'results']);
         setCityOptions(list);
+        setCityOptionsError(null);
       })
-      .catch(() => { });
+      .catch(() => setCityOptionsError('Не удалось загрузить список городов'));
 
     eventsCatalogAPI
       .listFilters()
@@ -75,8 +78,9 @@ export function useEventsCatalog() {
         const data = r?.data;
         const list = Array.isArray(data) ? data : normalizeListResponse(data, ['filters', 'tags', 'results']);
         setAllEventFilters(list);
+        setFiltersError(null);
       })
-      .catch(() => { });
+      .catch(() => setFiltersError('Не удалось загрузить теги событий'));
   }, []);
 
   useEffect(() => {
@@ -244,6 +248,9 @@ export function useEventsCatalog() {
     confirmDelete,
 
     toggleFlag,
+
+    cityOptionsError,
+    filtersError,
 
     // shortcuts
     openTags,

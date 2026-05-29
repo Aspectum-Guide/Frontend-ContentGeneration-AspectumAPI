@@ -122,6 +122,21 @@ export default function EventsCatalogPage() {
         <p className="mt-1 text-sm text-gray-500">Просмотр и редактирование событий</p>
       </div>
 
+      {(e.cityOptionsError || e.filtersError) && (
+        <div className="mb-4 flex flex-col gap-1">
+          {e.cityOptionsError && (
+            <div className="text-sm text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+              ⚠ {e.cityOptionsError} — фильтр по городу недоступен
+            </div>
+          )}
+          {e.filtersError && (
+            <div className="text-sm text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+              ⚠ {e.filtersError} — теги в форме недоступны
+            </div>
+          )}
+        </div>
+      )}
+
       <DataTable
         columns={columns}
         rows={e.events}

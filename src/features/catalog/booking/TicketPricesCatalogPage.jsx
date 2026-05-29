@@ -223,7 +223,7 @@ export default function TicketPricesCatalog() {
         await ticketPricesAPI.create(payload);
       }
       setEditingPrice(null);
-      await reload();
+      await reload(page);
     } catch (err) {
       setSaveError(parseApiError(err, editingPrice.id ? 'Ошибка сохранения цены' : 'Ошибка создания цены'));
     } finally {
@@ -238,7 +238,7 @@ export default function TicketPricesCatalog() {
       setDeleting(true);
       await ticketPricesAPI.delete(deleteTarget.id);
       setDeleteTarget(null);
-      await reload();
+      await reload(page);
     } catch (err) {
       prices.setError(parseApiError(err, 'Ошибка удаления цены'));
     } finally {

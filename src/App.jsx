@@ -1,4 +1,5 @@
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
+import ErrorBoundary from './components/ErrorBoundary';
 import ProtectedRoute from './components/ProtectedRoute';
 import { LayoutActionsProvider } from './context/LayoutActionsContext';
 import AISettings from './pages/ai/AISettings';
@@ -36,6 +37,7 @@ const ENABLE_LOGIN = false;
 
 function App() {
   return (
+    <ErrorBoundary>
     <LayoutActionsProvider>
       <BrowserRouter>
         <Routes>
@@ -87,6 +89,7 @@ function App() {
         </Routes>
       </BrowserRouter>
     </LayoutActionsProvider>
+    </ErrorBoundary>
   );
 }
 
