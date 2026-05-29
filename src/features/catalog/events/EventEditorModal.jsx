@@ -270,12 +270,7 @@ export default function EventEditorModal({
               </Field>
             )}
 
-            <div className="hidden md:block">
-              <FormActions saving={saving} onCancel={onClose} saveLabel={event?.id ? 'Сохранить' : 'Создать'} />
-            </div>
-            <div className="md:hidden text-xs text-gray-500 border border-dashed border-gray-300 rounded-lg p-3">
-              Кнопки формы перенесены в верхнее меню «Действия».
-            </div>
+            <FormActions saving={saving} onCancel={onClose} saveLabel={event?.id ? 'Сохранить' : 'Создать'} />
           </form>
         )}
       </Modal>

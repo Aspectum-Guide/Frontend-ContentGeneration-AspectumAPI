@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Layout from '../../../components/Layout';
 import DataTable from '../../../components/ui/DataTable';
@@ -12,6 +12,16 @@ export default function EventsCatalogPage() {
   const { setMobileActions } = useLayoutActions();
   const navigate = useNavigate();
   const e = useEventsCatalog();
+  const [toggleConfirm, setToggleConfirm] = useState(null); // { id, field, value, label }
+
+  const requestToggle = (id, field, value, label) => {
+    if (!value) {
+      // отключение — спрашиваем подтверждение
+      setToggleConfirm({ id, field, value, label });
+    } else {
+      e.toggleFlag(id, field, value);
+    }
+  };
 
   const columns = [
     {
@@ -45,7 +55,7 @@ export default function EventsCatalogPage() {
       label: 'Виден',
       render: (v, row) => (
         <button
-          onClick={() => e.toggleFlag(row.id, 'is_show', !v)}
+          onClick={() => requestToggle(row.id, 'is_show', !v, `Скрыть «${getMultiLangValue(row.title) || row.id}»?`)}
           title={v ? 'Скрыть' : 'Показать'}
           className={`relative w-9 h-5 rounded-full transition-colors focus:outline-none ${v ? 'bg-blue-500' : 'bg-gray-300'}`}
         >
@@ -58,7 +68,7 @@ export default function EventsCatalogPage() {
       label: 'В сторе',
       render: (v, row) => (
         <button
-          onClick={() => e.toggleFlag(row.id, 'is_bookable', !v)}
+          onClick={() => requestToggle(row.id, 'is_bookable', !v, `Убрать «${getMultiLangValue(row.title) || row.id}» из стора?`)}
           title={v ? 'Убрать из стора' : 'Добавить в стор'}
           className={`relative w-9 h-5 rounded-full transition-colors focus:outline-none ${v ? 'bg-green-500' : 'bg-gray-300'}`}
         >
@@ -200,6 +210,23 @@ export default function EventsCatalogPage() {
         onSetMedia={e.setEventMedia}
         mediaSaving={e.mediaSaving}
         mediaError={e.mediaError}
+      />
+
+      <ConfirmModal
+        open={!!toggleConfirm}
+        onClose={() => setToggleConfirm(null)}
+        onConfirm={() => {
+          e.toggleFlag(toggleConfirm.id, toggleConfirm.field, toggleConfirm.value);
+          setToggleConfirm(null);
+        }}
+        title={toggleConfirm?.label || 'Подтвердите действие'}
+        message={
+          toggleConfirm?.field === 'is_show'
+            ? 'Ивент исчезнет из публичного приложения.'
+            : 'Покупка билетов на этот ивент будет остановлена.'
+        }
+        confirmLabel="Да, отключить"
+        danger
       />
 
       <ConfirmModal

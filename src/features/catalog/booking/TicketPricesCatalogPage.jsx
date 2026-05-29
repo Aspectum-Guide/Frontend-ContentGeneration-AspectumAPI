@@ -337,10 +337,10 @@ export default function TicketPricesCatalog() {
             <select
               value={eventFilter}
               onChange={(e) => setEventFilter(e.target.value)}
-              className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+              className={`px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none ${eventsLoading ? 'opacity-60 cursor-wait' : ''}`}
               disabled={eventsLoading}
             >
-              <option value="">Все события</option>
+              <option value="">{eventsLoading ? 'Загрузка событий…' : 'Все события'}</option>
               {eventOptions.map((eventItem) => (
                 <option key={eventItem.id} value={eventItem.id}>
                   {getMultiLangValue(eventItem.title) || eventItem.id}
@@ -351,10 +351,10 @@ export default function TicketPricesCatalog() {
             <select
               value={ticketTypeFilter}
               onChange={(e) => setTicketTypeFilter(e.target.value)}
-              className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+              className={`px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none ${ticketTypesLoading ? 'opacity-60 cursor-wait' : ''}`}
               disabled={!eventFilter || ticketTypesLoading}
             >
-              <option value="">{eventFilter ? 'Все типы' : 'Сначала выберите событие'}</option>
+              <option value="">{ticketTypesLoading ? 'Загрузка типов…' : eventFilter ? 'Все типы' : 'Сначала выберите событие'}</option>
               {ticketTypeOptions.map((tt) => (
                 <option key={tt.id} value={tt.id}>
                   {getMultiLangValue(tt.name) || tt.name_primary || tt.id}
@@ -415,11 +415,11 @@ export default function TicketPricesCatalog() {
                 <select
                   value={editingPrice.ticket_type}
                   onChange={(e) => setEditingPrice((prev) => ({ ...prev, ticket_type: e.target.value, slot: '' }))}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+                  className={`w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none ${formTicketTypesLoading ? 'opacity-60 cursor-wait' : ''}`}
                   required
                   disabled={!editingPrice.event || formTicketTypesLoading}
                 >
-                  <option value="">{editingPrice.event ? 'Выберите тип' : 'Сначала выберите событие'}</option>
+                  <option value="">{formTicketTypesLoading ? 'Загрузка типов…' : editingPrice.event ? 'Выберите тип' : 'Сначала выберите событие'}</option>
                   {formTicketTypeOptions.map((tt) => (
                     <option key={tt.id} value={tt.id}>
                       {getMultiLangValue(tt.name) || tt.name_primary || tt.id}
@@ -433,12 +433,12 @@ export default function TicketPricesCatalog() {
               <select
                 value={editingPrice.slot}
                 onChange={(e) => setEditingPrice((prev) => ({ ...prev, slot: e.target.value }))}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+                className={`w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none ${slotsLoading ? 'opacity-60 cursor-wait' : ''}`}
                 required
                 disabled={!editingPrice.ticket_type || slotsLoading}
               >
                 <option value="">
-                  {editingPrice.ticket_type ? 'Выберите слот' : 'Сначала выберите тип билета'}
+                  {slotsLoading ? 'Загрузка слотов…' : editingPrice.ticket_type ? 'Выберите слот' : 'Сначала выберите тип билета'}
                 </option>
                 {slotOptions.map((slotItem) => (
                   <option key={slotItem.id} value={slotItem.id}>

@@ -288,10 +288,10 @@ export default function TicketTypesCatalog() {
             <select
               value={eventFilter}
               onChange={(e) => setEventFilter(e.target.value)}
-              className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+              className={`px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none ${eventsLoading ? 'opacity-60 cursor-wait' : ''}`}
               disabled={eventsLoading}
             >
-              <option value="">Все события</option>
+              <option value="">{eventsLoading ? 'Загрузка событий…' : 'Все события'}</option>
               {eventOptions.map((eventItem) => (
                 <option key={eventItem.id} value={eventItem.id}>
                   {getMultiLangValue(eventItem.title) || eventItem.id}
