@@ -4,6 +4,7 @@ import { useParams } from 'react-router-dom';
 import Layout from '../../components/Layout';
 import CommonsImagePicker from '../../components/generation/CommonsImagePicker';
 import SessionWizardAttractionsStep from './session-wizard/SessionWizardAttractionsStep';
+import SessionWizardInteractiveLocationsStep from './session-wizard/SessionWizardInteractiveLocationsStep';
 import SessionWizardCityStep from './session-wizard/SessionWizardCityStep';
 import SessionWizardPublishStep from './session-wizard/SessionWizardPublishStep';
 import SessionWizardTagsCatalogStep from './session-wizard/SessionWizardTagsCatalogStep';
@@ -32,6 +33,7 @@ const STEP_LABELS = [
   'Город',
   'Теги',
   'Достопримечательности',
+  'Интерактивные локации',
   'Публикация',
 ];
 
@@ -118,6 +120,14 @@ export default function SessionWizard({ components = {} } = {}) {
     cityInfoGenerationTaskId,
     cityInfoGenerationLang,
     attractions,
+    interactiveLocations,
+    ilView,
+    currentIl,
+    ilLocaleData,
+    ilActiveLocale,
+    ilSaving,
+    ilPhotoUploading,
+    ilPhotoFileRef,
     attrView,
     currentAttr,
     attrLocaleData,
@@ -223,10 +233,28 @@ export default function SessionWizard({ components = {} } = {}) {
     generateAttractionsFromPrompt,
     deleteCurrentAttr,
     saveCurrentAttr,
+    saveCurrentAttrIfDirty,
     saveCityForStep1,
     updateAttrLocaleField,
     updateCurrentAttrPatch,
     toggleCurrentAttractionTag,
+
+    openIlDetail,
+    addInteractiveLocation,
+    deleteCurrentIl,
+    saveCurrentIl,
+    saveCurrentIlIfDirty,
+    persistInteractiveLocationImage,
+    persistAttractionImage,
+    leaveIlDetailView,
+    updateIlLocaleField,
+    updateCurrentIlPatch,
+    toggleCurrentIlTag,
+    handleIlPhotoFile,
+    handleIlGeneratePlaceholder,
+    setIlView,
+    setCurrentIl,
+    setIlActiveLocale,
 
     setCurrentAttractionInfo,
     setAttractionInfoActiveLocale,
@@ -428,6 +456,16 @@ export default function SessionWizard({ components = {} } = {}) {
     setCommonsModalOpen(true);
   };
 
+  const openInteractiveLocationCommonsModal = (il) => {
+    setCommonsTarget({
+      type: 'interactive_location',
+      interactiveLocationId: il?.id ?? currentIl?.id ?? null,
+      feedItemId: null,
+    });
+
+    setCommonsModalOpen(true);
+  };
+
   const openAttractionFeedCommonsModal = (item) => {
     setCommonsTarget({
       type: 'attraction_feed',
@@ -472,24 +510,59 @@ export default function SessionWizard({ components = {} } = {}) {
       image?.image?.copyright ||
       '';
 
+    if (commonsTarget.type === 'interactive_location') {
+      void (async () => {
+        try {
+          await persistInteractiveLocationImage?.({
+            image_id: selectedImageId,
+            image: selectedImageId,
+            image_url: localUrl,
+            imageUrl: localUrl,
+            imagePreview: localUrl,
+            image_original_url: originalUrl,
+            imageOriginalUrl: originalUrl,
+            image_copyright: copyright,
+            imageCopyright: copyright,
+          });
+
+          setCommonsModalOpen(false);
+          showNote?.(
+            'Изображение интерактивной локации загружено из Wikimedia Commons',
+            'success',
+          );
+        } catch {
+          // persistInteractiveLocationImage already shows an error note
+        }
+      })();
+
+      return;
+    }
+
     if (commonsTarget.type === 'attraction') {
-      updateCurrentAttrPatch?.({
-        image_id: selectedImageId,
-        image: selectedImageId,
+      void (async () => {
+        try {
+          await persistAttractionImage?.({
+            image_id: selectedImageId,
+            image: selectedImageId,
+            image_url: localUrl,
+            imageUrl: localUrl,
+            imagePreview: localUrl,
+            image_original_url: originalUrl,
+            imageOriginalUrl: originalUrl,
+            image_copyright: copyright,
+            imageCopyright: copyright,
+          });
 
-        image_url: localUrl,
-        imageUrl: localUrl,
-        imagePreview: localUrl,
+          setCommonsModalOpen(false);
+          showNote?.(
+            'Изображение достопримечательности загружено из Wikimedia Commons',
+            'success',
+          );
+        } catch {
+          // persistAttractionImage already shows an error note
+        }
+      })();
 
-        image_original_url: originalUrl,
-        imageOriginalUrl: originalUrl,
-
-        image_copyright: copyright,
-        imageCopyright: copyright,
-      });
-
-      setCommonsModalOpen(false);
-      showNote?.('Изображение достопримечательности загружено из Wikimedia Commons', 'success');
       return;
     }
 
@@ -634,7 +707,7 @@ export default function SessionWizard({ components = {} } = {}) {
               if (currentStep === 3) {
                 void (async () => {
                   if (currentAttr) {
-                    await saveCurrentAttr?.();
+                    await saveCurrentAttrIfDirty?.();
                     return;
                   }
 
@@ -657,6 +730,13 @@ export default function SessionWizard({ components = {} } = {}) {
               }
 
               if (currentStep === 4) {
+                if (currentIl) {
+                  void saveCurrentIlIfDirty?.().catch(() => {});
+                }
+                return;
+              }
+
+              if (currentStep === 5) {
                 return;
               }
             }}
@@ -664,6 +744,7 @@ export default function SessionWizard({ components = {} } = {}) {
               saving ||
               cityInfoSaving ||
               attrSaving ||
+              ilSaving ||
               attractionInfoSaving ||
               attractionFeedSaving ||
               attractionAudioGuideSaving
@@ -674,6 +755,7 @@ export default function SessionWizard({ components = {} } = {}) {
             {saving ||
             cityInfoSaving ||
             attrSaving ||
+            ilSaving ||
             attractionInfoSaving ||
             attractionFeedSaving ||
             attractionAudioGuideSaving
@@ -990,11 +1072,46 @@ export default function SessionWizard({ components = {} } = {}) {
         )}
 
         {currentStep === 4 && (
+          <SessionWizardInteractiveLocationsStep
+            ilView={ilView}
+            interactiveLocations={interactiveLocations}
+            currentIl={currentIl}
+            ilActiveLocale={ilActiveLocale}
+            ilLocaleData={ilLocaleData}
+            ilSaving={ilSaving}
+            referenceCities={referenceCities || []}
+            cityDrafts={cityDrafts || []}
+            eventFilterTree={eventFilterTree}
+            eventFilterTreeLoading={eventFilterTreeLoading}
+            eventFilterTreeError={eventFilterTreeError}
+            photoUploading={ilPhotoUploading}
+            photoFileRef={ilPhotoFileRef}
+            onOpenIlDetail={openIlDetail}
+            onAddInteractiveLocation={addInteractiveLocation}
+            onDeleteCurrentIl={deleteCurrentIl}
+            onLeaveIlDetailView={leaveIlDetailView}
+            onSetIlView={setIlView}
+            onSetCurrentIl={setCurrentIl}
+            onSetIlActiveLocale={setIlActiveLocale}
+            onUpdateIlLocaleField={updateIlLocaleField}
+            onSaveCurrentIl={saveCurrentIl}
+            onUpdateCurrentIlPatch={updateCurrentIlPatch}
+            onToggleCurrentIlTag={toggleCurrentIlTag}
+            onReloadEventFilters={loadEventFilterTree}
+            onOpenCommonsModal={openInteractiveLocationCommonsModal}
+            onPhotoFileChange={handleIlPhotoFile}
+            onGeneratePlaceholder={handleIlGeneratePlaceholder}
+            onGoToStep={goToStep}
+          />
+        )}
+
+        {currentStep === 5 && (
           <SessionWizardPublishStep
             session={session}
             cityDrafts={cityDrafts}
             cityInfos={cityInfos}
             attractions={attractions}
+            interactiveLocations={interactiveLocations}
             attractionInfos={attractionInfos}
             attractionFeedItems={attractionFeedItems}
             cityTags={cityTags}

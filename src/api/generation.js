@@ -34,6 +34,23 @@ export const sessionsAPI = {
     }),
 };
 
+// ─── Interactive locations ─────────────────────────────────────────────────────
+export const interactiveLocationsAPI = {
+  create: (sessionId, data) =>
+    apiClient.post(`${BASE}/sessions/${sessionId}/interactive-locations/`, data),
+  get: (sessionId, locationId) =>
+    apiClient.get(`${BASE}/sessions/${sessionId}/interactive-locations/${locationId}/`),
+  update: (sessionId, locationId, data) =>
+    apiClient.patch(
+      `${BASE}/sessions/${sessionId}/interactive-locations/${locationId}/update/`,
+      data,
+    ),
+  delete: (sessionId, locationId) =>
+    apiClient.delete(
+      `${BASE}/sessions/${sessionId}/interactive-locations/${locationId}/delete/`,
+    ),
+};
+
 // ─── Attractions ─────────────────────────────────────────────────────────────
 export const attractionsAPI = {
   list: (sessionId) =>
