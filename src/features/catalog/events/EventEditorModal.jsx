@@ -1,9 +1,12 @@
-import { useState } from 'react';
+import 'leaflet/dist/leaflet.css';
+import { useEffect, useRef, useState } from 'react';
 import CommonsImagePicker from '../../../components/generation/CommonsImagePicker';
 import { Field, FormActions, TextInput } from '../../../components/ui/FormField';
 import Modal from '../../../components/ui/Modal';
 import { buildLangOptions, getMultiLangValue } from '../shared/i18n';
 import { LangBlock, LangTabs } from '../shared/LangFields';
+
+const parseCoord = (v) => { const n = Number(v); return Number.isFinite(n) ? n : null; };
 
 export default function EventEditorModal({
   open,
@@ -25,6 +28,83 @@ export default function EventEditorModal({
 }) {
   const [activeTab, setActiveTab] = useState('content');
   const [commonsModalOpen, setCommonsModalOpen] = useState(false);
+
+  // Черновик координат — применяются только по кнопке «Применить»
+  const [draftLat, setDraftLat] = useState('');
+  const [draftLon, setDraftLon] = useState('');
+
+  const mapElRef = useRef(null);
+  const mapRef = useRef(null);
+  const markerRef = useRef(null);
+  const leafletRef = useRef(null);
+
+  // Синхронизируем черновик с event при открытии или смене ивента
+  useEffect(() => {
+    if (!open) return;
+    setDraftLat(event?.lat ?? '');
+    setDraftLon(event?.lon ?? '');
+  }, [open, event?.id]);
+
+  // Инициализация карты при переходе на вкладку «Карта»
+  useEffect(() => {
+    const initMap = async () => {
+      if (!open || activeTab !== 'map' || !mapElRef.current || mapRef.current) return;
+      const { default: L } = await import('leaflet');
+      leafletRef.current = L;
+      if (L.Icon?.Default) {
+        L.Icon.Default.mergeOptions({
+          iconUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
+          iconRetinaUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png',
+          shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
+        });
+      }
+      const lat = parseCoord(draftLat);
+      const lon = parseCoord(draftLon);
+      const map = L.map(mapElRef.current).setView(
+        lat != null && lon != null ? [lat, lon] : [41.9028, 12.4964],
+        lat != null && lon != null ? 13 : 5
+      );
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        maxZoom: 19,
+        attribution: '&copy; OpenStreetMap contributors',
+      }).addTo(map);
+      map.on('click', (e) => {
+        setDraftLat(Number(e.latlng.lat.toFixed(6)));
+        setDraftLon(Number(e.latlng.lng.toFixed(6)));
+      });
+      mapRef.current = map;
+      if (lat != null && lon != null) {
+        markerRef.current = L.marker([lat, lon]).addTo(map);
+      }
+      setTimeout(() => map.invalidateSize(), 50);
+    };
+    initMap();
+  }, [open, activeTab]);
+
+  // Обновляем маркер при изменении черновика
+  useEffect(() => {
+    const map = mapRef.current;
+    const L = leafletRef.current;
+    if (!map || !L || activeTab !== 'map') return;
+    const lat = parseCoord(draftLat);
+    const lon = parseCoord(draftLon);
+    if (lat == null || lon == null) {
+      if (markerRef.current) { map.removeLayer(markerRef.current); markerRef.current = null; }
+      return;
+    }
+    if (!markerRef.current) {
+      markerRef.current = L.marker([lat, lon]).addTo(map);
+    } else {
+      markerRef.current.setLatLng([lat, lon]);
+    }
+    map.setView([lat, lon], Math.max(map.getZoom(), 13));
+  }, [draftLat, draftLon, activeTab]);
+
+  // Уничтожаем карту при закрытии
+  useEffect(() => {
+    if (open) return;
+    if (mapRef.current) { mapRef.current.remove(); mapRef.current = null; markerRef.current = null; }
+  }, [open]);
 
   const titleVal = typeof event?.title === 'object' ? event.title : {};
   const descVal = typeof event?.description === 'object' ? event.description : {};
@@ -58,6 +138,7 @@ export default function EventEditorModal({
                 { key: 'content', label: 'Контент' },
                 { key: 'media', label: 'Обложка' },
                 { key: 'meta', label: 'Связи' },
+                { key: 'map', label: 'Карта' },
               ].map((tab) => (
                 <button
                   key={tab.key}
@@ -250,24 +331,60 @@ export default function EventEditorModal({
               </Field>
             )}
 
-            {(event?.lat != null || event?.lon != null) && (
-              <Field label="Координаты (только просмотр)">
-                <div className="flex gap-3">
-                  <TextInput
-                    value={event?.lat ?? ''}
-                    readOnly
-                    className="bg-gray-50 text-gray-400 font-mono text-xs cursor-not-allowed"
-                    placeholder="lat"
-                  />
-                  <TextInput
-                    value={event?.lon ?? ''}
-                    readOnly
-                    className="bg-gray-50 text-gray-400 font-mono text-xs cursor-not-allowed"
-                    placeholder="lon"
-                  />
+            {activeTab === 'map' && (
+              <div className="space-y-3">
+                <p className="text-xs text-gray-500">
+                  Кликните по карте или введите координаты вручную. Изменения применяются кнопкой «Применить».
+                </p>
+
+                <div ref={mapElRef} className="w-full h-64 md:h-80 rounded-xl overflow-hidden border border-gray-200 bg-gray-100" />
+
+                <div className="grid grid-cols-2 gap-3">
+                  <Field label="Широта (lat)">
+                    <TextInput
+                      value={draftLat}
+                      onChange={(e) => setDraftLat(e.target.value)}
+                      placeholder="Например: 41.902782"
+                      className="font-mono text-sm"
+                    />
+                  </Field>
+                  <Field label="Долгота (lon)">
+                    <TextInput
+                      value={draftLon}
+                      onChange={(e) => setDraftLon(e.target.value)}
+                      placeholder="Например: 12.496366"
+                      className="font-mono text-sm"
+                    />
+                  </Field>
                 </div>
-                <p className="mt-1 text-xs text-gray-400">Координаты редактируются через Django Admin</p>
-              </Field>
+
+                {event?.lat != null && (
+                  <p className="text-xs text-gray-400">
+                    Текущие: {event.lat}, {event.lon}
+                  </p>
+                )}
+
+                <div className="flex gap-2 pt-1">
+                  <button
+                    type="button"
+                    onClick={() => { setDraftLat(event?.lat ?? ''); setDraftLon(event?.lon ?? ''); }}
+                    className="px-4 py-2 text-sm text-gray-600 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
+                  >
+                    Отмена
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const lat = parseCoord(draftLat);
+                      const lon = parseCoord(draftLon);
+                      if (lat != null && lon != null) setEvent((p) => ({ ...p, lat, lon }));
+                    }}
+                    className="px-4 py-2 text-sm text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors"
+                  >
+                    Применить
+                  </button>
+                </div>
+              </div>
             )}
 
             <FormActions saving={saving} onCancel={onClose} saveLabel={event?.id ? 'Сохранить' : 'Создать'} />

@@ -54,7 +54,7 @@ export function mergeEventWithDetail(row, detail) {
 }
 
 export function toApiEventPayload(event) {
-  return {
+  const payload = {
     title: event?.title || {},
     description: event?.description || {},
     is_show: !!event?.is_show,
@@ -62,5 +62,8 @@ export function toApiEventPayload(event) {
     city_id: event?.city_id || null,
     tag_ids: (event?.tag_ids || []).filter(Boolean).map(String),
   };
+  if (event?.lat != null) payload.lat = Number(event.lat);
+  if (event?.lon != null) payload.lon = Number(event.lon);
+  return payload;
 }
 
