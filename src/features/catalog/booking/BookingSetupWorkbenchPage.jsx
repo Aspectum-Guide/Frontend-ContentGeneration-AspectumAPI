@@ -1,572 +1,629 @@
-import { useMemo, useState } from 'react';
-import { Link } from 'react-router-dom';
-import { eventSlotAvailabilitiesAPI, ticketPricesAPI, ticketTypesAPI } from '../../../api/booking';
+import { useCallback, useEffect, useState } from 'react';
+import {
+  eventSlotAvailabilitiesAPI,
+  eventTicketTypePricesAPI,
+  ticketPricesAPI,
+  ticketTypesAPI,
+} from '../../../api/booking';
 import Layout from '../../../components/Layout';
-import { Field, FormActions, TextInput } from '../../../components/ui/FormField';
+import { Field, TextInput } from '../../../components/ui/FormField';
 import { parseApiError } from '../../../utils/apiError';
-import { useEventOptions, useTicketTypeOptions } from '../shared/bookingOptions';
-import FormErrorAlert from '../shared/components/FormErrorAlert';
-import FormHint from '../shared/components/FormHint';
+import { useEventOptions } from '../shared/bookingOptions';
 import { getMultiLangValue } from '../shared/i18n';
+import { normalizeListResponse } from '../shared/normalize';
 
-function parseInputToIso(value) {
-  if (!value) return '';
-  const d = new Date(value);
-  if (Number.isNaN(d.getTime())) return '';
-  return d.toISOString();
+// ─── helpers ────────────────────────────────────────────────────────────────
+
+function parseInputToIso(v) {
+  if (!v) return '';
+  const d = new Date(v);
+  return Number.isNaN(d.getTime()) ? '' : d.toISOString();
 }
 
-function buildSlotDatetimesFromInterval({ startIso, endIso, stepMinutes }) {
+function buildFromInterval({ startIso, endIso, stepMinutes }) {
   const start = startIso ? new Date(startIso) : null;
   const end = endIso ? new Date(endIso) : null;
   const step = Number(stepMinutes || 0);
-  if (!start || !end || Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) return [];
-  if (!Number.isFinite(step) || step <= 0) return [];
-
+  if (!start || !end || !Number.isFinite(step) || step <= 0) return [];
   const out = [];
-  for (let t = start.getTime(); t <= end.getTime(); t += step * 60 * 1000) {
+  for (let t = start.getTime(); t <= end.getTime(); t += step * 60_000) {
     out.push(new Date(t).toISOString());
     if (out.length >= 1000) break;
   }
   return out;
 }
 
-function parseSlotDatetimesText(text) {
-  const raw = String(text || '')
-    .split('\n')
-    .map((l) => l.trim())
-    .filter(Boolean);
-
-  const out = [];
-  for (const line of raw) {
-    const normalized = line.replace(' ', 'T');
-    const d = new Date(normalized);
-    if (!Number.isNaN(d.getTime())) out.push(d.toISOString());
-    if (out.length >= 1000) break;
-  }
-
-  return Array.from(new Set(out));
-}
-
-function parseTimesText(text) {
-  const lines = String(text || '')
-    .split('\n')
-    .map((l) => l.trim())
-    .filter(Boolean);
-
-  const out = [];
-  for (const line of lines) {
-    const m = /^(\d{1,2}):(\d{2})$/.exec(line);
-    if (!m) continue;
-    const hh = Number(m[1]);
-    const mm = Number(m[2]);
-    if (!Number.isFinite(hh) || !Number.isFinite(mm)) continue;
-    if (hh < 0 || hh > 23 || mm < 0 || mm > 59) continue;
-    out.push({ hh, mm, label: `${String(hh).padStart(2, '0')}:${String(mm).padStart(2, '0')}` });
-  }
-
-  const seen = new Set();
-  return out.filter((t) => (seen.has(t.label) ? false : (seen.add(t.label), true)));
-}
-
-function buildSlotDatetimesFromSchedule({ startDate, endDate, days, times }) {
+function buildFromSchedule({ startDate, endDate, days, timesText }) {
   if (!startDate || !endDate) return [];
-  const start = new Date(`${startDate}T00:00:00`);
-  const end = new Date(`${endDate}T00:00:00`);
-  if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) return [];
-  if (end.getTime() < start.getTime()) return [];
-  if (!times?.length) return [];
-
+  const lines = String(timesText || '').split('\n').map((l) => l.trim()).filter(Boolean);
+  const times = lines.map((l) => { const m = /^(\d{1,2}):(\d{2})$/.exec(l); return m ? { hh: +m[1], mm: +m[2] } : null; }).filter(Boolean);
   const dayMap = { 0: 'sun', 1: 'mon', 2: 'tue', 3: 'wed', 4: 'thu', 5: 'fri', 6: 'sat' };
   const out = [];
-  for (let d = new Date(start); d.getTime() <= end.getTime(); d.setDate(d.getDate() + 1)) {
-    const key = dayMap[d.getDay()];
-    if (!days?.[key]) continue;
+  for (let d = new Date(`${startDate}T00:00:00`); d <= new Date(`${endDate}T00:00:00`); d.setDate(d.getDate() + 1)) {
+    if (!days[dayMap[d.getDay()]]) continue;
     for (const t of times) {
-      const dt = new Date(d);
-      dt.setHours(t.hh, t.mm, 0, 0);
+      const dt = new Date(d); dt.setHours(t.hh, t.mm, 0, 0);
       out.push(dt.toISOString());
-      if (out.length >= 1000) return Array.from(new Set(out));
+      if (out.length >= 1000) return [...new Set(out)];
     }
   }
-  return Array.from(new Set(out));
+  return [...new Set(out)];
 }
+
+function buildFromList(text) {
+  return [...new Set(
+    String(text || '').split('\n').map((l) => l.trim()).filter(Boolean)
+      .map((l) => { const d = new Date(l.replace(' ', 'T')); return Number.isNaN(d.getTime()) ? null : d.toISOString(); })
+      .filter(Boolean)
+  )];
+}
+
+// ─── sub-components ──────────────────────────────────────────────────────────
+
+function SectionCard({ title, badge, children, action }) {
+  return (
+    <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+      <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100">
+        <div className="flex items-center gap-2">
+          <h2 className="text-sm font-semibold text-gray-800">{title}</h2>
+          {badge != null && (
+            <span className="px-1.5 py-0.5 rounded-full bg-gray-100 text-gray-500 text-xs font-medium">{badge}</span>
+          )}
+        </div>
+        {action}
+      </div>
+      <div className="p-4">{children}</div>
+    </div>
+  );
+}
+
+function Spinner() {
+  return <span className="inline-block w-4 h-4 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />;
+}
+
+function Err({ msg }) {
+  return msg ? <p className="text-xs text-red-600 bg-red-50 rounded px-2 py-1 mt-1">{msg}</p> : null;
+}
+
+function Ok({ msg }) {
+  return msg ? <p className="text-xs text-emerald-700 bg-emerald-50 rounded px-2 py-1 mt-1">{msg}</p> : null;
+}
+
+// ─── main ────────────────────────────────────────────────────────────────────
 
 export default function BookingSetupWorkbenchPage() {
   const { eventOptions, eventsLoading } = useEventOptions();
   const [eventId, setEventId] = useState('');
-  const { ticketTypeOptions, ticketTypesLoading, reloadTicketTypes } = useTicketTypeOptions(eventId);
 
-  const [typeForm, setTypeForm] = useState({
-    name_primary: '',
-    name_ru: '',
-    sort_order: 0,
-    is_active: true,
-  });
-  const [typeSaving, setTypeSaving] = useState(false);
-  const [typeError, setTypeError] = useState('');
-  const [typeSuccess, setTypeSuccess] = useState('');
+  // ── state per section ────────────────────────────────────────────────────
+  const [ticketTypes, setTicketTypes] = useState([]);
+  const [ttLoading, setTtLoading] = useState(false);
 
+  const [slotsTotal, setSlotsTotal] = useState(null);
+  const [recentSlots, setRecentSlots] = useState([]);
+  const [slotsLoading, setSlotsLoading] = useState(false);
+
+  const [coverage, setCoverage] = useState([]); // [{tt, covered, total}]
+  const [coverageLoading, setCoverageLoading] = useState(false);
+
+  const [basePrices, setBasePrices] = useState([]);
+  const [basePricesLoading, setBasePricesLoading] = useState(false);
+
+  // ── ticket type form ─────────────────────────────────────────────────────
+  const [showTtForm, setShowTtForm] = useState(false);
+  const [ttForm, setTtForm] = useState({ name_ru: '', code: '', sort_order: 0 });
+  const [ttSaving, setTtSaving] = useState(false);
+  const [ttError, setTtError] = useState('');
+  const [ttOk, setTtOk] = useState('');
+
+  // ── slots form ───────────────────────────────────────────────────────────
+  const [showSlotForm, setShowSlotForm] = useState(false);
+  const [slotMode, setSlotMode] = useState('schedule');
   const [slotForm, setSlotForm] = useState({
-    mode: 'interval',
-    ticket_types: [],
-    start_datetime: '',
-    end_datetime: '',
-    step_minutes: 60,
+    start_datetime: '', end_datetime: '', step_minutes: 60,
     datetimes_text: '',
-    schedule_start_date: '',
-    schedule_end_date: '',
+    schedule_start_date: '', schedule_end_date: '',
     schedule_days: { mon: true, tue: true, wed: true, thu: true, fri: true, sat: false, sun: false },
     schedule_times_text: '10:00\n12:00\n14:00',
-    booking_closes_minutes_before: 60,
-    available_seats: 0,
-    is_active: true,
+    booking_closes_minutes_before: 60, available_seats: 0,
   });
   const [slotSaving, setSlotSaving] = useState(false);
   const [slotError, setSlotError] = useState('');
-  const [slotResult, setSlotResult] = useState(null);
-  const [createdSlotIds, setCreatedSlotIds] = useState([]);
+  const [slotOk, setSlotOk] = useState('');
 
-  const [priceForm, setPriceForm] = useState({
-    price_mode: 'single',
-    price_value: '',
-    price_currency: 'EUR',
-    price_is_active: true,
-    price_by_ticket_type: {},
-  });
-  const [priceSaving, setPriceSaving] = useState(false);
-  const [priceError, setPriceError] = useState('');
-  const [priceResult, setPriceResult] = useState(null);
+  // ── coverage fill ────────────────────────────────────────────────────────
+  const [fillTtId, setFillTtId] = useState('');
+  const [fillPrice, setFillPrice] = useState('');
+  const [fillCurrency, setFillCurrency] = useState('EUR');
+  const [fillSaving, setFillSaving] = useState(false);
+  const [fillError, setFillError] = useState('');
+  const [fillOk, setFillOk] = useState('');
 
-  const eventLabel = useMemo(() => {
-    const event = eventOptions.find((item) => String(item.id) === String(eventId));
-    return getMultiLangValue(event?.title) || String(event?.id || '');
-  }, [eventOptions, eventId]);
+  // ── base price form ──────────────────────────────────────────────────────
+  const [showBpForm, setShowBpForm] = useState(false);
+  const [bpForm, setBpForm] = useState({ ticket_type: '', base_price: '', currency: 'EUR' });
+  const [bpSaving, setBpSaving] = useState(false);
+  const [bpError, setBpError] = useState('');
+  const [bpOk, setBpOk] = useState('');
 
-  const createTicketType = async (e) => {
-    e.preventDefault();
-    if (!eventId) {
-      setTypeError('Сначала выберите событие.');
-      return;
-    }
+  // ── loaders ──────────────────────────────────────────────────────────────
 
-    const namePrimary = (typeForm.name_primary || '').trim();
-    const nameRu = (typeForm.name_ru || '').trim();
-    if (!namePrimary && !nameRu) {
-      setTypeError('Укажите хотя бы название типа билета.');
-      return;
-    }
-
-    const payload = {
-      event: eventId,
-      name_primary: namePrimary || nameRu,
-      name: nameRu ? { ru: nameRu } : (namePrimary ? { en: namePrimary } : {}),
-      sort_order: Number(typeForm.sort_order || 0),
-      is_active: !!typeForm.is_active,
-    };
-
+  const loadTicketTypes = useCallback(async (evId) => {
+    if (!evId) { setTicketTypes([]); return; }
+    setTtLoading(true);
     try {
-      setTypeSaving(true);
-      setTypeError('');
-      setTypeSuccess('');
-      await ticketTypesAPI.create(payload);
-      setTypeSuccess('Тип билета создан.');
-      setTypeForm((prev) => ({ ...prev, name_primary: '', name_ru: '', sort_order: Number(prev.sort_order || 0) + 10 }));
-      await reloadTicketTypes();
-    } catch (err) {
-      setTypeError(parseApiError(err, 'Не удалось создать тип билета'));
-    } finally {
-      setTypeSaving(false);
-    }
+      const r = await ticketTypesAPI.list({ event: evId, page_size: 100, ordering: 'sort_order' });
+      setTicketTypes(normalizeListResponse(r?.data, ['results', 'data']));
+    } catch { setTicketTypes([]); } finally { setTtLoading(false); }
+  }, []);
+
+  const loadSlots = useCallback(async (evId) => {
+    if (!evId) { setSlotsTotal(null); setRecentSlots([]); return; }
+    setSlotsLoading(true);
+    try {
+      const r = await eventSlotAvailabilitiesAPI.list({ event: evId, page_size: 5, ordering: 'slot_datetime' });
+      const data = r?.data;
+      setSlotsTotal(data?.count ?? data?.total ?? normalizeListResponse(data, ['results', 'data']).length);
+      setRecentSlots(normalizeListResponse(data, ['results', 'data']).slice(0, 5));
+    } catch { setSlotsTotal(null); setRecentSlots([]); } finally { setSlotsLoading(false); }
+  }, []);
+
+  const loadCoverage = useCallback(async (evId, tts) => {
+    if (!evId || !tts.length) { setCoverage([]); return; }
+    setCoverageLoading(true);
+    try {
+      const [slotsR, pricesR] = await Promise.all([
+        eventSlotAvailabilitiesAPI.list({ event: evId, page_size: 1, is_active: 'true' }),
+        ticketPricesAPI.list({ event: evId, page_size: 1000, is_active: 'true' }),
+      ]);
+      const total = slotsR?.data?.count ?? slotsR?.data?.total ?? 0;
+      const prices = normalizeListResponse(pricesR?.data, ['results', 'data']);
+      const cov = tts.map((tt) => {
+        const covered = new Set(prices.filter((p) => String(p.ticket_type) === String(tt.id)).map((p) => String(p.slot))).size;
+        return { tt, covered, total };
+      });
+      setCoverage(cov);
+    } catch { setCoverage([]); } finally { setCoverageLoading(false); }
+  }, []);
+
+  const loadBasePrices = useCallback(async (evId) => {
+    if (!evId) { setBasePrices([]); return; }
+    setBasePricesLoading(true);
+    try {
+      const r = await eventTicketTypePricesAPI.list({ event: evId, page_size: 100 });
+      setBasePrices(normalizeListResponse(r?.data, ['results', 'data']));
+    } catch { setBasePrices([]); } finally { setBasePricesLoading(false); }
+  }, []);
+
+  const loadAll = useCallback((evId) => {
+    loadTicketTypes(evId);
+    loadSlots(evId);
+    loadBasePrices(evId);
+  }, [loadTicketTypes, loadSlots, loadBasePrices]);
+
+  useEffect(() => { loadAll(eventId); }, [eventId, loadAll]);
+  useEffect(() => { if (ticketTypes.length) loadCoverage(eventId, ticketTypes); }, [ticketTypes, eventId, loadCoverage]);
+
+  // ── actions ───────────────────────────────────────────────────────────────
+
+  const handleCreateTt = async (e) => {
+    e.preventDefault();
+    setTtError(''); setTtOk('');
+    const nameRu = ttForm.name_ru.trim();
+    const code = ttForm.code.trim().toLowerCase();
+    if (!nameRu) { setTtError('Введите название'); return; }
+    try {
+      setTtSaving(true);
+      await ticketTypesAPI.create({
+        event: eventId, code,
+        name: nameRu ? { ru: nameRu } : {},
+        name_primary: nameRu,
+        sort_order: Number(ttForm.sort_order || 0),
+        is_active: true,
+      });
+      setTtOk(`Создан: ${nameRu}`);
+      setTtForm({ name_ru: '', code: '', sort_order: Number(ttForm.sort_order || 0) + 10 });
+      await loadTicketTypes(eventId);
+    } catch (err) { setTtError(parseApiError(err, 'Ошибка создания')); }
+    finally { setTtSaving(false); }
   };
 
-  const createSlots = async (e) => {
+  const handleDeleteTt = async (tt) => {
+    if (!confirm(`Удалить тип «${tt.name_primary}»?`)) return;
+    try {
+      await ticketTypesAPI.delete(tt.id);
+      await loadTicketTypes(eventId);
+    } catch (err) { alert(parseApiError(err, 'Ошибка удаления')); }
+  };
+
+  const handleCreateSlots = async (e) => {
     e.preventDefault();
-    if (!eventId) {
-      setSlotError('Сначала выберите событие.');
-      return;
-    }
-
-    const slotDatetimes =
-      slotForm.mode === 'interval'
-        ? buildSlotDatetimesFromInterval({
-          startIso: parseInputToIso(slotForm.start_datetime),
-          endIso: parseInputToIso(slotForm.end_datetime),
-          stepMinutes: slotForm.step_minutes,
-        })
-        : slotForm.mode === 'schedule'
-          ? buildSlotDatetimesFromSchedule({
-            startDate: slotForm.schedule_start_date,
-            endDate: slotForm.schedule_end_date,
-            days: slotForm.schedule_days,
-            times: parseTimesText(slotForm.schedule_times_text),
-          })
-          : parseSlotDatetimesText(slotForm.datetimes_text);
-
-    if (!slotDatetimes.length) {
-      setSlotError('Нет валидных дат/времени для создания слотов.');
-      return;
-    }
-
-    const payload = {
-      event: eventId,
-      ticket_types: Array.isArray(slotForm.ticket_types) ? slotForm.ticket_types.filter(Boolean) : [],
-      slot_datetimes: slotDatetimes,
-      booking_closes_minutes_before: Number(slotForm.booking_closes_minutes_before || 0),
-      available_seats: Number(slotForm.available_seats || 0),
-      is_active: !!slotForm.is_active,
-    };
-
+    setSlotError(''); setSlotOk('');
+    const datetimes = slotMode === 'interval'
+      ? buildFromInterval({ startIso: parseInputToIso(slotForm.start_datetime), endIso: parseInputToIso(slotForm.end_datetime), stepMinutes: slotForm.step_minutes })
+      : slotMode === 'schedule'
+        ? buildFromSchedule({ startDate: slotForm.schedule_start_date, endDate: slotForm.schedule_end_date, days: slotForm.schedule_days, timesText: slotForm.schedule_times_text })
+        : buildFromList(slotForm.datetimes_text);
+    if (!datetimes.length) { setSlotError('Нет корректных дат'); return; }
     try {
       setSlotSaving(true);
-      setSlotError('');
-      const resp = await eventSlotAvailabilitiesAPI.bulkCreate(payload);
-      const result = resp?.data || null;
-      setSlotResult(result);
-      const ids = Array.isArray(result?.created_ids) ? result.created_ids.map(String) : [];
-      setCreatedSlotIds(ids);
-    } catch (err) {
-      setSlotError(parseApiError(err, 'Не удалось создать слоты'));
-    } finally {
-      setSlotSaving(false);
-    }
-  };
-
-  const createPrices = async (e) => {
-    e.preventDefault();
-    if (!eventId) {
-      setPriceError('Сначала выберите событие.');
-      return;
-    }
-    if (!createdSlotIds.length) {
-      setPriceError('Сначала создайте слоты в блоке выше (или создайте цены в каталоге цен).');
-      return;
-    }
-    const ticketTypeIds = Array.isArray(slotForm.ticket_types) ? slotForm.ticket_types.filter(Boolean) : [];
-    if (!ticketTypeIds.length) {
-      setPriceError('Для массовых цен выберите хотя бы один тип билета в блоке слотов.');
-      return;
-    }
-
-    try {
-      setPriceSaving(true);
-      setPriceError('');
-      const currency = (priceForm.price_currency || 'EUR').toUpperCase();
-      const isActive = !!priceForm.price_is_active;
-
-      if (priceForm.price_mode === 'per_type') {
-        for (const ttId of ticketTypeIds) {
-          const raw = priceForm.price_by_ticket_type?.[ttId];
-          const value = Number(raw);
-          if (!Number.isFinite(value) || value < 0) {
-            throw new Error(`Введите корректную цену для типа ${ttId}`);
-          }
-          await ticketPricesAPI.bulkCreate({
-            event: eventId,
-            slot_ids: createdSlotIds,
-            ticket_types: [ttId],
-            price: value,
-            currency,
-            is_active: isActive,
-          });
-        }
-      } else {
-        const value = Number(priceForm.price_value);
-        if (!Number.isFinite(value) || value < 0) {
-          throw new Error('Введите корректную цену (0 или больше).');
-        }
-        await ticketPricesAPI.bulkCreate({
-          event: eventId,
-          slot_ids: createdSlotIds,
-          ticket_types: ticketTypeIds,
-          price: value,
-          currency,
-          is_active: isActive,
-        });
-      }
-
-      setPriceResult({
-        slotCount: createdSlotIds.length,
-        ticketTypeCount: ticketTypeIds.length,
+      const r = await eventSlotAvailabilitiesAPI.bulkCreate({
+        event: eventId, slot_datetimes: datetimes,
+        ticket_types: ticketTypes.map((t) => t.id),
+        booking_closes_minutes_before: Number(slotForm.booking_closes_minutes_before || 0),
+        available_seats: Number(slotForm.available_seats || 0),
+        is_active: true,
       });
-    } catch (err) {
-      setPriceError(parseApiError(err, err?.message || 'Не удалось создать цены'));
-    } finally {
-      setPriceSaving(false);
-    }
+      const res = r?.data;
+      setSlotOk(`Создано: ${res?.created_count ?? 0}, пропущено: ${res?.skipped_existing ?? 0}`);
+      await loadSlots(eventId);
+      await loadCoverage(eventId, ticketTypes);
+    } catch (err) { setSlotError(parseApiError(err, 'Ошибка создания слотов')); }
+    finally { setSlotSaving(false); }
   };
+
+  const handleFillPrices = async (e) => {
+    e.preventDefault();
+    setFillError(''); setFillOk('');
+    const price = Number(fillPrice);
+    if (!fillTtId) { setFillError('Выберите тип билета'); return; }
+    if (!Number.isFinite(price) || price < 0) { setFillError('Введите корректную цену'); return; }
+    try {
+      setFillSaving(true);
+      // Load all slots for the event
+      const r = await eventSlotAvailabilitiesAPI.list({ event: eventId, page_size: 1000, is_active: 'true' });
+      const slots = normalizeListResponse(r?.data, ['results', 'data']);
+      if (!slots.length) { setFillError('Нет активных слотов'); return; }
+      await ticketPricesAPI.bulkCreate({
+        event: eventId,
+        slot_ids: slots.map((s) => s.id),
+        ticket_types: [fillTtId],
+        price, currency: fillCurrency.toUpperCase(), is_active: true,
+      });
+      setFillOk(`Готово: цены назначены для ${slots.length} слотов`);
+      await loadCoverage(eventId, ticketTypes);
+    } catch (err) { setFillError(parseApiError(err, 'Ошибка назначения цен')); }
+    finally { setFillSaving(false); }
+  };
+
+  const handleCreateBp = async (e) => {
+    e.preventDefault();
+    setBpError(''); setBpOk('');
+    if (!bpForm.ticket_type) { setBpError('Выберите тип билета'); return; }
+    const price = Number(bpForm.base_price);
+    if (!Number.isFinite(price) || price < 0) { setBpError('Введите корректную цену'); return; }
+    try {
+      setBpSaving(true);
+      await eventTicketTypePricesAPI.create({
+        event: eventId, ticket_type: bpForm.ticket_type,
+        base_price: price, currency: bpForm.currency.toUpperCase(), is_active: true,
+      });
+      setBpOk('Базовая цена добавлена');
+      setBpForm({ ticket_type: '', base_price: '', currency: 'EUR' });
+      await loadBasePrices(eventId);
+    } catch (err) { setBpError(parseApiError(err, 'Ошибка создания')); }
+    finally { setBpSaving(false); }
+  };
+
+  const handleDeleteBp = async (bp) => {
+    if (!confirm('Удалить базовую цену?')) return;
+    try {
+      await eventTicketTypePricesAPI.delete(bp.id);
+      await loadBasePrices(eventId);
+    } catch (err) { alert(parseApiError(err, 'Ошибка удаления')); }
+  };
+
+  // ── render ────────────────────────────────────────────────────────────────
+
+  const eventName = eventOptions.find((e) => String(e.id) === eventId);
+  const ttById = Object.fromEntries(ticketTypes.map((t) => [String(t.id), t]));
 
   return (
     <Layout>
-      <div className="space-y-4">
-        <div className="rounded-2xl border border-gray-200 bg-white p-4 md:p-5">
-          <h1 className="text-2xl font-bold text-gray-900">Booking Setup</h1>
-          <p className="mt-1 text-sm text-gray-500">
-            Удобный мастер для настройки продаж: типы билетов, массовые слоты и цены без табличного режима.
-          </p>
-          <div className="mt-4 max-w-xl">
-            <Field label="Событие" required>
-              <select
-                value={eventId}
-                onChange={(e) => {
-                  const nextEvent = e.target.value;
-                  setEventId(nextEvent);
-                  setTypeSuccess('');
-                  setCreatedSlotIds([]);
-                  setSlotResult(null);
-                  setPriceResult(null);
-                  setSlotForm((prev) => ({ ...prev, ticket_types: [] }));
-                }}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none"
-                disabled={eventsLoading}
-                required
-              >
-                <option value="">Выберите событие</option>
-                {eventOptions.map((eventItem) => (
-                  <option key={eventItem.id} value={eventItem.id}>
-                    {getMultiLangValue(eventItem.title) || eventItem.id}
-                  </option>
-                ))}
-              </select>
-            </Field>
-          </div>
+      <div className="space-y-4 max-w-4xl">
+
+        {/* Event selector */}
+        <div className="bg-white rounded-xl border border-gray-200 p-4">
+          <h1 className="text-xl font-bold text-gray-900 mb-3">Настройка продаж</h1>
+          <select
+            value={eventId}
+            onChange={(e) => { setEventId(e.target.value); setShowTtForm(false); setShowSlotForm(false); setShowBpForm(false); setTtOk(''); setSlotOk(''); setBpOk(''); setFillOk(''); }}
+            className={`w-full md:w-96 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none ${eventsLoading ? 'opacity-60 cursor-wait' : ''}`}
+            disabled={eventsLoading}
+          >
+            <option value="">{eventsLoading ? 'Загрузка…' : '— Выберите событие —'}</option>
+            {eventOptions.map((ev) => (
+              <option key={ev.id} value={ev.id}>{getMultiLangValue(ev.title) || ev.id}</option>
+            ))}
+          </select>
+
+          {eventId && (
+            <div className="mt-3 flex flex-wrap gap-3 text-sm">
+              <span className="px-3 py-1 bg-blue-50 text-blue-700 rounded-full">
+                {ttLoading ? '…' : ticketTypes.length} типов билетов
+              </span>
+              <span className="px-3 py-1 bg-purple-50 text-purple-700 rounded-full">
+                {slotsLoading ? '…' : slotsTotal ?? '?'} слотов
+              </span>
+              <span className="px-3 py-1 bg-amber-50 text-amber-700 rounded-full">
+                {basePricesLoading ? '…' : basePrices.length} базовых цен
+              </span>
+            </div>
+          )}
         </div>
 
-        <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
-          <section className="rounded-xl border border-gray-200 bg-white p-4">
-            <h2 className="text-lg font-semibold text-gray-900">1. Создать тип билета</h2>
-            <FormErrorAlert message={typeError} />
-            {typeSuccess ? <p className="mt-2 text-sm text-emerald-700">{typeSuccess}</p> : null}
-            <form className="mt-3 space-y-3" onSubmit={createTicketType}>
-              <Field label="Название (key)" required>
-                <TextInput
-                  value={typeForm.name_primary}
-                  onChange={(e) => setTypeForm((prev) => ({ ...prev, name_primary: e.target.value }))}
-                  placeholder="adult / child / vip"
-                  required={!typeForm.name_ru}
-                />
-              </Field>
-              <Field label="Название (RU)">
-                <TextInput
-                  value={typeForm.name_ru}
-                  onChange={(e) => setTypeForm((prev) => ({ ...prev, name_ru: e.target.value }))}
-                  placeholder="Взрослый / Детский / VIP"
-                />
-              </Field>
-              <Field label="Порядок">
-                <TextInput
-                  type="number"
-                  min={0}
-                  value={typeForm.sort_order}
-                  onChange={(e) => setTypeForm((prev) => ({ ...prev, sort_order: Number(e.target.value || 0) }))}
-                />
-              </Field>
-              <label className="inline-flex items-center gap-2 text-sm text-gray-700">
-                <input
-                  type="checkbox"
-                  checked={typeForm.is_active}
-                  onChange={(e) => setTypeForm((prev) => ({ ...prev, is_active: e.target.checked }))}
-                />
-                Активный тип билета
-              </label>
-              <FormActions saving={typeSaving} saveLabel="Создать тип" onCancel={() => setTypeError('')} />
-            </form>
-          </section>
+        {!eventId && (
+          <div className="text-sm text-gray-400 text-center py-8">Выберите событие чтобы начать настройку</div>
+        )}
 
-          <section className="rounded-xl border border-gray-200 bg-white p-4 xl:col-span-2">
-            <h2 className="text-lg font-semibold text-gray-900">2. Массово создать слоты</h2>
-            <FormErrorAlert message={slotError} />
-            <div className="mt-3 mb-3">
-              <Field label="Типы билетов (для слотов)">
-                {!eventId ? (
-                  <div className="text-sm text-gray-500">Сначала выберите событие</div>
-                ) : ticketTypesLoading ? (
-                  <div className="text-sm text-gray-500">Загрузка типов билетов...</div>
-                ) : (
-                  <div className="max-h-40 overflow-auto rounded-lg border border-gray-200 p-2">
-                    {ticketTypeOptions.map((tt) => {
-                      const id = String(tt.id);
-                      const label = getMultiLangValue(tt.name) || tt.name_primary || id;
-                      const checked = slotForm.ticket_types.includes(id);
-                      return (
-                        <label key={id} className="flex items-center gap-2 text-sm text-gray-700 py-1">
-                          <input
-                            type="checkbox"
-                            checked={checked}
-                            onChange={(e) => {
-                              const next = e.target.checked
-                                ? Array.from(new Set([...slotForm.ticket_types, id]))
-                                : slotForm.ticket_types.filter((x) => x !== id);
-                              setSlotForm((prev) => ({ ...prev, ticket_types: next }));
-                            }}
-                          />
-                          {label}
-                        </label>
-                      );
-                    })}
-                  </div>
-                )}
-              </Field>
-            </div>
-
-            <form className="space-y-3" onSubmit={createSlots}>
-              <div className="flex flex-wrap gap-2">
-                {['interval', 'list', 'schedule'].map((mode) => (
-                  <button
-                    key={mode}
-                    type="button"
-                    onClick={() => setSlotForm((prev) => ({ ...prev, mode }))}
-                    className={`px-3 py-1.5 text-sm rounded-lg border ${slotForm.mode === mode ? 'bg-blue-50 border-blue-300 text-blue-700' : 'bg-white border-gray-300 text-gray-700'}`}
-                  >
-                    {mode === 'interval' ? 'Интервал' : mode === 'list' ? 'Список дат' : 'Дни + время'}
-                  </button>
-                ))}
-              </div>
-
-              {slotForm.mode === 'interval' ? (
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                  <Field label="Начало" required><TextInput type="datetime-local" value={slotForm.start_datetime} onChange={(e) => setSlotForm((p) => ({ ...p, start_datetime: e.target.value }))} required /></Field>
-                  <Field label="Конец" required><TextInput type="datetime-local" value={slotForm.end_datetime} onChange={(e) => setSlotForm((p) => ({ ...p, end_datetime: e.target.value }))} required /></Field>
-                  <Field label="Шаг (мин)" required><TextInput type="number" min={1} value={slotForm.step_minutes} onChange={(e) => setSlotForm((p) => ({ ...p, step_minutes: Number(e.target.value || 0) }))} required /></Field>
+        {eventId && (
+          <>
+            {/* ── 1. Ticket types ─────────────────────────────────────────── */}
+            <SectionCard
+              title="Типы билетов"
+              badge={ticketTypes.length}
+              action={
+                <button
+                  onClick={() => setShowTtForm((v) => !v)}
+                  className="px-3 py-1 text-xs font-medium text-blue-600 bg-blue-50 rounded-md hover:bg-blue-100 transition-colors"
+                >
+                  {showTtForm ? 'Скрыть' : '+ Добавить'}
+                </button>
+              }
+            >
+              {ttLoading ? (
+                <div className="flex items-center gap-2 text-sm text-gray-400"><Spinner /> Загрузка...</div>
+              ) : (
+                <div className="flex flex-wrap gap-2">
+                  {ticketTypes.map((tt) => (
+                    <div key={tt.id} className="flex items-center gap-1.5 px-3 py-1.5 bg-gray-100 rounded-lg text-sm">
+                      <span className="font-medium text-gray-800">{tt.name_primary || getMultiLangValue(tt.name)}</span>
+                      {tt.code && <span className="font-mono text-xs text-gray-400">({tt.code})</span>}
+                      <button onClick={() => handleDeleteTt(tt)} className="text-gray-300 hover:text-red-500 transition-colors ml-1 text-xs">✕</button>
+                    </div>
+                  ))}
+                  {!ticketTypes.length && <p className="text-sm text-gray-400">Нет типов билетов — добавьте первый</p>}
                 </div>
-              ) : null}
+              )}
 
-              {slotForm.mode === 'list' ? (
-                <Field label="Даты/время (по строке)" required>
-                  <textarea
-                    rows={5}
-                    value={slotForm.datetimes_text}
-                    onChange={(e) => setSlotForm((p) => ({ ...p, datetimes_text: e.target.value }))}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none font-mono"
-                    placeholder={'2026-05-10 10:00\n2026-05-10 12:00'}
-                    required
-                  />
-                </Field>
-              ) : null}
-
-              {slotForm.mode === 'schedule' ? (
-                <div className="space-y-3">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                    <Field label="Дата начала" required><TextInput type="date" value={slotForm.schedule_start_date} onChange={(e) => setSlotForm((p) => ({ ...p, schedule_start_date: e.target.value }))} required /></Field>
-                    <Field label="Дата конца" required><TextInput type="date" value={slotForm.schedule_end_date} onChange={(e) => setSlotForm((p) => ({ ...p, schedule_end_date: e.target.value }))} required /></Field>
+              {showTtForm && (
+                <form onSubmit={handleCreateTt} className="mt-4 pt-4 border-t border-gray-100 grid grid-cols-1 md:grid-cols-3 gap-3">
+                  <Field label="Название (RU)" required>
+                    <TextInput value={ttForm.name_ru} onChange={(e) => setTtForm((p) => ({ ...p, name_ru: e.target.value }))} placeholder="Взрослый" required />
+                  </Field>
+                  <Field label="Код" hint="adult / child / vip">
+                    <TextInput value={ttForm.code} onChange={(e) => setTtForm((p) => ({ ...p, code: e.target.value }))} placeholder="adult" />
+                  </Field>
+                  <Field label="Порядок">
+                    <TextInput type="number" min={0} value={ttForm.sort_order} onChange={(e) => setTtForm((p) => ({ ...p, sort_order: +e.target.value || 0 }))} />
+                  </Field>
+                  <div className="md:col-span-3 flex items-center gap-3">
+                    <button type="submit" disabled={ttSaving} className="px-4 py-2 text-sm text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors">
+                      {ttSaving ? 'Создание…' : 'Создать тип'}
+                    </button>
+                    <Err msg={ttError} />
+                    <Ok msg={ttOk} />
                   </div>
+                </form>
+              )}
+            </SectionCard>
+
+            {/* ── 2. Slots ──────────────────────────────────────────────────── */}
+            <SectionCard
+              title="Слоты"
+              badge={slotsTotal != null ? slotsTotal : '…'}
+              action={
+                <button
+                  onClick={() => setShowSlotForm((v) => !v)}
+                  className="px-3 py-1 text-xs font-medium text-purple-600 bg-purple-50 rounded-md hover:bg-purple-100 transition-colors"
+                >
+                  {showSlotForm ? 'Скрыть' : '+ Добавить'}
+                </button>
+              }
+            >
+              {slotsLoading ? (
+                <div className="flex items-center gap-2 text-sm text-gray-400"><Spinner /> Загрузка...</div>
+              ) : recentSlots.length ? (
+                <div className="space-y-1">
+                  {recentSlots.map((s) => (
+                    <div key={s.id} className="text-sm text-gray-600">
+                      {new Date(s.slot_datetime).toLocaleString('ru-RU', { day: '2-digit', month: '2-digit', year: '2-digit', hour: '2-digit', minute: '2-digit' })}
+                      <span className="text-gray-400 ml-2">· {s.available_seats} мест</span>
+                    </div>
+                  ))}
+                  {slotsTotal > 5 && <p className="text-xs text-gray-400">…и ещё {slotsTotal - 5}</p>}
+                </div>
+              ) : (
+                <p className="text-sm text-gray-400">Слотов нет — добавьте первый</p>
+              )}
+
+              {showSlotForm && (
+                <form onSubmit={handleCreateSlots} className="mt-4 pt-4 border-t border-gray-100 space-y-3">
                   <div className="flex flex-wrap gap-2">
-                    {[
-                      ['mon', 'Пн'], ['tue', 'Вт'], ['wed', 'Ср'], ['thu', 'Чт'], ['fri', 'Пт'], ['sat', 'Сб'], ['sun', 'Вс'],
-                    ].map(([k, label]) => (
-                      <label key={k} className="inline-flex items-center gap-2 text-sm text-gray-700">
-                        <input
-                          type="checkbox"
-                          checked={!!slotForm.schedule_days[k]}
-                          onChange={(e) => setSlotForm((p) => ({ ...p, schedule_days: { ...p.schedule_days, [k]: e.target.checked } }))}
-                        />
-                        {label}
-                      </label>
+                    {[['interval', 'Интервал'], ['schedule', 'Расписание'], ['list', 'Список дат']].map(([m, l]) => (
+                      <button key={m} type="button" onClick={() => setSlotMode(m)}
+                        className={`px-3 py-1.5 text-xs rounded-lg border transition-colors ${slotMode === m ? 'bg-purple-50 border-purple-300 text-purple-700' : 'bg-white border-gray-200 text-gray-600 hover:bg-gray-50'}`}>
+                        {l}
+                      </button>
                     ))}
                   </div>
-                  <Field label="Время (HH:mm по строке)" required>
-                    <textarea
-                      rows={4}
-                      value={slotForm.schedule_times_text}
-                      onChange={(e) => setSlotForm((p) => ({ ...p, schedule_times_text: e.target.value }))}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none font-mono"
-                      required
-                    />
-                  </Field>
-                </div>
-              ) : null}
 
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                <Field label="Мест"><TextInput type="number" min={0} value={slotForm.available_seats} onChange={(e) => setSlotForm((p) => ({ ...p, available_seats: Number(e.target.value || 0) }))} /></Field>
-                <Field label="Закрытие брони (мин)"><TextInput type="number" min={0} value={slotForm.booking_closes_minutes_before} onChange={(e) => setSlotForm((p) => ({ ...p, booking_closes_minutes_before: Number(e.target.value || 0) }))} /></Field>
-                <label className="inline-flex items-center gap-2 text-sm text-gray-700 self-end pb-2">
-                  <input type="checkbox" checked={slotForm.is_active} onChange={(e) => setSlotForm((p) => ({ ...p, is_active: e.target.checked }))} />
-                  Активные слоты
-                </label>
-              </div>
-
-              <FormActions saving={slotSaving} saveLabel="Создать слоты" onCancel={() => setSlotError('')} />
-            </form>
-
-            {slotResult ? (
-              <div className="mt-3 rounded-lg border border-gray-200 bg-gray-50 p-3 text-sm text-gray-700">
-                Создано: <b>{slotResult.created_count ?? 0}</b>, пропущено: <b>{slotResult.skipped_existing ?? 0}</b>
-              </div>
-            ) : null}
-          </section>
-        </div>
-
-        <section className="rounded-xl border border-gray-200 bg-white p-4">
-          <h2 className="text-lg font-semibold text-gray-900">3. Массово создать цены для новых слотов</h2>
-          <FormErrorAlert message={priceError} />
-          <FormHint>
-            Цены применяются к слотам, созданным на шаге 2 в этом же мастере ({createdSlotIds.length} слотов в буфере).
-          </FormHint>
-          <form className="mt-3 space-y-3" onSubmit={createPrices}>
-            <div className="flex flex-wrap gap-2">
-              <button
-                type="button"
-                onClick={() => setPriceForm((p) => ({ ...p, price_mode: 'single' }))}
-                className={`px-3 py-1.5 text-sm rounded-lg border ${priceForm.price_mode === 'single' ? 'bg-blue-50 border-blue-300 text-blue-700' : 'bg-white border-gray-300 text-gray-700'}`}
-              >
-                Одна цена на все типы
-              </button>
-              <button
-                type="button"
-                onClick={() => setPriceForm((p) => ({ ...p, price_mode: 'per_type' }))}
-                className={`px-3 py-1.5 text-sm rounded-lg border ${priceForm.price_mode === 'per_type' ? 'bg-blue-50 border-blue-300 text-blue-700' : 'bg-white border-gray-300 text-gray-700'}`}
-              >
-                Разные цены по типам
-              </button>
-            </div>
-
-            {priceForm.price_mode === 'single' ? (
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                <Field label="Цена" required><TextInput type="number" step="0.01" min={0} value={priceForm.price_value} onChange={(e) => setPriceForm((p) => ({ ...p, price_value: e.target.value }))} required /></Field>
-                <Field label="Валюта" required><TextInput value={priceForm.price_currency} maxLength={3} onChange={(e) => setPriceForm((p) => ({ ...p, price_currency: e.target.value }))} required /></Field>
-                <label className="inline-flex items-center gap-2 text-sm text-gray-700 self-end pb-2"><input type="checkbox" checked={priceForm.price_is_active} onChange={(e) => setPriceForm((p) => ({ ...p, price_is_active: e.target.checked }))} />Цена активна</label>
-              </div>
-            ) : (
-              <div className="space-y-2">
-                {slotForm.ticket_types.map((ttId) => {
-                  const tt = ticketTypeOptions.find((x) => String(x.id) === String(ttId));
-                  const label = getMultiLangValue(tt?.name) || tt?.name_primary || ttId;
-                  return (
-                    <div key={ttId} className="grid grid-cols-1 md:grid-cols-[1fr_140px] gap-2 items-center">
-                      <div className="text-sm text-gray-700 truncate">{label}</div>
-                      <TextInput
-                        type="number"
-                        min={0}
-                        step="0.01"
-                        value={priceForm.price_by_ticket_type?.[ttId] ?? ''}
-                        onChange={(e) => setPriceForm((p) => ({ ...p, price_by_ticket_type: { ...(p.price_by_ticket_type || {}), [ttId]: e.target.value } }))}
-                        required
-                      />
+                  {slotMode === 'interval' && (
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                      <Field label="Начало" required><TextInput type="datetime-local" value={slotForm.start_datetime} onChange={(e) => setSlotForm((p) => ({ ...p, start_datetime: e.target.value }))} required /></Field>
+                      <Field label="Конец" required><TextInput type="datetime-local" value={slotForm.end_datetime} onChange={(e) => setSlotForm((p) => ({ ...p, end_datetime: e.target.value }))} required /></Field>
+                      <Field label="Шаг (мин)"><TextInput type="number" min={1} value={slotForm.step_minutes} onChange={(e) => setSlotForm((p) => ({ ...p, step_minutes: +e.target.value || 60 }))} /></Field>
                     </div>
-                  );
-                })}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                  <Field label="Валюта" required><TextInput value={priceForm.price_currency} maxLength={3} onChange={(e) => setPriceForm((p) => ({ ...p, price_currency: e.target.value }))} required /></Field>
-                  <label className="inline-flex items-center gap-2 text-sm text-gray-700 self-end pb-2"><input type="checkbox" checked={priceForm.price_is_active} onChange={(e) => setPriceForm((p) => ({ ...p, price_is_active: e.target.checked }))} />Цена активна</label>
+                  )}
+
+                  {slotMode === 'schedule' && (
+                    <div className="space-y-3">
+                      <div className="grid grid-cols-2 gap-3">
+                        <Field label="С даты" required><TextInput type="date" value={slotForm.schedule_start_date} onChange={(e) => setSlotForm((p) => ({ ...p, schedule_start_date: e.target.value }))} required /></Field>
+                        <Field label="По дату" required><TextInput type="date" value={slotForm.schedule_end_date} onChange={(e) => setSlotForm((p) => ({ ...p, schedule_end_date: e.target.value }))} required /></Field>
+                      </div>
+                      <div className="flex flex-wrap gap-3">
+                        {[['mon','Пн'],['tue','Вт'],['wed','Ср'],['thu','Чт'],['fri','Пт'],['sat','Сб'],['sun','Вс']].map(([k,l]) => (
+                          <label key={k} className="flex items-center gap-1.5 text-sm text-gray-700 cursor-pointer">
+                            <input type="checkbox" checked={!!slotForm.schedule_days[k]} onChange={(e) => setSlotForm((p) => ({ ...p, schedule_days: { ...p.schedule_days, [k]: e.target.checked } }))} />
+                            {l}
+                          </label>
+                        ))}
+                      </div>
+                      <Field label="Время (HH:mm, по строке)" required>
+                        <textarea rows={3} value={slotForm.schedule_times_text} onChange={(e) => setSlotForm((p) => ({ ...p, schedule_times_text: e.target.value }))}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm font-mono focus:ring-2 focus:ring-blue-500 outline-none" required />
+                      </Field>
+                    </div>
+                  )}
+
+                  {slotMode === 'list' && (
+                    <Field label="Даты/время по строке" required>
+                      <textarea rows={4} value={slotForm.datetimes_text} onChange={(e) => setSlotForm((p) => ({ ...p, datetimes_text: e.target.value }))}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm font-mono focus:ring-2 focus:ring-blue-500 outline-none" placeholder="2026-06-01 10:00" required />
+                    </Field>
+                  )}
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <Field label="Кол-во мест"><TextInput type="number" min={0} value={slotForm.available_seats} onChange={(e) => setSlotForm((p) => ({ ...p, available_seats: +e.target.value || 0 }))} /></Field>
+                    <Field label="Закрытие брони (мин до)"><TextInput type="number" min={0} value={slotForm.booking_closes_minutes_before} onChange={(e) => setSlotForm((p) => ({ ...p, booking_closes_minutes_before: +e.target.value || 0 }))} /></Field>
+                  </div>
+
+                  <div className="flex items-center gap-3">
+                    <button type="submit" disabled={slotSaving} className="px-4 py-2 text-sm text-white bg-purple-600 rounded-lg hover:bg-purple-700 disabled:opacity-50 transition-colors">
+                      {slotSaving ? 'Создание…' : 'Создать слоты'}
+                    </button>
+                    <Err msg={slotError} />
+                    <Ok msg={slotOk} />
+                  </div>
+                </form>
+              )}
+            </SectionCard>
+
+            {/* ── 3. Price coverage ─────────────────────────────────────────── */}
+            <SectionCard title="Покрытие ценами">
+              {coverageLoading ? (
+                <div className="flex items-center gap-2 text-sm text-gray-400"><Spinner /> Загрузка...</div>
+              ) : !coverage.length ? (
+                <p className="text-sm text-gray-400">Добавьте типы билетов и слоты чтобы увидеть покрытие</p>
+              ) : (
+                <div className="space-y-3">
+                  {coverage.map(({ tt, covered, total }) => {
+                    const pct = total > 0 ? Math.round((covered / total) * 100) : 0;
+                    const full = pct === 100;
+                    return (
+                      <div key={tt.id} className="flex items-center gap-3">
+                        <div className="w-28 text-sm font-medium text-gray-700 truncate">{tt.name_primary}</div>
+                        <div className="flex-1 h-2 bg-gray-100 rounded-full overflow-hidden">
+                          <div className={`h-full rounded-full transition-all ${full ? 'bg-green-500' : 'bg-blue-400'}`} style={{ width: `${pct}%` }} />
+                        </div>
+                        <div className="text-xs text-gray-500 w-20 text-right">{covered}/{total} слотов</div>
+                        {!full && (
+                          <button
+                            onClick={() => { setFillTtId(tt.id); setFillPrice(''); document.getElementById('fill-form')?.scrollIntoView({ behavior: 'smooth' }); }}
+                            className="px-2 py-1 text-xs text-blue-600 bg-blue-50 rounded-md hover:bg-blue-100 transition-colors whitespace-nowrap"
+                          >
+                            Заполнить
+                          </button>
+                        )}
+                      </div>
+                    );
+                  })}
                 </div>
-              </div>
-            )}
-            <FormActions saving={priceSaving} saveLabel="Создать цены" onCancel={() => setPriceError('')} />
-          </form>
+              )}
 
-          {priceResult ? (
-            <div className="mt-3 rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-800">
-              Готово: цены созданы для <b>{priceResult.slotCount}</b> слотов и <b>{priceResult.ticketTypeCount}</b> типов билетов.
-            </div>
-          ) : null}
-        </section>
+              {/* Fill prices form */}
+              {!!ticketTypes.length && (
+                <form id="fill-form" onSubmit={handleFillPrices} className="mt-4 pt-4 border-t border-gray-100">
+                  <p className="text-xs text-gray-500 mb-3">Назначить цену всем активным слотам события:</p>
+                  <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+                    <Field label="Тип билета" required>
+                      <select value={fillTtId} onChange={(e) => setFillTtId(e.target.value)}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none" required>
+                        <option value="">Выберите тип</option>
+                        {ticketTypes.map((tt) => <option key={tt.id} value={tt.id}>{tt.name_primary}</option>)}
+                      </select>
+                    </Field>
+                    <Field label="Цена" required>
+                      <TextInput type="number" step="0.01" min={0} value={fillPrice} onChange={(e) => setFillPrice(e.target.value)} required />
+                    </Field>
+                    <Field label="Валюта">
+                      <TextInput value={fillCurrency} maxLength={3} onChange={(e) => setFillCurrency(e.target.value.toUpperCase())} />
+                    </Field>
+                    <div className="flex items-end">
+                      <button type="submit" disabled={fillSaving} className="w-full px-4 py-2 text-sm text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors">
+                        {fillSaving ? 'Назначение…' : 'Назначить'}
+                      </button>
+                    </div>
+                  </div>
+                  <div className="mt-1 flex gap-2">
+                    <Err msg={fillError} />
+                    <Ok msg={fillOk} />
+                  </div>
+                </form>
+              )}
+            </SectionCard>
 
-        <div className="rounded-xl border border-gray-200 bg-white p-4 text-sm text-gray-600">
-          Работаете с событием: <b>{eventLabel || 'не выбрано'}</b>. Для детальной правки можно перейти в{' '}
-          <Link className="text-blue-700 hover:underline" to="/catalog/slot-availabilities">каталог слотов</Link>{' '}
-          и{' '}
-          <Link className="text-blue-700 hover:underline" to="/catalog/ticket-prices">каталог цен</Link>.
-        </div>
+            {/* ── 4. Base prices ────────────────────────────────────────────── */}
+            <SectionCard
+              title="Базовые цены"
+              badge={basePrices.length}
+              action={
+                <button onClick={() => setShowBpForm((v) => !v)}
+                  className="px-3 py-1 text-xs font-medium text-amber-600 bg-amber-50 rounded-md hover:bg-amber-100 transition-colors">
+                  {showBpForm ? 'Скрыть' : '+ Добавить'}
+                </button>
+              }
+            >
+              <p className="text-xs text-gray-400 mb-3">Fallback-цена ценового движка когда нет конкретной цены для слота.</p>
+              {basePricesLoading ? (
+                <div className="flex items-center gap-2 text-sm text-gray-400"><Spinner /> Загрузка...</div>
+              ) : basePrices.length ? (
+                <div className="flex flex-wrap gap-2">
+                  {basePrices.map((bp) => {
+                    const tt = ttById[String(bp.ticket_type)];
+                    return (
+                      <div key={bp.id} className="flex items-center gap-2 px-3 py-1.5 bg-amber-50 border border-amber-200 rounded-lg text-sm">
+                        <span className="text-gray-700">{tt?.name_primary || bp.ticket_type}</span>
+                        <span className="font-medium text-amber-800">{bp.base_price} {bp.currency}</span>
+                        <button onClick={() => handleDeleteBp(bp)} className="text-amber-300 hover:text-red-500 transition-colors text-xs">✕</button>
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : (
+                <p className="text-sm text-gray-400">Базовых цен нет</p>
+              )}
+
+              {showBpForm && (
+                <form onSubmit={handleCreateBp} className="mt-4 pt-4 border-t border-gray-100 grid grid-cols-1 md:grid-cols-4 gap-3">
+                  <Field label="Тип билета" required>
+                    <select value={bpForm.ticket_type} onChange={(e) => setBpForm((p) => ({ ...p, ticket_type: e.target.value }))}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none" required>
+                      <option value="">Выберите тип</option>
+                      {ticketTypes.map((tt) => <option key={tt.id} value={tt.id}>{tt.name_primary}</option>)}
+                    </select>
+                  </Field>
+                  <Field label="Базовая цена" required>
+                    <TextInput type="number" step="0.01" min={0} value={bpForm.base_price} onChange={(e) => setBpForm((p) => ({ ...p, base_price: e.target.value }))} required />
+                  </Field>
+                  <Field label="Валюта">
+                    <TextInput value={bpForm.currency} maxLength={3} onChange={(e) => setBpForm((p) => ({ ...p, currency: e.target.value.toUpperCase() }))} />
+                  </Field>
+                  <div className="flex items-end">
+                    <button type="submit" disabled={bpSaving} className="w-full px-4 py-2 text-sm text-white bg-amber-500 rounded-lg hover:bg-amber-600 disabled:opacity-50 transition-colors">
+                      {bpSaving ? 'Создание…' : 'Добавить'}
+                    </button>
+                  </div>
+                  <div className="md:col-span-4 flex gap-2">
+                    <Err msg={bpError} />
+                    <Ok msg={bpOk} />
+                  </div>
+                </form>
+              )}
+            </SectionCard>
+          </>
+        )}
       </div>
     </Layout>
   );
