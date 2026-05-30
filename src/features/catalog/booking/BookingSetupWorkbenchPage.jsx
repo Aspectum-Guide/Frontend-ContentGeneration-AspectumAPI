@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   eventSlotAvailabilitiesAPI,
   eventTicketTypePricesAPI,
@@ -6,6 +6,7 @@ import {
   ticketTypesAPI,
 } from '../../../api/booking';
 import Layout from '../../../components/Layout';
+import Modal, { ConfirmModal } from '../../../components/ui/Modal';
 import { Field, TextInput } from '../../../components/ui/FormField';
 import { parseApiError } from '../../../utils/apiError';
 import { useEventOptions } from '../shared/bookingOptions';
@@ -89,6 +90,242 @@ function Ok({ msg }) {
   return msg ? <p className="text-xs text-emerald-700 bg-emerald-50 rounded px-2 py-1 mt-1">{msg}</p> : null;
 }
 
+// ─── SlotsManagerModal ───────────────────────────────────────────────────────
+
+const SLOTS_PAGE = 20;
+
+function fmtSlot(iso) {
+  return new Date(iso).toLocaleString('ru-RU', { day: '2-digit', month: '2-digit', year: '2-digit', hour: '2-digit', minute: '2-digit' });
+}
+
+function SlotsManagerModal({ open, eventId, onClose, onChanged }) {
+  const [page, setPage] = useState(1);
+  const [total, setTotal] = useState(0);
+  const [slots, setSlots] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [dateFrom, setDateFrom] = useState('');
+  const [dateTo, setDateTo] = useState('');
+
+  const [editingId, setEditingId] = useState(null);
+  const [editForm, setEditForm] = useState({});
+  const [saving, setSaving] = useState(null); // slotId being saved
+  const [deleteTarget, setDeleteTarget] = useState(null);
+  const [deleting, setDeleting] = useState(false);
+  const [rowError, setRowError] = useState({}); // slotId → msg
+
+  const loadSlots = useCallback(async (p = 1, from = dateFrom, to = dateTo) => {
+    if (!eventId) return;
+    setLoading(true);
+    try {
+      const params = {
+        event: eventId, page: p, page_size: SLOTS_PAGE,
+        ordering: 'slot_datetime',
+        ...(from ? { slot_datetime_after: new Date(from).toISOString() } : {}),
+        ...(to ? { slot_datetime_before: new Date(to + 'T23:59:59').toISOString() } : {}),
+      };
+      const r = await eventSlotAvailabilitiesAPI.list(params);
+      const data = r?.data;
+      setSlots(normalizeListResponse(data, ['results', 'data']));
+      setTotal(data?.count ?? data?.total ?? 0);
+      setPage(p);
+    } catch {
+      setSlots([]);
+    } finally {
+      setLoading(false);
+    }
+  }, [eventId, dateFrom, dateTo]);
+
+  useEffect(() => {
+    if (open) { setPage(1); setEditingId(null); setRowError({}); loadSlots(1, dateFrom, dateTo); }
+  }, [open, eventId]);
+
+  const handleToggle = async (slot) => {
+    setSaving(slot.id);
+    try {
+      await eventSlotAvailabilitiesAPI.update(slot.id, { is_active: !slot.is_active });
+      setSlots((prev) => prev.map((s) => s.id === slot.id ? { ...s, is_active: !slot.is_active } : s));
+      onChanged?.();
+    } catch (e) {
+      setRowError((p) => ({ ...p, [slot.id]: parseApiError(e, 'Ошибка') }));
+    } finally { setSaving(null); }
+  };
+
+  const openEdit = (slot) => {
+    setEditingId(slot.id);
+    setEditForm({ available_seats: slot.available_seats, booking_closes_minutes_before: slot.booking_closes_minutes_before });
+    setRowError((p) => { const n = { ...p }; delete n[slot.id]; return n; });
+  };
+
+  const handleSaveEdit = async (slot) => {
+    setSaving(slot.id);
+    try {
+      await eventSlotAvailabilitiesAPI.update(slot.id, {
+        available_seats: Number(editForm.available_seats ?? 0),
+        booking_closes_minutes_before: Number(editForm.booking_closes_minutes_before ?? 0),
+      });
+      setSlots((prev) => prev.map((s) => s.id === slot.id
+        ? { ...s, available_seats: Number(editForm.available_seats), booking_closes_minutes_before: Number(editForm.booking_closes_minutes_before) }
+        : s));
+      setEditingId(null);
+      onChanged?.();
+    } catch (e) {
+      setRowError((p) => ({ ...p, [slot.id]: parseApiError(e, 'Ошибка сохранения') }));
+    } finally { setSaving(null); }
+  };
+
+  const handleDelete = async () => {
+    if (!deleteTarget) return;
+    setDeleting(true);
+    try {
+      await eventSlotAvailabilitiesAPI.delete(deleteTarget.id);
+      setDeleteTarget(null);
+      const newPage = slots.length === 1 && page > 1 ? page - 1 : page;
+      await loadSlots(newPage);
+      onChanged?.();
+    } catch (e) {
+      setRowError((p) => ({ ...p, [deleteTarget.id]: parseApiError(e, 'Ошибка удаления') }));
+      setDeleteTarget(null);
+    } finally { setDeleting(false); }
+  };
+
+  const totalPages = Math.ceil(total / SLOTS_PAGE);
+
+  return (
+    <>
+      <Modal open={open} onClose={onClose} title={`Слоты (${total})`} size="xl">
+        {/* Filters */}
+        <div className="flex flex-wrap gap-3 mb-4">
+          <div className="flex items-center gap-2">
+            <label className="text-xs text-gray-500">С</label>
+            <input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)}
+              className="px-2 py-1.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none" />
+          </div>
+          <div className="flex items-center gap-2">
+            <label className="text-xs text-gray-500">По</label>
+            <input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)}
+              className="px-2 py-1.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none" />
+          </div>
+          <button onClick={() => loadSlots(1, dateFrom, dateTo)}
+            className="px-3 py-1.5 text-xs font-medium text-blue-600 bg-blue-50 rounded-lg hover:bg-blue-100 transition-colors">
+            Применить
+          </button>
+          {(dateFrom || dateTo) && (
+            <button onClick={() => { setDateFrom(''); setDateTo(''); loadSlots(1, '', ''); }}
+              className="px-3 py-1.5 text-xs text-gray-400 hover:text-gray-600 transition-colors">
+              Сбросить
+            </button>
+          )}
+        </div>
+
+        {/* Table */}
+        <div className="overflow-x-auto rounded-xl border border-gray-200">
+          <table className="w-full text-sm">
+            <thead className="bg-gray-50 text-xs text-gray-500 uppercase">
+              <tr>
+                <th className="px-3 py-2 text-left">Дата и время</th>
+                <th className="px-3 py-2 text-right">Мест</th>
+                <th className="px-3 py-2 text-right">Закрытие (мин)</th>
+                <th className="px-3 py-2 text-center">Активен</th>
+                <th className="px-3 py-2 text-right"></th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-100">
+              {loading ? (
+                <tr><td colSpan={5} className="px-3 py-6 text-center text-gray-400">
+                  <Spinner /> Загрузка...
+                </td></tr>
+              ) : slots.length === 0 ? (
+                <tr><td colSpan={5} className="px-3 py-6 text-center text-gray-400 text-sm">Слотов не найдено</td></tr>
+              ) : slots.map((slot) => {
+                const isEditing = editingId === slot.id;
+                const isSaving = saving === slot.id;
+                const err = rowError[slot.id];
+                return (
+                  <tr key={slot.id} className={`hover:bg-gray-50 ${!slot.is_active ? 'opacity-50' : ''}`}>
+                    <td className="px-3 py-2 font-mono text-xs text-gray-700 whitespace-nowrap">{fmtSlot(slot.slot_datetime)}</td>
+                    <td className="px-3 py-2 text-right">
+                      {isEditing
+                        ? <input type="number" min={0} value={editForm.available_seats} onChange={(e) => setEditForm((p) => ({ ...p, available_seats: e.target.value }))}
+                            className="w-20 px-2 py-1 border border-blue-300 rounded text-sm text-right focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                        : <span className="text-gray-700">{slot.available_seats}</span>
+                      }
+                    </td>
+                    <td className="px-3 py-2 text-right">
+                      {isEditing
+                        ? <input type="number" min={0} value={editForm.booking_closes_minutes_before} onChange={(e) => setEditForm((p) => ({ ...p, booking_closes_minutes_before: e.target.value }))}
+                            className="w-20 px-2 py-1 border border-blue-300 rounded text-sm text-right focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                        : <span className="text-gray-700">{slot.booking_closes_minutes_before}</span>
+                      }
+                    </td>
+                    <td className="px-3 py-2 text-center">
+                      <button onClick={() => handleToggle(slot)} disabled={isSaving}
+                        className={`relative w-8 h-4 rounded-full transition-colors focus:outline-none disabled:opacity-50 ${slot.is_active ? 'bg-green-500' : 'bg-gray-300'}`}>
+                        <span className={`absolute top-0.5 w-3 h-3 bg-white rounded-full shadow transition-all ${slot.is_active ? 'left-4' : 'left-0.5'}`} />
+                      </button>
+                    </td>
+                    <td className="px-3 py-2 text-right">
+                      <div className="flex items-center justify-end gap-1">
+                        {err && <span className="text-xs text-red-500 mr-1">{err}</span>}
+                        {isEditing ? (
+                          <>
+                            <button onClick={() => handleSaveEdit(slot)} disabled={isSaving}
+                              className="px-2 py-1 text-xs text-white bg-blue-600 rounded hover:bg-blue-700 disabled:opacity-50 transition-colors">
+                              {isSaving ? '…' : 'OK'}
+                            </button>
+                            <button onClick={() => setEditingId(null)}
+                              className="px-2 py-1 text-xs text-gray-500 bg-gray-100 rounded hover:bg-gray-200 transition-colors">
+                              ✕
+                            </button>
+                          </>
+                        ) : (
+                          <>
+                            <button onClick={() => openEdit(slot)} disabled={!!saving}
+                              className="px-2 py-1 text-xs text-blue-600 bg-blue-50 rounded hover:bg-blue-100 disabled:opacity-40 transition-colors">
+                              Ред.
+                            </button>
+                            <button onClick={() => setDeleteTarget(slot)} disabled={!!saving}
+                              className="px-2 py-1 text-xs text-red-500 bg-red-50 rounded hover:bg-red-100 disabled:opacity-40 transition-colors">
+                              Удалить
+                            </button>
+                          </>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+
+        {/* Pagination */}
+        {totalPages > 1 && (
+          <div className="flex items-center justify-between mt-3 text-sm text-gray-500">
+            <span>Страница {page} из {totalPages} · всего {total}</span>
+            <div className="flex gap-1">
+              <button onClick={() => loadSlots(page - 1)} disabled={page <= 1 || loading}
+                className="px-3 py-1 rounded-md bg-gray-100 hover:bg-gray-200 disabled:opacity-40 transition-colors">←</button>
+              <button onClick={() => loadSlots(page + 1)} disabled={page >= totalPages || loading}
+                className="px-3 py-1 rounded-md bg-gray-100 hover:bg-gray-200 disabled:opacity-40 transition-colors">→</button>
+            </div>
+          </div>
+        )}
+      </Modal>
+
+      <ConfirmModal
+        open={!!deleteTarget}
+        onClose={() => setDeleteTarget(null)}
+        onConfirm={handleDelete}
+        title="Удалить слот?"
+        message={deleteTarget ? `${fmtSlot(deleteTarget.slot_datetime)} · ${deleteTarget.available_seats} мест` : ''}
+        confirmLabel="Удалить"
+        danger
+        loading={deleting}
+      />
+    </>
+  );
+}
+
 // ─── main ────────────────────────────────────────────────────────────────────
 
 export default function BookingSetupWorkbenchPage() {
@@ -118,6 +355,7 @@ export default function BookingSetupWorkbenchPage() {
 
   // ── slots form ───────────────────────────────────────────────────────────
   const [showSlotForm, setShowSlotForm] = useState(false);
+  const [showSlotsManager, setShowSlotsManager] = useState(false);
   const [slotMode, setSlotMode] = useState('schedule');
   const [slotForm, setSlotForm] = useState({
     start_datetime: '', end_datetime: '', step_minutes: 60,
@@ -413,12 +651,22 @@ export default function BookingSetupWorkbenchPage() {
               title="Слоты"
               badge={slotsTotal != null ? slotsTotal : '…'}
               action={
-                <button
-                  onClick={() => setShowSlotForm((v) => !v)}
-                  className="px-3 py-1 text-xs font-medium text-purple-600 bg-purple-50 rounded-md hover:bg-purple-100 transition-colors"
-                >
-                  {showSlotForm ? 'Скрыть' : '+ Добавить'}
-                </button>
+                <div className="flex gap-2">
+                  {slotsTotal > 0 && (
+                    <button
+                      onClick={() => setShowSlotsManager(true)}
+                      className="px-3 py-1 text-xs font-medium text-gray-600 bg-gray-100 rounded-md hover:bg-gray-200 transition-colors"
+                    >
+                      Управлять
+                    </button>
+                  )}
+                  <button
+                    onClick={() => setShowSlotForm((v) => !v)}
+                    className="px-3 py-1 text-xs font-medium text-purple-600 bg-purple-50 rounded-md hover:bg-purple-100 transition-colors"
+                  >
+                    {showSlotForm ? 'Скрыть' : '+ Добавить'}
+                  </button>
+                </div>
               }
             >
               {slotsLoading ? (
@@ -625,6 +873,13 @@ export default function BookingSetupWorkbenchPage() {
           </>
         )}
       </div>
+
+      <SlotsManagerModal
+        open={showSlotsManager}
+        eventId={eventId}
+        onClose={() => setShowSlotsManager(false)}
+        onChanged={() => loadSlots(eventId)}
+      />
     </Layout>
   );
 }
