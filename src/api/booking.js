@@ -35,3 +35,23 @@ export const bookingReservationsAPI = {
   list: (params) => apiClient.get('/booking/reservations/', { params }),
   get: (id) => apiClient.get(`/booking/reservations/${id}/`),
 };
+
+export const eventTicketTypePricesAPI = {
+  list: (params) => apiClient.get('/booking/event-ticket-type-prices/', { params }),
+  get: (id) => apiClient.get(`/booking/event-ticket-type-prices/${id}/`),
+  create: (data) => apiClient.post('/booking/event-ticket-type-prices/', data),
+  update: (id, data) => apiClient.patch(`/booking/event-ticket-type-prices/${id}/`, data),
+  delete: (id) => apiClient.delete(`/booking/event-ticket-type-prices/${id}/`),
+};
+
+export const pricingRulesAPI = {
+  list: (params) => apiClient.get('/booking/pricing-rules/', { params }),
+  get: (id) => apiClient.get(`/booking/pricing-rules/${id}/`),
+  create: (data) => apiClient.post('/booking/pricing-rules/', data),
+  update: (id, data) => apiClient.patch(`/booking/pricing-rules/${id}/`, data),
+  delete: (id) => apiClient.delete(`/booking/pricing-rules/${id}/`),
+};
+
+export const bookingAnalyticsAPI = {
+  summary: (params) => apiClient.get('/booking/analytics/', { params }),
+};
