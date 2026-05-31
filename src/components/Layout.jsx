@@ -100,22 +100,27 @@ export default function Layout({ children, pageHeader = null, pageHeaderMode = '
       items: [{ label: 'Мои задачи', to: '/tasks' }],
     },
     {
-      title: 'Справочники',
+      title: 'Контент',
       items: [
-        { label: 'Каталог (все справочники)', to: '/catalog' },
         { label: 'Города', to: '/catalog/cities' },
         { label: 'Ивенты', to: '/catalog/events' },
-        { label: 'Типы билетов', to: '/catalog/ticket-types' },
-        { label: 'Слоты (Доступность)', to: '/catalog/slot-availabilities' },
-        { label: 'Цены билетов', to: '/catalog/ticket-prices' },
-        { label: 'Базовые цены', to: '/catalog/base-prices' },
-        { label: 'Правила цен', to: '/catalog/pricing-rules' },
-        { label: 'Booking Setup (мастер)', to: '/catalog/booking-setup' },
-        { label: '📊 Аналитика', to: '/catalog/analytics' },
+        { label: 'Теги и фильтры', to: '/catalog/tags' },
+        { label: 'Фотографии', to: '/catalog/photos' },
+      ],
+    },
+    {
+      title: 'Букинг',
+      items: [
+        { label: 'Настройка продаж', to: '/catalog/booking-setup' },
+        { label: 'Аналитика', to: '/catalog/analytics' },
+        { label: 'Резервации', to: '/catalog/reservations' },
+      ],
+    },
+    {
+      title: 'Подписки',
+      items: [
         { label: 'Типы подписки', to: '/catalog/subscription-types' },
         { label: 'Коды активации', to: '/catalog/activation-codes' },
-        { label: 'Фотографии', to: '/catalog/photos' },
-        { label: 'Теги и фильтры', to: '/catalog/tags' },
       ],
     },
     {
