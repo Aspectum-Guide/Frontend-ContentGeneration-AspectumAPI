@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { eventAudioGuidesAPI, audioAPI } from '../../../api/generation';
+import { eventAudioGuidesAPI, audioAPI, eventsAPI } from '../../../api/generation';
 import Layout from '../../../components/Layout';
 import { parseApiError } from '../../../utils/apiError';
-import { useEventOptions } from '../shared/bookingOptions';
 import { getMultiLangValue } from '../shared/i18n';
+import { normalizeListResponse } from '../shared/normalize';
 
 const LANG_LABELS = { ru: 'RU', en: 'EN', it: 'IT', de: 'DE', fr: 'FR', es: 'ES' };
 
@@ -90,7 +90,7 @@ function TrackRow({ track, guideId, onUploaded }) {
   );
 }
 
-function GuideCard({ guide, onChanged }) {
+function GuideCard({ guide, onChanged, eventLabel }) {
   const [toggling, setToggling] = useState(false);
 
   const toggleShow = async () => {
@@ -113,7 +113,10 @@ function GuideCard({ guide, onChanged }) {
         </span>
         <div className="flex-1 min-w-0">
           <p className="text-sm font-semibold text-gray-900 truncate">{title}</p>
-          <p className="text-xs text-gray-400">{guide.tracks.length} треков</p>
+          <p className="text-xs text-gray-400">
+            {guide.tracks.length} треков
+            {eventLabel && <span className="ml-1 text-gray-300">· {eventLabel}</span>}
+          </p>
         </div>
         <button
           onClick={toggleShow}
@@ -139,18 +142,30 @@ function GuideCard({ guide, onChanged }) {
 }
 
 export default function AudioGuidesCatalogPage() {
-  const { eventOptions, eventsLoading } = useEventOptions();
+  const [eventOptions, setEventOptions] = useState([]);
+  const [eventsLoading, setEventsLoading] = useState(true);
   const [eventId, setEventId] = useState('');
   const [guides, setGuides] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
+  // Загружаем ВСЕ ивенты через admin endpoint, не публичный (is_show может быть false)
+  useEffect(() => {
+    setEventsLoading(true);
+    eventsAPI.list({ page_size: 500 })
+      .then((r) => {
+        const list = normalizeListResponse(r?.data, ['events', 'results', 'data']);
+        setEventOptions(list);
+      })
+      .catch(() => setEventOptions([]))
+      .finally(() => setEventsLoading(false));
+  }, []);
+
   const load = useCallback(async (evId) => {
-    if (!evId) { setGuides([]); return; }
     setLoading(true);
     setError(null);
     try {
-      const r = await eventAudioGuidesAPI.list(evId);
+      const r = await eventAudioGuidesAPI.list(evId || null);
       setGuides(r?.data?.guides || []);
     } catch (e) {
       setError(parseApiError(e, 'Ошибка загрузки аудиогидов'));
@@ -160,6 +175,7 @@ export default function AudioGuidesCatalogPage() {
     }
   }, []);
 
+  // Загружаем все гиды при открытии, фильтруем при выборе ивента
   useEffect(() => { load(eventId); }, [eventId, load]);
 
   return (
@@ -176,7 +192,7 @@ export default function AudioGuidesCatalogPage() {
           className={`w-full md:w-96 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none ${eventsLoading ? 'opacity-60 cursor-wait' : ''}`}
           disabled={eventsLoading}
         >
-          <option value="">{eventsLoading ? 'Загрузка…' : '— Выберите событие —'}</option>
+          <option value="">{eventsLoading ? 'Загрузка…' : 'Все события'}</option>
           {eventOptions.map((ev) => (
             <option key={ev.id} value={ev.id}>{getMultiLangValue(ev.title) || ev.id}</option>
           ))}
@@ -187,9 +203,7 @@ export default function AudioGuidesCatalogPage() {
         <div className="mb-4 text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">{error}</div>
       )}
 
-      {!eventId ? (
-        <div className="text-sm text-gray-400 text-center py-12">Выберите событие чтобы увидеть аудиогиды</div>
-      ) : loading ? (
+      {loading ? (
         <div className="flex items-center gap-2 text-sm text-gray-400 py-8">
           <span className="animate-spin w-4 h-4 border-2 border-blue-500 border-t-transparent rounded-full inline-block" />
           Загрузка...
@@ -197,13 +211,20 @@ export default function AudioGuidesCatalogPage() {
       ) : guides.length === 0 ? (
         <div className="text-center py-12 bg-white rounded-xl border border-gray-200">
           <div className="text-4xl mb-3">🎧</div>
-          <p className="text-gray-500 text-sm">У этого события нет опубликованных аудиогидов</p>
+          <p className="text-gray-500 text-sm">{eventId ? 'У этого события нет опубликованных аудиогидов' : 'Нет опубликованных аудиогидов'}</p>
           <p className="text-gray-400 text-xs mt-1">Аудиогиды создаются при публикации сессии</p>
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
           {guides.map((guide) => (
-            <GuideCard key={guide.id} guide={guide} onChanged={() => load(eventId)} />
+            <GuideCard
+                key={guide.id}
+                guide={guide}
+                onChanged={() => load(eventId)}
+                eventLabel={!eventId ? (
+                  getMultiLangValue(eventOptions.find((e) => String(e.id) === String(guide.event))?.title) || null
+                ) : null}
+              />
           ))}
         </div>
       )}
