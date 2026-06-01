@@ -21,6 +21,7 @@ import BookingReservationsCatalog from './pages/catalog/BookingReservationsCatal
 import BasePricesCatalog from './pages/catalog/BasePricesCatalog';
 import PricingRulesCatalog from './pages/catalog/PricingRulesCatalog';
 import BookingAnalytics from './pages/catalog/BookingAnalytics';
+import AudioGuidesCatalog from './pages/catalog/AudioGuidesCatalog';
 import ExportCities from './pages/export/ExportCities';
 import ExportEvents from './pages/export/ExportEvents';
 import ExportZip from './pages/export/ExportZip';
@@ -82,6 +83,7 @@ function App() {
           <Route path="/catalog/base-prices" element={<ProtectedRoute><BasePricesCatalog /></ProtectedRoute>} />
           <Route path="/catalog/pricing-rules" element={<ProtectedRoute><PricingRulesCatalog /></ProtectedRoute>} />
           <Route path="/catalog/analytics" element={<ProtectedRoute><BookingAnalytics /></ProtectedRoute>} />
+          <Route path="/catalog/audio-guides" element={<ProtectedRoute><AudioGuidesCatalog /></ProtectedRoute>} />
           <Route path="/catalog/subscription-types" element={<ProtectedRoute><SubscriptionTypesCatalog /></ProtectedRoute>} />
           <Route path="/catalog/activation-codes" element={<ProtectedRoute><ActivationCodesCatalog /></ProtectedRoute>} />
           <Route path="/catalog/photos" element={<ProtectedRoute><PhotosCatalog /></ProtectedRoute>} />

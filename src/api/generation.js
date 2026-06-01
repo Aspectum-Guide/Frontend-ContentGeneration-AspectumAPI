@@ -326,3 +326,12 @@ export const importAPI = {
 // citiesAPI.get(sessionId) — no longer maps to session cities;
 // use sessionsAPI.get(sessionId) and read session.city_data
 export { citiesAPI as citiesAPI_legacy };
+
+export const eventAudioGuidesAPI = {
+  list: (eventId) =>
+    apiClient.get(`${BASE}/event-audio-guides/`, { params: { event_id: eventId } }),
+  update: (guideId, data) =>
+    apiClient.patch(`${BASE}/event-audio-guides/${guideId}/`, data),
+  upsertTrack: (guideId, data) =>
+    apiClient.post(`${BASE}/event-audio-guides/${guideId}/tracks/`, data),
+};

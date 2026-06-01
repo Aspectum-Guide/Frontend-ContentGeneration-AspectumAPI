@@ -12,6 +12,7 @@ const CATALOG_SECTIONS = [
       { to: '/catalog/cities', title: 'Города', description: 'Контент, карта, теги города', icon: '🏙️' },
       { to: '/catalog/events', title: 'Ивенты', description: 'События, видимость, букинг', icon: '🎪' },
       { to: '/catalog/tags', title: 'Теги и фильтры', description: 'Теги городов и событий', icon: '🏷️' },
+      { to: '/catalog/audio-guides', title: 'Аудиогиды', description: 'Треки по языкам, загрузка MP3', icon: '🎧' },
       { to: '/catalog/photos', title: 'Фотографии', description: 'Медиа (изображения)', icon: '🖼️' },
     ],
   },
