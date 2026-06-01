@@ -471,7 +471,7 @@ export default function BookingSetupWorkbenchPage() {
     try {
       await ticketTypesAPI.delete(tt.id);
       await loadTicketTypes(eventId);
-    } catch (err) { alert(parseApiError(err, 'Ошибка удаления')); }
+    } catch (err) { setTtError(parseApiError(err, 'Ошибка удаления типа билета')); setShowTtForm(true); }
   };
 
   const handleCreateSlots = async (e) => {
@@ -548,7 +548,7 @@ export default function BookingSetupWorkbenchPage() {
     try {
       await eventTicketTypePricesAPI.delete(bp.id);
       await loadBasePrices(eventId);
-    } catch (err) { alert(parseApiError(err, 'Ошибка удаления')); }
+    } catch (err) { setBpError(parseApiError(err, 'Ошибка удаления базовой цены')); setShowBpForm(true); }
   };
 
   // ── render ────────────────────────────────────────────────────────────────

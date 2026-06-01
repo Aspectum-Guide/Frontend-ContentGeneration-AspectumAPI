@@ -53,6 +53,7 @@ export default function TicketTypesCatalog() {
 
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState(null);
 
   const [assignTarget, setAssignTarget] = useState(null);
 
@@ -203,14 +204,14 @@ export default function TicketTypesCatalog() {
 
   const handleDelete = async () => {
     if (!deleteTarget?.id) return;
-
+    setDeleteError(null);
     try {
       setDeleting(true);
       await ticketTypesAPI.delete(deleteTarget.id);
       setDeleteTarget(null);
       await loadTicketTypes();
     } catch (err) {
-      alert(parseApiError(err, 'Ошибка удаления типа билета'));
+      setDeleteError(parseApiError(err, 'Ошибка удаления типа билета'));
     } finally {
       setDeleting(false);
     }
@@ -275,7 +276,8 @@ export default function TicketTypesCatalog() {
         loading={loading}
         error={error}
         emptyIcon="🎟️"
-        emptyText={search || eventFilter || statusFilter ? 'По запросу ничего не найдено' : 'Типов билетов пока нет'}
+        isFiltered={!!(search || eventFilter || statusFilter)}
+        emptyText="Типов билетов пока нет"
         search={search}
         onSearch={setSearch}
         searchPlaceholder="Поиск по названию или описанию..."
@@ -462,10 +464,10 @@ export default function TicketTypesCatalog() {
 
       <ConfirmModal
         open={!!deleteTarget}
-        onClose={() => setDeleteTarget(null)}
+        onClose={() => { setDeleteTarget(null); setDeleteError(null); }}
         onConfirm={handleDelete}
         title="Удалить тип билета?"
-        message={`Тип «${getMultiLangValue(deleteTarget?.name) || deleteTarget?.name_primary || deleteTarget?.id || ''}» будет удален без возможности восстановления.`}
+        message={deleteError || `Тип «${getMultiLangValue(deleteTarget?.name) || deleteTarget?.name_primary || deleteTarget?.id || ''}» будет удален без возможности восстановления.`}
         confirmLabel="Удалить"
         danger
         loading={deleting}

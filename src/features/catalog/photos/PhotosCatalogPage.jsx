@@ -9,6 +9,7 @@ export default function PhotosCatalog() {
   const [error, setError] = useState(null);
   const [editingImage, setEditingImage] = useState(null);
   const [saving, setSaving] = useState(false);
+  const [actionError, setActionError] = useState(null);
   const [page, setPage] = useState(1);
   const [totalCount, setTotalCount] = useState(0);
 
@@ -53,7 +54,7 @@ export default function PhotosCatalog() {
       setEditingImage(null);
       await loadImages(page);
     } catch (err) {
-      alert(err?.response?.data?.error || 'Ошибка сохранения');
+      setActionError(err?.response?.data?.error || 'Ошибка сохранения');
     } finally {
       setSaving(false);
     }
@@ -61,11 +62,12 @@ export default function PhotosCatalog() {
 
   const handleDelete = async (img) => {
     if (!window.confirm('Удалить изображение?')) return;
+    setActionError(null);
     try {
       await imagesAPI.delete(img.id);
       await loadImages(page);
     } catch (err) {
-      alert(err?.response?.data?.error || 'Ошибка удаления');
+      setActionError(err?.response?.data?.error || 'Ошибка удаления');
     }
   };
 
@@ -86,6 +88,12 @@ export default function PhotosCatalog() {
       {error && (
         <div className="mb-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg text-sm text-yellow-700">
           {error}
+        </div>
+      )}
+      {actionError && (
+        <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700 flex items-center justify-between">
+          {actionError}
+          <button onClick={() => setActionError(null)} className="text-red-400 hover:text-red-600 ml-3 shrink-0">✕</button>
         </div>
       )}
 

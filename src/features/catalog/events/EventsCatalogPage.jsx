@@ -153,7 +153,8 @@ export default function EventsCatalogPage() {
         loading={e.loading}
         error={e.error}
         emptyIcon="🎪"
-        emptyText={e.search || e.cityFilter ? 'По запросу событий не найдено' : 'Событий нет'}
+        isFiltered={!!(e.search || e.cityFilter)}
+        emptyText="Событий нет"
         search={e.search}
         onSearch={e.setSearch}
         searchPlaceholder="Поиск по названию..."

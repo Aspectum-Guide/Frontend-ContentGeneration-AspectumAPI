@@ -162,7 +162,8 @@ export default function BasePricesCatalogPage() {
         loading={loading}
         error={listError}
         emptyIcon="💰"
-        emptyText={eventFilter ? 'По запросу ничего не найдено' : 'Базовых цен пока нет'}
+        isFiltered={!!eventFilter}
+        emptyText="Базовых цен пока нет"
         page={page}
         totalCount={total}
         pageSize={PAGE_SIZE}

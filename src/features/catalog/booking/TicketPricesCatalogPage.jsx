@@ -324,7 +324,8 @@ export default function TicketPricesCatalog() {
         loading={prices.loading}
         error={prices.error}
         emptyIcon="🎟️"
-        emptyText={search || eventFilter || ticketTypeFilter || statusFilter ? 'По запросу ничего не найдено' : 'Цен пока нет'}
+        isFiltered={!!(search || eventFilter || ticketTypeFilter || statusFilter)}
+        emptyText="Цен пока нет"
         search={search}
         onSearch={setSearch}
         searchPlaceholder="Поиск..."

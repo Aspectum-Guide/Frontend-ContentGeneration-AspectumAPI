@@ -40,6 +40,7 @@ export default function SubscriptionTypesCatalogPage() {
 
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState(null);
 
   const loadItems = useCallback(async (paramsState) => {
     const state = paramsState || { search, statusFilter, page };
@@ -137,14 +138,14 @@ export default function SubscriptionTypesCatalogPage() {
 
   const handleDelete = async () => {
     if (!deleteTarget?.id) return;
-
+    setDeleteError(null);
     try {
       setDeleting(true);
       await subscriptionTypesAPI.delete(deleteTarget.id);
       setDeleteTarget(null);
       await loadItems();
     } catch (err) {
-      alert(parseApiError(err, 'Ошибка удаления типа подписки'));
+      setDeleteError(parseApiError(err, 'Ошибка удаления типа подписки'));
     } finally {
       setDeleting(false);
     }
@@ -186,7 +187,8 @@ export default function SubscriptionTypesCatalogPage() {
         loading={loading}
         error={error}
         emptyIcon="🧩"
-        emptyText={search || statusFilter ? 'По запросу ничего не найдено' : 'Типов подписки пока нет'}
+        isFiltered={!!(search || statusFilter)}
+        emptyText="Типов подписки пока нет"
         search={search}
         onSearch={setSearch}
         searchPlaceholder="Поиск по названию или описанию..."
@@ -265,10 +267,10 @@ export default function SubscriptionTypesCatalogPage() {
 
       <ConfirmModal
         open={!!deleteTarget}
-        onClose={() => setDeleteTarget(null)}
+        onClose={() => { setDeleteTarget(null); setDeleteError(null); }}
         onConfirm={handleDelete}
         title="Удалить тип подписки?"
-        message={`Тип «${deleteTarget?.name || deleteTarget?.id || ''}» будет удален без возможности восстановления.`}
+        message={deleteError || `Тип «${deleteTarget?.name || deleteTarget?.id || ''}» будет удален без возможности восстановления.`}
         confirmLabel="Удалить"
         danger
         loading={deleting}

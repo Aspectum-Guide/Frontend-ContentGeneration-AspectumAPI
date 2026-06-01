@@ -101,7 +101,8 @@ export default function CitiesCatalogPage() {
         loading={c.loading}
         error={c.error}
         emptyIcon="🏙️"
-        emptyText={c.search ? 'По запросу городов не найдено' : 'Городов нет'}
+        isFiltered={!!c.search}
+        emptyText="Городов нет"
         search={c.search}
         onSearch={c.setSearch}
         searchPlaceholder="Поиск по названию, стране..."

@@ -277,7 +277,8 @@ export default function ActivationCodesCatalogPage() {
         loading={loading}
         error={error}
         emptyIcon="🔐"
-        emptyText={search || statusFilter || subscriptionTypeFilter ? 'По запросу ничего не найдено' : 'Кодов активации пока нет'}
+        isFiltered={!!(search || statusFilter || subscriptionTypeFilter)}
+        emptyText="Кодов активации пока нет"
         search={search}
         onSearch={setSearch}
         searchPlaceholder="Поиск по коду, продукту, описанию..."
@@ -410,15 +411,9 @@ export default function ActivationCodesCatalogPage() {
       <ConfirmModal
         open={!!crud.deleteTarget}
         onClose={() => crud.cancelDelete()}
-        onConfirm={async () => {
-          try {
-            await crud.confirmDelete();
-          } catch (e) {
-            alert(crud.deleteError || parseApiError(e, 'Ошибка удаления кода'));
-          }
-        }}
+        onConfirm={crud.confirmDelete}
         title="Удалить код активации?"
-        message={`Код «${crud.deleteTarget?.code || crud.deleteTarget?.id || ''}» будет удален без возможности восстановления.`}
+        message={crud.deleteError || `Код «${crud.deleteTarget?.code || crud.deleteTarget?.id || ''}» будет удален без возможности восстановления.`}
         confirmLabel="Удалить"
         danger
         loading={crud.deleting}

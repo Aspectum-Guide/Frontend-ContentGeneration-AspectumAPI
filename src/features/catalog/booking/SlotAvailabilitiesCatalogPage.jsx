@@ -450,7 +450,8 @@ export default function SlotAvailabilitiesCatalog() {
         loading={avail.loading}
         error={avail.error}
         emptyIcon="🕒"
-        emptyText={eventFilter || ticketTypeFilter ? 'По запросу ничего не найдено' : 'Слотов пока нет'}
+        isFiltered={!!(eventFilter || ticketTypeFilter)}
+        emptyText="Слотов пока нет"
         search={search}
         onSearch={setSearch}
         searchPlaceholder="Поиск (локально, по таблице)..."

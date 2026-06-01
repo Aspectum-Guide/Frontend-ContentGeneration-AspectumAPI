@@ -210,7 +210,8 @@ export default function PricingRulesCatalogPage() {
         loading={loading}
         error={listError}
         emptyIcon="📋"
-        emptyText={eventFilter ? 'По запросу ничего не найдено' : 'Правил пока нет'}
+        isFiltered={!!eventFilter}
+        emptyText="Правил пока нет"
         page={page}
         totalCount={total}
         pageSize={PAGE_SIZE}
