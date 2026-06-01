@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { bookingReservationsAPI, eventSlotAvailabilitiesAPI } from '../../../api/booking';
 import Layout from '../../../components/Layout';
 import DataTable from '../../../components/ui/DataTable';
@@ -8,10 +8,13 @@ import { useLayoutActions } from '../../../context/useLayoutActions';
 import { parseApiError } from '../../../utils/apiError';
 import { useCatalogFilters } from '../core/useCatalogFilters';
 import { useCatalogResource } from '../core/useCatalogResource';
-import { useEventOptions, useTicketTypeOptions } from '../shared/bookingOptions';
+import { useEventOptions, useTicketTypeMap, useTicketTypeOptions } from '../shared/bookingOptions';
 import CatalogPageHeader from '../shared/components/CatalogPageHeader';
+import EventSelect from '../shared/components/EventSelect';
 import StatusBadge from '../shared/components/StatusBadge';
-import { getMultiLangValue } from '../shared/i18n';
+import TicketTypeSelect from '../shared/components/TicketTypeSelect';
+import { formatMoney } from '../shared/currencies';
+import { getEventLabelById } from '../shared/labels';
 import { normalizeListResponse } from '../shared/normalize';
 
 const PAGE_SIZE = 20;
@@ -54,21 +57,7 @@ export default function BookingReservationsCatalogPage() {
 
   const [detail, setDetail] = useState(null);
 
-  const eventLabelById = useMemo(() => {
-    const map = new Map();
-    for (const e of eventOptions) {
-      map.set(String(e.id), getMultiLangValue(e.title) || String(e.id));
-    }
-    return map;
-  }, [eventOptions]);
-
-  const ticketTypeLabelById = useMemo(() => {
-    const map = new Map();
-    for (const tt of ticketTypeOptions) {
-      map.set(String(tt.id), getMultiLangValue(tt.name) || tt.code || String(tt.id));
-    }
-    return map;
-  }, [ticketTypeOptions]);
+  const ticketTypeLabelById = useTicketTypeMap(ticketTypeOptions);
 
   const loadSlots = useCallback(async (eventId) => {
     const normalizedEventId = eventId || '';
@@ -160,14 +149,14 @@ export default function BookingReservationsCatalogPage() {
     {
       key: 'event',
       label: 'Событие',
-      render: (id) => <span className="text-sm text-gray-700">{eventLabelById.get(String(id)) || id || '—'}</span>,
+      render: (id) => <span className="text-sm text-gray-700">{getEventLabelById(eventOptions, id) || id || '—'}</span>,
     },
     {
       key: 'ticket_type',
       label: 'Тип',
       render: (id) => (
         <span className="text-sm text-gray-700">
-          {id ? (ticketTypeLabelById.get(String(id)) || String(id)) : '—'}
+          {id ? (ticketTypeLabelById.get(String(id))?.title || String(id)) : '—'}
         </span>
       ),
     },
@@ -181,7 +170,7 @@ export default function BookingReservationsCatalogPage() {
       label: 'Сумма',
       render: (v, row) => (
         <span className="text-sm font-medium text-gray-900">
-          {v != null ? `${Number(v).toFixed(2)} ${row.currency || 'EUR'}` : '—'}
+          {v != null ? formatMoney(Number(v).toFixed(2), row.currency) : '—'}
         </span>
       ),
     },
@@ -217,17 +206,14 @@ export default function BookingReservationsCatalogPage() {
         onRowClick={(row) => setDetail(row)}
         filters={(
           <>
-            <select
+            <EventSelect
               value={eventFilter}
-              onChange={(e) => setEventFilter(e.target.value)}
-              className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+              onChange={setEventFilter}
+              options={eventOptions}
               disabled={eventsLoading}
-            >
-              <option value="">Все события</option>
-              {eventOptions.map((e) => (
-                <option key={e.id} value={e.id}>{getMultiLangValue(e.title) || e.id}</option>
-              ))}
-            </select>
+              placeholder="Все события"
+              className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+            />
 
             <select
               value={statusFilter}
@@ -240,19 +226,14 @@ export default function BookingReservationsCatalogPage() {
               <option value="expired">expired</option>
             </select>
 
-            <select
+            <TicketTypeSelect
               value={ticketTypeFilter}
-              onChange={(e) => setTicketTypeFilter(e.target.value)}
-              className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+              onChange={setTicketTypeFilter}
+              options={ticketTypeOptions}
               disabled={!eventFilter || ticketTypesLoading}
-            >
-              <option value="">{eventFilter ? 'Все типы' : 'Сначала выберите событие'}</option>
-              {ticketTypeOptions.map((tt) => (
-                <option key={tt.id} value={tt.id}>
-                  {getMultiLangValue(tt.name) || tt.code || tt.id}
-                </option>
-              ))}
-            </select>
+              placeholder={eventFilter ? 'Все типы' : 'Сначала выберите событие'}
+              className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+            />
 
             <select
               value={slotFilter}
@@ -287,13 +268,13 @@ export default function BookingReservationsCatalogPage() {
                 <div className="text-sm text-gray-700">{detail.status || '—'}</div>
               </Field>
               <Field label="Событие">
-                <div className="text-sm text-gray-700">{eventLabelById.get(String(detail.event)) || detail.event || '—'}</div>
+                <div className="text-sm text-gray-700">{getEventLabelById(eventOptions, detail.event) || detail.event || '—'}</div>
               </Field>
               <Field label="Слот">
                 <div className="text-sm text-gray-700 font-mono">{detail.slot || '—'}</div>
               </Field>
               <Field label="Тип (single)">
-                <div className="text-sm text-gray-700">{detail.ticket_type ? (ticketTypeLabelById.get(String(detail.ticket_type)) || detail.ticket_type) : '—'}</div>
+                <div className="text-sm text-gray-700">{detail.ticket_type ? (ticketTypeLabelById.get(String(detail.ticket_type))?.title || detail.ticket_type) : '—'}</div>
               </Field>
               <Field label="Кол-во">
                 <div className="text-sm text-gray-700">{detail.qty ?? '—'}</div>

@@ -10,16 +10,19 @@ import { useCatalogFilters } from '../core/useCatalogFilters';
 import { useEventOptions, useTicketTypeOptions } from '../shared/bookingOptions';
 import ActiveCheckboxField from '../shared/components/ActiveCheckboxField';
 import CatalogPageHeader from '../shared/components/CatalogPageHeader';
+import EventSelect from '../shared/components/EventSelect';
 import FormErrorAlert from '../shared/components/FormErrorAlert';
 import StatusBadge from '../shared/components/StatusBadge';
 import TableRowActions from '../shared/components/TableRowActions';
-import { getMultiLangValue } from '../shared/i18n';
+import TicketTypeSelect from '../shared/components/TicketTypeSelect';
+import { DEFAULT_CURRENCY, normalizeCurrency } from '../shared/currencies';
+import { getEventLabelById, getTicketTypeLabel } from '../shared/labels';
 import { normalizeListResponse } from '../shared/normalize';
 
 const PAGE_SIZE = 20;
 
 function createEmpty() {
-  return { id: null, event: '', ticket_type: '', base_price: '', currency: 'EUR', is_active: true };
+  return { id: null, event: '', ticket_type: '', base_price: '', currency: DEFAULT_CURRENCY, is_active: true };
 }
 
 export default function BasePricesCatalogPage() {
@@ -77,13 +80,10 @@ export default function BasePricesCatalogPage() {
     return () => setMobileActions([]);
   }, [editing, setMobileActions]);
 
-  const eventLabel = (id) => {
-    const ev = eventOptions.find((e) => String(e.id) === String(id));
-    return ev ? getMultiLangValue(ev.title) || String(id) : String(id);
-  };
+  const eventLabel = (id) => getEventLabelById(eventOptions, id);
   const ttLabel = (id) => {
     for (const tt of [...ticketTypeOptions, ...editingTTOptions]) {
-      if (String(tt.id) === String(id)) return getMultiLangValue(tt.name) || tt.code || String(id);
+      if (String(tt.id) === String(id)) return getTicketTypeLabel(tt);
     }
     return String(id);
   };
@@ -95,7 +95,7 @@ export default function BasePricesCatalogPage() {
       event: editing.event || null,
       ticket_type: editing.ticket_type || null,
       base_price: Number(editing.base_price) || 0,
-      currency: (editing.currency || 'EUR').toUpperCase(),
+      currency: normalizeCurrency(editing.currency),
       is_active: !!editing.is_active,
     };
     try {
@@ -169,21 +169,18 @@ export default function BasePricesCatalogPage() {
         pageSize={PAGE_SIZE}
         onPage={setPage}
         filters={(
-          <select
+          <EventSelect
             value={eventFilter}
-            onChange={(e) => setEventFilter(e.target.value)}
-            className={`px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none ${eventsLoading ? 'opacity-60 cursor-wait' : ''}`}
+            onChange={setEventFilter}
+            options={eventOptions}
             disabled={eventsLoading}
-          >
-            <option value="">{eventsLoading ? 'Загрузка…' : 'Все события'}</option>
-            {eventOptions.map((ev) => (
-              <option key={ev.id} value={ev.id}>{getMultiLangValue(ev.title) || ev.id}</option>
-            ))}
-          </select>
+            placeholder={eventsLoading ? 'Загрузка…' : 'Все события'}
+            className={`px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none ${eventsLoading ? 'opacity-60 cursor-wait' : ''}`}
+          />
         )}
         actions={(row) => (
           <TableRowActions
-            onEdit={() => { setSaveError(null); setEditing({ id: row.id, event: String(row.event), ticket_type: String(row.ticket_type), base_price: String(row.base_price), currency: row.currency || 'EUR', is_active: row.is_active !== false }); }}
+            onEdit={() => { setSaveError(null); setEditing({ id: row.id, event: String(row.event), ticket_type: String(row.ticket_type), base_price: String(row.base_price), currency: normalizeCurrency(row.currency), is_active: row.is_active !== false }); }}
             onDelete={() => setDeleteTarget(row)}
           />
         )}
@@ -200,31 +197,25 @@ export default function BasePricesCatalogPage() {
             <FormErrorAlert message={saveError} />
 
             <Field label="Событие" required>
-              <select
+              <EventSelect
                 value={editing.event}
-                onChange={(e) => setEditing((p) => ({ ...p, event: e.target.value, ticket_type: '' }))}
-                className={`w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none ${eventsLoading ? 'opacity-60 cursor-wait' : ''}`}
-                required disabled={eventsLoading}
-              >
-                <option value="">{eventsLoading ? 'Загрузка…' : 'Выберите событие'}</option>
-                {eventOptions.map((ev) => (
-                  <option key={ev.id} value={ev.id}>{getMultiLangValue(ev.title) || ev.id}</option>
-                ))}
-              </select>
+                onChange={(v) => setEditing((p) => ({ ...p, event: v, ticket_type: '' }))}
+                options={eventOptions}
+                disabled={eventsLoading}
+                required
+                placeholder={eventsLoading ? 'Загрузка…' : 'Выберите событие'}
+              />
             </Field>
 
             <Field label="Тип билета" required>
-              <select
+              <TicketTypeSelect
                 value={editing.ticket_type}
-                onChange={(e) => setEditing((p) => ({ ...p, ticket_type: e.target.value }))}
-                className={`w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none ${editingTTLoading ? 'opacity-60 cursor-wait' : ''}`}
-                required disabled={!editing.event || editingTTLoading}
-              >
-                <option value="">{editingTTLoading ? 'Загрузка…' : editing.event ? 'Выберите тип' : 'Сначала выберите событие'}</option>
-                {editingTTOptions.map((tt) => (
-                  <option key={tt.id} value={tt.id}>{getMultiLangValue(tt.name) || tt.code || tt.id}</option>
-                ))}
-              </select>
+                onChange={(v) => setEditing((p) => ({ ...p, ticket_type: v }))}
+                options={editingTTOptions}
+                disabled={!editing.event || editingTTLoading}
+                required
+                placeholder={editingTTLoading ? 'Загрузка…' : editing.event ? 'Выберите тип' : 'Сначала выберите событие'}
+              />
             </Field>
 
             <div className="grid grid-cols-2 gap-3">

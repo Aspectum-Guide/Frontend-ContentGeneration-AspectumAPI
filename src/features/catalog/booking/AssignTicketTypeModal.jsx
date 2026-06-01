@@ -1,9 +1,9 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { bookingReferenceAPI, ticketTypesAPI } from '../../../api/booking';
 import Modal from '../../../components/ui/Modal';
 import { parseApiError } from '../../../utils/apiError';
 import { normalizeListResponse } from '../shared/normalize';
-import { getMultiLangValue } from '../shared/i18n';
+import { getEventLabel, getTicketTypeLabel } from '../shared/labels';
 
 export default function AssignTicketTypeModal({ open, ticketType, onClose, onDone }) {
   const [events, setEvents] = useState([]);
@@ -93,7 +93,7 @@ export default function AssignTicketTypeModal({ open, ticketType, onClose, onDon
     }
   };
 
-  const typeName = getMultiLangValue(ticketType?.name) || ticketType?.code || '—';
+  const typeName = getTicketTypeLabel(ticketType) || '—';
 
   return (
     <Modal
@@ -138,7 +138,7 @@ export default function AssignTicketTypeModal({ open, ticketType, onClose, onDon
                         className="w-4 h-4 rounded border-gray-300 text-blue-600"
                       />
                       <span className="text-sm text-gray-800 flex-1">
-                        {getMultiLangValue(ev.title) || ev.id}
+                        {getEventLabel(ev) || ev.id}
                       </span>
                       {isCurrent && (
                         <span className="text-xs text-gray-400">текущий</span>

@@ -10,54 +10,18 @@ import Modal, { ConfirmModal } from '../../../components/ui/Modal';
 import { Field, TextInput } from '../../../components/ui/FormField';
 import { parseApiError } from '../../../utils/apiError';
 import { useEventOptions } from '../shared/bookingOptions';
-import { getMultiLangValue } from '../shared/i18n';
+import EventSelect from '../shared/components/EventSelect';
+import TicketTypeSelect from '../shared/components/TicketTypeSelect';
+import { DEFAULT_CURRENCY, normalizeCurrency } from '../shared/currencies';
+import { getTicketTypeLabel } from '../shared/labels';
 import { normalizeListResponse } from '../shared/normalize';
-
-// ─── helpers ────────────────────────────────────────────────────────────────
-
-function parseInputToIso(v) {
-  if (!v) return '';
-  const d = new Date(v);
-  return Number.isNaN(d.getTime()) ? '' : d.toISOString();
-}
-
-function buildFromInterval({ startIso, endIso, stepMinutes }) {
-  const start = startIso ? new Date(startIso) : null;
-  const end = endIso ? new Date(endIso) : null;
-  const step = Number(stepMinutes || 0);
-  if (!start || !end || !Number.isFinite(step) || step <= 0) return [];
-  const out = [];
-  for (let t = start.getTime(); t <= end.getTime(); t += step * 60_000) {
-    out.push(new Date(t).toISOString());
-    if (out.length >= 1000) break;
-  }
-  return out;
-}
-
-function buildFromSchedule({ startDate, endDate, days, timesText }) {
-  if (!startDate || !endDate) return [];
-  const lines = String(timesText || '').split('\n').map((l) => l.trim()).filter(Boolean);
-  const times = lines.map((l) => { const m = /^(\d{1,2}):(\d{2})$/.exec(l); return m ? { hh: +m[1], mm: +m[2] } : null; }).filter(Boolean);
-  const dayMap = { 0: 'sun', 1: 'mon', 2: 'tue', 3: 'wed', 4: 'thu', 5: 'fri', 6: 'sat' };
-  const out = [];
-  for (let d = new Date(`${startDate}T00:00:00`); d <= new Date(`${endDate}T00:00:00`); d.setDate(d.getDate() + 1)) {
-    if (!days[dayMap[d.getDay()]]) continue;
-    for (const t of times) {
-      const dt = new Date(d); dt.setHours(t.hh, t.mm, 0, 0);
-      out.push(dt.toISOString());
-      if (out.length >= 1000) return [...new Set(out)];
-    }
-  }
-  return [...new Set(out)];
-}
-
-function buildFromList(text) {
-  return [...new Set(
-    String(text || '').split('\n').map((l) => l.trim()).filter(Boolean)
-      .map((l) => { const d = new Date(l.replace(' ', 'T')); return Number.isNaN(d.getTime()) ? null : d.toISOString(); })
-      .filter(Boolean)
-  )];
-}
+import {
+  buildFromInterval,
+  buildFromList,
+  buildFromSchedule,
+  formatSlot as fmtSlot,
+  parseInputToIso,
+} from '../shared/scheduleParsers';
 
 // ─── sub-components ──────────────────────────────────────────────────────────
 
@@ -93,10 +57,6 @@ function Ok({ msg }) {
 // ─── SlotsManagerModal ───────────────────────────────────────────────────────
 
 const SLOTS_PAGE = 20;
-
-function fmtSlot(iso) {
-  return new Date(iso).toLocaleString('ru-RU', { day: '2-digit', month: '2-digit', year: '2-digit', hour: '2-digit', minute: '2-digit' });
-}
 
 function SlotsManagerModal({ open, eventId, onClose, onChanged }) {
   const [page, setPage] = useState(1);
@@ -372,14 +332,14 @@ export default function BookingSetupWorkbenchPage() {
   // ── coverage fill ────────────────────────────────────────────────────────
   const [fillTtId, setFillTtId] = useState('');
   const [fillPrice, setFillPrice] = useState('');
-  const [fillCurrency, setFillCurrency] = useState('EUR');
+  const [fillCurrency, setFillCurrency] = useState(DEFAULT_CURRENCY);
   const [fillSaving, setFillSaving] = useState(false);
   const [fillError, setFillError] = useState('');
   const [fillOk, setFillOk] = useState('');
 
   // ── base price form ──────────────────────────────────────────────────────
   const [showBpForm, setShowBpForm] = useState(false);
-  const [bpForm, setBpForm] = useState({ ticket_type: '', base_price: '', currency: 'EUR' });
+  const [bpForm, setBpForm] = useState({ ticket_type: '', base_price: '', currency: DEFAULT_CURRENCY });
   const [bpSaving, setBpSaving] = useState(false);
   const [bpError, setBpError] = useState('');
   const [bpOk, setBpOk] = useState('');
@@ -466,7 +426,7 @@ export default function BookingSetupWorkbenchPage() {
   };
 
   const handleDeleteTt = async (tt) => {
-    if (!confirm(`Удалить тип «${getMultiLangValue(tt.name) || tt.code}»?`)) return;
+    if (!confirm(`Удалить тип «${getTicketTypeLabel(tt)}»?`)) return;
     try {
       await ticketTypesAPI.delete(tt.id);
       await loadTicketTypes(eventId);
@@ -515,7 +475,7 @@ export default function BookingSetupWorkbenchPage() {
         event: eventId,
         slot_ids: slots.map((s) => s.id),
         ticket_types: [fillTtId],
-        price, currency: fillCurrency.toUpperCase(), is_active: true,
+        price, currency: normalizeCurrency(fillCurrency), is_active: true,
       });
       setFillOk(`Готово: цены назначены для ${slots.length} слотов`);
       await loadCoverage(eventId, ticketTypes);
@@ -533,10 +493,10 @@ export default function BookingSetupWorkbenchPage() {
       setBpSaving(true);
       await eventTicketTypePricesAPI.create({
         event: eventId, ticket_type: bpForm.ticket_type,
-        base_price: price, currency: bpForm.currency.toUpperCase(), is_active: true,
+        base_price: price, currency: normalizeCurrency(bpForm.currency), is_active: true,
       });
       setBpOk('Базовая цена добавлена');
-      setBpForm({ ticket_type: '', base_price: '', currency: 'EUR' });
+      setBpForm({ ticket_type: '', base_price: '', currency: DEFAULT_CURRENCY });
       await loadBasePrices(eventId);
     } catch (err) { setBpError(parseApiError(err, 'Ошибка создания')); }
     finally { setBpSaving(false); }
@@ -562,17 +522,14 @@ export default function BookingSetupWorkbenchPage() {
         {/* Event selector */}
         <div className="bg-white rounded-xl border border-gray-200 p-4">
           <h1 className="text-xl font-bold text-gray-900 mb-3">Настройка продаж</h1>
-          <select
+          <EventSelect
             value={eventId}
-            onChange={(e) => { setEventId(e.target.value); setShowTtForm(false); setShowSlotForm(false); setShowBpForm(false); setTtOk(''); setSlotOk(''); setBpOk(''); setFillOk(''); }}
-            className={`w-full md:w-96 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none ${eventsLoading ? 'opacity-60 cursor-wait' : ''}`}
+            onChange={(v) => { setEventId(v); setShowTtForm(false); setShowSlotForm(false); setShowBpForm(false); setTtOk(''); setSlotOk(''); setBpOk(''); setFillOk(''); }}
+            options={eventOptions}
             disabled={eventsLoading}
-          >
-            <option value="">{eventsLoading ? 'Загрузка…' : '— Выберите событие —'}</option>
-            {eventOptions.map((ev) => (
-              <option key={ev.id} value={ev.id}>{getMultiLangValue(ev.title) || ev.id}</option>
-            ))}
-          </select>
+            placeholder={eventsLoading ? 'Загрузка…' : '— Выберите событие —'}
+            className={`w-full md:w-96 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none ${eventsLoading ? 'opacity-60 cursor-wait' : ''}`}
+          />
 
           {eventId && (
             <div className="mt-3 flex flex-wrap gap-3 text-sm">
@@ -614,7 +571,7 @@ export default function BookingSetupWorkbenchPage() {
                 <div className="flex flex-wrap gap-2">
                   {ticketTypes.map((tt) => (
                     <div key={tt.id} className="flex items-center gap-1.5 px-3 py-1.5 bg-gray-100 rounded-lg text-sm">
-                      <span className="font-medium text-gray-800">{getMultiLangValue(tt.name) || tt.code}</span>
+                      <span className="font-medium text-gray-800">{getTicketTypeLabel(tt)}</span>
                       {tt.code && <span className="font-mono text-xs text-gray-400">({tt.code})</span>}
                       <button onClick={() => handleDeleteTt(tt)} className="text-gray-300 hover:text-red-500 transition-colors ml-1 text-xs">✕</button>
                     </div>
@@ -760,7 +717,7 @@ export default function BookingSetupWorkbenchPage() {
                     const full = pct === 100;
                     return (
                       <div key={tt.id} className="flex items-center gap-3">
-                        <div className="w-28 text-sm font-medium text-gray-700 truncate">{getMultiLangValue(tt.name) || tt.code}</div>
+                        <div className="w-28 text-sm font-medium text-gray-700 truncate">{getTicketTypeLabel(tt)}</div>
                         <div className="flex-1 h-2 bg-gray-100 rounded-full overflow-hidden">
                           <div className={`h-full rounded-full transition-all ${full ? 'bg-green-500' : 'bg-blue-400'}`} style={{ width: `${pct}%` }} />
                         </div>
@@ -785,11 +742,13 @@ export default function BookingSetupWorkbenchPage() {
                   <p className="text-xs text-gray-500 mb-3">Назначить цену всем активным слотам события:</p>
                   <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
                     <Field label="Тип билета" required>
-                      <select value={fillTtId} onChange={(e) => setFillTtId(e.target.value)}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none" required>
-                        <option value="">Выберите тип</option>
-                        {ticketTypes.map((tt) => <option key={tt.id} value={tt.id}>{getMultiLangValue(tt.name) || tt.code}</option>)}
-                      </select>
+                      <TicketTypeSelect
+                        value={fillTtId}
+                        onChange={setFillTtId}
+                        options={ticketTypes}
+                        required
+                        placeholder="Выберите тип"
+                      />
                     </Field>
                     <Field label="Цена" required>
                       <TextInput type="number" step="0.01" min={0} value={fillPrice} onChange={(e) => setFillPrice(e.target.value)} required />
@@ -831,7 +790,7 @@ export default function BookingSetupWorkbenchPage() {
                     const tt = ttById[String(bp.ticket_type)];
                     return (
                       <div key={bp.id} className="flex items-center gap-2 px-3 py-1.5 bg-amber-50 border border-amber-200 rounded-lg text-sm">
-                        <span className="text-gray-700">{tt ? (getMultiLangValue(tt.name) || tt.code) : bp.ticket_type}</span>
+                        <span className="text-gray-700">{tt ? getTicketTypeLabel(tt) : bp.ticket_type}</span>
                         <span className="font-medium text-amber-800">{bp.base_price} {bp.currency}</span>
                         <button onClick={() => handleDeleteBp(bp)} className="text-amber-300 hover:text-red-500 transition-colors text-xs">✕</button>
                       </div>
@@ -845,11 +804,13 @@ export default function BookingSetupWorkbenchPage() {
               {showBpForm && (
                 <form onSubmit={handleCreateBp} className="mt-4 pt-4 border-t border-gray-100 grid grid-cols-1 md:grid-cols-4 gap-3">
                   <Field label="Тип билета" required>
-                    <select value={bpForm.ticket_type} onChange={(e) => setBpForm((p) => ({ ...p, ticket_type: e.target.value }))}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none" required>
-                      <option value="">Выберите тип</option>
-                      {ticketTypes.map((tt) => <option key={tt.id} value={tt.id}>{getMultiLangValue(tt.name) || tt.code}</option>)}
-                    </select>
+                    <TicketTypeSelect
+                      value={bpForm.ticket_type}
+                      onChange={(v) => setBpForm((p) => ({ ...p, ticket_type: v }))}
+                      options={ticketTypes}
+                      required
+                      placeholder="Выберите тип"
+                    />
                   </Field>
                   <Field label="Базовая цена" required>
                     <TextInput type="number" step="0.01" min={0} value={bpForm.base_price} onChange={(e) => setBpForm((p) => ({ ...p, base_price: e.target.value }))} required />

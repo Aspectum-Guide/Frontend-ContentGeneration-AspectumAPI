@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { eventSlotAvailabilitiesAPI, ticketPricesAPI } from '../../../api/booking';
 import Layout from '../../../components/Layout';
 import DataTable from '../../../components/ui/DataTable';
@@ -8,14 +8,17 @@ import { useLayoutActions } from '../../../context/useLayoutActions';
 import { parseApiError } from '../../../utils/apiError';
 import { useCatalogFilters } from '../core/useCatalogFilters';
 import { useCatalogResource } from '../core/useCatalogResource';
-import { useEventOptions, useTicketTypeOptions } from '../shared/bookingOptions';
+import { useEventOptions, useTicketTypeMap, useTicketTypeOptions } from '../shared/bookingOptions';
 import ActiveCheckboxField from '../shared/components/ActiveCheckboxField';
 import CatalogPageHeader from '../shared/components/CatalogPageHeader';
+import EventSelect from '../shared/components/EventSelect';
 import FormErrorAlert from '../shared/components/FormErrorAlert';
 import FormHint from '../shared/components/FormHint';
 import StatusBadge from '../shared/components/StatusBadge';
 import TableRowActions from '../shared/components/TableRowActions';
-import { getMultiLangValue } from '../shared/i18n';
+import TicketTypeSelect from '../shared/components/TicketTypeSelect';
+import { DEFAULT_CURRENCY, formatMoney, normalizeCurrency } from '../shared/currencies';
+import { getEventLabelById } from '../shared/labels';
 import { normalizeListResponse } from '../shared/normalize';
 
 const PAGE_SIZE = 20;
@@ -27,7 +30,7 @@ function createEmptyTicketPrice() {
     ticket_type: '',
     slot: '',
     price: '',
-    currency: 'EUR',
+    currency: DEFAULT_CURRENCY,
     is_active: true,
   };
 }
@@ -60,21 +63,7 @@ export default function TicketPricesCatalog() {
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [deleting, setDeleting] = useState(false);
 
-  const eventLabelById = useMemo(() => {
-    const map = new Map();
-    for (const eventItem of eventOptions) {
-      map.set(String(eventItem.id), getMultiLangValue(eventItem.title) || String(eventItem.id));
-    }
-    return map;
-  }, [eventOptions]);
-
-  const ticketTypeLabelById = useMemo(() => {
-    const map = new Map();
-    for (const tt of ticketTypeOptions) {
-      map.set(String(tt.id), tt.name || String(tt.id));
-    }
-    return map;
-  }, [ticketTypeOptions]);
+  const ticketTypeLabelById = useTicketTypeMap(ticketTypeOptions);
 
   const loadSlots = useCallback(async (eventId, ticketTypeId) => {
     const normalizedEventId = eventId || '';
@@ -173,7 +162,7 @@ export default function TicketPricesCatalog() {
       ticket_type: row?.ticket_type ? String(row.ticket_type) : '',
       slot: row?.slot ? String(row.slot) : '',
       price: row?.price != null ? String(row.price) : '',
-      currency: row?.currency || 'EUR',
+      currency: normalizeCurrency(row?.currency),
       is_active: row?.is_active !== false,
     };
 
@@ -191,7 +180,7 @@ export default function TicketPricesCatalog() {
           ticket_type: d.ticket_type ? String(d.ticket_type) : prev.ticket_type,
           slot: d.slot ? String(d.slot) : prev.slot,
           price: d.price != null ? String(d.price) : prev.price,
-          currency: d.currency || prev.currency || 'EUR',
+          currency: normalizeCurrency(d.currency || prev.currency),
           is_active: d.is_active !== false,
         }));
       }
@@ -210,7 +199,7 @@ export default function TicketPricesCatalog() {
       ticket_type: editingPrice.ticket_type || null,
       slot: editingPrice.slot || null,
       price: Number.isFinite(parsedPrice) ? parsedPrice : 0,
-      currency: (editingPrice.currency || 'EUR').toUpperCase(),
+      currency: normalizeCurrency(editingPrice.currency),
       is_active: !!editingPrice.is_active,
     };
 
@@ -261,7 +250,7 @@ export default function TicketPricesCatalog() {
       label: 'Событие',
       render: (eventId) => (
         <span className="text-sm text-gray-700">
-          {eventLabelById.get(String(eventId)) || String(eventId || '—')}
+          {getEventLabelById(eventOptions, eventId) || '—'}
         </span>
       ),
     },
@@ -270,7 +259,7 @@ export default function TicketPricesCatalog() {
       label: 'Тип',
       render: (ticketTypeId) => (
         <span className="text-sm text-gray-700">
-          {ticketTypeLabelById.get(String(ticketTypeId)) || String(ticketTypeId || '—')}
+          {ticketTypeLabelById.get(String(ticketTypeId))?.title || String(ticketTypeId || '—')}
         </span>
       ),
     },
@@ -288,7 +277,7 @@ export default function TicketPricesCatalog() {
       label: 'Цена',
       render: (price, row) => (
         <span className="text-sm text-gray-700">
-          {price != null && price !== '' ? `${price} ${row?.currency || 'EUR'}` : '—'}
+          {price != null && price !== '' ? formatMoney(price, row?.currency) : '—'}
         </span>
       ),
     },
@@ -335,33 +324,23 @@ export default function TicketPricesCatalog() {
         onPage={setPage}
         filters={(
           <>
-            <select
+            <EventSelect
               value={eventFilter}
-              onChange={(e) => setEventFilter(e.target.value)}
-              className={`px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none ${eventsLoading ? 'opacity-60 cursor-wait' : ''}`}
+              onChange={setEventFilter}
+              options={eventOptions}
               disabled={eventsLoading}
-            >
-              <option value="">{eventsLoading ? 'Загрузка событий…' : 'Все события'}</option>
-              {eventOptions.map((eventItem) => (
-                <option key={eventItem.id} value={eventItem.id}>
-                  {getMultiLangValue(eventItem.title) || eventItem.id}
-                </option>
-              ))}
-            </select>
+              placeholder={eventsLoading ? 'Загрузка событий…' : 'Все события'}
+              className={`px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none ${eventsLoading ? 'opacity-60 cursor-wait' : ''}`}
+            />
 
-            <select
+            <TicketTypeSelect
               value={ticketTypeFilter}
-              onChange={(e) => setTicketTypeFilter(e.target.value)}
-              className={`px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none ${ticketTypesLoading ? 'opacity-60 cursor-wait' : ''}`}
+              onChange={setTicketTypeFilter}
+              options={ticketTypeOptions}
               disabled={!eventFilter || ticketTypesLoading}
-            >
-              <option value="">{ticketTypesLoading ? 'Загрузка типов…' : eventFilter ? 'Все типы' : 'Сначала выберите событие'}</option>
-              {ticketTypeOptions.map((tt) => (
-                <option key={tt.id} value={tt.id}>
-                  {getMultiLangValue(tt.name) || tt.code || tt.id}
-                </option>
-              ))}
-            </select>
+              placeholder={ticketTypesLoading ? 'Загрузка типов…' : eventFilter ? 'Все типы' : 'Сначала выберите событие'}
+              className={`px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none ${ticketTypesLoading ? 'opacity-60 cursor-wait' : ''}`}
+            />
 
             <select
               value={statusFilter}
@@ -394,39 +373,23 @@ export default function TicketPricesCatalog() {
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               <Field label="Событие" required>
-                <select
+                <EventSelect
                   value={editingPrice.event}
-                  onChange={(e) => {
-                    const nextEvent = e.target.value;
-                    setEditingPrice((prev) => ({ ...prev, event: nextEvent, ticket_type: '', slot: '' }));
-                  }}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+                  onChange={(v) => setEditingPrice((prev) => ({ ...prev, event: v, ticket_type: '', slot: '' }))}
+                  options={eventOptions}
                   required
-                >
-                  <option value="">Выберите событие</option>
-                  {eventOptions.map((eventItem) => (
-                    <option key={eventItem.id} value={eventItem.id}>
-                      {getMultiLangValue(eventItem.title) || eventItem.id}
-                    </option>
-                  ))}
-                </select>
+                />
               </Field>
 
               <Field label="Тип билета" required>
-                <select
+                <TicketTypeSelect
                   value={editingPrice.ticket_type}
-                  onChange={(e) => setEditingPrice((prev) => ({ ...prev, ticket_type: e.target.value, slot: '' }))}
-                  className={`w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none ${formTicketTypesLoading ? 'opacity-60 cursor-wait' : ''}`}
-                  required
+                  onChange={(v) => setEditingPrice((prev) => ({ ...prev, ticket_type: v, slot: '' }))}
+                  options={formTicketTypeOptions}
                   disabled={!editingPrice.event || formTicketTypesLoading}
-                >
-                  <option value="">{formTicketTypesLoading ? 'Загрузка типов…' : editingPrice.event ? 'Выберите тип' : 'Сначала выберите событие'}</option>
-                  {formTicketTypeOptions.map((tt) => (
-                    <option key={tt.id} value={tt.id}>
-                      {getMultiLangValue(tt.name) || tt.code || tt.id}
-                    </option>
-                  ))}
-                </select>
+                  required
+                  placeholder={formTicketTypesLoading ? 'Загрузка типов…' : editingPrice.event ? 'Выберите тип' : 'Сначала выберите событие'}
+                />
               </Field>
             </div>
 
@@ -464,8 +427,8 @@ export default function TicketPricesCatalog() {
               <Field label="Валюта" required>
                 <TextInput
                   value={editingPrice.currency}
-                  onChange={(e) => setEditingPrice((prev) => ({ ...prev, currency: e.target.value }))}
-                  placeholder="EUR"
+                  onChange={(e) => setEditingPrice((prev) => ({ ...prev, currency: e.target.value.toUpperCase() }))}
+                  placeholder={DEFAULT_CURRENCY}
                   maxLength={3}
                   required
                 />

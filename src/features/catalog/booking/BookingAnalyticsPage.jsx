@@ -2,6 +2,8 @@ import { useEffect, useState } from 'react';
 import { bookingAnalyticsAPI } from '../../../api/booking';
 import Layout from '../../../components/Layout';
 import { useEventOptions } from '../shared/bookingOptions';
+import EventSelect from '../shared/components/EventSelect';
+import { DEFAULT_CURRENCY, normalizeCurrency } from '../shared/currencies';
 import { getMultiLangValue } from '../shared/i18n';
 import { parseApiError } from '../../../utils/apiError';
 
@@ -39,7 +41,7 @@ export default function BookingAnalyticsPage() {
 
   useEffect(() => { load(eventFilter); }, [eventFilter]);
 
-  const currency = data?.by_event?.[0]?.currency || 'EUR';
+  const currency = normalizeCurrency(data?.by_event?.[0]?.currency || DEFAULT_CURRENCY);
 
   return (
     <Layout>
@@ -48,19 +50,14 @@ export default function BookingAnalyticsPage() {
           <h1 className="text-2xl font-bold text-gray-900">Аналитика бронирований</h1>
           <p className="mt-1 text-sm text-gray-500">Только подтверждённые резервации</p>
         </div>
-        <select
+        <EventSelect
           value={eventFilter}
-          onChange={(e) => setEventFilter(e.target.value)}
-          className={`px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none ${eventsLoading ? 'opacity-60' : ''}`}
+          onChange={setEventFilter}
+          options={eventOptions}
           disabled={eventsLoading}
-        >
-          <option value="">{eventsLoading ? 'Загрузка…' : 'Все события'}</option>
-          {eventOptions.map((ev) => (
-            <option key={ev.id} value={ev.id}>
-              {getMultiLangValue(ev.title) || ev.id}
-            </option>
-          ))}
-        </select>
+          placeholder={eventsLoading ? 'Загрузка…' : 'Все события'}
+          className={`px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none ${eventsLoading ? 'opacity-60' : ''}`}
+        />
       </div>
 
       {error && (

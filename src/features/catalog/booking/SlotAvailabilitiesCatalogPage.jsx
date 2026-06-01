@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { eventSlotAvailabilitiesAPI, ticketPricesAPI, ticketTypesAPI } from '../../../api/booking';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { eventSlotAvailabilitiesAPI, ticketPricesAPI } from '../../../api/booking';
 import Layout from '../../../components/Layout';
 import DataTable from '../../../components/ui/DataTable';
 import { Field, FormActions, TextInput } from '../../../components/ui/FormField';
@@ -10,14 +10,23 @@ import { useCatalogFilters } from '../core/useCatalogFilters';
 import { useCatalogCrud } from '../core/useCatalogCrud';
 import { useCatalogResource } from '../core/useCatalogResource';
 import BulkActionModal from '../../../components/bulk/BulkActionModal';
-import { useEventOptions, useTicketTypeOptions } from '../shared/bookingOptions';
+import { useEventOptions, useTicketTypeMapForEvents, useTicketTypeOptions } from '../shared/bookingOptions';
 import ActiveCheckboxField from '../shared/components/ActiveCheckboxField';
 import CatalogPageHeader from '../shared/components/CatalogPageHeader';
+import EventSelect from '../shared/components/EventSelect';
 import FormErrorAlert from '../shared/components/FormErrorAlert';
 import FormHint from '../shared/components/FormHint';
 import StatusBadge from '../shared/components/StatusBadge';
 import TableRowActions from '../shared/components/TableRowActions';
-import { getMultiLangValue } from '../shared/i18n';
+import TicketTypeSelect from '../shared/components/TicketTypeSelect';
+import { DEFAULT_CURRENCY, normalizeCurrency } from '../shared/currencies';
+import { getEventLabel, getTicketTypeLabel } from '../shared/labels';
+import {
+  buildFromInterval as buildSlotDatetimesFromInterval,
+  buildSlotDatetimesFromSchedule,
+  parseSlotDatetimesText,
+  parseTimesText,
+} from '../shared/scheduleParsers';
 
 const PAGE_SIZE = 20;
 
@@ -74,102 +83,10 @@ function createEmptyBulk() {
     also_create_prices: false,
     price_mode: 'single', // single | per_type
     price_value: '',
-    price_currency: 'EUR',
+    price_currency: DEFAULT_CURRENCY,
     price_is_active: true,
     price_by_ticket_type: {}, // { [ticketTypeId]: string|number }
   };
-}
-
-function buildSlotDatetimesFromInterval({ startIso, endIso, stepMinutes }) {
-  const start = startIso ? new Date(startIso) : null;
-  const end = endIso ? new Date(endIso) : null;
-  const step = Number(stepMinutes || 0);
-  if (!start || !end || Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) return [];
-  if (!Number.isFinite(step) || step <= 0) return [];
-
-  const out = [];
-  for (let t = start.getTime(); t <= end.getTime(); t += step * 60 * 1000) {
-    out.push(new Date(t).toISOString());
-    if (out.length >= 1000) break;
-  }
-  return out;
-}
-
-function parseSlotDatetimesText(text) {
-  const raw = String(text || '')
-    .split('\n')
-    .map((l) => l.trim())
-    .filter(Boolean);
-
-  const out = [];
-  for (const line of raw) {
-    // Accept:
-    // - ISO strings
-    // - "YYYY-MM-DD HH:mm"
-    // - "YYYY-MM-DDTHH:mm"
-    const normalized = line.replace(' ', 'T');
-    const d = new Date(normalized);
-    if (!Number.isNaN(d.getTime())) {
-      out.push(d.toISOString());
-    }
-    if (out.length >= 1000) break;
-  }
-  // de-dupe
-  return Array.from(new Set(out));
-}
-
-function parseTimesText(text) {
-  const lines = String(text || '')
-    .split('\n')
-    .map((l) => l.trim())
-    .filter(Boolean);
-  const out = [];
-  for (const line of lines) {
-    const m = /^(\d{1,2}):(\d{2})$/.exec(line);
-    if (!m) continue;
-    const hh = Number(m[1]);
-    const mm = Number(m[2]);
-    if (!Number.isFinite(hh) || !Number.isFinite(mm)) continue;
-    if (hh < 0 || hh > 23 || mm < 0 || mm > 59) continue;
-    out.push({ hh, mm, label: `${String(hh).padStart(2, '0')}:${String(mm).padStart(2, '0')}` });
-    if (out.length >= 48) break;
-  }
-  // de-dupe by label
-  const seen = new Set();
-  return out.filter((t) => (seen.has(t.label) ? false : (seen.add(t.label), true)));
-}
-
-function buildSlotDatetimesFromSchedule({ startDate, endDate, days, times }) {
-  // startDate/endDate are "YYYY-MM-DD"
-  if (!startDate || !endDate) return [];
-  const start = new Date(`${startDate}T00:00:00`);
-  const end = new Date(`${endDate}T00:00:00`);
-  if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) return [];
-  if (end.getTime() < start.getTime()) return [];
-  if (!times?.length) return [];
-
-  const dayMap = {
-    0: 'sun',
-    1: 'mon',
-    2: 'tue',
-    3: 'wed',
-    4: 'thu',
-    5: 'fri',
-    6: 'sat',
-  };
-
-  const out = [];
-  for (let d = new Date(start); d.getTime() <= end.getTime(); d.setDate(d.getDate() + 1)) {
-    const key = dayMap[d.getDay()];
-    if (!days?.[key]) continue;
-    for (const t of times) {
-      const dt = new Date(d);
-      dt.setHours(t.hh, t.mm, 0, 0);
-      out.push(dt.toISOString());
-      if (out.length >= 1000) return Array.from(new Set(out));
-    }
-  }
-  return Array.from(new Set(out));
 }
 
 export default function SlotAvailabilitiesCatalog() {
@@ -189,10 +106,6 @@ export default function SlotAvailabilitiesCatalog() {
 
   const { ticketTypeOptions, ticketTypesLoading } = useTicketTypeOptions(eventFilter);
   const [ticketTypeFilter, setTicketTypeFilter] = useState('');
-
-  // Cache ticket type labels for table rendering (so we can show labels even when filters are empty).
-  const ticketTypeCacheRef = useRef(new Map()); // id -> { title: string, primary: string }
-  const [, setTicketTypeLabelVersion] = useState(0);
 
   const crud = useCatalogCrud({
     createEmpty: createEmptyAvailability,
@@ -235,75 +148,18 @@ export default function SlotAvailabilitiesCatalog() {
   const eventLabelById = useMemo(() => {
     const map = new Map();
     for (const eventItem of eventOptions) {
-      map.set(String(eventItem.id), getMultiLangValue(eventItem.title) || String(eventItem.id));
+      map.set(String(eventItem.id), getEventLabel(eventItem));
     }
     return map;
   }, [eventOptions]);
 
-  const ticketTypeById = useMemo(() => {
-    // start with cached (covers table rows)
-    const map = new Map(ticketTypeCacheRef.current);
-    // overlay currently loaded options for selects (event-filtered)
-    for (const tt of ticketTypeOptions) {
-      const id = String(tt?.id || '');
-      if (!id) continue;
-      const title = getMultiLangValue(tt?.name) || tt?.code || id;
-      const primary = String(tt?.code || '').trim();
-      map.set(id, { title, primary });
-    }
-    return map;
-  }, [ticketTypeOptions]);
-
-  useEffect(() => {
-    // Prefetch ticket type labels for all events visible in current table page,
-      // so the "Тип билета" column shows code instead of UUID.
+  // Prefetch ticket type labels for all events visible in current table page,
+  // so the "Тип билета" column shows code/name instead of UUID.
+  const visibleEventIds = useMemo(() => {
     const items = Array.isArray(avail.items) ? avail.items : [];
-    const eventIds = Array.from(
-      new Set(items.map((x) => String(x?.event || '')).filter(Boolean))
-    );
-    if (!eventIds.length) return;
-
-    let cancelled = false;
-
-    (async () => {
-      try {
-        const responses = await Promise.all(
-          eventIds.map((eventId) =>
-            ticketTypesAPI.list({
-              event: eventId,
-              page_size: 500,
-              ordering: 'code',
-            })
-          )
-        );
-        if (cancelled) return;
-
-        let changed = false;
-        for (const r of responses) {
-          const data = r?.data;
-          const list = Array.isArray(data?.results) ? data.results : Array.isArray(data) ? data : [];
-          for (const tt of list) {
-            const id = String(tt?.id || '');
-            if (!id) continue;
-            const title = getMultiLangValue(tt?.name) || tt?.code || id;
-            const primary = String(tt?.code || '').trim();
-            const prev = ticketTypeCacheRef.current.get(id);
-            if (!prev || prev.title !== title || prev.primary !== primary) {
-              ticketTypeCacheRef.current.set(id, { title, primary });
-              changed = true;
-            }
-          }
-        }
-        if (changed) setTicketTypeLabelVersion((v) => v + 1);
-      } catch {
-        // ignore prefetch errors (table will fallback to UUID)
-      }
-    })();
-
-    return () => {
-      cancelled = true;
-    };
+    return Array.from(new Set(items.map((x) => String(x?.event || '')).filter(Boolean)));
   }, [avail.items]);
+  const ticketTypeById = useTicketTypeMapForEvents(visibleEventIds);
 
   useEffect(() => {
     setTicketTypeFilter('');
@@ -395,7 +251,7 @@ export default function SlotAvailabilitiesCatalog() {
             const ids = Array.isArray(ticketTypeIds) ? ticketTypeIds.map((x) => String(x)) : [];
             if (!ids.length) return <div className="text-sm text-gray-400">—</div>;
             const titles = ids.map((id) => ticketTypeById.get(id)?.title || id).filter(Boolean);
-            const primaries = ids.map((id) => ticketTypeById.get(id)?.primary || '').filter(Boolean);
+            const primaries = ids.map((id) => ticketTypeById.get(id)?.code || '').filter(Boolean);
             return (
               <>
                 <div className="text-sm text-gray-700 truncate">{titles.join(', ')}</div>
@@ -461,33 +317,23 @@ export default function SlotAvailabilitiesCatalog() {
         onPage={setPage}
         filters={(
           <>
-            <select
+            <EventSelect
               value={eventFilter}
-              onChange={(e) => setEventFilter(e.target.value)}
-              className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+              onChange={setEventFilter}
+              options={eventOptions}
               disabled={eventsLoading}
-            >
-              <option value="">Все события</option>
-              {eventOptions.map((eventItem) => (
-                <option key={eventItem.id} value={eventItem.id}>
-                  {getMultiLangValue(eventItem.title) || eventItem.id}
-                </option>
-              ))}
-            </select>
-
-            <select
-              value={ticketTypeFilter}
-              onChange={(e) => setTicketTypeFilter(e.target.value)}
+              placeholder="Все события"
               className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+            />
+
+            <TicketTypeSelect
+              value={ticketTypeFilter}
+              onChange={setTicketTypeFilter}
+              options={ticketTypeOptions}
               disabled={!eventFilter || ticketTypesLoading}
-            >
-              <option value="">{eventFilter ? 'Все типы' : 'Сначала выберите событие'}</option>
-              {ticketTypeOptions.map((tt) => (
-                <option key={tt.id} value={tt.id}>
-                  {getMultiLangValue(tt.name) || tt.code || tt.id}
-                </option>
-              ))}
-            </select>
+              placeholder={eventFilter ? 'Все типы' : 'Сначала выберите событие'}
+              className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+            />
           </>
         )}
         actions={(row) => (
@@ -510,45 +356,25 @@ export default function SlotAvailabilitiesCatalog() {
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               <Field label="Событие" required>
-                <select
+                <EventSelect
                   value={crud.editingItem.event}
-                  onChange={(e) => {
-                    const nextEvent = e.target.value;
-                    crud.setEditingItem((prev) => ({ ...prev, event: nextEvent, ticket_types: [] }));
-                    setEventFilter(nextEvent);
+                  onChange={(v) => {
+                    crud.setEditingItem((prev) => ({ ...prev, event: v, ticket_types: [] }));
+                    setEventFilter(v);
                   }}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+                  options={eventOptions}
                   required
-                >
-                  <option value="">Выберите событие</option>
-                  {eventOptions.map((eventItem) => (
-                    <option key={eventItem.id} value={eventItem.id}>
-                      {getMultiLangValue(eventItem.title) || eventItem.id}
-                    </option>
-                  ))}
-                </select>
+                />
               </Field>
 
               <Field label="Типы билетов">
-                <select
+                <TicketTypeSelect
                   multiple
                   value={crud.editingItem.ticket_types}
-                  onChange={(e) => {
-                    const selected = Array.from(e.target.selectedOptions).map((o) => o.value);
-                    crud.setEditingItem((prev) => ({ ...prev, ticket_types: selected }));
-                  }}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+                  onChange={(selected) => crud.setEditingItem((prev) => ({ ...prev, ticket_types: selected }))}
+                  options={ticketTypeOptions}
                   disabled={!crud.editingItem.event || ticketTypesLoading}
-                >
-                  {!crud.editingItem.event ? (
-                    <option value="" disabled>Сначала выберите событие</option>
-                  ) : null}
-                  {ticketTypeOptions.map((tt) => (
-                    <option key={tt.id} value={tt.id}>
-                      {getMultiLangValue(tt.name) || tt.code || tt.id}
-                    </option>
-                  ))}
-                </select>
+                />
               </Field>
             </div>
 
@@ -666,7 +492,7 @@ export default function SlotAvailabilitiesCatalog() {
             const slot_ids = Array.isArray(result?.created_ids) ? result.created_ids : [];
             if (!slot_ids.length) throw new Error('Слоты не созданы — нечего прайсить');
 
-            const currency = (values.price_currency || 'EUR').toUpperCase();
+            const currency = normalizeCurrency(values.price_currency);
             const is_active = !!values.price_is_active;
 
             if ((values.price_mode || 'single') === 'per_type') {
@@ -711,24 +537,16 @@ export default function SlotAvailabilitiesCatalog() {
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               <Field label="Событие" required>
-                <select
+                <EventSelect
                   value={values.event}
-                  onChange={(e) => {
-                    const nextEvent = e.target.value;
-                    setValues((prev) => ({ ...prev, event: nextEvent, ticket_types: [] }));
-                    setEventFilter(nextEvent);
+                  onChange={(v) => {
+                    setValues((prev) => ({ ...prev, event: v, ticket_types: [] }));
+                    setEventFilter(v);
                   }}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+                  options={eventOptions}
                   required
                   disabled={eventsLoading}
-                >
-                  <option value="">Выберите событие</option>
-                  {eventOptions.map((eventItem) => (
-                    <option key={eventItem.id} value={eventItem.id}>
-                      {getMultiLangValue(eventItem.title) || eventItem.id}
-                    </option>
-                  ))}
-                </select>
+                />
               </Field>
 
               <Field label="Типы билетов (опционально)">
@@ -770,7 +588,7 @@ export default function SlotAvailabilitiesCatalog() {
                         <div className="space-y-1">
                           {ticketTypeOptions.map((tt) => {
                             const id = String(tt.id);
-                            const label = getMultiLangValue(tt.name) || tt.code || tt.id;
+                            const label = getTicketTypeLabel(tt) || tt.id;
                             const checked = Array.isArray(values.ticket_types)
                               ? values.ticket_types.includes(id)
                               : false;
@@ -1001,10 +819,8 @@ export default function SlotAvailabilitiesCatalog() {
                   {values.price_mode === 'per_type' ? (
                     <div className="rounded-lg border border-gray-200 p-2 bg-white space-y-2">
                       {(Array.isArray(values.ticket_types) ? values.ticket_types : []).map((ttId) => {
-                        const label =
-                          getMultiLangValue(ticketTypeOptions.find((x) => String(x.id) === String(ttId))?.name) ||
-                          ticketTypeOptions.find((x) => String(x.id) === String(ttId))?.code ||
-                          String(ttId);
+                        const tt = ticketTypeOptions.find((x) => String(x.id) === String(ttId));
+                        const label = getTicketTypeLabel(tt) || String(ttId);
                         const v = values.price_by_ticket_type?.[ttId] ?? '';
                         return (
                           <div key={ttId} className="grid grid-cols-1 md:grid-cols-[1fr_140px] gap-2 items-center">
