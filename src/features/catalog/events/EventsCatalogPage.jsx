@@ -29,7 +29,14 @@ export default function EventsCatalogPage() {
       label: 'Название',
       render: (title, row) => (
         <div>
-          <div className="font-medium text-gray-900 text-sm">{getMultiLangValue(title) || '—'}</div>
+          <div className="flex items-center gap-1.5 font-medium text-gray-900 text-sm">
+            {getMultiLangValue(title) || '—'}
+            {row.audio_guide_count > 0 && (
+              <span className="text-xs text-gray-400 font-normal" title={`${row.audio_guide_count} аудиогид(ов)`}>
+                🎧{row.audio_guide_count}
+              </span>
+            )}
+          </div>
           {row.tags?.length > 0 && (
             <div className="flex flex-wrap gap-1 mt-1">
               {row.tags.slice(0, 3).map((tag, i) => (
