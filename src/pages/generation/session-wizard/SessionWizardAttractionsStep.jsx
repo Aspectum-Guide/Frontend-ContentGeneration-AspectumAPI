@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { getAttrName, getFlag } from './sessionWizardShared.jsx';
+import { getAttrName, getFlag, getSessionEntityImagePreview, resolveSessionEntityImageOriginalUrl, resolveSessionEntityImageCopyright } from './sessionWizardShared.jsx';
 import SessionWizardAttractionTagsPicker from './SessionWizardAttractionTagsPicker.jsx';
 
 const getCityDisplayName = (city) => {
@@ -121,57 +121,6 @@ const getAttractionCityBindingLabel = (attr, referenceCities = [], cityDrafts = 
   return 'Без города';
 };
 
-const getAttractionImagePreview = (attr) => {
-  const image =
-    attr?.image_preview ||
-    attr?.imagePreview ||
-    attr?.image_url ||
-    attr?.imageUrl ||
-    attr?.photo_url ||
-    attr?.photoUrl ||
-    attr?.image ||
-    attr?.photo ||
-    '';
-
-  if (!image) return '';
-
-  if (typeof image === 'string') return image;
-
-  if (typeof image === 'object') {
-    return (
-      image.preview_url ||
-      image.previewUrl ||
-      image.url ||
-      image.file ||
-      image.src ||
-      ''
-    );
-  }
-
-  return '';
-};
-
-const getAttractionImageOriginalUrl = (attr) => {
-  return (
-    attr?.image_original_url ||
-    attr?.imageOriginalUrl ||
-    attr?.original_image_url ||
-    attr?.originalImageUrl ||
-    ''
-  );
-};
-
-const getAttractionImageCopyright = (attr) => {
-  return (
-    attr?.image_copyright ||
-    attr?.imageCopyright ||
-    attr?.copyright ||
-    attr?.photo_copyright ||
-    attr?.photoCopyright ||
-    ''
-  );
-};
-
 function AttractionDraftsPanel({
   attractions = [],
   currentAttr,
@@ -241,23 +190,23 @@ function AttractionPhotoPanel({
   onPhotoFileChange,
   onUpdateAttractionPatch,
 }) {
-  const imagePreview = getAttractionImagePreview(currentAttr);
-  const imageOriginalUrl = getAttractionImageOriginalUrl(currentAttr);
-  const imageCopyright = getAttractionImageCopyright(currentAttr);
+  const preview = getSessionEntityImagePreview(currentAttr);
+  const imageOriginalUrl = resolveSessionEntityImageOriginalUrl(currentAttr);
+  const imageCopyright = resolveSessionEntityImageCopyright(currentAttr);
 
   return (
     <aside className="w-52 shrink-0 space-y-3">
       <div className="relative aspect-[3/4] bg-gray-100 rounded-xl overflow-hidden border border-gray-200 flex items-center justify-center">
-        {imagePreview ? (
+        {preview ? (
           <img
-            src={imagePreview}
+            src={preview}
             alt="Фото достопримечательности"
             className="w-full h-full object-cover"
           />
         ) : (
-          <span className="text-gray-400 text-sm text-center px-2">
+          <div className="text-gray-400 text-sm text-center px-2">
             Фото достопримечательности
-          </span>
+          </div>
         )}
 
         {photoUploading && (
@@ -882,7 +831,7 @@ export default function SessionWizardAttractionsStep({
               onClick={() => onGoToStep(4)}
               className="px-5 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors"
             >
-              Далее: Публикация →
+              Далее: Интерактивные локации →
             </button>
           </div>
         </div>

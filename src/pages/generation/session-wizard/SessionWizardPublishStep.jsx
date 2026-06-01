@@ -10,6 +10,7 @@ export default function SessionWizardPublishStep({
   cityDrafts = [],
   cityInfos = [],
   attractions = [],
+  interactiveLocations = [],
   attractionInfos = [],
   attractionFeedItems = [],
   cityTags = [],
@@ -28,6 +29,7 @@ export default function SessionWizardPublishStep({
   const hasCity = Boolean(session?.city) || cityDrafts.length > 0;
   const hasCityInfos = cityInfos.length > 0;
   const hasAttractions = attractions.length > 0;
+  const hasInteractiveLocations = interactiveLocations.length > 0;
   const hasAttractionInfos = attractionInfos.length > 0;
   const hasAttractionFeedItems = attractionFeedItems.length > 0;
   const hasTags = cityTags.length > 0;
@@ -36,6 +38,7 @@ export default function SessionWizardPublishStep({
     hasCity ||
     hasCityInfos ||
     hasAttractions ||
+    hasInteractiveLocations ||
     hasAttractionInfos ||
     hasAttractionFeedItems ||
     hasTags;
@@ -112,6 +115,14 @@ export default function SessionWizardPublishStep({
         </div>
 
         <div className="flex justify-between gap-4">
+          <span className="text-gray-500">Интерактивные локации:</span>
+
+          <span className="font-medium text-gray-900">
+            {getCountLabel(interactiveLocations.length)}
+          </span>
+        </div>
+
+        <div className="flex justify-between gap-4">
           <span className="text-gray-500">
             Полезная информация о достопримечательностях:
           </span>
@@ -164,7 +175,7 @@ export default function SessionWizardPublishStep({
       <div className="flex justify-between pt-2">
         <button
           type="button"
-          onClick={() => onGoToStep(3)}
+          onClick={() => onGoToStep(4)}
           className="px-4 py-2 text-sm text-gray-600 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
         >
           ← Назад

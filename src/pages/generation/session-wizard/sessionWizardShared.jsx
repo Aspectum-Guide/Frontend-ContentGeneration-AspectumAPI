@@ -51,15 +51,22 @@ export function normalizeLocaleCountryForSave(countryValue, localeCode) {
   return trimmed;
 }
 
-/** Description text safe to persist: empty if punctuation-only. */
+/** Description for API save — preserves punctuation-only values such as "." */
 export function normalizeLocaleDescriptionForSave(value) {
-  const trimmed = String(value ?? '').trim();
-  return isMeaningfulLocaleText(trimmed) ? trimmed : '';
+  if (value === null || value === undefined) {
+    return '';
+  }
+  return String(value);
 }
 
 export function getCityDraftName(draft) {
   const name = draft?.name || {};
-  return name.ru || name.en || name.it || Object.values(name).find(Boolean) || 'Новый город';
+  const display =
+    name.ru || name.en || name.it || Object.values(name).find((v) => v != null && String(v).trim() !== '');
+  if (display != null && String(display).trim() !== '') {
+    return String(display);
+  }
+  return 'без названия';
 }
 
 export function getAttrName(attr) {
@@ -76,6 +83,143 @@ export const normalizeId = (value) => {
 
   return String(value).trim();
 };
+
+const UUID_RE =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+/** True when a string looks like a renderable image src, not a bare image id. */
+export function isLikelyImageUrl(value) {
+  const v = String(value ?? '').trim();
+  if (!v) return false;
+  if (UUID_RE.test(v)) return false;
+  if (/^\d+$/.test(v)) return false;
+
+  return (
+    v.startsWith('http://') ||
+    v.startsWith('https://') ||
+    v.startsWith('/') ||
+    v.startsWith('media/') ||
+    v.startsWith('data:') ||
+    v.startsWith('blob:')
+  );
+}
+
+/** Prefer published media paths over stale session draft paths when several URLs exist. */
+function scoreSessionEntityImageUrl(url) {
+  const u = String(url || '');
+  if (/\/media\/(il|events)\//i.test(u)) return 4;
+  if (/\/media\//i.test(u)) return 3;
+  if (u.startsWith('blob:') || u.startsWith('data:')) return 3;
+  if (u.startsWith('http://') || u.startsWith('https://') || u.startsWith('/')) return 2;
+  if (u.startsWith('media/')) return 2;
+  return 1;
+}
+
+/** Remove legacy preview/FK fields before spreading entity state (avoids UUID in img src). */
+export function stripLegacyImageFields(raw = {}) {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) {
+    return {};
+  }
+
+  const {
+    image,
+    imagePreview,
+    image_preview,
+    photoPreview,
+    photo_preview,
+    ...rest
+  } = raw;
+
+  return rest;
+}
+
+/** Preview URL from API/session entity — uses image_url, never a bare image id. */
+export function resolveSessionEntityImageUrl(raw = {}) {
+  const candidates = [];
+
+  const pushCandidate = (value) => {
+    const v = String(value ?? '').trim();
+    if (isLikelyImageUrl(v)) {
+      candidates.push(v);
+    }
+  };
+
+  [
+    raw.image_url,
+    raw.imageUrl,
+    raw.image_preview,
+    raw.imagePreview,
+    raw.localUrl,
+    raw.local_url,
+    raw.photo_url,
+    raw.photoUrl,
+  ].forEach(pushCandidate);
+
+  if (raw.image && typeof raw.image === 'object') {
+    [
+      raw.image.url,
+      raw.image.file,
+      raw.image.src,
+      raw.image.preview_url,
+      raw.image.previewUrl,
+    ].forEach(pushCandidate);
+  }
+
+  if (candidates.length === 0) {
+    return '';
+  }
+
+  const unique = [...new Set(candidates)];
+  unique.sort(
+    (a, b) => scoreSessionEntityImageUrl(b) - scoreSessionEntityImageUrl(a),
+  );
+  return unique[0];
+}
+
+export function resolveSessionEntityImageId(raw = {}) {
+  const direct = normalizeId(raw.image_id ?? raw.imageId);
+  if (direct) return direct;
+
+  if (raw.image && typeof raw.image === 'object') {
+    const nested = normalizeId(raw.image.id ?? raw.image.uuid);
+    if (nested) return nested;
+  }
+
+  if (typeof raw.image === 'string' && UUID_RE.test(raw.image.trim())) {
+    return raw.image.trim();
+  }
+
+  return '';
+}
+
+export function resolveSessionEntityImageOriginalUrl(raw = {}) {
+  return String(
+    raw.image_original_url ??
+      raw.imageOriginalUrl ??
+      raw.original_image_url ??
+      raw.originalImageUrl ??
+      raw.image?.original_url ??
+      raw.image?.source_url ??
+      raw.image?.file_page_url ??
+      '',
+  ).trim();
+}
+
+export function resolveSessionEntityImageCopyright(raw = {}) {
+  return String(
+    raw.image_copyright ??
+      raw.imageCopyright ??
+      raw.copyright ??
+      raw.photo_copyright ??
+      raw.photoCopyright ??
+      raw.image?.copyright ??
+      '',
+  ).trim();
+}
+
+export function getSessionEntityImagePreview(entity) {
+  return resolveSessionEntityImageUrl(entity);
+}
 
 export const getSessionAttractionIdFromItem = (item) =>
   normalizeId(
