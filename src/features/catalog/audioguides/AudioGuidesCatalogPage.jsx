@@ -130,7 +130,7 @@ function TrackRow({ track, guideId, onUploaded, onDeleted }) {
         onClose={() => setConfirmDelete(false)}
         onConfirm={handleDelete}
         title={`Удалить трек ${langLabel(track.language)}?`}
-        message={linked ? 'Файл останется на диске, только запись в БД будет удалена.' : 'Пустой трек будет удалён.'}
+        message={linked ? 'Аудиофайл и запись в базе будут удалены безвозвратно.' : 'Пустой трек будет удалён.'}
         confirmLabel="Удалить"
         danger
         loading={deleting}
