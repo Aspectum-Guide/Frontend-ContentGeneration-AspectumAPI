@@ -351,4 +351,6 @@ export const eventAudioGuidesAPI = {
     apiClient.patch(`${BASE}/event-audio-guides/${guideId}/`, data),
   upsertTrack: (guideId, data) =>
     apiClient.post(`${BASE}/event-audio-guides/${guideId}/tracks/`, data),
+  deleteTrack: (guideId, trackId) =>
+    apiClient.delete(`${BASE}/event-audio-guides/${guideId}/tracks/${trackId}/delete/`),
 };
