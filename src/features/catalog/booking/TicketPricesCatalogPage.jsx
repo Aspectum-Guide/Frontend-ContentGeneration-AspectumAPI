@@ -358,7 +358,7 @@ export default function TicketPricesCatalog() {
               <option value="">{ticketTypesLoading ? 'Загрузка типов…' : eventFilter ? 'Все типы' : 'Сначала выберите событие'}</option>
               {ticketTypeOptions.map((tt) => (
                 <option key={tt.id} value={tt.id}>
-                  {getMultiLangValue(tt.name) || tt.name_primary || tt.id}
+                  {getMultiLangValue(tt.name) || tt.code || tt.id}
                 </option>
               ))}
             </select>
@@ -423,7 +423,7 @@ export default function TicketPricesCatalog() {
                   <option value="">{formTicketTypesLoading ? 'Загрузка типов…' : editingPrice.event ? 'Выберите тип' : 'Сначала выберите событие'}</option>
                   {formTicketTypeOptions.map((tt) => (
                     <option key={tt.id} value={tt.id}>
-                      {getMultiLangValue(tt.name) || tt.name_primary || tt.id}
+                      {getMultiLangValue(tt.name) || tt.code || tt.id}
                     </option>
                   ))}
                 </select>

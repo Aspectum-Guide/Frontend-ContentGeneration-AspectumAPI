@@ -93,7 +93,7 @@ export default function AssignTicketTypeModal({ open, ticketType, onClose, onDon
     }
   };
 
-  const typeName = getMultiLangValue(ticketType?.name) || ticketType?.name_primary || ticketType?.code || '—';
+  const typeName = getMultiLangValue(ticketType?.name) || ticketType?.code || '—';
 
   return (
     <Modal

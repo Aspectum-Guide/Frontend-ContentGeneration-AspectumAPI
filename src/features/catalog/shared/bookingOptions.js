@@ -61,7 +61,7 @@ export function useTicketTypeOptions(eventId, pageSize = 500) {
       const response = await ticketTypesAPI.list({
         event: normalizedEventId,
         page_size: pageSize,
-        ordering: 'name_primary',
+        ordering: 'code',
       });
       const data = response?.data;
       const list = normalizeListResponse(data, ['results', 'data']);

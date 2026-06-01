@@ -24,7 +24,6 @@ function createEmptyTicketType() {
     event: '',
     code: '',
     name: {},
-    name_primary: '',
     description: {},
     sort_order: 0,
     is_active: true,
@@ -165,7 +164,6 @@ export default function TicketTypesCatalog() {
       event: row.event || '',
       code: row.code || '',
       name: typeof row.name === 'object' && row.name ? row.name : (row.name ? { ru: String(row.name) } : {}),
-      name_primary: row.name_primary || '',
       description: typeof row.description === 'object' && row.description ? row.description : (row.description ? { ru: String(row.description) } : {}),
       sort_order: Number.isFinite(row.sort_order) ? row.sort_order : 0,
       is_active: row.is_active !== false,
@@ -176,9 +174,15 @@ export default function TicketTypesCatalog() {
     e?.preventDefault();
     if (!editingType) return;
 
+    const code = (editingType.code || '').trim().toLowerCase();
+    if (!code) {
+      setSaveError('Поле «Код» обязательно для заполнения.');
+      return;
+    }
+
     const payload = {
       event: editingType.event,
-      code: (editingType.code || '').trim().toLowerCase(),
+      code,
       name: editingType.name || {},
       description: editingType.description || {},
       sort_order: Number(editingType.sort_order || 0),
@@ -224,7 +228,7 @@ export default function TicketTypesCatalog() {
       render: (value, row) => (
         <div>
           <div className="text-sm font-medium text-gray-900">
-            {getMultiLangValue(row?.name) || row?.name_primary || value || '—'}
+            {getMultiLangValue(row?.name) || row?.code || value || '—'}
           </div>
           {row.code ? (
             <div className="text-xs text-gray-400 mt-0.5 font-mono">{row.code}</div>
@@ -318,8 +322,8 @@ export default function TicketTypesCatalog() {
             >
               <option value="sort_order">Сортировка: порядок ↑</option>
               <option value="-sort_order">Сортировка: порядок ↓</option>
-              <option value="name_primary">Сортировка: название А-Я</option>
-              <option value="-name_primary">Сортировка: название Я-А</option>
+              <option value="code">Сортировка: код А-Я</option>
+              <option value="-code">Сортировка: код Я-А</option>
             </select>
           </>
         )}
@@ -344,7 +348,7 @@ export default function TicketTypesCatalog() {
         open={!!editingType}
         onClose={() => setEditingType(null)}
         title={editingType?.id
-          ? `Редактировать тип билета: ${getMultiLangValue(editingType.name) || editingType.name_primary || ''}`
+          ? `Редактировать тип билета: ${getMultiLangValue(editingType.name) || editingType.code || ''}`
           : 'Создать тип билета'}
         size="lg"
       >
@@ -371,12 +375,14 @@ export default function TicketTypesCatalog() {
 
               <Field
                 label="Код"
+                required
                 hint="Стабильный идентификатор для аналитики между ивентами. Например: adult, child, vip."
               >
                 <TextInput
                   value={editingType.code || ''}
                   onChange={(e) => setEditingType((prev) => ({ ...prev, code: e.target.value }))}
                   placeholder="adult / child / vip"
+                  required
                 />
               </Field>
 
@@ -467,7 +473,7 @@ export default function TicketTypesCatalog() {
         onClose={() => { setDeleteTarget(null); setDeleteError(null); }}
         onConfirm={handleDelete}
         title="Удалить тип билета?"
-        message={deleteError || `Тип «${getMultiLangValue(deleteTarget?.name) || deleteTarget?.name_primary || deleteTarget?.id || ''}» будет удален без возможности восстановления.`}
+        message={deleteError || `Тип «${getMultiLangValue(deleteTarget?.name) || deleteTarget?.code || deleteTarget?.id || ''}» будет удален без возможности восстановления.`}
         confirmLabel="Удалить"
         danger
         loading={deleting}

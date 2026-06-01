@@ -108,7 +108,7 @@ export default function BookingAnalyticsPage() {
                   <tbody className="divide-y divide-gray-100">
                     {data.by_code.map((row, i) => (
                       <tr key={i} className="hover:bg-gray-50">
-                        <td className="px-4 py-2 font-medium text-gray-800">{row.name_primary || '—'}</td>
+                        <td className="px-4 py-2 font-medium text-gray-800">{row.code || '—'}</td>
                         <td className="px-4 py-2 font-mono text-xs text-gray-400">{row.code || '—'}</td>
                         <td className="px-4 py-2 text-right text-gray-700">{row.reservations}</td>
                         <td className="px-4 py-2 text-right text-gray-700">{row.qty}</td>

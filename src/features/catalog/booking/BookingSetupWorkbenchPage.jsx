@@ -455,7 +455,6 @@ export default function BookingSetupWorkbenchPage() {
       await ticketTypesAPI.create({
         event: eventId, code,
         name: nameRu ? { ru: nameRu } : {},
-        name_primary: nameRu,
         sort_order: Number(ttForm.sort_order || 0),
         is_active: true,
       });
@@ -467,7 +466,7 @@ export default function BookingSetupWorkbenchPage() {
   };
 
   const handleDeleteTt = async (tt) => {
-    if (!confirm(`Удалить тип «${tt.name_primary}»?`)) return;
+    if (!confirm(`Удалить тип «${getMultiLangValue(tt.name) || tt.code}»?`)) return;
     try {
       await ticketTypesAPI.delete(tt.id);
       await loadTicketTypes(eventId);
@@ -615,7 +614,7 @@ export default function BookingSetupWorkbenchPage() {
                 <div className="flex flex-wrap gap-2">
                   {ticketTypes.map((tt) => (
                     <div key={tt.id} className="flex items-center gap-1.5 px-3 py-1.5 bg-gray-100 rounded-lg text-sm">
-                      <span className="font-medium text-gray-800">{tt.name_primary || getMultiLangValue(tt.name)}</span>
+                      <span className="font-medium text-gray-800">{getMultiLangValue(tt.name) || tt.code}</span>
                       {tt.code && <span className="font-mono text-xs text-gray-400">({tt.code})</span>}
                       <button onClick={() => handleDeleteTt(tt)} className="text-gray-300 hover:text-red-500 transition-colors ml-1 text-xs">✕</button>
                     </div>
@@ -761,7 +760,7 @@ export default function BookingSetupWorkbenchPage() {
                     const full = pct === 100;
                     return (
                       <div key={tt.id} className="flex items-center gap-3">
-                        <div className="w-28 text-sm font-medium text-gray-700 truncate">{tt.name_primary}</div>
+                        <div className="w-28 text-sm font-medium text-gray-700 truncate">{getMultiLangValue(tt.name) || tt.code}</div>
                         <div className="flex-1 h-2 bg-gray-100 rounded-full overflow-hidden">
                           <div className={`h-full rounded-full transition-all ${full ? 'bg-green-500' : 'bg-blue-400'}`} style={{ width: `${pct}%` }} />
                         </div>
@@ -789,7 +788,7 @@ export default function BookingSetupWorkbenchPage() {
                       <select value={fillTtId} onChange={(e) => setFillTtId(e.target.value)}
                         className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none" required>
                         <option value="">Выберите тип</option>
-                        {ticketTypes.map((tt) => <option key={tt.id} value={tt.id}>{tt.name_primary}</option>)}
+                        {ticketTypes.map((tt) => <option key={tt.id} value={tt.id}>{getMultiLangValue(tt.name) || tt.code}</option>)}
                       </select>
                     </Field>
                     <Field label="Цена" required>
@@ -832,7 +831,7 @@ export default function BookingSetupWorkbenchPage() {
                     const tt = ttById[String(bp.ticket_type)];
                     return (
                       <div key={bp.id} className="flex items-center gap-2 px-3 py-1.5 bg-amber-50 border border-amber-200 rounded-lg text-sm">
-                        <span className="text-gray-700">{tt?.name_primary || bp.ticket_type}</span>
+                        <span className="text-gray-700">{tt ? (getMultiLangValue(tt.name) || tt.code) : bp.ticket_type}</span>
                         <span className="font-medium text-amber-800">{bp.base_price} {bp.currency}</span>
                         <button onClick={() => handleDeleteBp(bp)} className="text-amber-300 hover:text-red-500 transition-colors text-xs">✕</button>
                       </div>
@@ -849,7 +848,7 @@ export default function BookingSetupWorkbenchPage() {
                     <select value={bpForm.ticket_type} onChange={(e) => setBpForm((p) => ({ ...p, ticket_type: e.target.value }))}
                       className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none" required>
                       <option value="">Выберите тип</option>
-                      {ticketTypes.map((tt) => <option key={tt.id} value={tt.id}>{tt.name_primary}</option>)}
+                      {ticketTypes.map((tt) => <option key={tt.id} value={tt.id}>{getMultiLangValue(tt.name) || tt.code}</option>)}
                     </select>
                   </Field>
                   <Field label="Базовая цена" required>

@@ -354,3 +354,8 @@ export const eventAudioGuidesAPI = {
   deleteTrack: (guideId, trackId) =>
     apiClient.delete(`${BASE}/event-audio-guides/${guideId}/tracks/${trackId}/delete/`),
 };
+
+export const ilCatalogAPI = {
+  list: (params) => apiClient.get(`${BASE}/interactive-locations/`, { params }),
+  update: (id, data) => apiClient.patch(`${BASE}/interactive-locations/${id}/`, data),
+};

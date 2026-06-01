@@ -247,8 +247,8 @@ export default function SlotAvailabilitiesCatalog() {
     for (const tt of ticketTypeOptions) {
       const id = String(tt?.id || '');
       if (!id) continue;
-      const title = getMultiLangValue(tt?.name) || tt?.name_primary || id;
-      const primary = String(tt?.name_primary || '').trim();
+      const title = getMultiLangValue(tt?.name) || tt?.code || id;
+      const primary = String(tt?.code || '').trim();
       map.set(id, { title, primary });
     }
     return map;
@@ -256,7 +256,7 @@ export default function SlotAvailabilitiesCatalog() {
 
   useEffect(() => {
     // Prefetch ticket type labels for all events visible in current table page,
-    // so the "Тип билета" column shows name_primary instead of UUID.
+      // so the "Тип билета" column shows code instead of UUID.
     const items = Array.isArray(avail.items) ? avail.items : [];
     const eventIds = Array.from(
       new Set(items.map((x) => String(x?.event || '')).filter(Boolean))
@@ -272,7 +272,7 @@ export default function SlotAvailabilitiesCatalog() {
             ticketTypesAPI.list({
               event: eventId,
               page_size: 500,
-              ordering: 'name_primary',
+              ordering: 'code',
             })
           )
         );
@@ -285,8 +285,8 @@ export default function SlotAvailabilitiesCatalog() {
           for (const tt of list) {
             const id = String(tt?.id || '');
             if (!id) continue;
-            const title = getMultiLangValue(tt?.name) || tt?.name_primary || id;
-            const primary = String(tt?.name_primary || '').trim();
+            const title = getMultiLangValue(tt?.name) || tt?.code || id;
+            const primary = String(tt?.code || '').trim();
             const prev = ticketTypeCacheRef.current.get(id);
             if (!prev || prev.title !== title || prev.primary !== primary) {
               ticketTypeCacheRef.current.set(id, { title, primary });
@@ -484,7 +484,7 @@ export default function SlotAvailabilitiesCatalog() {
               <option value="">{eventFilter ? 'Все типы' : 'Сначала выберите событие'}</option>
               {ticketTypeOptions.map((tt) => (
                 <option key={tt.id} value={tt.id}>
-                  {getMultiLangValue(tt.name) || tt.name_primary || tt.id}
+                  {getMultiLangValue(tt.name) || tt.code || tt.id}
                 </option>
               ))}
             </select>
@@ -545,7 +545,7 @@ export default function SlotAvailabilitiesCatalog() {
                   ) : null}
                   {ticketTypeOptions.map((tt) => (
                     <option key={tt.id} value={tt.id}>
-                      {getMultiLangValue(tt.name) || tt.name_primary || tt.id}
+                      {getMultiLangValue(tt.name) || tt.code || tt.id}
                     </option>
                   ))}
                 </select>
@@ -770,7 +770,7 @@ export default function SlotAvailabilitiesCatalog() {
                         <div className="space-y-1">
                           {ticketTypeOptions.map((tt) => {
                             const id = String(tt.id);
-                            const label = getMultiLangValue(tt.name) || tt.name_primary || tt.id;
+                            const label = getMultiLangValue(tt.name) || tt.code || tt.id;
                             const checked = Array.isArray(values.ticket_types)
                               ? values.ticket_types.includes(id)
                               : false;
@@ -1003,7 +1003,7 @@ export default function SlotAvailabilitiesCatalog() {
                       {(Array.isArray(values.ticket_types) ? values.ticket_types : []).map((ttId) => {
                         const label =
                           getMultiLangValue(ticketTypeOptions.find((x) => String(x.id) === String(ttId))?.name) ||
-                          ticketTypeOptions.find((x) => String(x.id) === String(ttId))?.name_primary ||
+                          ticketTypeOptions.find((x) => String(x.id) === String(ttId))?.code ||
                           String(ttId);
                         const v = values.price_by_ticket_type?.[ttId] ?? '';
                         return (

@@ -83,7 +83,7 @@ export default function BasePricesCatalogPage() {
   };
   const ttLabel = (id) => {
     for (const tt of [...ticketTypeOptions, ...editingTTOptions]) {
-      if (String(tt.id) === String(id)) return tt.name_primary || getMultiLangValue(tt.name) || String(id);
+      if (String(tt.id) === String(id)) return getMultiLangValue(tt.name) || tt.code || String(id);
     }
     return String(id);
   };
@@ -222,7 +222,7 @@ export default function BasePricesCatalogPage() {
               >
                 <option value="">{editingTTLoading ? 'Загрузка…' : editing.event ? 'Выберите тип' : 'Сначала выберите событие'}</option>
                 {editingTTOptions.map((tt) => (
-                  <option key={tt.id} value={tt.id}>{tt.name_primary || getMultiLangValue(tt.name) || tt.id}</option>
+                  <option key={tt.id} value={tt.id}>{getMultiLangValue(tt.name) || tt.code || tt.id}</option>
                 ))}
               </select>
             </Field>

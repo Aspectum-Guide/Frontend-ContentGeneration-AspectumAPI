@@ -268,7 +268,7 @@ export default function PricingRulesCatalogPage() {
                 >
                   <option value="">{editingTTLoading ? 'Загрузка…' : editing.event ? 'Выберите тип' : 'Сначала выберите событие'}</option>
                   {editingTTOptions.map((tt) => (
-                    <option key={tt.id} value={tt.id}>{tt.name_primary || getMultiLangValue(tt.name) || tt.id}</option>
+                    <option key={tt.id} value={tt.id}>{getMultiLangValue(tt.name) || tt.code || tt.id}</option>
                   ))}
                 </select>
               </Field>

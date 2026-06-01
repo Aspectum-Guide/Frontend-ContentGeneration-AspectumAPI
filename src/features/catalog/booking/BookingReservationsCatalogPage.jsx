@@ -65,7 +65,7 @@ export default function BookingReservationsCatalogPage() {
   const ticketTypeLabelById = useMemo(() => {
     const map = new Map();
     for (const tt of ticketTypeOptions) {
-      map.set(String(tt.id), getMultiLangValue(tt.name) || tt.name_primary || String(tt.id));
+      map.set(String(tt.id), getMultiLangValue(tt.name) || tt.code || String(tt.id));
     }
     return map;
   }, [ticketTypeOptions]);
@@ -136,6 +136,12 @@ export default function BookingReservationsCatalogPage() {
     return () => setMobileActions([]);
   }, [setMobileActions]);
 
+  const STATUS_STYLE = {
+    reserved:  'bg-green-100 text-green-700',
+    cancelled: 'bg-red-100 text-red-600',
+    expired:   'bg-gray-100 text-gray-500',
+  };
+
   const columns = [
     {
       key: 'created_at',
@@ -145,7 +151,11 @@ export default function BookingReservationsCatalogPage() {
     {
       key: 'status',
       label: 'Статус',
-      render: (v) => <StatusBadge active={String(v) === 'reserved'} />,
+      render: (v) => (
+        <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${STATUS_STYLE[v] || 'bg-gray-100 text-gray-500'}`}>
+          {v || '—'}
+        </span>
+      ),
     },
     {
       key: 'event',
@@ -167,8 +177,17 @@ export default function BookingReservationsCatalogPage() {
       render: (v) => <span className="text-sm text-gray-700">{Number.isFinite(v) ? v : Number(v || 0)}</span>,
     },
     {
+      key: 'total_price',
+      label: 'Сумма',
+      render: (v, row) => (
+        <span className="text-sm font-medium text-gray-900">
+          {v != null ? `${Number(v).toFixed(2)} ${row.currency || 'EUR'}` : '—'}
+        </span>
+      ),
+    },
+    {
       key: 'guest_email',
-      label: 'Гость email',
+      label: 'Гость',
       render: (v) => <span className="text-xs text-gray-500 font-mono">{v || '—'}</span>,
     },
   ];
@@ -185,6 +204,7 @@ export default function BookingReservationsCatalogPage() {
         rows={reservations.items}
         loading={reservations.loading}
         error={reservations.error}
+        isFiltered={!!(eventFilter || statusFilter || ticketTypeFilter || slotFilter || debouncedSearch)}
         emptyIcon="🧾"
         emptyText="Резервов пока нет"
         search={search}
@@ -229,7 +249,7 @@ export default function BookingReservationsCatalogPage() {
               <option value="">{eventFilter ? 'Все типы' : 'Сначала выберите событие'}</option>
               {ticketTypeOptions.map((tt) => (
                 <option key={tt.id} value={tt.id}>
-                  {getMultiLangValue(tt.name) || tt.name_primary || tt.id}
+                  {getMultiLangValue(tt.name) || tt.code || tt.id}
                 </option>
               ))}
             </select>
