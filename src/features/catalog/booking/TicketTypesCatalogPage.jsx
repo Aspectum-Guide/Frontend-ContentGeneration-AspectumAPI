@@ -26,7 +26,6 @@ const PAGE_SIZE = 20;
 function createEmptyTicketType() {
   return {
     id: null,
-    event: '',
     code: '',
     name: {},
     description: {},
@@ -184,6 +183,12 @@ export default function TicketTypesCatalog() {
       render: (eventId) => (
         <span className="text-sm text-gray-700">{getEventLabelById(eventOptions, eventId) || eventId || '—'}</span>
       ),
+    },
+    {
+      key: 'code',
+      label: 'Код',
+      className: 'text-sm text-gray-600 font-mono',
+      render: (value) => <span>{value || '—'}</span>,
     },
     {
       key: 'sort_order',

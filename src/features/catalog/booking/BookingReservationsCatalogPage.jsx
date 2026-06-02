@@ -11,7 +11,6 @@ import { useCatalogResource } from '../core/useCatalogResource';
 import { useEventOptions, useTicketTypeMap, useTicketTypeOptions } from '../shared/bookingOptions';
 import CatalogPageHeader from '../shared/components/CatalogPageHeader';
 import EventSelect from '../shared/components/EventSelect';
-import StatusBadge from '../shared/components/StatusBadge';
 import TicketTypeSelect from '../shared/components/TicketTypeSelect';
 import { formatMoney } from '../shared/currencies';
 import { getEventLabelById } from '../shared/labels';

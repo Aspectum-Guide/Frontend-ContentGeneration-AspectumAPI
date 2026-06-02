@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import {
   eventSlotAvailabilitiesAPI,
   eventTicketTypePricesAPI,
@@ -512,7 +512,6 @@ export default function BookingSetupWorkbenchPage() {
 
   // ── render ────────────────────────────────────────────────────────────────
 
-  const eventName = eventOptions.find((e) => String(e.id) === eventId);
   const ttById = Object.fromEntries(ticketTypes.map((t) => [String(t.id), t]));
 
   return (

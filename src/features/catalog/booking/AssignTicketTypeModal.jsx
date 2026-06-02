@@ -7,7 +7,7 @@ import { getEventLabel, getTicketTypeLabel } from '../shared/labels';
 
 export default function AssignTicketTypeModal({ open, ticketType, onClose, onDone }) {
   const [events, setEvents] = useState([]);
-  const [existingByEvent, setExistingByEvent] = useState({}); // eventId → ticketTypeId
+  const [existingByEvent, setExistingByEvent] = useState({}); // eventId → { id, is_active }
   const [selected, setSelected] = useState(new Set());
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -30,13 +30,20 @@ export default function AssignTicketTypeModal({ open, ticketType, onClose, onDon
 
         const ttList = normalizeListResponse(ttRes?.data, ['results', 'data']);
         const map = {};
-        for (const tt of ttList) map[String(tt.event)] = tt.id;
+        for (const tt of ttList) {
+          map[String(tt.event)] = {
+            id: tt.id,
+            is_active: tt.is_active !== false,
+          };
+        }
         setExistingByEvent(map);
 
-        // Пре-чекаем ивенты у которых уже есть этот тип
-        const preSelected = new Set(Object.keys(map));
-        // Всегда включаем текущий ивент этого тикет-тайпа
-        if (ticketType.event) preSelected.add(String(ticketType.event));
+        // Чекбоксы отражают только активные привязки типа билета.
+        const preSelected = new Set(
+          Object.entries(map)
+            .filter(([, v]) => v?.is_active)
+            .map(([eventId]) => eventId)
+        );
         setSelected(preSelected);
       })
       .catch((e) => setError(parseApiError(e, 'Ошибка загрузки ивентов')))
@@ -45,8 +52,6 @@ export default function AssignTicketTypeModal({ open, ticketType, onClose, onDon
 
   const toggle = (eventId) => {
     const id = String(eventId);
-    // Нельзя снять галочку с текущего ивента тикет-тайпа
-    if (id === String(ticketType?.event)) return;
     setSelected((prev) => {
       const next = new Set(prev);
       next.has(id) ? next.delete(id) : next.add(id);
@@ -59,13 +64,23 @@ export default function AssignTicketTypeModal({ open, ticketType, onClose, onDon
     setSaving(true);
     setError(null);
     try {
-      const originalSet = new Set(Object.keys(existingByEvent));
-      originalSet.add(String(ticketType.event)); // текущий ивент всегда был
-
-      const toAdd = [...selected].filter((id) => !originalSet.has(id));
-      const toRemove = [...originalSet].filter(
-        (id) => !selected.has(id) && id !== String(ticketType.event)
+      const allSet = new Set(Object.keys(existingByEvent));
+      const activeSet = new Set(
+        Object.entries(existingByEvent)
+          .filter(([, v]) => v?.is_active)
+          .map(([eventId]) => eventId)
       );
+
+      const toAdd = [...selected].filter((id) => !allSet.has(id));
+      const toEnable = [...selected].filter((id) => allSet.has(id) && !activeSet.has(id));
+      const toRemove = [...activeSet].filter((id) => !selected.has(id));
+
+      const removeTicketType = async (eventId) => {
+        const ttId = existingByEvent[eventId]?.id;
+        if (!ttId) return;
+        // Unassign from event via soft-disable to avoid backend 500 on delete.
+        await ticketTypesAPI.update(ttId, { is_active: false });
+      };
 
       await Promise.all([
         ...toAdd.map((eventId) =>
@@ -78,10 +93,11 @@ export default function AssignTicketTypeModal({ open, ticketType, onClose, onDon
             is_active: ticketType.is_active !== false,
           })
         ),
-        ...toRemove.map((eventId) => {
-          const ttId = existingByEvent[eventId];
-          return ttId ? ticketTypesAPI.delete(ttId) : Promise.resolve();
+        ...toEnable.map((eventId) => {
+          const ttId = existingByEvent[eventId]?.id;
+          return ttId ? ticketTypesAPI.update(ttId, { is_active: true }) : Promise.resolve();
         }),
+        ...toRemove.map((eventId) => removeTicketType(eventId)),
       ]);
 
       onDone?.();
@@ -123,26 +139,21 @@ export default function AssignTicketTypeModal({ open, ticketType, onClose, onDon
               <div className="max-h-72 overflow-y-auto divide-y divide-gray-100 border border-gray-200 rounded-lg">
                 {events.map((ev) => {
                   const evId = String(ev.id);
-                  const isCurrent = evId === String(ticketType?.event);
                   const isChecked = selected.has(evId);
                   return (
                     <label
                       key={evId}
-                      className={`flex items-center gap-3 px-3 py-2.5 cursor-pointer hover:bg-gray-50 ${isCurrent ? 'opacity-60 cursor-default' : ''}`}
+                      className="flex items-center gap-3 px-3 py-2.5 cursor-pointer hover:bg-gray-50"
                     >
                       <input
                         type="checkbox"
                         checked={isChecked}
                         onChange={() => toggle(evId)}
-                        disabled={isCurrent}
                         className="w-4 h-4 rounded border-gray-300 text-blue-600"
                       />
                       <span className="text-sm text-gray-800 flex-1">
                         {getEventLabel(ev) || ev.id}
                       </span>
-                      {isCurrent && (
-                        <span className="text-xs text-gray-400">текущий</span>
-                      )}
                     </label>
                   );
                 })}

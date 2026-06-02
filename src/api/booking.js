@@ -1,5 +1,6 @@
 import apiClient from './client';
 
+/** Типы билетов (event-scoped). */
 export const ticketTypesAPI = {
   list: (params) => apiClient.get('/booking/ticket-types/', { params }),
   get: (ticketTypeId) => apiClient.get(`/booking/ticket-types/${ticketTypeId}/`),

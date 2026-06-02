@@ -36,8 +36,7 @@ export default function BasePricesCatalogPage() {
 
   const [eventFilter, setEventFilter] = useState('');
   const { eventOptions, eventsLoading } = useEventOptions();
-  const { ticketTypeOptions, ticketTypesLoading } = useTicketTypeOptions(eventFilter);
-  const { ticketTypeOptions: formTTOptions, ticketTypesLoading: formTTLoading } = useTicketTypeOptions('');
+  const { ticketTypeOptions } = useTicketTypeOptions(eventFilter);
 
   const [editing, setEditing] = useState(null);
   const [saving, setSaving] = useState(false);

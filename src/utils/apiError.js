@@ -20,6 +20,22 @@ function pickFirstString(value) {
   return null;
 }
 
+function normalizeMessage(message) {
+  if (typeof message !== 'string') return null;
+  const trimmed = message.trim();
+  if (!trimmed) return null;
+
+  // Backend sometimes returns a full HTML debug/error page as a string.
+  if (/<!doctype html/i.test(trimmed) || /<html[\s>]/i.test(trimmed)) {
+    if (/ProtectedError/i.test(trimmed)) {
+      return 'Нельзя удалить объект: есть связанные записи. Отключите его вместо удаления.';
+    }
+    return null;
+  }
+
+  return trimmed;
+}
+
 export function isNotFoundError(error) {
   return error?.response?.status === 404;
 }
@@ -35,8 +51,16 @@ export function parseApiError(error, fallback = 'Произошла ошибка
     || data
   );
 
-  if (message) return message;
-  if (typeof error?.message === 'string' && error.message.trim()) return error.message.trim();
+  const normalized = normalizeMessage(message);
+  if (normalized) return normalized;
+
+  const fallbackMessage = normalizeMessage(error?.message);
+  if (fallbackMessage) return fallbackMessage;
+
+  if (typeof data === 'string' && /ProtectedError/i.test(data)) {
+    return 'Нельзя удалить объект: есть связанные записи. Отключите его вместо удаления.';
+  }
+
   return fallback;
 }
 
