@@ -251,7 +251,23 @@ export default function SessionWizard({ components = {} } = {}) {
     updateCurrentIlPatch,
     toggleCurrentIlTag,
     handleIlPhotoFile,
-    handleIlGeneratePlaceholder,
+    ilGenerationOpen,
+    ilGenerationPrompt,
+    ilGenerating,
+    ilGenerationTaskId,
+    ilGenerationError,
+    ilGenerationAssignedCityType,
+    ilGenerationSessionCityId,
+    ilGenerationDatabaseCityId,
+    ilGenerationLang,
+    openIlGenerationModal,
+    closeIlGenerationModal,
+    setIlGenerationPrompt,
+    setIlGenerationAssignedCityTypeSafe,
+    setIlGenerationSessionCityId,
+    setIlGenerationDatabaseCityId,
+    setIlGenerationLang,
+    generateInteractiveLocationsFromPrompt,
     setIlView,
     setCurrentIl,
     setIlActiveLocale,
@@ -1100,7 +1116,23 @@ export default function SessionWizard({ components = {} } = {}) {
             onReloadEventFilters={loadEventFilterTree}
             onOpenCommonsModal={openInteractiveLocationCommonsModal}
             onPhotoFileChange={handleIlPhotoFile}
-            onGeneratePlaceholder={handleIlGeneratePlaceholder}
+            ilGenerationOpen={ilGenerationOpen}
+            ilGenerationPrompt={ilGenerationPrompt}
+            ilGenerating={ilGenerating}
+            ilGenerationTaskId={ilGenerationTaskId}
+            ilGenerationError={ilGenerationError}
+            ilGenerationAssignedCityType={ilGenerationAssignedCityType}
+            ilGenerationSessionCityId={ilGenerationSessionCityId}
+            ilGenerationDatabaseCityId={ilGenerationDatabaseCityId}
+            ilGenerationLang={ilGenerationLang}
+            onOpenIlGenerationModal={openIlGenerationModal}
+            onCloseIlGenerationModal={closeIlGenerationModal}
+            onIlGenerationPromptChange={setIlGenerationPrompt}
+            onIlGenerationAssignedCityTypeChange={setIlGenerationAssignedCityTypeSafe}
+            onIlGenerationSessionCityIdChange={setIlGenerationSessionCityId}
+            onIlGenerationDatabaseCityIdChange={setIlGenerationDatabaseCityId}
+            onIlGenerationLangChange={setIlGenerationLang}
+            onGenerateInteractiveLocationsFromPrompt={generateInteractiveLocationsFromPrompt}
             onGoToStep={goToStep}
           />
         )}

@@ -288,6 +288,13 @@ export const aiAPI = {
     apiClient.post(`${BASE}/ai/attractions-json/start/`, data),
   attractionsCreateFromTask: (taskId, payload = {}) =>
     apiClient.post(`${BASE}/ai/attractions-json/tasks/${taskId}/create-attractions/`, payload),
+  interactiveLocationsJsonStart: (data) =>
+    apiClient.post(`${BASE}/ai/interactive-locations-json/start/`, data),
+  interactiveLocationsCreateFromTask: (taskId, payload = {}) =>
+    apiClient.post(
+      `${BASE}/ai/interactive-locations-json/tasks/${taskId}/create-interactive-locations/`,
+      payload,
+    ),
   cityInfoJsonStart: (data) =>
     apiClient.post(`${BASE}/ai/city-info-json/start/`, data),
   cityInfoCreateFromTask: (taskId, payload = {}) =>

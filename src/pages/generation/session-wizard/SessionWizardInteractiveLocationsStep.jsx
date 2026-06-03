@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import 'leaflet/dist/leaflet.css';
 import { getAttrName, getFlag, getSessionEntityImagePreview, resolveSessionEntityImageOriginalUrl, resolveSessionEntityImageCopyright } from './sessionWizardShared.jsx';
 import SessionWizardAttractionTagsPicker from './SessionWizardAttractionTagsPicker.jsx';
@@ -38,6 +38,15 @@ const getDraftCityDisplayName = (draft) => {
 
   return draft.display_name || draft.id || 'Без названия';
 };
+
+const AI_GENERATION_LANG_OPTIONS = [
+  { value: 'ru', label: 'Русский (ru)' },
+  { value: 'en', label: 'English (en)' },
+  { value: 'it', label: 'Italiano (it)' },
+  { value: 'fr', label: 'Français (fr)' },
+  { value: 'de', label: 'Deutsch (de)' },
+  { value: 'es', label: 'Español (es)' },
+];
 
 const normalizeId = (value) => {
   if (value == null) return '';
@@ -444,10 +453,63 @@ export default function SessionWizardInteractiveLocationsStep({
   onReloadEventFilters,
   onOpenCommonsModal,
   onPhotoFileChange,
-  onGeneratePlaceholder,
+  ilGenerationOpen = false,
+  ilGenerationPrompt = '',
+  ilGenerating = false,
+  ilGenerationTaskId = null,
+  ilGenerationError = '',
+  ilGenerationAssignedCityType = 'none',
+  ilGenerationSessionCityId = '',
+  ilGenerationDatabaseCityId = '',
+  ilGenerationLang = 'ru',
+  onOpenIlGenerationModal,
+  onCloseIlGenerationModal,
+  onIlGenerationPromptChange,
+  onIlGenerationAssignedCityTypeChange,
+  onIlGenerationSessionCityIdChange,
+  onIlGenerationDatabaseCityIdChange,
+  onIlGenerationLangChange,
+  onGenerateInteractiveLocationsFromPrompt,
   onGoToStep,
 }) {
   const ilCurrentLocale = ilLocaleData[ilActiveLocale] || {};
+
+  const sessionDraftsForAi = (cityDrafts || []).filter(
+    (draft) => normalizeId(draft.id) && normalizeId(draft.id) !== 'legacy',
+  );
+
+  const ilGenBindingHint = (() => {
+    switch (ilGenerationAssignedCityType) {
+      case 'draft':
+        return 'Новые локации будут привязаны к выбранному городу сессии.';
+      case 'database':
+        return 'Новые локации будут привязаны к городу из базы.';
+      default:
+        return 'Новые локации будут без привязки к городу (можно изменить в карточке).';
+    }
+  })();
+
+  const canSubmitIlGeneration = useMemo(() => {
+    if (!ilGenerationPrompt?.trim()) return false;
+    if (
+      ilGenerationAssignedCityType === 'draft' &&
+      !ilGenerationSessionCityId
+    ) {
+      return false;
+    }
+    if (
+      ilGenerationAssignedCityType === 'database' &&
+      !ilGenerationDatabaseCityId
+    ) {
+      return false;
+    }
+    return true;
+  }, [
+    ilGenerationPrompt,
+    ilGenerationAssignedCityType,
+    ilGenerationSessionCityId,
+    ilGenerationDatabaseCityId,
+  ]);
 
   const assignedCityType = currentIl?.assigned_city_type || 'none';
   const selectedDatabaseCityId = normalizeId(currentIl?.city_id ?? currentIl?.city);
@@ -468,6 +530,179 @@ export default function SessionWizardInteractiveLocationsStep({
   if (ilView === 'list') {
     return (
       <div className="space-y-4">
+        {ilGenerationOpen && (
+          <div
+            className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 p-4"
+            onClick={() => {
+              if (!ilGenerating) onCloseIlGenerationModal?.();
+            }}
+          >
+            <div
+              className="bg-white rounded-xl max-w-lg w-full p-6 shadow-xl space-y-4 relative"
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="il-gen-title"
+              onClick={(e) => e.stopPropagation()}
+            >
+              {ilGenerating && (
+                <div className="absolute inset-0 bg-white/70 rounded-xl flex items-center justify-center z-10">
+                  <div className="text-sm text-gray-700 font-medium">Генерация…</div>
+                </div>
+              )}
+
+              <h2 id="il-gen-title" className="text-lg font-semibold text-gray-900">
+                Сгенерировать интерактивные локации
+              </h2>
+
+              <p className="text-sm text-gray-600">{ilGenBindingHint}</p>
+
+              <div className="space-y-3">
+                <div>
+                  <label
+                    htmlFor="il-gen-city-binding"
+                    className="block text-sm font-medium text-gray-700 mb-1"
+                  >
+                    Привязка к городу
+                  </label>
+                  <select
+                    id="il-gen-city-binding"
+                    value={ilGenerationAssignedCityType}
+                    onChange={(e) => onIlGenerationAssignedCityTypeChange?.(e.target.value)}
+                    disabled={ilGenerating}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
+                  >
+                    <option value="none">Без города</option>
+                    <option value="draft">Город из сессии</option>
+                    <option value="database">Город из базы</option>
+                  </select>
+                </div>
+
+                {ilGenerationAssignedCityType === 'draft' && (
+                  <div>
+                    <label
+                      htmlFor="il-gen-session-city"
+                      className="block text-sm font-medium text-gray-700 mb-1"
+                    >
+                      Черновик города в сессии
+                    </label>
+                    <select
+                      id="il-gen-session-city"
+                      value={ilGenerationSessionCityId || ''}
+                      onChange={(e) => onIlGenerationSessionCityIdChange?.(e.target.value)}
+                      disabled={ilGenerating}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
+                    >
+                      <option value="">— Выберите —</option>
+                      {sessionDraftsForAi.map((draft) => (
+                        <option key={String(draft.id)} value={String(draft.id)}>
+                          {getDraftCityDisplayName(draft)}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+
+                {ilGenerationAssignedCityType === 'database' && (
+                  <div>
+                    <label
+                      htmlFor="il-gen-db-city"
+                      className="block text-sm font-medium text-gray-700 mb-1"
+                    >
+                      Город из базы
+                    </label>
+                    <select
+                      id="il-gen-db-city"
+                      value={ilGenerationDatabaseCityId || ''}
+                      onChange={(e) => onIlGenerationDatabaseCityIdChange?.(e.target.value)}
+                      disabled={ilGenerating}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
+                    >
+                      <option value="">— Выберите —</option>
+                      {(referenceCities || []).map((city) => (
+                        <option key={normalizeId(city.id)} value={normalizeId(city.id)}>
+                          {getCityDisplayName(city)}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+
+                <div>
+                  <label
+                    htmlFor="il-gen-lang"
+                    className="block text-sm font-medium text-gray-700 mb-1"
+                  >
+                    Основной язык запроса
+                  </label>
+                  <select
+                    id="il-gen-lang"
+                    value={ilGenerationLang || 'ru'}
+                    onChange={(e) => onIlGenerationLangChange?.(e.target.value)}
+                    disabled={ilGenerating}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
+                  >
+                    {AI_GENERATION_LANG_OPTIONS.map((opt) => (
+                      <option key={opt.value} value={opt.value}>
+                        {opt.label}
+                      </option>
+                    ))}
+                  </select>
+                  <p className="text-xs text-gray-500 mt-1">
+                    В карточках будут заполнены все языки, настроенные на шаге «Город».
+                  </p>
+                </div>
+              </div>
+
+              {ilGenerationTaskId && (
+                <div className="text-xs text-gray-500">
+                  Задача:{' '}
+                  <span className="font-mono text-gray-700">
+                    {String(ilGenerationTaskId).slice(0, 8)}…
+                  </span>
+                </div>
+              )}
+
+              {ilGenerationError && (
+                <div className="text-sm text-red-700 bg-red-50 border border-red-200 rounded-lg p-3">
+                  {ilGenerationError}
+                </div>
+              )}
+
+              <label className="block text-sm font-medium text-gray-700" htmlFor="il-gen-prompt">
+                Запрос к ИИ
+              </label>
+              <textarea
+                id="il-gen-prompt"
+                rows={5}
+                value={ilGenerationPrompt}
+                onChange={(e) => onIlGenerationPromptChange?.(e.target.value)}
+                disabled={ilGenerating}
+                placeholder="Например: Сгенерируй 5 интерактивных локаций с названием, описанием и координатами."
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
+              />
+
+              <div className="flex justify-end gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={() => onCloseIlGenerationModal?.()}
+                  disabled={ilGenerating}
+                  className="px-4 py-2 text-sm font-medium text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50"
+                >
+                  Отмена
+                </button>
+                <button
+                  type="button"
+                  onClick={() => onGenerateInteractiveLocationsFromPrompt?.()}
+                  disabled={ilGenerating || !canSubmitIlGeneration}
+                  className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-50"
+                >
+                  Сгенерировать
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
         <div className="flex items-center justify-between">
           <div>
             <h2 className="text-lg font-semibold text-gray-900">
@@ -482,7 +717,7 @@ export default function SessionWizardInteractiveLocationsStep({
           <div className="flex items-center gap-2">
             <button
               type="button"
-              onClick={() => onGeneratePlaceholder?.()}
+              onClick={() => onOpenIlGenerationModal?.()}
               className="px-3 py-1.5 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors"
             >
               Сгенерировать

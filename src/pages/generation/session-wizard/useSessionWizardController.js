@@ -2010,6 +2010,17 @@ export function useSessionWizardController({ sessionId, confirm: confirmProp } =
   const [attractionGenerationLang, setAttractionGenerationLang] = useState('ru');
   const attractionGenPollCancelledRef = useRef(false);
 
+  const [ilGenerationOpen, setIlGenerationOpen] = useState(false);
+  const [ilGenerationPrompt, setIlGenerationPrompt] = useState('');
+  const [ilGenerating, setIlGenerating] = useState(false);
+  const [ilGenerationTaskId, setIlGenerationTaskId] = useState(null);
+  const [ilGenerationError, setIlGenerationError] = useState('');
+  const [ilGenerationAssignedCityType, setIlGenerationAssignedCityType] = useState('none');
+  const [ilGenerationSessionCityId, setIlGenerationSessionCityId] = useState('');
+  const [ilGenerationDatabaseCityId, setIlGenerationDatabaseCityId] = useState('');
+  const [ilGenerationLang, setIlGenerationLang] = useState('ru');
+  const ilGenPollCancelledRef = useRef(false);
+
   const [cityInfoGenerateModalOpen, setCityInfoGenerateModalOpen] = useState(false);
   const [cityInfoGeneratePrompt, setCityInfoGeneratePrompt] = useState('');
   const [cityInfoGenerateCount, setCityInfoGenerateCount] = useState(5);
@@ -6674,9 +6685,181 @@ export function useSessionWizardController({ sessionId, confirm: confirmProp } =
     });
   }, []);
 
-  const handleIlGeneratePlaceholder = useCallback(() => {
-    showNote('Генерация интерактивных локаций пока не реализована', 'info');
-  }, [showNote]);
+  const collectWizardLanguageCodes = useCallback(() => {
+    const codes = new Set();
+    const ingest = (data) => {
+      Object.values(data || {}).forEach((loc) => {
+        const raw = (loc?.lang || '').trim().toLowerCase();
+        if (!raw) return;
+        const base = raw.split('-')[0];
+        if (base) codes.add(base);
+      });
+    };
+    ingest(localeData);
+    ingest(ilLocaleData);
+    if (!codes.size) codes.add('ru');
+    return Array.from(codes);
+  }, [localeData, ilLocaleData]);
+
+  const openIlGenerationModal = useCallback(() => {
+    ilGenPollCancelledRef.current = false;
+    setIlGenerationError('');
+    setIlGenerationPrompt('');
+    setIlGenerationTaskId(null);
+    setIlGenerationAssignedCityType('none');
+    setIlGenerationSessionCityId('');
+    setIlGenerationDatabaseCityId('');
+
+    const loc = ilLocaleData[ilActiveLocale] || localeData[activeLocale];
+    const locLang = (loc?.lang || '').trim().toLowerCase();
+    if (locLang) {
+      setIlGenerationLang(locLang.split('-')[0] || 'ru');
+    } else {
+      setIlGenerationLang(collectWizardLanguageCodes()[0] || 'ru');
+    }
+
+    setIlGenerationOpen(true);
+  }, [ilLocaleData, ilActiveLocale, localeData, activeLocale, collectWizardLanguageCodes]);
+
+  const closeIlGenerationModal = useCallback(() => {
+    ilGenPollCancelledRef.current = true;
+    setIlGenerationOpen(false);
+    setIlGenerating(false);
+    setIlGenerationTaskId(null);
+    setIlGenerationError('');
+  }, []);
+
+  const setIlGenerationAssignedCityTypeSafe = useCallback((value) => {
+    setIlGenerationAssignedCityType(value);
+    if (value !== 'draft') setIlGenerationSessionCityId('');
+    if (value !== 'database') setIlGenerationDatabaseCityId('');
+  }, []);
+
+  const generateInteractiveLocationsFromPrompt = useCallback(async () => {
+    const prompt = ilGenerationPrompt.trim();
+    if (!prompt) {
+      setIlGenerationError('Введите запрос');
+      return;
+    }
+
+    const assigned_city_type = ilGenerationAssignedCityType || 'none';
+    let session_city_id = null;
+    let city_id = null;
+
+    if (assigned_city_type === 'draft') {
+      const sid = normalizeDraftId(ilGenerationSessionCityId);
+      if (!sid || sid === 'legacy') {
+        setIlGenerationError('Выберите город сессии');
+        return;
+      }
+      session_city_id = sid;
+    } else if (assigned_city_type === 'database') {
+      const cid = (ilGenerationDatabaseCityId || '').trim();
+      if (!cid) {
+        setIlGenerationError('Выберите город из базы');
+        return;
+      }
+      city_id = cid;
+    }
+
+    const langRaw = (ilGenerationLang || 'ru').trim().toLowerCase();
+    const lang = (langRaw.split('-')[0] || 'ru').slice(0, 8) || 'ru';
+    const languages = collectWizardLanguageCodes();
+
+    ilGenPollCancelledRef.current = false;
+    setIlGenerating(true);
+    setIlGenerationError('');
+    setIlGenerationTaskId(null);
+
+    try {
+      await saveCurrentIlIfDirty({ silent: true });
+
+      const startRes = await aiAPI.interactiveLocationsJsonStart({
+        session_id: sessionId,
+        prompt,
+        lang,
+        languages,
+        assigned_city_type,
+        session_city_id: assigned_city_type === 'draft' ? session_city_id : null,
+        city_id: assigned_city_type === 'database' ? city_id : null,
+      });
+      const taskId = startRes?.data?.task_id;
+      if (!taskId) {
+        throw new Error('Сервер не вернул task_id');
+      }
+      setIlGenerationTaskId(taskId);
+
+      let pollDone = false;
+      while (!pollDone) {
+        if (ilGenPollCancelledRef.current) return;
+        const tr = await tasksAPI.get(taskId);
+        const task = tr?.data;
+        if (task?.status === 'completed') {
+          pollDone = true;
+        } else if (task?.status === 'failed') {
+          const failedMsg =
+            task?.error_message ||
+            task?.result_data?.error ||
+            'Задача завершилась с ошибкой';
+          throw new Error(failedMsg);
+        } else {
+          await new Promise((r) => setTimeout(r, 1000));
+        }
+      }
+
+      if (ilGenPollCancelledRef.current) return;
+
+      const createRes = await aiAPI.interactiveLocationsCreateFromTask(taskId, {
+        session_id: sessionId,
+      });
+      const createData = createRes?.data || {};
+      const list = createData.interactive_locations || [];
+      const createdCount =
+        typeof createData.created_count === 'number'
+          ? createData.created_count
+          : Array.isArray(list)
+            ? list.length
+            : 0;
+      const skippedDuplicates = createData.skipped_duplicates_count || 0;
+
+      const keepDraft = normalizeDraftId(activeCityDraftIdRef.current);
+      await loadSession(keepDraft);
+
+      if (!ilGenPollCancelledRef.current) {
+        if (createdCount > 0 && list[0]?.id) {
+          await openIlDetail(list[0].id);
+        }
+        let successMsg = `Создано: ${createdCount}.`;
+        if (skippedDuplicates > 0) {
+          successMsg += ` Пропущено дублей: ${skippedDuplicates}.`;
+        }
+        showNote(successMsg, 'success');
+        setIlGenerationOpen(false);
+        setIlGenerationPrompt('');
+        setIlGenerationTaskId(null);
+      }
+    } catch (e) {
+      if (!ilGenPollCancelledRef.current) {
+        const msg = parseApiError(e, 'Ошибка генерации');
+        setIlGenerationError(msg);
+        showNote(msg, 'error');
+      }
+    } finally {
+      setIlGenerating(false);
+    }
+  }, [
+    sessionId,
+    ilGenerationPrompt,
+    ilGenerationAssignedCityType,
+    ilGenerationSessionCityId,
+    ilGenerationDatabaseCityId,
+    ilGenerationLang,
+    collectWizardLanguageCodes,
+    saveCurrentIlIfDirty,
+    loadSession,
+    openIlDetail,
+    showNote,
+  ]);
 
   const handleIlPhotoFile = useCallback(
     async (e, il) => {
@@ -7024,7 +7207,12 @@ export function useSessionWizardController({ sessionId, confirm: confirmProp } =
     openIlDetail, addInteractiveLocation, deleteCurrentIl, saveCurrentIl, saveCurrentIlIfDirty,
     updateIlLocaleField, updateCurrentIlPatch, persistInteractiveLocationImage,
     leaveIlDetailView,
-    toggleCurrentIlTag, handleIlPhotoFile, handleIlGeneratePlaceholder,
+    toggleCurrentIlTag, handleIlPhotoFile,
+    ilGenerationOpen, ilGenerationPrompt, ilGenerating, ilGenerationTaskId, ilGenerationError,
+    ilGenerationAssignedCityType, ilGenerationSessionCityId, ilGenerationDatabaseCityId, ilGenerationLang,
+    openIlGenerationModal, closeIlGenerationModal, setIlGenerationPrompt,
+    setIlGenerationAssignedCityTypeSafe, setIlGenerationSessionCityId, setIlGenerationDatabaseCityId,
+    setIlGenerationLang, generateInteractiveLocationsFromPrompt,
     setIlView, setCurrentIl, setIlActiveLocale,
     saveCurrentAttrIfDirty, persistAttractionImage,
     openAttractionGenerationModal, closeAttractionGenerationModal, setAttractionGenerationPrompt,
