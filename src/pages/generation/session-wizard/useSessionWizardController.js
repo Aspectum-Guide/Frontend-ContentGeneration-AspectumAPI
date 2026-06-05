@@ -19,6 +19,10 @@ import {
 } from '../../../features/catalog/shared/tagCatalog';
 import { useToast } from '../../../components/ui/Toast.jsx';
 import {
+  DEFAULT_GENERATION_MODE,
+  buildGenerationPayloadFields,
+} from '../../../components/generation/AiGenerationQualitySettings.jsx';
+import {
   DEFAULT_LOCALE_DEFS,
   getLocaleInfo,
   isLocaleCodeUsedAsCountry,
@@ -2029,6 +2033,10 @@ export function useSessionWizardController({ sessionId, confirm: confirmProp } =
   const [cityInfoGenerationTaskId, setCityInfoGenerationTaskId] = useState(null);
   const [cityInfoGenerationLang, setCityInfoGenerationLang] = useState('ru');
   const cityInfoGenPollCancelledRef = useRef(false);
+
+  const [aiGenerationMode, setAiGenerationMode] = useState(DEFAULT_GENERATION_MODE);
+  const [aiUseWebSearch, setAiUseWebSearch] = useState(false);
+  const [aiAdvancedGenerationAvailable, setAiAdvancedGenerationAvailable] = useState(true);
   const loadSessionSeqRef = useRef(0);
   const localCreatedCityDraftsRef = useRef(new Map());
   const localDeletedCityDraftIdsRef = useRef(new Set());
@@ -2049,6 +2057,39 @@ export function useSessionWizardController({ sessionId, confirm: confirmProp } =
 
     localCreatedCityDraftsRef.current.delete(normalizedDraftId);
     localDeletedCityDraftIdsRef.current.add(normalizedDraftId);
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    (async () => {
+      try {
+        const response = await aiAPI.getSettings();
+        if (cancelled) return;
+
+        const caps = response?.data?.generation_capabilities || {};
+        const advancedAvailable = caps.thinking_modes !== false && caps.web_search !== false;
+        const provider = String(response?.data?.provider || '').toLowerCase();
+        const isOllama = provider === 'ollama';
+
+        setAiAdvancedGenerationAvailable(!isOllama && advancedAvailable);
+
+        if (isOllama || !advancedAvailable) {
+          setAiGenerationMode((prev) =>
+            prev === DEFAULT_GENERATION_MODE ? prev : DEFAULT_GENERATION_MODE,
+          );
+          setAiUseWebSearch(false);
+        }
+      } catch {
+        if (!cancelled) {
+          setAiAdvancedGenerationAvailable(true);
+        }
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   const reconcileCityDraftsWithLocalOverlay = useCallback((serverDrafts) => {
@@ -5835,6 +5876,7 @@ export function useSessionWizardController({ sessionId, confirm: confirmProp } =
         assigned_city_type,
         session_city_id: assigned_city_type === 'draft' ? session_city_id : null,
         city_id: assigned_city_type === 'database' ? city_id : null,
+        ...buildGenerationPayloadFields(aiGenerationMode, aiUseWebSearch),
       });
       const taskId = startRes?.data?.task_id;
       if (!taskId) {
@@ -5895,6 +5937,8 @@ export function useSessionWizardController({ sessionId, confirm: confirmProp } =
     attractionGenerationSessionCityId,
     attractionGenerationDatabaseCityId,
     attractionGenerationLang,
+    aiGenerationMode,
+    aiUseWebSearch,
     loadSession,
     showNote,
   ]);
@@ -5980,6 +6024,7 @@ export function useSessionWizardController({ sessionId, confirm: confirmProp } =
         assigned_city_type,
         session_city_id: assigned_city_type === 'draft' ? session_city_id : null,
         city_id: null,
+        ...buildGenerationPayloadFields(aiGenerationMode, aiUseWebSearch),
       });
       const taskId = startRes?.data?.task_id;
       if (!taskId) {
@@ -6044,6 +6089,8 @@ export function useSessionWizardController({ sessionId, confirm: confirmProp } =
     cityInfoGeneratePrompt,
     cityInfoGenerateCount,
     cityInfoGenerationLang,
+    aiGenerationMode,
+    aiUseWebSearch,
     showNote,
   ]);
 
@@ -6782,6 +6829,7 @@ export function useSessionWizardController({ sessionId, confirm: confirmProp } =
         assigned_city_type,
         session_city_id: assigned_city_type === 'draft' ? session_city_id : null,
         city_id: assigned_city_type === 'database' ? city_id : null,
+        ...buildGenerationPayloadFields(aiGenerationMode, aiUseWebSearch),
       });
       const taskId = startRes?.data?.task_id;
       if (!taskId) {
@@ -6854,6 +6902,8 @@ export function useSessionWizardController({ sessionId, confirm: confirmProp } =
     ilGenerationSessionCityId,
     ilGenerationDatabaseCityId,
     ilGenerationLang,
+    aiGenerationMode,
+    aiUseWebSearch,
     collectWizardLanguageCodes,
     saveCurrentIlIfDirty,
     loadSession,
@@ -7160,6 +7210,8 @@ export function useSessionWizardController({ sessionId, confirm: confirmProp } =
     cityInfos, currentCityInfo, cityInfoLocaleData, cityInfoActiveLocale, cityInfoSaving,
     cityInfoGenerateModalOpen, cityInfoGeneratePrompt, cityInfoGenerateCount, cityInfoGenerating,
     cityInfoGenerationError, cityInfoGenerationTaskId, cityInfoGenerationLang,
+    aiGenerationMode, aiUseWebSearch, aiAdvancedGenerationAvailable,
+    setAiGenerationMode, setAiUseWebSearch,
     attractions, attrView, currentAttr, attrLocaleData, attrActiveLocale, attrSaving,
     interactiveLocations, ilView, currentIl, ilLocaleData, ilActiveLocale, ilSaving, ilPhotoUploading, ilPhotoFileRef,
     attractionInfos, currentAttractionInfo, attractionInfoLocaleData, attractionInfoActiveLocale, attractionInfoSaving,    

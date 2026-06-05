@@ -1,4 +1,5 @@
 import { useMemo } from 'react';
+import AiGenerationQualitySettings from '../../../components/generation/AiGenerationQualitySettings.jsx';
 import { getFlag } from './sessionWizardShared.jsx';
 
 const AI_GENERATION_LANG_OPTIONS = [
@@ -231,6 +232,11 @@ export default function SessionWizardCityInfoStep({
   onCityInfoGenerateCountChange,
   onCityInfoGenerationLangChange,
   onGenerateCityInfoFromPrompt,
+  aiGenerationMode = 'instant',
+  aiUseWebSearch = false,
+  aiAdvancedGenerationAvailable = true,
+  onAiGenerationModeChange,
+  onAiUseWebSearchChange,
 }) {
   const currentLocale = cityInfoLocaleData[cityInfoActiveLocale] || {};
 
@@ -367,6 +373,15 @@ export default function SessionWizardCityInfoStep({
                 {cityInfoGenerationError}
               </div>
             )}
+
+            <AiGenerationQualitySettings
+              generationMode={aiGenerationMode}
+              onGenerationModeChange={onAiGenerationModeChange}
+              useWebSearch={aiUseWebSearch}
+              onUseWebSearchChange={onAiUseWebSearchChange}
+              disabled={cityInfoGenerating}
+              advancedDisabled={!aiAdvancedGenerationAvailable}
+            />
 
             <div>
               <label

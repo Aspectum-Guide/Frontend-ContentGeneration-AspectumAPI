@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import 'leaflet/dist/leaflet.css';
+import AiGenerationQualitySettings from '../../../components/generation/AiGenerationQualitySettings.jsx';
 import { getAttrName, getFlag, getSessionEntityImagePreview, resolveSessionEntityImageOriginalUrl, resolveSessionEntityImageCopyright } from './sessionWizardShared.jsx';
 import SessionWizardAttractionTagsPicker from './SessionWizardAttractionTagsPicker.jsx';
 
@@ -470,6 +471,11 @@ export default function SessionWizardInteractiveLocationsStep({
   onIlGenerationDatabaseCityIdChange,
   onIlGenerationLangChange,
   onGenerateInteractiveLocationsFromPrompt,
+  aiGenerationMode = 'instant',
+  aiUseWebSearch = false,
+  aiAdvancedGenerationAvailable = true,
+  onAiGenerationModeChange,
+  onAiUseWebSearchChange,
   onGoToStep,
 }) {
   const ilCurrentLocale = ilLocaleData[ilActiveLocale] || {};
@@ -667,6 +673,15 @@ export default function SessionWizardInteractiveLocationsStep({
                   {ilGenerationError}
                 </div>
               )}
+
+              <AiGenerationQualitySettings
+                generationMode={aiGenerationMode}
+                onGenerationModeChange={onAiGenerationModeChange}
+                useWebSearch={aiUseWebSearch}
+                onUseWebSearchChange={onAiUseWebSearchChange}
+                disabled={ilGenerating}
+                advancedDisabled={!aiAdvancedGenerationAvailable}
+              />
 
               <label className="block text-sm font-medium text-gray-700" htmlFor="il-gen-prompt">
                 Запрос к ИИ

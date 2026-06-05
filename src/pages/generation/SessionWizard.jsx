@@ -119,6 +119,11 @@ export default function SessionWizard({ components = {} } = {}) {
     cityInfoGenerationError,
     cityInfoGenerationTaskId,
     cityInfoGenerationLang,
+    aiGenerationMode,
+    aiUseWebSearch,
+    aiAdvancedGenerationAvailable,
+    setAiGenerationMode,
+    setAiUseWebSearch,
     attractions,
     interactiveLocations,
     ilView,
@@ -907,6 +912,11 @@ export default function SessionWizard({ components = {} } = {}) {
                 onCityInfoGenerateCountChange={setCityInfoGenerateCount}
                 onCityInfoGenerationLangChange={setCityInfoGenerationLang}
                 onGenerateCityInfoFromPrompt={generateCityInfoFromPrompt}
+                aiGenerationMode={aiGenerationMode}
+                aiUseWebSearch={aiUseWebSearch}
+                aiAdvancedGenerationAvailable={aiAdvancedGenerationAvailable}
+                onAiGenerationModeChange={setAiGenerationMode}
+                onAiUseWebSearchChange={setAiUseWebSearch}
               />
             </div>
           </div>
@@ -975,6 +985,11 @@ export default function SessionWizard({ components = {} } = {}) {
               onAttractionGenerationDatabaseCityIdChange={setAttractionGenerationDatabaseCityId}
               onAttractionGenerationLangChange={setAttractionGenerationLang}
               onGenerateAttractionsFromPrompt={generateAttractionsFromPrompt}
+              aiGenerationMode={aiGenerationMode}
+              aiUseWebSearch={aiUseWebSearch}
+              aiAdvancedGenerationAvailable={aiAdvancedGenerationAvailable}
+              onAiGenerationModeChange={setAiGenerationMode}
+              onAiUseWebSearchChange={setAiUseWebSearch}
               onDeleteCurrentAttr={deleteCurrentAttr}
               onSetAttrView={setAttrView}
               onSetCurrentAttr={setCurrentAttr}
@@ -1133,6 +1148,11 @@ export default function SessionWizard({ components = {} } = {}) {
             onIlGenerationDatabaseCityIdChange={setIlGenerationDatabaseCityId}
             onIlGenerationLangChange={setIlGenerationLang}
             onGenerateInteractiveLocationsFromPrompt={generateInteractiveLocationsFromPrompt}
+            aiGenerationMode={aiGenerationMode}
+            aiUseWebSearch={aiUseWebSearch}
+            aiAdvancedGenerationAvailable={aiAdvancedGenerationAvailable}
+            onAiGenerationModeChange={setAiGenerationMode}
+            onAiUseWebSearchChange={setAiUseWebSearch}
             onGoToStep={goToStep}
           />
         )}

@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import AiGenerationQualitySettings from '../../../components/generation/AiGenerationQualitySettings.jsx';
 import { getAttrName, getFlag, getSessionEntityImagePreview, resolveSessionEntityImageOriginalUrl, resolveSessionEntityImageCopyright } from './sessionWizardShared.jsx';
 import SessionWizardAttractionTagsPicker from './SessionWizardAttractionTagsPicker.jsx';
 
@@ -496,6 +497,11 @@ export default function SessionWizardAttractionsStep({
   onAttractionGenerationDatabaseCityIdChange,
   onAttractionGenerationLangChange,
   onGenerateAttractionsFromPrompt,
+  aiGenerationMode = 'instant',
+  aiUseWebSearch = false,
+  aiAdvancedGenerationAvailable = true,
+  onAiGenerationModeChange,
+  onAiUseWebSearchChange,
 }) {
   const attrCurrentLocale = attrLocaleData[attrActiveLocale] || {};
 
@@ -700,6 +706,15 @@ export default function SessionWizardAttractionsStep({
                 {attractionGenerationError}
               </div>
             )}
+
+            <AiGenerationQualitySettings
+              generationMode={aiGenerationMode}
+              onGenerationModeChange={onAiGenerationModeChange}
+              useWebSearch={aiUseWebSearch}
+              onUseWebSearchChange={onAiUseWebSearchChange}
+              disabled={attractionGenerating}
+              advancedDisabled={!aiAdvancedGenerationAvailable}
+            />
 
             <label className="block text-sm font-medium text-gray-700" htmlFor="attraction-gen-prompt">
               Запрос к ИИ

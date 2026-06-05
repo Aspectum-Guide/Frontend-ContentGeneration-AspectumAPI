@@ -2,6 +2,10 @@ import { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Layout from '../../components/Layout';
 import { aiAPI, tasksAPI } from '../../api/generation';
+import AiGenerationQualitySettings, {
+  DEFAULT_GENERATION_MODE,
+  buildGenerationPayloadFields,
+} from '../../components/generation/AiGenerationQualitySettings.jsx';
 
 const POLL_INTERVAL = 4000;
 
@@ -53,6 +57,9 @@ export default function CityGeneration() {
   const [prompt, setPrompt] = useState('');
   const [provider, setProvider] = useState('');
   const [sourceLanguage, setSourceLanguage] = useState('ru');
+  const [generationMode, setGenerationMode] = useState(DEFAULT_GENERATION_MODE);
+  const [useWebSearch, setUseWebSearch] = useState(false);
+  const [advancedGenerationAvailable, setAdvancedGenerationAvailable] = useState(true);
 
   const [loading, setLoading] = useState(false);
   const [taskId, setTaskId] = useState(null);
@@ -67,6 +74,36 @@ export default function CityGeneration() {
 
   useEffect(() => {
     return () => clearInterval(pollRef.current);
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    (async () => {
+      try {
+        const response = await aiAPI.getSettings();
+        if (cancelled) return;
+
+        const caps = response?.data?.generation_capabilities || {};
+        const providerName = String(response?.data?.provider || '').toLowerCase();
+        const isOllama = providerName === 'ollama';
+        const advancedAvailable = !isOllama && caps.thinking_modes !== false;
+
+        setAdvancedGenerationAvailable(advancedAvailable);
+        if (!advancedAvailable) {
+          setGenerationMode(DEFAULT_GENERATION_MODE);
+          setUseWebSearch(false);
+        }
+      } catch {
+        if (!cancelled) {
+          setAdvancedGenerationAvailable(true);
+        }
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   const pollTask = (id) => {
@@ -116,6 +153,7 @@ export default function CityGeneration() {
         with_images: false,
         source_language: sourceLanguage,
         ...(provider ? { provider } : {}),
+        ...buildGenerationPayloadFields(generationMode, useWebSearch),
       };
 
       const r = await aiAPI.citiesJsonStart(payload);
@@ -239,6 +277,15 @@ export default function CityGeneration() {
                 Модель должна вернуть поля name, description и country только с этим языковым ключом.
               </p>
             </div>
+
+            <AiGenerationQualitySettings
+              generationMode={generationMode}
+              onGenerationModeChange={setGenerationMode}
+              useWebSearch={useWebSearch}
+              onUseWebSearchChange={setUseWebSearch}
+              disabled={isRunning}
+              advancedDisabled={!advancedGenerationAvailable}
+            />
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
