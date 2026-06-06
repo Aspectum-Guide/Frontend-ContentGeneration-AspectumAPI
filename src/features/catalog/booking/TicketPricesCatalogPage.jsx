@@ -59,6 +59,7 @@ export default function TicketPricesCatalog() {
   const { ticketTypeOptions: formTicketTypeOptions, ticketTypesLoading: formTicketTypesLoading } = useTicketTypeOptions(editingPrice?.event || '');
   const [slotOptions, setSlotOptions] = useState([]);
   const [slotsLoading, setSlotsLoading] = useState(false);
+  const [slotSearch, setSlotSearch] = useState('');
 
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [deleting, setDeleting] = useState(false);
@@ -98,6 +99,7 @@ export default function TicketPricesCatalog() {
   useEffect(() => {
     const eventId = editingPrice?.event || '';
     const ticketTypeId = editingPrice?.ticket_type || '';
+    setSlotSearch('');
     loadSlots(eventId, ticketTypeId);
   }, [editingPrice?.event, editingPrice?.ticket_type, loadSlots]);
 
@@ -394,22 +396,41 @@ export default function TicketPricesCatalog() {
             </div>
 
             <Field label="Слот" required>
+              {slotOptions.length > 8 && (
+                <input
+                  type="text"
+                  value={slotSearch}
+                  onChange={(e) => setSlotSearch(e.target.value)}
+                  placeholder="Поиск по дате…"
+                  className="w-full px-3 py-1.5 border border-gray-300 rounded-lg text-sm mb-1 focus:ring-2 focus:ring-blue-500 outline-none"
+                />
+              )}
               <select
                 value={editingPrice.slot}
                 onChange={(e) => setEditingPrice((prev) => ({ ...prev, slot: e.target.value }))}
                 className={`w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none ${slotsLoading ? 'opacity-60 cursor-wait' : ''}`}
                 required
                 disabled={!editingPrice.ticket_type || slotsLoading}
+                size={Math.min(8, slotOptions.length > 0 ? slotOptions.length + 1 : 1)}
               >
                 <option value="">
                   {slotsLoading ? 'Загрузка слотов…' : editingPrice.ticket_type ? 'Выберите слот' : 'Сначала выберите тип билета'}
                 </option>
-                {slotOptions.map((slotItem) => (
-                  <option key={slotItem.id} value={slotItem.id}>
-                    {new Date(slotItem.slot_datetime).toLocaleString()} | мест: {slotItem.available_seats}
-                  </option>
-                ))}
+                {slotOptions
+                  .filter((s) => !slotSearch || new Date(s.slot_datetime).toLocaleString('ru-RU').includes(slotSearch))
+                  .map((slotItem) => (
+                    <option key={slotItem.id} value={slotItem.id}>
+                      {new Date(slotItem.slot_datetime).toLocaleString('ru-RU', { day:'2-digit', month:'2-digit', year:'2-digit', hour:'2-digit', minute:'2-digit' })} · {slotItem.available_seats} мест
+                    </option>
+                  ))}
               </select>
+              {slotOptions.length > 0 && (
+                <p className="text-xs text-gray-400 mt-0.5">
+                  {slotSearch
+                    ? `${slotOptions.filter((s) => new Date(s.slot_datetime).toLocaleString('ru-RU').includes(slotSearch)).length} из ${slotOptions.length}`
+                    : `${slotOptions.length} слотов`}
+                </p>
+              )}
             </Field>
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-3">

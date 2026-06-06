@@ -58,6 +58,17 @@ function Ok({ msg }) {
 
 const SLOTS_PAGE = 20;
 
+/** Converts ISO datetime string to datetime-local input value (YYYY-MM-DDTHH:mm). */
+function toDatetimeLocalValue(iso) {
+  if (!iso) return '';
+  try {
+    const d = new Date(iso);
+    if (!Number.isFinite(d.getTime())) return '';
+    const pad = (n) => String(n).padStart(2, '0');
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  } catch { return ''; }
+}
+
 function SlotsManagerModal({ open, eventId, onClose, onChanged }) {
   const [page, setPage] = useState(1);
   const [total, setTotal] = useState(0);
@@ -72,6 +83,11 @@ function SlotsManagerModal({ open, eventId, onClose, onChanged }) {
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [deleting, setDeleting] = useState(false);
   const [rowError, setRowError] = useState({}); // slotId → msg
+
+  const [selectedIds, setSelectedIds] = useState(new Set());
+  const [bulkForm, setBulkForm] = useState({ available_seats: '', booking_closes_minutes_before: '' });
+  const [bulkSaving, setBulkSaving] = useState(false);
+  const [bulkError, setBulkError] = useState('');
 
   const loadSlots = useCallback(async (p = 1, from = dateFrom, to = dateTo) => {
     if (!eventId) return;
@@ -96,7 +112,7 @@ function SlotsManagerModal({ open, eventId, onClose, onChanged }) {
   }, [eventId, dateFrom, dateTo]);
 
   useEffect(() => {
-    if (open) { setPage(1); setEditingId(null); setRowError({}); loadSlots(1, dateFrom, dateTo); }
+    if (open) { setPage(1); setEditingId(null); setRowError({}); setSelectedIds(new Set()); setBulkError(''); loadSlots(1, dateFrom, dateTo); }
   }, [open, eventId]);
 
   const handleToggle = async (slot) => {
@@ -112,25 +128,61 @@ function SlotsManagerModal({ open, eventId, onClose, onChanged }) {
 
   const openEdit = (slot) => {
     setEditingId(slot.id);
-    setEditForm({ available_seats: slot.available_seats, booking_closes_minutes_before: slot.booking_closes_minutes_before });
+    setEditForm({
+      available_seats: slot.available_seats,
+      booking_closes_minutes_before: slot.booking_closes_minutes_before,
+      slot_datetime: toDatetimeLocalValue(slot.slot_datetime),
+    });
     setRowError((p) => { const n = { ...p }; delete n[slot.id]; return n; });
   };
 
   const handleSaveEdit = async (slot) => {
     setSaving(slot.id);
     try {
+      const newDatetime = editForm.slot_datetime
+        ? new Date(editForm.slot_datetime).toISOString()
+        : slot.slot_datetime;
       await eventSlotAvailabilitiesAPI.update(slot.id, {
         available_seats: Number(editForm.available_seats ?? 0),
         booking_closes_minutes_before: Number(editForm.booking_closes_minutes_before ?? 0),
+        slot_datetime: newDatetime,
       });
       setSlots((prev) => prev.map((s) => s.id === slot.id
-        ? { ...s, available_seats: Number(editForm.available_seats), booking_closes_minutes_before: Number(editForm.booking_closes_minutes_before) }
+        ? { ...s, available_seats: Number(editForm.available_seats), booking_closes_minutes_before: Number(editForm.booking_closes_minutes_before), slot_datetime: newDatetime }
         : s));
       setEditingId(null);
       onChanged?.();
     } catch (e) {
       setRowError((p) => ({ ...p, [slot.id]: parseApiError(e, 'Ошибка сохранения') }));
     } finally { setSaving(null); }
+  };
+
+  const toggleSelect = (id) => setSelectedIds((prev) => {
+    const next = new Set(prev);
+    next.has(id) ? next.delete(id) : next.add(id);
+    return next;
+  });
+
+  const toggleSelectAll = () => setSelectedIds((prev) =>
+    prev.size === slots.length ? new Set() : new Set(slots.map((s) => s.id))
+  );
+
+  const handleBulkSave = async () => {
+    if (!selectedIds.size) return;
+    setBulkSaving(true); setBulkError('');
+    const patch = {};
+    if (bulkForm.available_seats !== '') patch.available_seats = Number(bulkForm.available_seats);
+    if (bulkForm.booking_closes_minutes_before !== '') patch.booking_closes_minutes_before = Number(bulkForm.booking_closes_minutes_before);
+    if (!Object.keys(patch).length) { setBulkError('Заполните хотя бы одно поле'); setBulkSaving(false); return; }
+    try {
+      await Promise.all([...selectedIds].map((id) => eventSlotAvailabilitiesAPI.update(id, patch)));
+      setSlots((prev) => prev.map((s) => selectedIds.has(s.id) ? { ...s, ...patch } : s));
+      setSelectedIds(new Set());
+      setBulkForm({ available_seats: '', booking_closes_minutes_before: '' });
+      onChanged?.();
+    } catch (e) {
+      setBulkError(parseApiError(e, 'Ошибка массового сохранения'));
+    } finally { setBulkSaving(false); }
   };
 
   const handleDelete = async () => {
@@ -177,11 +229,36 @@ function SlotsManagerModal({ open, eventId, onClose, onChanged }) {
           )}
         </div>
 
+        {/* Bulk action bar */}
+        {selectedIds.size > 0 && (
+          <div className="flex flex-wrap items-center gap-3 mb-3 px-3 py-2 bg-blue-50 border border-blue-200 rounded-xl text-sm">
+            <span className="text-blue-700 font-medium">{selectedIds.size} выбрано</span>
+            <input type="number" min={0} placeholder="Мест" value={bulkForm.available_seats}
+              onChange={(e) => setBulkForm((p) => ({ ...p, available_seats: e.target.value }))}
+              className="w-24 px-2 py-1 border border-blue-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+            <input type="number" min={0} placeholder="Закрытие (мин)" value={bulkForm.booking_closes_minutes_before}
+              onChange={(e) => setBulkForm((p) => ({ ...p, booking_closes_minutes_before: e.target.value }))}
+              className="w-36 px-2 py-1 border border-blue-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+            <button onClick={handleBulkSave} disabled={bulkSaving}
+              className="px-3 py-1 text-xs text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors">
+              {bulkSaving ? '…' : 'Применить'}
+            </button>
+            <button onClick={() => setSelectedIds(new Set())}
+              className="px-2 py-1 text-xs text-gray-500 hover:text-gray-700 transition-colors">Сбросить</button>
+            {bulkError && <span className="text-xs text-red-600">{bulkError}</span>}
+          </div>
+        )}
+
         {/* Table */}
         <div className="overflow-x-auto rounded-xl border border-gray-200">
           <table className="w-full text-sm">
             <thead className="bg-gray-50 text-xs text-gray-500 uppercase">
               <tr>
+                <th className="px-3 py-2 text-center w-8">
+                  <input type="checkbox" checked={slots.length > 0 && selectedIds.size === slots.length}
+                    onChange={toggleSelectAll}
+                    className="rounded border-gray-300 text-blue-600 focus:ring-blue-500" />
+                </th>
                 <th className="px-3 py-2 text-left">Дата и время</th>
                 <th className="px-3 py-2 text-right">Мест</th>
                 <th className="px-3 py-2 text-right">Закрытие (мин)</th>
@@ -201,8 +278,20 @@ function SlotsManagerModal({ open, eventId, onClose, onChanged }) {
                 const isSaving = saving === slot.id;
                 const err = rowError[slot.id];
                 return (
-                  <tr key={slot.id} className={`hover:bg-gray-50 ${!slot.is_active ? 'opacity-50' : ''}`}>
-                    <td className="px-3 py-2 font-mono text-xs text-gray-700 whitespace-nowrap">{fmtSlot(slot.slot_datetime)}</td>
+                  <tr key={slot.id} className={`hover:bg-gray-50 ${!slot.is_active ? 'opacity-50' : ''} ${selectedIds.has(slot.id) ? 'bg-blue-50' : ''}`}>
+                    <td className="px-3 py-2 text-center">
+                      <input type="checkbox" checked={selectedIds.has(slot.id)}
+                        onChange={() => toggleSelect(slot.id)}
+                        className="rounded border-gray-300 text-blue-600 focus:ring-blue-500" />
+                    </td>
+                    <td className="px-3 py-2 font-mono text-xs text-gray-700 whitespace-nowrap">
+                      {isEditing
+                        ? <input type="datetime-local" value={editForm.slot_datetime ?? ''}
+                            onChange={(e) => setEditForm((p) => ({ ...p, slot_datetime: e.target.value }))}
+                            className="px-2 py-1 border border-blue-300 rounded text-xs focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                        : fmtSlot(slot.slot_datetime)
+                      }
+                    </td>
                     <td className="px-3 py-2 text-right">
                       {isEditing
                         ? <input type="number" min={0} value={editForm.available_seats} onChange={(e) => setEditForm((p) => ({ ...p, available_seats: e.target.value }))}
@@ -336,6 +425,7 @@ export default function BookingSetupWorkbenchPage() {
   const [fillSaving, setFillSaving] = useState(false);
   const [fillError, setFillError] = useState('');
   const [fillOk, setFillOk] = useState('');
+  const [fillConfirm, setFillConfirm] = useState(null); // { slotIds, slotCount, ttLabel, price, currency }
 
   // ── base price form ──────────────────────────────────────────────────────
   const [showBpForm, setShowBpForm] = useState(false);
@@ -467,21 +557,39 @@ export default function BookingSetupWorkbenchPage() {
     if (!Number.isFinite(price) || price < 0) { setFillError('Введите корректную цену'); return; }
     try {
       setFillSaving(true);
-      // Load all slots for the event
       const r = await eventSlotAvailabilitiesAPI.list({ event: eventId, page_size: 1000, is_active: 'true' });
-      const slots = normalizeListResponse(r?.data, ['results', 'data']);
-      if (!slots.length) { setFillError('Нет активных слотов'); return; }
+      const activeSlots = normalizeListResponse(r?.data, ['results', 'data']);
+      if (!activeSlots.length) { setFillError('Нет активных слотов'); return; }
+      const tt = ticketTypes.find((t) => String(t.id) === String(fillTtId));
+      setFillConfirm({
+        slotIds: activeSlots.map((s) => s.id),
+        slotCount: activeSlots.length,
+        ttLabel: tt ? getTicketTypeLabel(tt) : fillTtId,
+        price,
+        currency: normalizeCurrency(fillCurrency),
+      });
+    } catch (err) { setFillError(parseApiError(err, 'Ошибка загрузки слотов')); }
+    finally { setFillSaving(false); }
+  };
+
+  const handleFillPricesConfirm = useCallback(async () => {
+    if (!fillConfirm) return;
+    const { slotIds, slotCount, price, currency } = fillConfirm;
+    setFillConfirm(null);
+    setFillError(''); setFillOk('');
+    try {
+      setFillSaving(true);
       await ticketPricesAPI.bulkCreate({
         event: eventId,
-        slot_ids: slots.map((s) => s.id),
+        slot_ids: slotIds,
         ticket_types: [fillTtId],
-        price, currency: normalizeCurrency(fillCurrency), is_active: true,
+        price, currency, is_active: true,
       });
-      setFillOk(`Готово: цены назначены для ${slots.length} слотов`);
+      setFillOk(`Готово: цены назначены для ${slotCount} слотов`);
       await loadCoverage(eventId, ticketTypes);
     } catch (err) { setFillError(parseApiError(err, 'Ошибка назначения цен')); }
     finally { setFillSaving(false); }
-  };
+  }, [fillConfirm, eventId, fillTtId, loadCoverage, ticketTypes]);
 
   const handleCreateBp = async (e) => {
     e.preventDefault();
@@ -665,17 +773,43 @@ export default function BookingSetupWorkbenchPage() {
                         <Field label="С даты" required><TextInput type="date" value={slotForm.schedule_start_date} onChange={(e) => setSlotForm((p) => ({ ...p, schedule_start_date: e.target.value }))} required /></Field>
                         <Field label="По дату" required><TextInput type="date" value={slotForm.schedule_end_date} onChange={(e) => setSlotForm((p) => ({ ...p, schedule_end_date: e.target.value }))} required /></Field>
                       </div>
-                      <div className="flex flex-wrap gap-3">
-                        {[['mon','Пн'],['tue','Вт'],['wed','Ср'],['thu','Чт'],['fri','Пт'],['sat','Сб'],['sun','Вс']].map(([k,l]) => (
-                          <label key={k} className="flex items-center gap-1.5 text-sm text-gray-700 cursor-pointer">
-                            <input type="checkbox" checked={!!slotForm.schedule_days[k]} onChange={(e) => setSlotForm((p) => ({ ...p, schedule_days: { ...p.schedule_days, [k]: e.target.checked } }))} />
-                            {l}
-                          </label>
-                        ))}
+                      <div className="space-y-2">
+                        <div className="flex flex-wrap gap-1.5">
+                          {[
+                            ['Пн–Пт', { mon:true, tue:true, wed:true, thu:true, fri:true, sat:false, sun:false }],
+                            ['Выходные', { mon:false, tue:false, wed:false, thu:false, fri:false, sat:true, sun:true }],
+                            ['Все', { mon:true, tue:true, wed:true, thu:true, fri:true, sat:true, sun:true }],
+                            ['Сбросить', { mon:false, tue:false, wed:false, thu:false, fri:false, sat:false, sun:false }],
+                          ].map(([label, days]) => (
+                            <button key={label} type="button"
+                              onClick={() => setSlotForm((p) => ({ ...p, schedule_days: days }))}
+                              className="px-2 py-1 text-xs rounded border border-gray-200 bg-gray-50 text-gray-600 hover:bg-gray-100 transition-colors">
+                              {label}
+                            </button>
+                          ))}
+                        </div>
+                        <div className="flex flex-wrap gap-3">
+                          {[['mon','Пн'],['tue','Вт'],['wed','Ср'],['thu','Чт'],['fri','Пт'],['sat','Сб'],['sun','Вс']].map(([k,l]) => (
+                            <label key={k} className="flex items-center gap-1.5 text-sm text-gray-700 cursor-pointer">
+                              <input type="checkbox" checked={!!slotForm.schedule_days[k]} onChange={(e) => setSlotForm((p) => ({ ...p, schedule_days: { ...p.schedule_days, [k]: e.target.checked } }))} />
+                              {l}
+                            </label>
+                          ))}
+                        </div>
                       </div>
                       <Field label="Время (HH:mm, по строке)" required>
                         <textarea rows={3} value={slotForm.schedule_times_text} onChange={(e) => setSlotForm((p) => ({ ...p, schedule_times_text: e.target.value }))}
                           className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm font-mono focus:ring-2 focus:ring-blue-500 outline-none" required />
+                        {(() => {
+                          const bad = slotForm.schedule_times_text.split('\n')
+                            .map((l, i) => ({ l: l.trim(), i: i + 1 }))
+                            .filter(({ l }) => l && !/^([01]\d|2[0-3]):([0-5]\d)$/.test(l));
+                          return bad.length > 0 ? (
+                            <p className="text-xs text-red-600 mt-1">
+                              Неверный формат в строках: {bad.map(({ l, i }) => `${i} («${l}»)`).join(', ')}
+                            </p>
+                          ) : null;
+                        })()}
                       </Field>
                     </div>
                   )}
@@ -838,6 +972,17 @@ export default function BookingSetupWorkbenchPage() {
         eventId={eventId}
         onClose={() => setShowSlotsManager(false)}
         onChanged={() => loadSlots(eventId)}
+      />
+
+      <ConfirmModal
+        open={!!fillConfirm}
+        onClose={() => setFillConfirm(null)}
+        onConfirm={handleFillPricesConfirm}
+        title="Подтвердите назначение цен"
+        message={fillConfirm
+          ? `Назначить цену ${fillConfirm.price} ${fillConfirm.currency} для типа «${fillConfirm.ttLabel}» на ${fillConfirm.slotCount} слотов? Существующие цены будут перезаписаны.`
+          : ''}
+        confirmLabel="Назначить"
       />
     </Layout>
   );
