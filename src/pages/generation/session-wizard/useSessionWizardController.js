@@ -5,6 +5,11 @@ import { useLayoutActions } from '../../../context/useLayoutActions';
 import { trackEvent } from '../../../utils/analytics';
 import { isNotFoundError, parseApiError } from '../../../utils/apiError';
 import {
+  pollGenerationTask,
+  isPollCancelledError,
+  TASK_NOT_FOUND_MESSAGE,
+} from '../../../utils/generationTaskPoll';
+import {
   removeFilterIdsFromTree,
   upsertEventFilterInTree,
 } from '../../../features/catalog/shared/normalize';
@@ -2013,6 +2018,7 @@ export function useSessionWizardController({ sessionId, confirm: confirmProp } =
   const [attractionGenerationDatabaseCityId, setAttractionGenerationDatabaseCityId] = useState('');
   const [attractionGenerationLang, setAttractionGenerationLang] = useState('ru');
   const attractionGenPollCancelledRef = useRef(false);
+  const attractionGenInFlightRef = useRef(false);
 
   const [ilGenerationOpen, setIlGenerationOpen] = useState(false);
   const [ilGenerationPrompt, setIlGenerationPrompt] = useState('');
@@ -2023,7 +2029,9 @@ export function useSessionWizardController({ sessionId, confirm: confirmProp } =
   const [ilGenerationSessionCityId, setIlGenerationSessionCityId] = useState('');
   const [ilGenerationDatabaseCityId, setIlGenerationDatabaseCityId] = useState('');
   const [ilGenerationLang, setIlGenerationLang] = useState('ru');
+  const [ilDedupeExistingLocations, setIlDedupeExistingLocations] = useState(true);
   const ilGenPollCancelledRef = useRef(false);
+  const ilGenInFlightRef = useRef(false);
 
   const [cityInfoGenerateModalOpen, setCityInfoGenerateModalOpen] = useState(false);
   const [cityInfoGeneratePrompt, setCityInfoGeneratePrompt] = useState('');
@@ -2033,6 +2041,7 @@ export function useSessionWizardController({ sessionId, confirm: confirmProp } =
   const [cityInfoGenerationTaskId, setCityInfoGenerationTaskId] = useState(null);
   const [cityInfoGenerationLang, setCityInfoGenerationLang] = useState('ru');
   const cityInfoGenPollCancelledRef = useRef(false);
+  const cityInfoGenInFlightRef = useRef(false);
 
   const [aiGenerationMode, setAiGenerationMode] = useState(DEFAULT_GENERATION_MODE);
   const [aiUseWebSearch, setAiUseWebSearch] = useState(false);
@@ -5817,6 +5826,7 @@ export function useSessionWizardController({ sessionId, confirm: confirmProp } =
 
   const closeAttractionGenerationModal = useCallback(() => {
     attractionGenPollCancelledRef.current = true;
+    attractionGenInFlightRef.current = false;
     setAttractionGenerationOpen(false);
     setAttractionGenerating(false);
     setAttractionGenerationTaskId(null);
@@ -5834,6 +5844,8 @@ export function useSessionWizardController({ sessionId, confirm: confirmProp } =
   }, []);
 
   const generateAttractionsFromPrompt = useCallback(async () => {
+    if (attractionGenerating || attractionGenInFlightRef.current) return;
+
     const prompt = attractionGenerationPrompt.trim();
     if (!prompt) {
       setAttractionGenerationError('Введите запрос');
@@ -5864,6 +5876,7 @@ export function useSessionWizardController({ sessionId, confirm: confirmProp } =
     const lang = (langRaw.split('-')[0] || 'ru').slice(0, 8) || 'ru';
 
     attractionGenPollCancelledRef.current = false;
+    attractionGenInFlightRef.current = true;
     setAttractionGenerating(true);
     setAttractionGenerationError('');
     setAttractionGenerationTaskId(null);
@@ -5884,25 +5897,11 @@ export function useSessionWizardController({ sessionId, confirm: confirmProp } =
       }
       setAttractionGenerationTaskId(taskId);
 
-      let pollDone = false;
-      while (!pollDone) {
-        if (attractionGenPollCancelledRef.current) {
-          return;
-        }
-        const tr = await tasksAPI.get(taskId);
-        const task = tr?.data;
-        if (task?.status === 'completed') {
-          pollDone = true;
-        } else if (task?.status === 'failed') {
-          const failedMsg =
-            task?.error_message ||
-            task?.result_data?.error ||
-            'Задача завершилась с ошибкой';
-          throw new Error(failedMsg);
-        } else {
-          await new Promise((r) => setTimeout(r, 1000));
-        }
-      }
+      await pollGenerationTask(taskId, {
+        tasksAPI,
+        maxWaitMs: 20 * 60 * 1000,
+        isCancelled: () => attractionGenPollCancelledRef.current,
+      });
 
       if (attractionGenPollCancelledRef.current) {
         return;
@@ -5922,12 +5921,14 @@ export function useSessionWizardController({ sessionId, confirm: confirmProp } =
         setAttractionGenerationTaskId(null);
       }
     } catch (e) {
-      if (!attractionGenPollCancelledRef.current) {
-        const msg = parseApiError(e, 'Ошибка генерации');
+      if (!attractionGenPollCancelledRef.current && !isPollCancelledError(e)) {
+        const msg = e?.message || parseApiError(e, TASK_NOT_FOUND_MESSAGE);
         setAttractionGenerationError(msg);
         showNote(msg, 'error');
       }
+      setAttractionGenerationTaskId(null);
     } finally {
+      attractionGenInFlightRef.current = false;
       setAttractionGenerating(false);
     }
   }, [
@@ -5984,6 +5985,7 @@ export function useSessionWizardController({ sessionId, confirm: confirmProp } =
 
   const closeCityInfoGenerateModal = useCallback(() => {
     cityInfoGenPollCancelledRef.current = true;
+    cityInfoGenInFlightRef.current = false;
     setCityInfoGenerateModalOpen(false);
     setCityInfoGenerating(false);
     setCityInfoGenerationTaskId(null);
@@ -5991,6 +5993,8 @@ export function useSessionWizardController({ sessionId, confirm: confirmProp } =
   }, []);
 
   const generateCityInfoFromPrompt = useCallback(async () => {
+    if (cityInfoGenerating || cityInfoGenInFlightRef.current) return;
+
     const prompt = cityInfoGeneratePrompt.trim();
     const userPrompt = prompt || 'Сгенерируй полезную информацию для туристов';
 
@@ -6011,6 +6015,7 @@ export function useSessionWizardController({ sessionId, confirm: confirmProp } =
     desired_items_count = Math.max(1, Math.min(20, desired_items_count));
 
     cityInfoGenPollCancelledRef.current = false;
+    cityInfoGenInFlightRef.current = true;
     setCityInfoGenerating(true);
     setCityInfoGenerationError('');
     setCityInfoGenerationTaskId(null);
@@ -6032,25 +6037,11 @@ export function useSessionWizardController({ sessionId, confirm: confirmProp } =
       }
       setCityInfoGenerationTaskId(taskId);
 
-      let pollDone = false;
-      while (!pollDone) {
-        if (cityInfoGenPollCancelledRef.current) {
-          return;
-        }
-        const tr = await tasksAPI.get(taskId);
-        const task = tr?.data;
-        if (task?.status === 'completed') {
-          pollDone = true;
-        } else if (task?.status === 'failed') {
-          const failedMsg =
-            task?.error_message ||
-            task?.result_data?.error ||
-            'Задача завершилась с ошибкой';
-          throw new Error(failedMsg);
-        } else {
-          await new Promise((r) => setTimeout(r, 1000));
-        }
-      }
+      await pollGenerationTask(taskId, {
+        tasksAPI,
+        maxWaitMs: 20 * 60 * 1000,
+        isCancelled: () => cityInfoGenPollCancelledRef.current,
+      });
 
       if (cityInfoGenPollCancelledRef.current) {
         return;
@@ -6076,12 +6067,14 @@ export function useSessionWizardController({ sessionId, confirm: confirmProp } =
         setCityInfoGenerationTaskId(null);
       }
     } catch (e) {
-      if (!cityInfoGenPollCancelledRef.current) {
-        const msg = parseApiError(e, 'Ошибка генерации');
+      if (!cityInfoGenPollCancelledRef.current && !isPollCancelledError(e)) {
+        const msg = e?.message || parseApiError(e, TASK_NOT_FOUND_MESSAGE);
         setCityInfoGenerationError(msg);
         showNote(msg, 'error');
       }
+      setCityInfoGenerationTaskId(null);
     } finally {
+      cityInfoGenInFlightRef.current = false;
       setCityInfoGenerating(false);
     }
   }, [
@@ -6770,6 +6763,7 @@ export function useSessionWizardController({ sessionId, confirm: confirmProp } =
 
   const closeIlGenerationModal = useCallback(() => {
     ilGenPollCancelledRef.current = true;
+    ilGenInFlightRef.current = false;
     setIlGenerationOpen(false);
     setIlGenerating(false);
     setIlGenerationTaskId(null);
@@ -6783,6 +6777,8 @@ export function useSessionWizardController({ sessionId, confirm: confirmProp } =
   }, []);
 
   const generateInteractiveLocationsFromPrompt = useCallback(async () => {
+    if (ilGenerating || ilGenInFlightRef.current) return;
+
     const prompt = ilGenerationPrompt.trim();
     if (!prompt) {
       setIlGenerationError('Введите запрос');
@@ -6814,6 +6810,7 @@ export function useSessionWizardController({ sessionId, confirm: confirmProp } =
     const languages = collectWizardLanguageCodes();
 
     ilGenPollCancelledRef.current = false;
+    ilGenInFlightRef.current = true;
     setIlGenerating(true);
     setIlGenerationError('');
     setIlGenerationTaskId(null);
@@ -6829,6 +6826,7 @@ export function useSessionWizardController({ sessionId, confirm: confirmProp } =
         assigned_city_type,
         session_city_id: assigned_city_type === 'draft' ? session_city_id : null,
         city_id: assigned_city_type === 'database' ? city_id : null,
+        dedupe_existing_locations: ilDedupeExistingLocations,
         ...buildGenerationPayloadFields(aiGenerationMode, aiUseWebSearch),
       });
       const taskId = startRes?.data?.task_id;
@@ -6837,28 +6835,17 @@ export function useSessionWizardController({ sessionId, confirm: confirmProp } =
       }
       setIlGenerationTaskId(taskId);
 
-      let pollDone = false;
-      while (!pollDone) {
-        if (ilGenPollCancelledRef.current) return;
-        const tr = await tasksAPI.get(taskId);
-        const task = tr?.data;
-        if (task?.status === 'completed') {
-          pollDone = true;
-        } else if (task?.status === 'failed') {
-          const failedMsg =
-            task?.error_message ||
-            task?.result_data?.error ||
-            'Задача завершилась с ошибкой';
-          throw new Error(failedMsg);
-        } else {
-          await new Promise((r) => setTimeout(r, 1000));
-        }
-      }
+      await pollGenerationTask(taskId, {
+        tasksAPI,
+        maxWaitMs: 20 * 60 * 1000,
+        isCancelled: () => ilGenPollCancelledRef.current,
+      });
 
       if (ilGenPollCancelledRef.current) return;
 
       const createRes = await aiAPI.interactiveLocationsCreateFromTask(taskId, {
         session_id: sessionId,
+        dedupe_existing_locations: ilDedupeExistingLocations,
       });
       const createData = createRes?.data || {};
       const list = createData.interactive_locations || [];
@@ -6868,7 +6855,14 @@ export function useSessionWizardController({ sessionId, confirm: confirmProp } =
           : Array.isArray(list)
             ? list.length
             : 0;
-      const skippedDuplicates = createData.skipped_duplicates_count || 0;
+      const requestedCount = createData.requested_count;
+      const dedupeExisting = createData.dedupe_existing_locations !== false;
+      const skippedExistingDuplicates = createData.skipped_existing_duplicates_count || 0;
+      const skippedBatchDuplicates = createData.skipped_batch_duplicates_count || 0;
+      const skippedInvalid = createData.skipped_invalid_count || 0;
+      const refillAttempts = createData.refill_attempts || 0;
+      const partial = Boolean(createData.partial);
+      const warning = createData.warning;
 
       const keepDraft = normalizeDraftId(activeCityDraftIdRef.current);
       await loadSession(keepDraft);
@@ -6877,22 +6871,45 @@ export function useSessionWizardController({ sessionId, confirm: confirmProp } =
         if (createdCount > 0 && list[0]?.id) {
           await openIlDetail(list[0].id);
         }
-        let successMsg = `Создано: ${createdCount}.`;
-        if (skippedDuplicates > 0) {
-          successMsg += ` Пропущено дублей: ${skippedDuplicates}.`;
+
+        if (partial && warning) {
+          showNote(warning, 'warning');
         }
-        showNote(successMsg, 'success');
+        let successMsg = `Создано: ${createdCount}`;
+        if (typeof requestedCount === 'number') {
+          successMsg += ` из ${requestedCount}`;
+        }
+        if (dedupeExisting) {
+          if (skippedExistingDuplicates > 0) {
+            successMsg += `. Пропущено дублей с существующими: ${skippedExistingDuplicates}`;
+          }
+        } else {
+          successMsg += '. Дубли с существующими разрешены';
+        }
+        if (skippedBatchDuplicates > 0) {
+          successMsg += `. Пропущено повторов в ответе AI: ${skippedBatchDuplicates}`;
+        }
+        if (skippedInvalid > 0) {
+          successMsg += `. Пропущено без координат: ${skippedInvalid}`;
+        }
+        if (refillAttempts > 0) {
+          successMsg += `. Догенерация: ${refillAttempts} попыток`;
+        }
+        showNote(successMsg, partial ? 'warning' : 'success');
+
         setIlGenerationOpen(false);
         setIlGenerationPrompt('');
         setIlGenerationTaskId(null);
       }
     } catch (e) {
-      if (!ilGenPollCancelledRef.current) {
-        const msg = parseApiError(e, 'Ошибка генерации');
+      if (!ilGenPollCancelledRef.current && !isPollCancelledError(e)) {
+        const msg = e?.message || parseApiError(e, TASK_NOT_FOUND_MESSAGE);
         setIlGenerationError(msg);
         showNote(msg, 'error');
       }
+      setIlGenerationTaskId(null);
     } finally {
+      ilGenInFlightRef.current = false;
       setIlGenerating(false);
     }
   }, [
@@ -6902,6 +6919,7 @@ export function useSessionWizardController({ sessionId, confirm: confirmProp } =
     ilGenerationSessionCityId,
     ilGenerationDatabaseCityId,
     ilGenerationLang,
+    ilDedupeExistingLocations,
     aiGenerationMode,
     aiUseWebSearch,
     collectWizardLanguageCodes,
@@ -7262,6 +7280,7 @@ export function useSessionWizardController({ sessionId, confirm: confirmProp } =
     toggleCurrentIlTag, handleIlPhotoFile,
     ilGenerationOpen, ilGenerationPrompt, ilGenerating, ilGenerationTaskId, ilGenerationError,
     ilGenerationAssignedCityType, ilGenerationSessionCityId, ilGenerationDatabaseCityId, ilGenerationLang,
+    ilDedupeExistingLocations, setIlDedupeExistingLocations,
     openIlGenerationModal, closeIlGenerationModal, setIlGenerationPrompt,
     setIlGenerationAssignedCityTypeSafe, setIlGenerationSessionCityId, setIlGenerationDatabaseCityId,
     setIlGenerationLang, generateInteractiveLocationsFromPrompt,

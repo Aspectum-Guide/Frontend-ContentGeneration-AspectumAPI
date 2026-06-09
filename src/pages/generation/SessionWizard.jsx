@@ -265,6 +265,7 @@ export default function SessionWizard({ components = {} } = {}) {
     ilGenerationSessionCityId,
     ilGenerationDatabaseCityId,
     ilGenerationLang,
+    ilDedupeExistingLocations,
     openIlGenerationModal,
     closeIlGenerationModal,
     setIlGenerationPrompt,
@@ -272,6 +273,7 @@ export default function SessionWizard({ components = {} } = {}) {
     setIlGenerationSessionCityId,
     setIlGenerationDatabaseCityId,
     setIlGenerationLang,
+    setIlDedupeExistingLocations,
     generateInteractiveLocationsFromPrompt,
     setIlView,
     setCurrentIl,
@@ -1140,6 +1142,8 @@ export default function SessionWizard({ components = {} } = {}) {
             ilGenerationSessionCityId={ilGenerationSessionCityId}
             ilGenerationDatabaseCityId={ilGenerationDatabaseCityId}
             ilGenerationLang={ilGenerationLang}
+            ilDedupeExistingLocations={ilDedupeExistingLocations}
+            onIlDedupeExistingLocationsChange={setIlDedupeExistingLocations}
             onOpenIlGenerationModal={openIlGenerationModal}
             onCloseIlGenerationModal={closeIlGenerationModal}
             onIlGenerationPromptChange={setIlGenerationPrompt}

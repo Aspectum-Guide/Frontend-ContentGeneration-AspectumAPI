@@ -6,8 +6,14 @@ import AiGenerationQualitySettings, {
   DEFAULT_GENERATION_MODE,
   buildGenerationPayloadFields,
 } from '../../components/generation/AiGenerationQualitySettings.jsx';
+import {
+  pollGenerationTask,
+  isPollCancelledError,
+  TASK_NOT_FOUND_MESSAGE,
+} from '../../utils/generationTaskPoll';
 
 const POLL_INTERVAL = 4000;
+const POLL_MAX_WAIT_MS = 20 * 60 * 1000;
 
 const SOURCE_LANGUAGES = [
   { value: 'ru', label: 'Русский' },
@@ -70,10 +76,13 @@ export default function CityGeneration() {
   const [creatingSessions, setCreatingSessions] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(null);
 
-  const pollRef = useRef(null);
+  const pollCancelledRef = useRef(false);
+  const generationInFlightRef = useRef(false);
 
   useEffect(() => {
-    return () => clearInterval(pollRef.current);
+    return () => {
+      pollCancelledRef.current = true;
+    };
   }, []);
 
   useEffect(() => {
@@ -106,48 +115,54 @@ export default function CityGeneration() {
     };
   }, []);
 
-  const pollTask = (id) => {
-    clearInterval(pollRef.current);
-
-    pollRef.current = setInterval(async () => {
-      try {
-        const r = await tasksAPI.get(id);
-        const data = r?.data;
-
-        setTaskStatus(data);
-
-        if (
-          data?.status === 'completed' ||
-          data?.status === 'failed' ||
-          data?.status === 'cancelled'
-        ) {
-          clearInterval(pollRef.current);
-          setLoading(false);
-
-          if (data?.status === 'completed' && data?.result_data) {
-            setResult(data.result_data);
-          }
-        }
-      } catch {
-        clearInterval(pollRef.current);
-        setLoading(false);
+  const runPoll = async (id) => {
+    pollCancelledRef.current = false;
+    try {
+      const task = await pollGenerationTask(id, {
+        tasksAPI,
+        intervalMs: POLL_INTERVAL,
+        maxWaitMs: POLL_MAX_WAIT_MS,
+        isCancelled: () => pollCancelledRef.current,
+        onProgress: (data) => setTaskStatus(data),
+      });
+      setTaskStatus(task);
+      if (task?.result_data) {
+        setResult(task.result_data);
       }
-    }, POLL_INTERVAL);
+    } catch (err) {
+      if (isPollCancelledError(err)) {
+        return;
+      }
+      const message = err?.message || TASK_NOT_FOUND_MESSAGE;
+      setError(message);
+      setTaskStatus((prev) => ({
+        ...(prev || {}),
+        status: 'failed',
+        error_message: message,
+        current_step: `Ошибка: ${message}`,
+      }));
+      setTaskId(null);
+    } finally {
+      setLoading(false);
+      generationInFlightRef.current = false;
+    }
   };
 
   const handleStart = async (e) => {
     e.preventDefault();
 
-    if (!prompt.trim()) return;
+    if (!prompt.trim() || loading || generationInFlightRef.current) return;
+
+    generationInFlightRef.current = true;
+    pollCancelledRef.current = false;
+    setLoading(true);
+    setError(null);
+    setResult(null);
+    setTaskStatus(null);
+    setTaskId(null);
+    setSaveSuccess(null);
 
     try {
-      setLoading(true);
-      setError(null);
-      setResult(null);
-      setTaskStatus(null);
-      setTaskId(null);
-      setSaveSuccess(null);
-
       const payload = {
         prompt: prompt.trim(),
         with_images: false,
@@ -163,18 +178,21 @@ export default function CityGeneration() {
       if (id) {
         setTaskId(id);
         setTaskStatus({
-          status: 'running',
+          status: 'processing',
           progress: 0,
           current_step: 'Запуск...',
         });
-        pollTask(id);
+        await runPoll(id);
       } else {
         setResult(data);
         setLoading(false);
+        generationInFlightRef.current = false;
       }
     } catch (err) {
       setError(err?.response?.data?.error || err.message || 'Ошибка генерации');
       setLoading(false);
+      setTaskId(null);
+      generationInFlightRef.current = false;
     }
   };
 
@@ -214,7 +232,7 @@ export default function CityGeneration() {
     }
   };
 
-  const isRunning = loading && taskId;
+  const isRunning = loading;
   const isDone = taskStatus?.status === 'completed';
   const isFailed = taskStatus?.status === 'failed';
   const progress = taskStatus?.progress ?? null;

@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import AiGenerationModal, { WizardGenerationActionFooter } from '../../../components/generation/AiGenerationModal.jsx';
 import AiGenerationQualitySettings from '../../../components/generation/AiGenerationQualitySettings.jsx';
 import { getAttrName, getFlag, getSessionEntityImagePreview, resolveSessionEntityImageOriginalUrl, resolveSessionEntityImageCopyright } from './sessionWizardShared.jsx';
 import SessionWizardAttractionTagsPicker from './SessionWizardAttractionTagsPicker.jsx';
@@ -561,195 +562,182 @@ export default function SessionWizardAttractionsStep({
 
   return (
     <div>
-      {attractionGenerationOpen && (
-        <div
-          className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 p-4"
-          onClick={() => {
-            if (!attractionGenerating) onCloseAttractionGenerationModal?.();
-          }}
-        >
-          <div
-            className="bg-white rounded-xl max-w-lg w-full p-6 shadow-xl space-y-4 relative"
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="attraction-gen-title"
-            onClick={(e) => e.stopPropagation()}
-          >
-            {attractionGenerating && (
-              <div className="absolute inset-0 bg-white/70 rounded-xl flex items-center justify-center z-10">
-                <div className="text-sm text-gray-700 font-medium">Генерация…</div>
-              </div>
-            )}
-
-            <h2 id="attraction-gen-title" className="text-lg font-semibold text-gray-900">
-              Сгенерировать достопримечательности
-            </h2>
-
-            <p className="text-sm text-gray-600">{attractionGenBindingHint}</p>
-
-            <div className="space-y-3">
-              <div>
-                <label
-                  htmlFor="attraction-gen-city-binding"
-                  className="block text-sm font-medium text-gray-700 mb-1"
-                >
-                  Привязка к городу
-                </label>
-                <select
-                  id="attraction-gen-city-binding"
-                  value={attractionGenerationAssignedCityType}
-                  onChange={(e) =>
-                    onAttractionGenerationAssignedCityTypeChange?.(e.target.value)
-                  }
-                  disabled={attractionGenerating}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
-                >
-                  <option value="none">Без города</option>
-                  <option value="draft">Город из сессии</option>
-                  <option value="database">Город из базы</option>
-                </select>
-              </div>
-
-              {attractionGenerationAssignedCityType === 'draft' && (
-                <div>
-                  <label
-                    htmlFor="attraction-gen-session-city"
-                    className="block text-sm font-medium text-gray-700 mb-1"
-                  >
-                    Черновик города в сессии
-                  </label>
-                  <select
-                    id="attraction-gen-session-city"
-                    value={attractionGenerationSessionCityId || ''}
-                    onChange={(e) =>
-                      onAttractionGenerationSessionCityIdChange?.(e.target.value)
-                    }
-                    disabled={attractionGenerating}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
-                  >
-                    <option value="">— Выберите —</option>
-                    {sessionDraftsForAi.map((draft) => (
-                      <option key={String(draft.id)} value={String(draft.id)}>
-                        {getDraftCityDisplayName(draft)}
-                      </option>
-                    ))}
-                  </select>
-                  {sessionDraftsForAi.length === 0 && (
-                    <p className="text-xs text-amber-700 mt-1">
-                      Нет черновиков города (кроме унаследованной строки). Создайте черновик на шаге «Город».
-                    </p>
-                  )}
-                </div>
-              )}
-
-              {attractionGenerationAssignedCityType === 'database' && (
-                <div>
-                  <label
-                    htmlFor="attraction-gen-db-city"
-                    className="block text-sm font-medium text-gray-700 mb-1"
-                  >
-                    Город из базы
-                  </label>
-                  <select
-                    id="attraction-gen-db-city"
-                    value={attractionGenerationDatabaseCityId || ''}
-                    onChange={(e) =>
-                      onAttractionGenerationDatabaseCityIdChange?.(e.target.value)
-                    }
-                    disabled={attractionGenerating}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
-                  >
-                    <option value="">— Выберите —</option>
-                    {(referenceCities || []).map((city) => (
-                      <option key={normalizeId(city.id)} value={normalizeId(city.id)}>
-                        {getCityDisplayName(city)}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              )}
-
-              <div>
-                <label
-                  htmlFor="attraction-gen-lang"
-                  className="block text-sm font-medium text-gray-700 mb-1"
-                >
-                  Язык генерации
-                </label>
-                <select
-                  id="attraction-gen-lang"
-                  value={attractionGenerationLang || 'ru'}
-                  onChange={(e) => onAttractionGenerationLangChange?.(e.target.value)}
-                  disabled={attractionGenerating}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
-                >
-                  {AI_GENERATION_LANG_OPTIONS.map((opt) => (
-                    <option key={opt.value} value={opt.value}>
-                      {opt.label}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            </div>
-
-            {attractionGenerationTaskId && (
-              <div className="text-xs text-gray-500">
-                Задача:{' '}
-                <span className="font-mono text-gray-700">
-                  {String(attractionGenerationTaskId).slice(0, 8)}…
-                </span>
-              </div>
-            )}
-
-            {attractionGenerationError && (
-              <div className="text-sm text-red-700 bg-red-50 border border-red-200 rounded-lg p-3">
-                {attractionGenerationError}
-              </div>
-            )}
-
-            <AiGenerationQualitySettings
-              generationMode={aiGenerationMode}
-              onGenerationModeChange={onAiGenerationModeChange}
-              useWebSearch={aiUseWebSearch}
-              onUseWebSearchChange={onAiUseWebSearchChange}
+      <AiGenerationModal
+        open={attractionGenerationOpen}
+        onBackdropClick={() => {
+          if (!attractionGenerating) onCloseAttractionGenerationModal?.();
+        }}
+        titleId="attraction-gen-title"
+        busy={attractionGenerating}
+        footer={(
+          <WizardGenerationActionFooter>
+            <button
+              type="button"
+              onClick={() => onCloseAttractionGenerationModal?.()}
               disabled={attractionGenerating}
-              advancedDisabled={!aiAdvancedGenerationAvailable}
-            />
+              className="px-4 py-2 text-sm font-medium text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50"
+            >
+              Отмена
+            </button>
+            <button
+              type="button"
+              onClick={() => onGenerateAttractionsFromPrompt?.()}
+              disabled={attractionGenerating || !attractionGenCanSubmit}
+              className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-50"
+            >
+              Сгенерировать
+            </button>
+          </WizardGenerationActionFooter>
+        )}
+      >
+        <h2 id="attraction-gen-title" className="text-lg font-semibold text-gray-900">
+          Сгенерировать достопримечательности
+        </h2>
 
-            <label className="block text-sm font-medium text-gray-700" htmlFor="attraction-gen-prompt">
-              Запрос к ИИ
+        <p className="text-sm text-gray-600">{attractionGenBindingHint}</p>
+
+        <div className="space-y-3">
+          <div>
+            <label
+              htmlFor="attraction-gen-city-binding"
+              className="block text-sm font-medium text-gray-700 mb-1"
+            >
+              Привязка к городу
             </label>
-            <textarea
-              id="attraction-gen-prompt"
-              rows={5}
-              value={attractionGenerationPrompt}
-              onChange={(e) => onAttractionGenerationPromptChange?.(e.target.value)}
+            <select
+              id="attraction-gen-city-binding"
+              value={attractionGenerationAssignedCityType}
+              onChange={(e) =>
+                onAttractionGenerationAssignedCityTypeChange?.(e.target.value)
+              }
               disabled={attractionGenerating}
-              placeholder="Например: Сгенерируй 10 достопримечательностей города, включая название, краткое описание и при возможности координаты."
               className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
-            />
+            >
+              <option value="none">Без города</option>
+              <option value="draft">Город из сессии</option>
+              <option value="database">Город из базы</option>
+            </select>
+          </div>
 
-            <div className="flex justify-end gap-2 pt-2">
-              <button
-                type="button"
-                onClick={() => onCloseAttractionGenerationModal?.()}
+          {attractionGenerationAssignedCityType === 'draft' && (
+            <div>
+              <label
+                htmlFor="attraction-gen-session-city"
+                className="block text-sm font-medium text-gray-700 mb-1"
+              >
+                Черновик города в сессии
+              </label>
+              <select
+                id="attraction-gen-session-city"
+                value={attractionGenerationSessionCityId || ''}
+                onChange={(e) =>
+                  onAttractionGenerationSessionCityIdChange?.(e.target.value)
+                }
                 disabled={attractionGenerating}
-                className="px-4 py-2 text-sm font-medium text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
               >
-                Отмена
-              </button>
-              <button
-                type="button"
-                onClick={() => onGenerateAttractionsFromPrompt?.()}
-                disabled={attractionGenerating || !attractionGenCanSubmit}
-                className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-50"
-              >
-                Сгенерировать
-              </button>
+                <option value="">— Выберите —</option>
+                {sessionDraftsForAi.map((draft) => (
+                  <option key={String(draft.id)} value={String(draft.id)}>
+                    {getDraftCityDisplayName(draft)}
+                  </option>
+                ))}
+              </select>
+              {sessionDraftsForAi.length === 0 && (
+                <p className="text-xs text-amber-700 mt-1">
+                  Нет черновиков города (кроме унаследованной строки). Создайте черновик на шаге «Город».
+                </p>
+              )}
             </div>
+          )}
+
+          {attractionGenerationAssignedCityType === 'database' && (
+            <div>
+              <label
+                htmlFor="attraction-gen-db-city"
+                className="block text-sm font-medium text-gray-700 mb-1"
+              >
+                Город из базы
+              </label>
+              <select
+                id="attraction-gen-db-city"
+                value={attractionGenerationDatabaseCityId || ''}
+                onChange={(e) =>
+                  onAttractionGenerationDatabaseCityIdChange?.(e.target.value)
+                }
+                disabled={attractionGenerating}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
+              >
+                <option value="">— Выберите —</option>
+                {(referenceCities || []).map((city) => (
+                  <option key={normalizeId(city.id)} value={normalizeId(city.id)}>
+                    {getCityDisplayName(city)}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
+
+          <div>
+            <label
+              htmlFor="attraction-gen-lang"
+              className="block text-sm font-medium text-gray-700 mb-1"
+            >
+              Язык генерации
+            </label>
+            <select
+              id="attraction-gen-lang"
+              value={attractionGenerationLang || 'ru'}
+              onChange={(e) => onAttractionGenerationLangChange?.(e.target.value)}
+              disabled={attractionGenerating}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
+            >
+              {AI_GENERATION_LANG_OPTIONS.map((opt) => (
+                <option key={opt.value} value={opt.value}>
+                  {opt.label}
+                </option>
+              ))}
+            </select>
           </div>
         </div>
-      )}
+
+        {attractionGenerationTaskId && (
+          <div className="text-xs text-gray-500">
+            Задача:{' '}
+            <span className="font-mono text-gray-700">
+              {String(attractionGenerationTaskId).slice(0, 8)}…
+            </span>
+          </div>
+        )}
+
+        {attractionGenerationError && (
+          <div className="text-sm text-red-700 bg-red-50 border border-red-200 rounded-lg p-3">
+            {attractionGenerationError}
+          </div>
+        )}
+
+        <AiGenerationQualitySettings
+          generationMode={aiGenerationMode}
+          onGenerationModeChange={onAiGenerationModeChange}
+          useWebSearch={aiUseWebSearch}
+          onUseWebSearchChange={onAiUseWebSearchChange}
+          disabled={attractionGenerating}
+          advancedDisabled={!aiAdvancedGenerationAvailable}
+        />
+
+        <label className="block text-sm font-medium text-gray-700" htmlFor="attraction-gen-prompt">
+          Запрос к ИИ
+        </label>
+        <textarea
+          id="attraction-gen-prompt"
+          rows={5}
+          value={attractionGenerationPrompt}
+          onChange={(e) => onAttractionGenerationPromptChange?.(e.target.value)}
+          disabled={attractionGenerating}
+          placeholder="Например: Сгенерируй 10 достопримечательностей города, включая название, краткое описание и при возможности координаты."
+          className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
+        />
+      </AiGenerationModal>
 
       {attrView === 'list' ? (
         <div className="space-y-4">
