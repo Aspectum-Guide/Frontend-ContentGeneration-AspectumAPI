@@ -1,12 +1,282 @@
-import { useCallback, useEffect, useState } from 'react';
+import 'leaflet/dist/leaflet.css';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { ilCatalogAPI } from '../../../api/generation';
 import Layout from '../../../components/Layout';
 import DataTable from '../../../components/ui/DataTable';
+import { Field, TextInput, Textarea } from '../../../components/ui/FormField';
+import Modal, { ConfirmModal } from '../../../components/ui/Modal';
 import { useLayoutActions } from '../../../context/useLayoutActions';
 import { parseApiError } from '../../../utils/apiError';
-import { getMultiLangValue } from '../shared/i18n';
+import { buildLangOptions, getMultiLangValue } from '../shared/i18n';
+import { LangBlock, LangTabs } from '../shared/LangFields';
 
 const PAGE_SIZE = 20;
+const ALL_LANGS = ['ru', 'en', 'it', 'fr', 'de', 'es'];
+
+const parseCoord = (v) => { const n = Number(v); return Number.isFinite(n) ? n : null; };
+
+function ILEditorModal({ open, onClose, location, onSaved, cityOptions }) {
+  const isNew = !location?.id;
+
+  const [activeLang, setActiveLang] = useState('ru');
+  const [form, setForm] = useState({ title: {}, description: {}, lat: '', lon: '', index: 0, is_show: true, city_id: '' });
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
+  const [activeTab, setActiveTab] = useState('content');
+
+  const mapElRef = useRef(null);
+  const mapRef = useRef(null);
+  const markerRef = useRef(null);
+  const leafletRef = useRef(null);
+
+  useEffect(() => {
+    if (!open) return;
+    if (isNew) {
+      setForm({ title: {}, description: {}, lat: '', lon: '', index: 0, is_show: true, city_id: '' });
+    } else {
+      setForm({
+        title: location.title || {},
+        description: location.description || {},
+        lat: location.lat ?? '',
+        lon: location.lon ?? '',
+        index: location.index ?? 0,
+        is_show: location.is_show ?? true,
+        city_id: location.city_id ? String(location.city_id) : '',
+      });
+    }
+    setError('');
+    setActiveTab('content');
+    setActiveLang('ru');
+  }, [open, location?.id]);
+
+  // Map init on tab switch
+  useEffect(() => {
+    const initMap = async () => {
+      if (!open || activeTab !== 'map' || !mapElRef.current || mapRef.current) return;
+      const { default: L } = await import('leaflet');
+      leafletRef.current = L;
+      if (L.Icon?.Default) {
+        L.Icon.Default.mergeOptions({
+          iconUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
+          iconRetinaUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png',
+          shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
+        });
+      }
+      const lat = parseCoord(form.lat);
+      const lon = parseCoord(form.lon);
+      const map = L.map(mapElRef.current).setView(
+        lat != null && lon != null ? [lat, lon] : [41.9028, 12.4964],
+        lat != null && lon != null ? 13 : 5,
+      );
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 }).addTo(map);
+      map.on('click', (e) => {
+        setForm((p) => ({ ...p, lat: Number(e.latlng.lat.toFixed(6)), lon: Number(e.latlng.lng.toFixed(6)) }));
+      });
+      mapRef.current = map;
+      if (lat != null && lon != null) {
+        markerRef.current = L.marker([lat, lon]).addTo(map);
+      }
+      setTimeout(() => map.invalidateSize(), 50);
+    };
+    initMap();
+  }, [open, activeTab]);
+
+  useEffect(() => {
+    const map = mapRef.current;
+    const L = leafletRef.current;
+    if (!map || !L || activeTab !== 'map') return;
+    const lat = parseCoord(form.lat);
+    const lon = parseCoord(form.lon);
+    if (lat == null || lon == null) {
+      if (markerRef.current) { map.removeLayer(markerRef.current); markerRef.current = null; }
+      return;
+    }
+    if (!markerRef.current) {
+      markerRef.current = L.marker([lat, lon]).addTo(map);
+    } else {
+      markerRef.current.setLatLng([lat, lon]);
+    }
+    map.setView([lat, lon], Math.max(map.getZoom(), 13));
+  }, [form.lat, form.lon, activeTab]);
+
+  // Reset map on close
+  useEffect(() => {
+    if (!open) {
+      mapRef.current?.remove();
+      mapRef.current = null;
+      markerRef.current = null;
+    }
+  }, [open]);
+
+  const langOptions = buildLangOptions(Object.keys(form.title || {}).filter(Boolean).length
+    ? Object.keys(form.title)
+    : ALL_LANGS.slice(0, 2));
+
+  const handleSave = async (e) => {
+    e.preventDefault();
+    if (!Object.values(form.title).some((v) => v?.trim())) {
+      setError('Введите название хотя бы на одном языке');
+      return;
+    }
+    setSaving(true); setError('');
+    try {
+      const payload = {
+        title: form.title,
+        description: form.description,
+        lat: parseCoord(form.lat),
+        lon: parseCoord(form.lon),
+        index: Number(form.index || 0),
+        is_show: form.is_show,
+        ...(form.city_id ? { city_id: form.city_id } : {}),
+      };
+      if (isNew) {
+        await ilCatalogAPI.create(payload);
+      } else {
+        await ilCatalogAPI.update(location.id, payload);
+      }
+      onSaved();
+    } catch (err) {
+      setError(parseApiError(err, 'Ошибка сохранения'));
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const tabs = [
+    { key: 'content', label: 'Контент' },
+    { key: 'map', label: 'Карта' },
+    { key: 'settings', label: 'Настройки' },
+  ];
+
+  return (
+    <Modal open={open} onClose={onClose} title={isNew ? 'Новая локация' : 'Редактировать локацию'} size="lg">
+      <div className="flex gap-2 mb-4 border-b border-gray-100 pb-3">
+        {tabs.map((tab) => (
+          <button
+            key={tab.key}
+            type="button"
+            onClick={() => setActiveTab(tab.key)}
+            className={`px-3 py-1.5 text-sm font-medium rounded-lg transition-colors ${
+              activeTab === tab.key ? 'bg-blue-50 text-blue-700' : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'
+            }`}
+          >
+            {tab.label}
+          </button>
+        ))}
+      </div>
+
+      <form onSubmit={handleSave}>
+        {activeTab === 'content' && (
+          <div className="space-y-4">
+            <LangTabs
+              active={activeLang}
+              onSwitch={setActiveLang}
+              value={form.title}
+              onChangeValue={(v) => setForm((p) => ({ ...p, title: v }))}
+              langOptions={langOptions}
+            />
+            <LangBlock
+              label="Название"
+              value={form.title}
+              onChange={(v) => setForm((p) => ({ ...p, title: v }))}
+              activeLang={activeLang}
+              required
+            />
+            <LangBlock
+              label="Описание"
+              value={form.description}
+              onChange={(v) => setForm((p) => ({ ...p, description: v }))}
+              activeLang={activeLang}
+              multiline
+              rows={4}
+            />
+          </div>
+        )}
+
+        {activeTab === 'map' && (
+          <div className="space-y-3">
+            <div className="grid grid-cols-2 gap-3">
+              <Field label="Широта (lat)">
+                <TextInput
+                  type="number"
+                  step="any"
+                  value={form.lat}
+                  onChange={(e) => setForm((p) => ({ ...p, lat: e.target.value }))}
+                  placeholder="41.902800"
+                />
+              </Field>
+              <Field label="Долгота (lon)">
+                <TextInput
+                  type="number"
+                  step="any"
+                  value={form.lon}
+                  onChange={(e) => setForm((p) => ({ ...p, lon: e.target.value }))}
+                  placeholder="12.496400"
+                />
+              </Field>
+            </div>
+            <p className="text-xs text-gray-400">Кликните по карте чтобы выбрать точку</p>
+            <div ref={mapElRef} className="w-full h-72 rounded-xl border border-gray-200 overflow-hidden" />
+          </div>
+        )}
+
+        {activeTab === 'settings' && (
+          <div className="space-y-4">
+            <div className="grid grid-cols-2 gap-3">
+              <Field label="Индекс (порядок)">
+                <TextInput
+                  type="number"
+                  min={0}
+                  value={form.index}
+                  onChange={(e) => setForm((p) => ({ ...p, index: +e.target.value || 0 }))}
+                />
+              </Field>
+              <Field label="Город">
+                <select
+                  value={form.city_id}
+                  onChange={(e) => setForm((p) => ({ ...p, city_id: e.target.value }))}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+                >
+                  <option value="">— не выбран —</option>
+                  {cityOptions.map((c) => (
+                    <option key={c.id} value={String(c.id)}>{c.name}</option>
+                  ))}
+                </select>
+              </Field>
+            </div>
+            <label className="flex items-center gap-2 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={form.is_show}
+                onChange={(e) => setForm((p) => ({ ...p, is_show: e.target.checked }))}
+                className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+              />
+              <span className="text-sm text-gray-700">Показывать в приложении</span>
+            </label>
+          </div>
+        )}
+
+        <div className="flex items-center gap-3 mt-5 pt-4 border-t border-gray-100">
+          <button
+            type="submit"
+            disabled={saving}
+            className="px-5 py-2 text-sm text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors"
+          >
+            {saving ? 'Сохранение…' : isNew ? 'Создать' : 'Сохранить'}
+          </button>
+          <button
+            type="button"
+            onClick={onClose}
+            className="px-4 py-2 text-sm text-gray-600 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
+          >
+            Отмена
+          </button>
+          {error && <p className="text-xs text-red-600 bg-red-50 rounded px-2 py-1">{error}</p>}
+        </div>
+      </form>
+    </Modal>
+  );
+}
 
 export default function InteractiveLocationsCatalogPage() {
   const { setMobileActions } = useLayoutActions();
@@ -22,7 +292,11 @@ export default function InteractiveLocationsCatalogPage() {
   const [showFilter, setShowFilter] = useState('');
   const [cities, setCities] = useState([]);
 
-  // collect cities from rows
+  const [editorOpen, setEditorOpen] = useState(false);
+  const [editingRow, setEditingRow] = useState(null);
+  const [deleteTarget, setDeleteTarget] = useState(null);
+  const [deleting, setDeleting] = useState(false);
+
   useEffect(() => {
     const map = new Map();
     for (const r of rows) {
@@ -60,7 +334,13 @@ export default function InteractiveLocationsCatalogPage() {
   useEffect(() => { load(1); setPage(1); }, [search, cityFilter, showFilter]);
   useEffect(() => { load(page); }, [page]);
 
-  useEffect(() => { setMobileActions([]); return () => setMobileActions([]); }, [setMobileActions]);
+  useEffect(() => {
+    setMobileActions([{
+      label: '+ Новая локация',
+      onClick: () => { setEditingRow(null); setEditorOpen(true); },
+    }]);
+    return () => setMobileActions([]);
+  }, [setMobileActions]);
 
   const toggleShow = async (row) => {
     const next = !row.is_show;
@@ -70,6 +350,26 @@ export default function InteractiveLocationsCatalogPage() {
     } catch {
       setRows((prev) => prev.map((r) => r.id === row.id ? { ...r, is_show: !next } : r));
     }
+  };
+
+  const handleDelete = async () => {
+    if (!deleteTarget) return;
+    setDeleting(true);
+    try {
+      await ilCatalogAPI.delete(deleteTarget.id);
+      setDeleteTarget(null);
+      await load(rows.length === 1 && page > 1 ? page - 1 : page);
+    } catch (e) {
+      setError(parseApiError(e, 'Ошибка удаления'));
+      setDeleteTarget(null);
+    } finally {
+      setDeleting(false);
+    }
+  };
+
+  const handleSaved = () => {
+    setEditorOpen(false);
+    load(editingRow ? page : 1);
   };
 
   const isFiltered = !!(search || cityFilter || showFilter);
@@ -115,13 +415,41 @@ export default function InteractiveLocationsCatalogPage() {
         </button>
       ),
     },
+    {
+      key: 'actions',
+      label: '',
+      render: (_, row) => (
+        <div className="flex items-center gap-2 justify-end" onClick={(e) => e.stopPropagation()}>
+          <button
+            onClick={() => { setEditingRow(row); setEditorOpen(true); }}
+            className="px-2 py-1 text-xs text-blue-600 bg-blue-50 rounded-md hover:bg-blue-100 transition-colors"
+          >
+            Ред.
+          </button>
+          <button
+            onClick={() => setDeleteTarget(row)}
+            className="px-2 py-1 text-xs text-red-500 bg-red-50 rounded-md hover:bg-red-100 transition-colors"
+          >
+            Удалить
+          </button>
+        </div>
+      ),
+    },
   ];
 
   return (
     <Layout>
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold text-gray-900">Интерактивные локации</h1>
-        <p className="mt-1 text-sm text-gray-500">Опубликованные interactive locations из сессий</p>
+      <div className="mb-6 flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">Интерактивные локации</h1>
+          <p className="mt-1 text-sm text-gray-500">Управление локациями для приложения</p>
+        </div>
+        <button
+          onClick={() => { setEditingRow(null); setEditorOpen(true); }}
+          className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors"
+        >
+          + Новая локация
+        </button>
       </div>
 
       <DataTable
@@ -139,6 +467,7 @@ export default function InteractiveLocationsCatalogPage() {
         totalCount={total}
         pageSize={PAGE_SIZE}
         onPage={setPage}
+        onRowClick={(row) => { setEditingRow(row); setEditorOpen(true); }}
         filters={(
           <>
             <select
@@ -162,6 +491,23 @@ export default function InteractiveLocationsCatalogPage() {
             </select>
           </>
         )}
+      />
+
+      <ILEditorModal
+        open={editorOpen}
+        onClose={() => setEditorOpen(false)}
+        location={editingRow}
+        onSaved={handleSaved}
+        cityOptions={cities}
+      />
+
+      <ConfirmModal
+        open={!!deleteTarget}
+        onClose={() => setDeleteTarget(null)}
+        onConfirm={handleDelete}
+        title="Удалить локацию?"
+        message={`«${getMultiLangValue(deleteTarget?.title) || 'Локация'}» будет удалена безвозвратно.`}
+        confirmLabel={deleting ? 'Удаление…' : 'Удалить'}
       />
     </Layout>
   );

@@ -364,5 +364,7 @@ export const eventAudioGuidesAPI = {
 
 export const ilCatalogAPI = {
   list: (params) => apiClient.get(`${BASE}/interactive-locations/`, { params }),
+  create: (data) => apiClient.post(`${BASE}/interactive-locations/`, data),
   update: (id, data) => apiClient.patch(`${BASE}/interactive-locations/${id}/`, data),
+  delete: (id) => apiClient.delete(`${BASE}/interactive-locations/${id}/`),
 };

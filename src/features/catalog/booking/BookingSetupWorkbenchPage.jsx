@@ -401,6 +401,10 @@ export default function BookingSetupWorkbenchPage() {
   const [ttSaving, setTtSaving] = useState(false);
   const [ttError, setTtError] = useState('');
   const [ttOk, setTtOk] = useState('');
+  const [editingTt, setEditingTt] = useState(null); // tt object being edited
+  const [editTtForm, setEditTtForm] = useState({ name_ru: '', code: '', sort_order: 0 });
+  const [editTtSaving, setEditTtSaving] = useState(false);
+  const [editTtError, setEditTtError] = useState('');
 
   // ── slots form ───────────────────────────────────────────────────────────
   const [showSlotForm, setShowSlotForm] = useState(false);
@@ -433,6 +437,10 @@ export default function BookingSetupWorkbenchPage() {
   const [bpSaving, setBpSaving] = useState(false);
   const [bpError, setBpError] = useState('');
   const [bpOk, setBpOk] = useState('');
+  const [editingBp, setEditingBp] = useState(null); // bp object being edited
+  const [editBpForm, setEditBpForm] = useState({ base_price: '', currency: DEFAULT_CURRENCY });
+  const [editBpSaving, setEditBpSaving] = useState(false);
+  const [editBpError, setEditBpError] = useState('');
 
   // ── loaders ──────────────────────────────────────────────────────────────
 
@@ -521,6 +529,30 @@ export default function BookingSetupWorkbenchPage() {
       await ticketTypesAPI.delete(tt.id);
       await loadTicketTypes(eventId);
     } catch (err) { setTtError(parseApiError(err, 'Ошибка удаления типа билета')); setShowTtForm(true); }
+  };
+
+  const openEditTt = (tt) => {
+    const nameRu = tt.name?.ru || tt.name_ru || '';
+    setEditTtForm({ name_ru: nameRu, code: tt.code || '', sort_order: tt.sort_order ?? 0 });
+    setEditTtError('');
+    setEditingTt(tt);
+  };
+
+  const handleSaveEditTt = async (e) => {
+    e.preventDefault();
+    const nameRu = editTtForm.name_ru.trim();
+    if (!nameRu) { setEditTtError('Введите название'); return; }
+    setEditTtSaving(true); setEditTtError('');
+    try {
+      await ticketTypesAPI.update(editingTt.id, {
+        name: { ...(editingTt.name || {}), ru: nameRu },
+        code: editTtForm.code.trim().toLowerCase(),
+        sort_order: Number(editTtForm.sort_order || 0),
+      });
+      setEditingTt(null);
+      await loadTicketTypes(eventId);
+    } catch (err) { setEditTtError(parseApiError(err, 'Ошибка сохранения')); }
+    finally { setEditTtSaving(false); }
   };
 
   const handleCreateSlots = async (e) => {
@@ -618,6 +650,28 @@ export default function BookingSetupWorkbenchPage() {
     } catch (err) { setBpError(parseApiError(err, 'Ошибка удаления базовой цены')); setShowBpForm(true); }
   };
 
+  const openEditBp = (bp) => {
+    setEditBpForm({ base_price: String(bp.base_price), currency: bp.currency || DEFAULT_CURRENCY });
+    setEditBpError('');
+    setEditingBp(bp);
+  };
+
+  const handleSaveEditBp = async (e) => {
+    e.preventDefault();
+    const price = parseFloat(editBpForm.base_price);
+    if (!Number.isFinite(price) || price < 0) { setEditBpError('Введите корректную цену'); return; }
+    setEditBpSaving(true); setEditBpError('');
+    try {
+      await eventTicketTypePricesAPI.update(editingBp.id, {
+        base_price: price,
+        currency: normalizeCurrency(editBpForm.currency),
+      });
+      setEditingBp(null);
+      await loadBasePrices(eventId);
+    } catch (err) { setEditBpError(parseApiError(err, 'Ошибка сохранения')); }
+    finally { setEditBpSaving(false); }
+  };
+
   // ── render ────────────────────────────────────────────────────────────────
 
   const ttById = Object.fromEntries(ticketTypes.map((t) => [String(t.id), t]));
@@ -680,7 +734,8 @@ export default function BookingSetupWorkbenchPage() {
                     <div key={tt.id} className="flex items-center gap-1.5 px-3 py-1.5 bg-gray-100 rounded-lg text-sm">
                       <span className="font-medium text-gray-800">{getTicketTypeLabel(tt)}</span>
                       {tt.code && <span className="font-mono text-xs text-gray-400">({tt.code})</span>}
-                      <button onClick={() => handleDeleteTt(tt)} className="text-gray-300 hover:text-red-500 transition-colors ml-1 text-xs">✕</button>
+                      <button onClick={() => openEditTt(tt)} className="text-gray-300 hover:text-blue-500 transition-colors ml-0.5 text-xs" title="Редактировать">✎</button>
+                      <button onClick={() => handleDeleteTt(tt)} className="text-gray-300 hover:text-red-500 transition-colors text-xs" title="Удалить">✕</button>
                     </div>
                   ))}
                   {!ticketTypes.length && <p className="text-sm text-gray-400">Нет типов билетов — добавьте первый</p>}
@@ -925,7 +980,8 @@ export default function BookingSetupWorkbenchPage() {
                       <div key={bp.id} className="flex items-center gap-2 px-3 py-1.5 bg-amber-50 border border-amber-200 rounded-lg text-sm">
                         <span className="text-gray-700">{tt ? getTicketTypeLabel(tt) : bp.ticket_type}</span>
                         <span className="font-medium text-amber-800">{bp.base_price} {bp.currency}</span>
-                        <button onClick={() => handleDeleteBp(bp)} className="text-amber-300 hover:text-red-500 transition-colors text-xs">✕</button>
+                        <button onClick={() => openEditBp(bp)} className="text-amber-300 hover:text-blue-500 transition-colors text-xs" title="Редактировать">✎</button>
+                        <button onClick={() => handleDeleteBp(bp)} className="text-amber-300 hover:text-red-500 transition-colors text-xs" title="Удалить">✕</button>
                       </div>
                     );
                   })}
@@ -966,6 +1022,58 @@ export default function BookingSetupWorkbenchPage() {
           </>
         )}
       </div>
+
+      {/* Edit Ticket Type Modal */}
+      <Modal open={!!editingTt} onClose={() => setEditingTt(null)} title="Редактировать тип билета" size="sm">
+        {editingTt && (
+          <form onSubmit={handleSaveEditTt} className="space-y-3">
+            <Field label="Название (RU)" required>
+              <TextInput value={editTtForm.name_ru} onChange={(e) => setEditTtForm((p) => ({ ...p, name_ru: e.target.value }))} placeholder="Взрослый" required autoFocus />
+            </Field>
+            <Field label="Код" hint="adult / child / vip">
+              <TextInput value={editTtForm.code} onChange={(e) => setEditTtForm((p) => ({ ...p, code: e.target.value }))} placeholder="adult" />
+            </Field>
+            <Field label="Порядок">
+              <TextInput type="number" min={0} value={editTtForm.sort_order} onChange={(e) => setEditTtForm((p) => ({ ...p, sort_order: +e.target.value || 0 }))} />
+            </Field>
+            <div className="flex items-center gap-3 pt-1">
+              <button type="submit" disabled={editTtSaving} className="px-4 py-2 text-sm text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors">
+                {editTtSaving ? 'Сохранение…' : 'Сохранить'}
+              </button>
+              <button type="button" onClick={() => setEditingTt(null)} className="px-4 py-2 text-sm text-gray-600 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors">
+                Отмена
+              </button>
+              <Err msg={editTtError} />
+            </div>
+          </form>
+        )}
+      </Modal>
+
+      {/* Edit Base Price Modal */}
+      <Modal open={!!editingBp} onClose={() => setEditingBp(null)} title="Редактировать базовую цену" size="sm">
+        {editingBp && (
+          <form onSubmit={handleSaveEditBp} className="space-y-3">
+            <p className="text-sm text-gray-500">
+              Тип: <span className="font-medium text-gray-800">{getTicketTypeLabel(ttById[String(editingBp.ticket_type)] || { name: String(editingBp.ticket_type) })}</span>
+            </p>
+            <Field label="Базовая цена" required>
+              <TextInput type="number" step="0.01" min={0} value={editBpForm.base_price} onChange={(e) => setEditBpForm((p) => ({ ...p, base_price: e.target.value }))} required autoFocus />
+            </Field>
+            <Field label="Валюта">
+              <TextInput value={editBpForm.currency} maxLength={3} onChange={(e) => setEditBpForm((p) => ({ ...p, currency: e.target.value.toUpperCase() }))} />
+            </Field>
+            <div className="flex items-center gap-3 pt-1">
+              <button type="submit" disabled={editBpSaving} className="px-4 py-2 text-sm text-white bg-amber-500 rounded-lg hover:bg-amber-600 disabled:opacity-50 transition-colors">
+                {editBpSaving ? 'Сохранение…' : 'Сохранить'}
+              </button>
+              <button type="button" onClick={() => setEditingBp(null)} className="px-4 py-2 text-sm text-gray-600 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors">
+                Отмена
+              </button>
+              <Err msg={editBpError} />
+            </div>
+          </form>
+        )}
+      </Modal>
 
       <SlotsManagerModal
         open={showSlotsManager}
