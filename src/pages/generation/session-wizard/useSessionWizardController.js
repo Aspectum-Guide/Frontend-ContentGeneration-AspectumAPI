@@ -27,6 +27,8 @@ import {
   DEFAULT_GENERATION_MODE,
   buildGenerationPayloadFields,
 } from '../../../components/generation/AiGenerationQualitySettings.jsx';
+import { clampGenerationCount } from '../../../components/generation/AiGenerationCountField.jsx';
+import { formatGenerationDedupeResultMessage } from '../../../components/generation/AiGenerationDedupeToggle.jsx';
 import {
   DEFAULT_LOCALE_DEFS,
   getLocaleInfo,
@@ -2017,6 +2019,8 @@ export function useSessionWizardController({ sessionId, confirm: confirmProp } =
   const [attractionGenerationSessionCityId, setAttractionGenerationSessionCityId] = useState('');
   const [attractionGenerationDatabaseCityId, setAttractionGenerationDatabaseCityId] = useState('');
   const [attractionGenerationLang, setAttractionGenerationLang] = useState('ru');
+  const [attractionGenerationCount, setAttractionGenerationCount] = useState(5);
+  const [attractionDedupeExistingItems, setAttractionDedupeExistingItems] = useState(true);
   const attractionGenPollCancelledRef = useRef(false);
   const attractionGenInFlightRef = useRef(false);
 
@@ -2030,12 +2034,14 @@ export function useSessionWizardController({ sessionId, confirm: confirmProp } =
   const [ilGenerationDatabaseCityId, setIlGenerationDatabaseCityId] = useState('');
   const [ilGenerationLang, setIlGenerationLang] = useState('ru');
   const [ilDedupeExistingLocations, setIlDedupeExistingLocations] = useState(true);
+  const [ilGenerationCount, setIlGenerationCount] = useState(5);
   const ilGenPollCancelledRef = useRef(false);
   const ilGenInFlightRef = useRef(false);
 
   const [cityInfoGenerateModalOpen, setCityInfoGenerateModalOpen] = useState(false);
   const [cityInfoGeneratePrompt, setCityInfoGeneratePrompt] = useState('');
   const [cityInfoGenerateCount, setCityInfoGenerateCount] = useState(5);
+  const [cityInfoDedupeExistingItems, setCityInfoDedupeExistingItems] = useState(true);
   const [cityInfoGenerating, setCityInfoGenerating] = useState(false);
   const [cityInfoGenerationError, setCityInfoGenerationError] = useState('');
   const [cityInfoGenerationTaskId, setCityInfoGenerationTaskId] = useState(null);
@@ -5937,6 +5943,8 @@ export function useSessionWizardController({ sessionId, confirm: confirmProp } =
       const startRes = await aiAPI.attractionsJsonStart({
         session_id: sessionId,
         prompt,
+        requested_count: clampGenerationCount(attractionGenerationCount, 'attractions'),
+        dedupe_existing_items: attractionDedupeExistingItems,
         lang,
         assigned_city_type,
         session_city_id: assigned_city_type === 'draft' ? session_city_id : null,
@@ -5959,15 +5967,26 @@ export function useSessionWizardController({ sessionId, confirm: confirmProp } =
         return;
       }
 
-      const createRes = await aiAPI.attractionsCreateFromTask(taskId, { session_id: sessionId });
-      const list = createRes?.data?.attractions || [];
-      const n = Array.isArray(list) ? list.length : 0;
+      const createRes = await aiAPI.attractionsCreateFromTask(taskId, {
+        session_id: sessionId,
+        dedupe_existing_items: attractionDedupeExistingItems,
+      });
+      const createData = createRes?.data || {};
+      const list = createData.attractions || [];
+      const n = typeof createData.created_count === 'number' ? createData.created_count : list.length;
 
       const keepDraft = normalizeDraftId(activeCityDraftIdRef.current);
       await loadSession(keepDraft);
 
       if (!attractionGenPollCancelledRef.current) {
-        showNote(`Сгенерировано достопримечательностей: ${n}`, 'success');
+        if (createData.partial && createData.warning) {
+          showNote(createData.warning, 'warning');
+        }
+        showNote(
+          formatGenerationDedupeResultMessage(createData, { dedupeField: 'dedupe_existing_items' })
+            || `Сгенерировано достопримечательностей: ${n}`,
+          createData.partial ? 'warning' : 'success',
+        );
         setAttractionGenerationOpen(false);
         setAttractionGenerationPrompt('');
         setAttractionGenerationTaskId(null);
@@ -5990,6 +6009,8 @@ export function useSessionWizardController({ sessionId, confirm: confirmProp } =
     attractionGenerationSessionCityId,
     attractionGenerationDatabaseCityId,
     attractionGenerationLang,
+    attractionGenerationCount,
+    attractionDedupeExistingItems,
     aiGenerationMode,
     aiUseWebSearch,
     loadSession,
@@ -6062,9 +6083,7 @@ export function useSessionWizardController({ sessionId, confirm: confirmProp } =
     const langRaw = (cityInfoGenerationLang || 'ru').trim().toLowerCase();
     const lang = (langRaw.split('-')[0] || 'ru').slice(0, 8) || 'ru';
 
-    let desired_items_count = parseInt(String(cityInfoGenerateCount), 10);
-    if (Number.isNaN(desired_items_count)) desired_items_count = 5;
-    desired_items_count = Math.max(1, Math.min(20, desired_items_count));
+    let requested_count = clampGenerationCount(cityInfoGenerateCount, 'city_info');
 
     cityInfoGenPollCancelledRef.current = false;
     cityInfoGenInFlightRef.current = true;
@@ -6077,7 +6096,8 @@ export function useSessionWizardController({ sessionId, confirm: confirmProp } =
         session_id: sessionId,
         prompt: userPrompt,
         lang,
-        desired_items_count,
+        requested_count,
+        dedupe_existing_items: cityInfoDedupeExistingItems,
         assigned_city_type,
         session_city_id: assigned_city_type === 'draft' ? session_city_id : null,
         city_id: null,
@@ -6099,10 +6119,16 @@ export function useSessionWizardController({ sessionId, confirm: confirmProp } =
         return;
       }
 
-      const createRes = await aiAPI.cityInfoCreateFromTask(taskId, { session_id: sessionId });
-      const createdRaw = createRes?.data?.city_infos || [];
+      const createRes = await aiAPI.cityInfoCreateFromTask(taskId, {
+        session_id: sessionId,
+        dedupe_existing_items: cityInfoDedupeExistingItems,
+      });
+      const createData = createRes?.data || {};
+      const createdRaw = createData.city_infos || [];
       const created = (Array.isArray(createdRaw) ? createdRaw : []).map(normalizeCityInfo);
-      const n = created.length || createRes?.data?.created_count || 0;
+      const n = typeof createData.created_count === 'number'
+        ? createData.created_count
+        : created.length;
 
       if (created.length > 0) {
         setCityInfos((prev) => {
@@ -6113,7 +6139,14 @@ export function useSessionWizardController({ sessionId, confirm: confirmProp } =
       }
 
       if (!cityInfoGenPollCancelledRef.current) {
-        showNote(`Сгенерировано блоков полезной информации: ${n}`, 'success');
+        if (createData.partial && createData.warning) {
+          showNote(createData.warning, 'warning');
+        }
+        showNote(
+          formatGenerationDedupeResultMessage(createData, { dedupeField: 'dedupe_existing_items' })
+            || `Сгенерировано блоков полезной информации: ${n}`,
+          createData.partial ? 'warning' : 'success',
+        );
         setCityInfoGenerateModalOpen(false);
         setCityInfoGeneratePrompt('');
         setCityInfoGenerationTaskId(null);
@@ -6133,6 +6166,7 @@ export function useSessionWizardController({ sessionId, confirm: confirmProp } =
     sessionId,
     cityInfoGeneratePrompt,
     cityInfoGenerateCount,
+    cityInfoDedupeExistingItems,
     cityInfoGenerationLang,
     aiGenerationMode,
     aiUseWebSearch,
@@ -6873,6 +6907,7 @@ export function useSessionWizardController({ sessionId, confirm: confirmProp } =
       const startRes = await aiAPI.interactiveLocationsJsonStart({
         session_id: sessionId,
         prompt,
+        requested_count: clampGenerationCount(ilGenerationCount, 'interactive_locations'),
         lang,
         languages,
         assigned_city_type,
@@ -6927,26 +6962,9 @@ export function useSessionWizardController({ sessionId, confirm: confirmProp } =
         if (partial && warning) {
           showNote(warning, 'warning');
         }
-        let successMsg = `Создано: ${createdCount}`;
-        if (typeof requestedCount === 'number') {
-          successMsg += ` из ${requestedCount}`;
-        }
-        if (dedupeExisting) {
-          if (skippedExistingDuplicates > 0) {
-            successMsg += `. Пропущено дублей с существующими: ${skippedExistingDuplicates}`;
-          }
-        } else {
-          successMsg += '. Дубли с существующими разрешены';
-        }
-        if (skippedBatchDuplicates > 0) {
-          successMsg += `. Пропущено повторов в ответе AI: ${skippedBatchDuplicates}`;
-        }
-        if (skippedInvalid > 0) {
-          successMsg += `. Пропущено без координат: ${skippedInvalid}`;
-        }
-        if (refillAttempts > 0) {
-          successMsg += `. Догенерация: ${refillAttempts} попыток`;
-        }
+        const successMsg = formatGenerationDedupeResultMessage(createData, {
+          dedupeField: 'dedupe_existing_locations',
+        });
         showNote(successMsg, partial ? 'warning' : 'success');
 
         setIlGenerationOpen(false);
@@ -6971,6 +6989,7 @@ export function useSessionWizardController({ sessionId, confirm: confirmProp } =
     ilGenerationSessionCityId,
     ilGenerationDatabaseCityId,
     ilGenerationLang,
+    ilGenerationCount,
     ilDedupeExistingLocations,
     aiGenerationMode,
     aiUseWebSearch,
@@ -7278,7 +7297,8 @@ export function useSessionWizardController({ sessionId, confirm: confirmProp } =
     cityTagCatalog, cityTagCatalogLoading, cityTagCatalogError, loadCityTagCatalog,
     deletingCityFilterIds, deletingEventFilterIds,
     cityInfos, currentCityInfo, cityInfoLocaleData, cityInfoActiveLocale, cityInfoSaving,
-    cityInfoGenerateModalOpen, cityInfoGeneratePrompt, cityInfoGenerateCount, cityInfoGenerating,
+    cityInfoGenerateModalOpen, cityInfoGeneratePrompt,     cityInfoGenerateCount, cityInfoGenerating,
+    cityInfoDedupeExistingItems, setCityInfoDedupeExistingItems,
     cityInfoGenerationError, cityInfoGenerationTaskId, cityInfoGenerationLang,
     aiGenerationMode, aiUseWebSearch, aiAdvancedGenerationAvailable,
     setAiGenerationMode, setAiUseWebSearch,
@@ -7291,6 +7311,8 @@ export function useSessionWizardController({ sessionId, confirm: confirmProp } =
     audioGuidePlanGenerationState,
     attractionGenerationOpen, attractionGenerationPrompt, attractionGenerating, attractionGenerationTaskId, attractionGenerationError,
     attractionGenerationAssignedCityType, attractionGenerationSessionCityId, attractionGenerationDatabaseCityId, attractionGenerationLang,
+    attractionGenerationCount, setAttractionGenerationCount,
+    attractionDedupeExistingItems, setAttractionDedupeExistingItems,
     saving, autoSaving, autoSaved, closeOpen, closeMode, closing, publishing, translating,
     setAttrView, setCurrentAttr, setAttrActiveLocale,
     setCloseOpen, setCloseMode,
@@ -7333,6 +7355,7 @@ export function useSessionWizardController({ sessionId, confirm: confirmProp } =
     ilGenerationOpen, ilGenerationPrompt, ilGenerating, ilGenerationTaskId, ilGenerationError,
     ilGenerationAssignedCityType, ilGenerationSessionCityId, ilGenerationDatabaseCityId, ilGenerationLang,
     ilDedupeExistingLocations, setIlDedupeExistingLocations,
+    ilGenerationCount, setIlGenerationCount,
     openIlGenerationModal, closeIlGenerationModal, setIlGenerationPrompt,
     setIlGenerationAssignedCityTypeSafe, setIlGenerationSessionCityId, setIlGenerationDatabaseCityId,
     setIlGenerationLang, generateInteractiveLocationsFromPrompt,

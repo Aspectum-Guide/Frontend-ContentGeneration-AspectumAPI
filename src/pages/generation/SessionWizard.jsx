@@ -116,6 +116,8 @@ export default function SessionWizard({ components = {} } = {}) {
     cityInfoGenerateModalOpen,
     cityInfoGeneratePrompt,
     cityInfoGenerateCount,
+    cityInfoDedupeExistingItems,
+    setCityInfoDedupeExistingItems,
     cityInfoGenerating,
     cityInfoGenerationError,
     cityInfoGenerationTaskId,
@@ -173,6 +175,10 @@ export default function SessionWizard({ components = {} } = {}) {
     attractionGenerationSessionCityId,
     attractionGenerationDatabaseCityId,
     attractionGenerationLang,
+    attractionGenerationCount,
+    setAttractionGenerationCount,
+    attractionDedupeExistingItems,
+    setAttractionDedupeExistingItems,
 
     saving,
     autoSaving,
@@ -269,6 +275,7 @@ export default function SessionWizard({ components = {} } = {}) {
     ilGenerationDatabaseCityId,
     ilGenerationLang,
     ilDedupeExistingLocations,
+    ilGenerationCount,
     openIlGenerationModal,
     closeIlGenerationModal,
     setIlGenerationPrompt,
@@ -277,6 +284,7 @@ export default function SessionWizard({ components = {} } = {}) {
     setIlGenerationDatabaseCityId,
     setIlGenerationLang,
     setIlDedupeExistingLocations,
+    setIlGenerationCount,
     generateInteractiveLocationsFromPrompt,
     setIlView,
     setCurrentIl,
@@ -932,6 +940,8 @@ export default function SessionWizard({ components = {} } = {}) {
                 cityInfoGenerateModalOpen={cityInfoGenerateModalOpen}
                 cityInfoGeneratePrompt={cityInfoGeneratePrompt}
                 cityInfoGenerateCount={cityInfoGenerateCount}
+                cityInfoDedupeExistingItems={cityInfoDedupeExistingItems}
+                onCityInfoDedupeExistingItemsChange={setCityInfoDedupeExistingItems}
                 cityInfoGenerating={cityInfoGenerating}
                 cityInfoGenerationError={cityInfoGenerationError}
                 cityInfoGenerationTaskId={cityInfoGenerationTaskId}
@@ -1005,6 +1015,10 @@ export default function SessionWizard({ components = {} } = {}) {
               attractionGenerationSessionCityId={attractionGenerationSessionCityId}
               attractionGenerationDatabaseCityId={attractionGenerationDatabaseCityId}
               attractionGenerationLang={attractionGenerationLang}
+              attractionGenerationCount={attractionGenerationCount}
+              onAttractionGenerationCountChange={setAttractionGenerationCount}
+              attractionDedupeExistingItems={attractionDedupeExistingItems}
+              onAttractionDedupeExistingItemsChange={setAttractionDedupeExistingItems}
               onOpenAttractionGenerationModal={openAttractionGenerationModal}
               onCloseAttractionGenerationModal={closeAttractionGenerationModal}
               onAttractionGenerationPromptChange={setAttractionGenerationPrompt}
@@ -1171,6 +1185,8 @@ export default function SessionWizard({ components = {} } = {}) {
             ilGenerationDatabaseCityId={ilGenerationDatabaseCityId}
             ilGenerationLang={ilGenerationLang}
             ilDedupeExistingLocations={ilDedupeExistingLocations}
+            ilGenerationCount={ilGenerationCount}
+            onIlGenerationCountChange={setIlGenerationCount}
             onIlDedupeExistingLocationsChange={setIlDedupeExistingLocations}
             onOpenIlGenerationModal={openIlGenerationModal}
             onCloseIlGenerationModal={closeIlGenerationModal}

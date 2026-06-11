@@ -6,6 +6,8 @@ import AiGenerationQualitySettings, {
   DEFAULT_GENERATION_MODE,
   buildGenerationPayloadFields,
 } from '../../components/generation/AiGenerationQualitySettings.jsx';
+import AiGenerationCountField from '../../components/generation/AiGenerationCountField.jsx';
+import { clampGenerationCount } from '../../components/generation/AiGenerationCountField.jsx';
 import {
   pollGenerationTask,
   isPollCancelledError,
@@ -61,6 +63,7 @@ export default function CityGeneration() {
   const navigate = useNavigate();
 
   const [prompt, setPrompt] = useState('');
+  const [requestedCount, setRequestedCount] = useState(5);
   const [provider, setProvider] = useState('');
   const [sourceLanguage, setSourceLanguage] = useState('ru');
   const [generationMode, setGenerationMode] = useState(DEFAULT_GENERATION_MODE);
@@ -165,6 +168,7 @@ export default function CityGeneration() {
     try {
       const payload = {
         prompt: prompt.trim(),
+        requested_count: clampGenerationCount(requestedCount, 'cities'),
         with_images: false,
         source_language: sourceLanguage,
         ...(provider ? { provider } : {}),
@@ -263,15 +267,24 @@ export default function CityGeneration() {
                 value={prompt}
                 onChange={(e) => setPrompt(e.target.value)}
                 rows={8}
-                placeholder="Например: Сгенерируй 5 городов Италии для культурного туризма с кратким описанием"
+                placeholder="Например: города Италии для культурного туризма с кратким описанием"
                 disabled={isRunning}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm resize-none focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none disabled:bg-gray-50"
               />
 
               <p className="text-xs text-gray-400 mt-1">
-                Переводы на другие языки не создаются на этом этапе. Их можно добавить позже кнопкой перевода в редакторе сессии.
+                Количество задаётся отдельным полем ниже — не нужно писать число в промпте.
               </p>
             </div>
+
+            <AiGenerationCountField
+              id="city-gen-count"
+              label="Количество городов"
+              value={requestedCount}
+              onChange={setRequestedCount}
+              generationType="cities"
+              disabled={isRunning}
+            />
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">

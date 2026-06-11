@@ -8,193 +8,247 @@ type GenerateParams = {
   onProgress?: (progress: number, step: string) => void;
 };
 
+type GeneratedImage = {
+  url: string;
+  author: string;
+};
+
+type PollResult =
+  | { finished: false }
+  | { finished: true; image: GeneratedImage | null };
+
+function extractCityData(resultData: any): any | null {
+  if (!resultData) return null;
+
+  if (resultData.city_data) {
+    return resultData.city_data;
+  }
+
+  if (Array.isArray(resultData.data) && resultData.data.length > 0) {
+    const firstItem = resultData.data[0];
+
+    if (firstItem?.city) {
+      return firstItem.city;
+    }
+
+    return firstItem;
+  }
+
+  if (resultData.city) {
+    return resultData.city;
+  }
+
+  return null;
+}
+
 export default function useCityAI(session: any) {
   const [aiLoading, setAiLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [progress, setProgress] = useState(0);
   const [currentStep, setCurrentStep] = useState<string | null>(null);
-  const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Очистка интервала при размонтировании
+  const pollingTimerRef = useRef<number | null>(null);
+
+  const clearPollingTimer = () => {
+    if (pollingTimerRef.current !== null) {
+      window.clearTimeout(pollingTimerRef.current);
+      pollingTimerRef.current = null;
+    }
+  };
+
   useEffect(() => {
     return () => {
-      if (pollingIntervalRef.current) {
-        clearInterval(pollingIntervalRef.current);
-      }
+      clearPollingTimer();
     };
   }, []);
 
-  const pollTaskStatus = async (taskId: string, setValue: (field: string, value: any) => void): Promise<any> => {
+  const applyCityDataToForm = (
+    cityData: any,
+    setValue: (field: string, value: any) => void,
+    fallbackCountry: string
+  ): GeneratedImage | null => {
+    setValue('name', cityData.name || {});
+    setValue('description', cityData.description || {});
+    setValue('country', cityData.country || fallbackCountry || '');
+
+    if (cityData.unsplash_image) {
+      setValue('image_copyright', cityData.unsplash_image.author || '');
+
+      return {
+        url: cityData.unsplash_image.url,
+        author: cityData.unsplash_image.author || '',
+      };
+    }
+
+    return null;
+  };
+
+  const pollTaskStatus = async (
+    taskId: string,
+    setValue: (field: string, value: any) => void,
+    fallbackCountry: string,
+    onProgress?: (progress: number, step: string) => void
+  ): Promise<PollResult> => {
     try {
       const response = await tasksAPI.get(taskId);
       const task = response.data;
 
-      // Обновляем прогресс
-      setProgress(task.progress || 0);
-      setCurrentStep(task.current_step || null);
+      const nextProgress = task.progress || 0;
+      const nextStep = task.current_step || null;
+
+      setProgress(nextProgress);
+      setCurrentStep(nextStep);
+      onProgress?.(nextProgress, nextStep || '');
 
       if (task.status === 'completed') {
-        // Задача завершена
         setAiLoading(false);
-        if (pollingIntervalRef.current) {
-          clearInterval(pollingIntervalRef.current);
-          pollingIntervalRef.current = null;
+        clearPollingTimer();
+
+        const cityData = extractCityData(task.result_data);
+
+        if (cityData) {
+          const image = applyCityDataToForm(cityData, setValue, fallbackCountry);
+          return { finished: true, image };
         }
 
-        // Заполняем форму результатами
-        if (task.result_data?.city_data) {
-          const cityData = task.result_data.city_data;
-          setValue('name', cityData.name || {});
-          setValue('description', cityData.description || {});
-          setValue('country', cityData.country || '');
-          
-          if (cityData.unsplash_image) {
-            setValue('image_copyright', cityData.unsplash_image.author || '');
-            return {
-              url: cityData.unsplash_image.url,
-              author: cityData.unsplash_image.author || '',
-            };
-          }
-        }
-
-        return null;
-      } else if (task.status === 'failed') {
-        // Задача провалилась
-        setAiLoading(false);
-        setError(task.error_message || 'Ошибка при генерации через ИИ');
-        if (pollingIntervalRef.current) {
-          clearInterval(pollingIntervalRef.current);
-          pollingIntervalRef.current = null;
-        }
-        throw new Error(task.error_message || 'Ошибка при генерации через ИИ');
+        return { finished: true, image: null };
       }
-      // Иначе продолжаем polling - возвращаем null чтобы продолжить
-      return null;
+
+      if (task.status === 'failed') {
+        setAiLoading(false);
+        clearPollingTimer();
+
+        const message = task.error_message || 'Ошибка при генерации через ИИ';
+        setError(message);
+
+        throw new Error(message);
+      }
+
+      return { finished: false };
     } catch (err: any) {
       setAiLoading(false);
-      setError(err.message || 'Ошибка при проверке статуса задачи');
-      if (pollingIntervalRef.current) {
-        clearInterval(pollingIntervalRef.current);
-        pollingIntervalRef.current = null;
-      }
+      clearPollingTimer();
+
+      const message = err.message || 'Ошибка при проверке статуса задачи';
+      setError(message);
+
       throw err;
     }
   };
 
-  const generate = async ({ cityName, country, setValue, onProgress }: GenerateParams) => {
+  const waitForTask = (
+    taskId: string,
+    setValue: (field: string, value: any) => void,
+    fallbackCountry: string,
+    onProgress?: (progress: number, step: string) => void
+  ): Promise<GeneratedImage | null> => {
+    return new Promise((resolve, reject) => {
+      const poll = async () => {
+        try {
+          const result = await pollTaskStatus(
+            taskId,
+            setValue,
+            fallbackCountry,
+            onProgress
+          );
+
+          if (result.finished) {
+            resolve(result.image);
+            return;
+          }
+
+          pollingTimerRef.current = window.setTimeout(poll, 1000);
+        } catch (err) {
+          reject(err);
+        }
+      };
+
+      poll();
+    });
+  };
+
+  const generate = async ({
+    cityName,
+    country,
+    setValue,
+    onProgress,
+  }: GenerateParams): Promise<GeneratedImage | null> => {
     try {
       setAiLoading(true);
       setError(null);
       setProgress(0);
       setCurrentStep('Запуск генерации...');
+      onProgress?.(0, 'Запуск генерации...');
 
-      // Backend ожидает prompt, а не массив cities
       const prompt = [cityName, country].filter(Boolean).join(', ');
-      const response = await aiAPI.citiesJsonStart({ prompt });
-      
-      // Если это синхронный ответ (старый формат)
+
+      const response = await aiAPI.citiesJsonStart({
+        prompt,
+        requested_count: 1,
+      });
+
       if (response.data && response.data.name) {
         const generated = response.data;
-        setValue('name', generated.name || {});
-        setValue('description', generated.description || {});
-        setValue('country', generated.country || country);
-        
-        if (generated.unsplash_image) {
-          return {
-            url: generated.unsplash_image.url,
-            author: generated.unsplash_image.author || '',
-          };
-        }
+        const image = applyCityDataToForm(generated, setValue, country);
+
         setAiLoading(false);
-        return null;
+        setProgress(100);
+        setCurrentStep('Готово');
+        onProgress?.(100, 'Готово');
+
+        return image;
       }
 
-      // Если это асинхронная задача
       if (response.data && response.data.task_id) {
         const taskId = response.data.task_id;
-        setCurrentStep('Ожидание запуска...');
-        
-        // Начинаем polling
-        const poll = async () => {
-          try {
-            const result = await pollTaskStatus(taskId, setValue);
-            // Если задача завершена, result будет содержать данные изображения или null
-            if (result !== undefined) {
-              // Задача завершена, возвращаем результат
-              return result;
-            }
-            // Если задача еще не завершена, продолжаем polling
-            if (pollingIntervalRef.current) {
-              // Продолжаем polling каждые 1 секунду
-              pollingIntervalRef.current = setTimeout(poll, 1000);
-            }
-          } catch (err) {
-            // Ошибка уже обработана в pollTaskStatus
-            throw err;
-          }
-        };
 
-        // Первый запрос сразу
-        const firstResult = await poll();
-        if (firstResult !== undefined) {
-          return firstResult;
-        }
-        
-        // Устанавливаем интервал для дальнейшего polling
-        pollingIntervalRef.current = setInterval(async () => {
-          try {
-            const result = await pollTaskStatus(taskId, setValue);
-            if (result !== undefined) {
-              // Задача завершена
-              if (pollingIntervalRef.current) {
-                clearInterval(pollingIntervalRef.current);
-                pollingIntervalRef.current = null;
-              }
-            }
-          } catch (err) {
-            // Ошибка обработана
-          }
-        }, 1000);
-        
-        return null;
+        setCurrentStep('Ожидание запуска...');
+        onProgress?.(0, 'Ожидание запуска...');
+
+        return await waitForTask(taskId, setValue, country, onProgress);
       }
 
-      // Неожиданный формат ответа
       throw new Error('Неожиданный формат ответа от сервера');
     } catch (err: any) {
       setAiLoading(false);
       setProgress(0);
       setCurrentStep(null);
-      
+      clearPollingTimer();
+
       let errorMsg = 'Ошибка при генерации через ИИ';
+
       if (err.response?.data) {
-        if (typeof err.response.data === 'string') errorMsg = err.response.data;
-        else if (err.response.data.error) errorMsg = err.response.data.error;
-        else if (err.response.data.detail) errorMsg = err.response.data.detail;
-        else errorMsg = JSON.stringify(err.response.data);
+        if (typeof err.response.data === 'string') {
+          errorMsg = err.response.data;
+        } else if (err.response.data.error) {
+          errorMsg = err.response.data.error;
+        } else if (err.response.data.detail) {
+          errorMsg = err.response.data.detail;
+        } else {
+          errorMsg = JSON.stringify(err.response.data);
+        }
       } else if (err.message) {
         errorMsg = err.message;
       }
+
       setError(errorMsg);
-      
-      if (pollingIntervalRef.current) {
-        clearInterval(pollingIntervalRef.current);
-        pollingIntervalRef.current = null;
-      }
-      
       throw err;
     }
   };
 
   const cancel = () => {
-    if (pollingIntervalRef.current) {
-      clearInterval(pollingIntervalRef.current);
-      pollingIntervalRef.current = null;
-    }
+    clearPollingTimer();
     setAiLoading(false);
     setProgress(0);
     setCurrentStep(null);
   };
 
-  return { generate, aiLoading, error, progress, currentStep, cancel };
+  return {
+    generate,
+    aiLoading,
+    error,
+    progress,
+    currentStep,
+    cancel,
+  };
 }

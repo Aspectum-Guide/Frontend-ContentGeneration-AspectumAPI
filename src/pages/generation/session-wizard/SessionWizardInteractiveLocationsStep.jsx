@@ -2,6 +2,8 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import 'leaflet/dist/leaflet.css';
 import AiGenerationModal, { WizardGenerationActionFooter } from '../../../components/generation/AiGenerationModal.jsx';
 import AiGenerationQualitySettings from '../../../components/generation/AiGenerationQualitySettings.jsx';
+import AiGenerationDedupeToggle from '../../../components/generation/AiGenerationDedupeToggle.jsx';
+import AiGenerationCountField from '../../../components/generation/AiGenerationCountField.jsx';
 import { getAttrName, getFlag, getSessionEntityImagePreview, resolveSessionEntityImageOriginalUrl, resolveSessionEntityImageCopyright } from './sessionWizardShared.jsx';
 import SessionWizardAttractionTagsPicker from './SessionWizardAttractionTagsPicker.jsx';
 
@@ -466,6 +468,8 @@ export default function SessionWizardInteractiveLocationsStep({
   ilGenerationLang = 'ru',
   ilDedupeExistingLocations = true,
   onIlDedupeExistingLocationsChange,
+  ilGenerationCount = 5,
+  onIlGenerationCountChange,
   onOpenIlGenerationModal,
   onCloseIlGenerationModal,
   onIlGenerationPromptChange,
@@ -670,21 +674,21 @@ export default function SessionWizardInteractiveLocationsStep({
             </div>
           </div>
 
-          {ilGenerationTaskId && (
-            <div className="text-xs text-gray-500">
-              Задача:{' '}
-              <span className="font-mono text-gray-700">
-                {String(ilGenerationTaskId).slice(0, 8)}…
-              </span>
-            </div>
-          )}
-
           {ilGenerationError && (
             <div className="text-sm text-red-700 bg-red-50 border border-red-200 rounded-lg p-3">
               {ilGenerationError}
             </div>
           )}
 
+          <AiGenerationCountField
+            id="il-gen-count"
+            label="Количество интерактивных локаций"
+            value={ilGenerationCount}
+            onChange={onIlGenerationCountChange}
+            generationType="interactive_locations"
+            disabled={ilGenerating}
+          />
+          
           <AiGenerationQualitySettings
             generationMode={aiGenerationMode}
             onGenerationModeChange={onAiGenerationModeChange}
@@ -694,23 +698,13 @@ export default function SessionWizardInteractiveLocationsStep({
             advancedDisabled={!aiAdvancedGenerationAvailable}
           />
 
-          <div className="rounded-lg border border-gray-200 bg-gray-50 px-3 py-3 space-y-2">
-            <label className="flex items-center justify-between gap-3 cursor-pointer">
-              <span className="text-sm font-medium text-gray-900">Исключать дубликаты</span>
-              <input
-                type="checkbox"
-                checked={Boolean(ilDedupeExistingLocations)}
-                onChange={(e) => onIlDedupeExistingLocationsChange?.(e.target.checked)}
-                disabled={ilGenerating}
-                className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500 disabled:opacity-50"
-              />
-            </label>
-            <p className="text-xs text-gray-600">
-              {ilDedupeExistingLocations
-                ? 'Дубликаты с достопримечательностями и уже созданными интерактивными локациями будут отфильтрованы. При нехватке уникальных выполнится догенерация.'
-                : 'Дубликаты с существующими объектами разрешены. Повторы внутри одной генерации не создаются.'}
-            </p>
-          </div>
+
+          <AiGenerationDedupeToggle
+            checked={Boolean(ilDedupeExistingLocations)}
+            onChange={onIlDedupeExistingLocationsChange}
+            disabled={ilGenerating}
+            entityType="interactive_locations"
+          />
 
           <label className="block text-sm font-medium text-gray-700" htmlFor="il-gen-prompt">
             Запрос к ИИ
@@ -721,7 +715,7 @@ export default function SessionWizardInteractiveLocationsStep({
             value={ilGenerationPrompt}
             onChange={(e) => onIlGenerationPromptChange?.(e.target.value)}
             disabled={ilGenerating}
-            placeholder="Например: Сгенерируй 5 интерактивных локаций с названием, описанием и координатами."
+            placeholder="Например: Необычные места для прогулок с координатами и описанием."
             className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
           />
         </AiGenerationModal>

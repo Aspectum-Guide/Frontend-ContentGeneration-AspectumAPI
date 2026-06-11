@@ -1,6 +1,8 @@
 import { useMemo } from 'react';
 import AiGenerationModal, { WizardGenerationActionFooter } from '../../../components/generation/AiGenerationModal.jsx';
 import AiGenerationQualitySettings from '../../../components/generation/AiGenerationQualitySettings.jsx';
+import AiGenerationDedupeToggle from '../../../components/generation/AiGenerationDedupeToggle.jsx';
+import AiGenerationCountField from '../../../components/generation/AiGenerationCountField.jsx';
 import { getFlag } from './sessionWizardShared.jsx';
 
 const AI_GENERATION_LANG_OPTIONS = [
@@ -223,6 +225,8 @@ export default function SessionWizardCityInfoStep({
   cityInfoGenerateModalOpen = false,
   cityInfoGeneratePrompt = '',
   cityInfoGenerateCount = 5,
+  cityInfoDedupeExistingItems = true,
+  onCityInfoDedupeExistingItemsChange,
   cityInfoGenerating = false,
   cityInfoGenerationError = '',
   cityInfoGenerationTaskId = null,
@@ -347,33 +351,15 @@ export default function SessionWizardCityInfoStep({
         </div>
 
         <div>
-          <label
-            htmlFor="city-info-gen-count"
-            className="block text-sm font-medium text-gray-700 mb-1"
-          >
-            Количество пунктов
-          </label>
-
-          <input
+          <AiGenerationCountField
             id="city-info-gen-count"
-            type="number"
-            min={1}
-            max={20}
+            label="Количество блоков полезной информации"
             value={cityInfoGenerateCount}
-            onChange={(e) => onCityInfoGenerateCountChange?.(e.target.value)}
+            onChange={onCityInfoGenerateCountChange}
+            generationType="city_info"
             disabled={cityInfoGenerating}
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
           />
         </div>
-
-        {cityInfoGenerationTaskId && (
-          <div className="text-xs text-gray-500">
-            Задача:{' '}
-            <span className="font-mono text-gray-700">
-              {String(cityInfoGenerationTaskId).slice(0, 8)}…
-            </span>
-          </div>
-        )}
 
         {cityInfoGenerationError && (
           <div className="text-sm text-red-700 bg-red-50 border border-red-200 rounded-lg p-3">
@@ -388,6 +374,13 @@ export default function SessionWizardCityInfoStep({
           onUseWebSearchChange={onAiUseWebSearchChange}
           disabled={cityInfoGenerating}
           advancedDisabled={!aiAdvancedGenerationAvailable}
+        />
+
+        <AiGenerationDedupeToggle
+          checked={cityInfoDedupeExistingItems}
+          onChange={onCityInfoDedupeExistingItemsChange}
+          disabled={cityInfoGenerating}
+          entityType="city_info"
         />
 
         <div>

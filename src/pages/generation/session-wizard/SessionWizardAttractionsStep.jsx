@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import AiGenerationModal, { WizardGenerationActionFooter } from '../../../components/generation/AiGenerationModal.jsx';
 import AiGenerationQualitySettings from '../../../components/generation/AiGenerationQualitySettings.jsx';
+import AiGenerationDedupeToggle from '../../../components/generation/AiGenerationDedupeToggle.jsx';
+import AiGenerationCountField from '../../../components/generation/AiGenerationCountField.jsx';
 import { getAttrName, getFlag, getSessionEntityImagePreview, resolveSessionEntityImageOriginalUrl, resolveSessionEntityImageCopyright } from './sessionWizardShared.jsx';
 import SessionWizardAttractionTagsPicker from './SessionWizardAttractionTagsPicker.jsx';
 
@@ -490,6 +492,10 @@ export default function SessionWizardAttractionsStep({
   attractionGenerationSessionCityId = '',
   attractionGenerationDatabaseCityId = '',
   attractionGenerationLang = 'ru',
+  attractionGenerationCount = 5,
+  attractionDedupeExistingItems = true,
+  onAttractionDedupeExistingItemsChange,
+  onAttractionGenerationCountChange,
   onOpenAttractionGenerationModal,
   onCloseAttractionGenerationModal,
   onAttractionGenerationPromptChange,
@@ -701,20 +707,20 @@ export default function SessionWizardAttractionsStep({
           </div>
         </div>
 
-        {attractionGenerationTaskId && (
-          <div className="text-xs text-gray-500">
-            Задача:{' '}
-            <span className="font-mono text-gray-700">
-              {String(attractionGenerationTaskId).slice(0, 8)}…
-            </span>
-          </div>
-        )}
-
         {attractionGenerationError && (
           <div className="text-sm text-red-700 bg-red-50 border border-red-200 rounded-lg p-3">
             {attractionGenerationError}
           </div>
         )}
+
+        <AiGenerationCountField
+          id="attraction-gen-count"
+          label="Количество достопримечательностей"
+          value={attractionGenerationCount}
+          onChange={onAttractionGenerationCountChange}
+          generationType="attractions"
+          disabled={attractionGenerating}
+        />
 
         <AiGenerationQualitySettings
           generationMode={aiGenerationMode}
@@ -723,6 +729,13 @@ export default function SessionWizardAttractionsStep({
           onUseWebSearchChange={onAiUseWebSearchChange}
           disabled={attractionGenerating}
           advancedDisabled={!aiAdvancedGenerationAvailable}
+        />
+
+        <AiGenerationDedupeToggle
+          checked={attractionDedupeExistingItems}
+          onChange={onAttractionDedupeExistingItemsChange}
+          disabled={attractionGenerating}
+          entityType="attractions"
         />
 
         <label className="block text-sm font-medium text-gray-700" htmlFor="attraction-gen-prompt">
@@ -734,7 +747,7 @@ export default function SessionWizardAttractionsStep({
           value={attractionGenerationPrompt}
           onChange={(e) => onAttractionGenerationPromptChange?.(e.target.value)}
           disabled={attractionGenerating}
-          placeholder="Например: Сгенерируй 10 достопримечательностей города, включая название, краткое описание и при возможности координаты."
+          placeholder="Например: Главные музеи и архитектурные памятники центра города."
           className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
         />
       </AiGenerationModal>
