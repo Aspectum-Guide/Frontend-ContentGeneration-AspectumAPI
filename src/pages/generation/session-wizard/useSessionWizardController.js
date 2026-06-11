@@ -2148,6 +2148,8 @@ export function useSessionWizardController({ sessionId, confirm: confirmProp } =
   }, []);
 
   const [saving, setSaving] = useState(false);
+  const [autoSaving, setAutoSaving] = useState(false);
+  const [autoSaved, setAutoSaved] = useState(false); // brief "Сохранено ✓" flash
   const [closeOpen, setCloseOpen] = useState(false);
   const [closeMode, setCloseMode] = useState('save');
   const [closing, setClosing] = useState(false);
@@ -2765,6 +2767,56 @@ export function useSessionWizardController({ sessionId, confirm: confirmProp } =
   useEffect(() => {
     currentStepRef.current = currentStep;
   }, [currentStep]);
+
+  // ── тихое авто-сохранение города (шаг 1) ────────────────────────────────
+  const autoSaveTimerRef = useRef(null);
+  const saveCityForStep1Ref = useRef(saveCityForStep1);
+  useEffect(() => { saveCityForStep1Ref.current = saveCityForStep1; }, [saveCityForStep1]);
+
+  useEffect(() => {
+    // Срабатывает только на шаге 1, только если сессия и основной язык готовы
+    if (currentStepRef.current !== 1 || !sessionId || !defaultLocale) return;
+
+    clearTimeout(autoSaveTimerRef.current);
+    autoSaveTimerRef.current = setTimeout(async () => {
+      // Не запускать параллельно с ручным сохранением
+      if (saving) return;
+      setAutoSaving(true);
+      try {
+        const name = {};
+        const description = {};
+        const country = {};
+        Object.entries(localeData).forEach(([, loc]) => {
+          if (!loc?.lang) return;
+          name[loc.lang] = loc.name != null ? String(loc.name).trim() : '';
+          description[loc.lang] = loc.description != null ? String(loc.description).trim() : '';
+          country[loc.lang] = loc.country != null ? String(loc.country).trim() : '';
+        });
+        const payload = {
+          name, description, country,
+          lat: lat ? parseFloat(lat) : null,
+          lon: lon ? parseFloat(lon) : null,
+          default_language: localeData[defaultLocale]?.lang || null,
+          tags: normalizeTagIds(cityTags),
+          image_id: imageId,
+          image_original_url: imageOriginalUrl || '',
+          ...(activeCityDraftIdRef.current && activeCityDraftIdRef.current !== 'legacy'
+            ? { draft_id: activeCityDraftIdRef.current }
+            : {}),
+        };
+        await sessionsAPI.updateCity(sessionId, payload);
+        setAutoSaved(true);
+        setTimeout(() => setAutoSaved(false), 2500);
+      } catch {
+        // авто-сохранение не должно мешать пользователю — ошибку игнорируем
+      } finally {
+        setAutoSaving(false);
+      }
+    }, 2500);
+
+    return () => clearTimeout(autoSaveTimerRef.current);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [localeData, lat, lon]);
 
   const switchLocale = useCallback((key) => { setActiveLocale(key); }, []);
 
@@ -7239,7 +7291,7 @@ export function useSessionWizardController({ sessionId, confirm: confirmProp } =
     audioGuidePlanGenerationState,
     attractionGenerationOpen, attractionGenerationPrompt, attractionGenerating, attractionGenerationTaskId, attractionGenerationError,
     attractionGenerationAssignedCityType, attractionGenerationSessionCityId, attractionGenerationDatabaseCityId, attractionGenerationLang,
-    saving, closeOpen, closeMode, closing, publishing, translating,
+    saving, autoSaving, autoSaved, closeOpen, closeMode, closing, publishing, translating,
     setAttrView, setCurrentAttr, setAttrActiveLocale,
     setCloseOpen, setCloseMode,
     setMapContainerRef,

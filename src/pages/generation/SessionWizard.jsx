@@ -175,6 +175,8 @@ export default function SessionWizard({ components = {} } = {}) {
     attractionGenerationLang,
 
     saving,
+    autoSaving,
+    autoSaved,
     closeOpen,
     closeMode,
     closing,
@@ -713,7 +715,26 @@ export default function SessionWizard({ components = {} } = {}) {
           </div>
         </div>
 
-        <div className="flex items-center gap-2 shrink-0">
+        <div className="flex items-center gap-3 shrink-0">
+
+          {/* Индикатор авто-сохранения */}
+          {currentStep === 1 && (autoSaving || autoSaved) && (
+            <div className={`flex items-center gap-1.5 text-xs transition-opacity ${autoSaved && !autoSaving ? 'text-emerald-600' : 'text-gray-400'}`}>
+              {autoSaving ? (
+                <>
+                  <span className="inline-block w-3 h-3 border-2 border-gray-300 border-t-transparent rounded-full animate-spin" />
+                  <span>Сохранение...</span>
+                </>
+              ) : (
+                <>
+                  <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                  </svg>
+                  <span>Сохранено</span>
+                </>
+              )}
+            </div>
+          )}
 
           <button
             type="button"
