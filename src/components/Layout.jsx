@@ -17,6 +17,9 @@ export default function Layout({ children, pageHeader = null, pageHeaderMode = '
   const navigate = useNavigate();
   const [activeSessions, setActiveSessions] = useState([]);
   const [sidebarExpanded, setSidebarExpanded] = useState(true);
+  const [rightPanelOpen, setRightPanelOpen] = useState(
+    () => localStorage.getItem('rightPanelOpen') !== 'false'
+  );
   const [isMobile, setIsMobile] = useState(false);
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   const [mobileActionsOpen, setMobileActionsOpen] = useState(false);
@@ -424,40 +427,75 @@ export default function Layout({ children, pageHeader = null, pageHeaderMode = '
               {children}
             </div>
 
-            {!isMobile && formActions.length > 0 && (
-              <aside className="hidden lg:block w-72 shrink-0">
-                <div className="sticky top-6 rounded-xl border border-gray-200 bg-white p-4">
-                  <div className="text-xs uppercase tracking-wide text-gray-400 mb-2">Кнопки формы</div>
-                  <div className="space-y-2">
-                    {formActions.length > 0 ? formActions.map((action, index) => (
+            {!isMobile && (
+              <aside className="hidden lg:block shrink-0">
+                {rightPanelOpen ? (
+                  <div className="w-64 sticky top-6 rounded-xl border border-gray-200 bg-white overflow-hidden">
+                    <div className="flex items-center justify-between px-3 py-2 border-b border-gray-100">
+                      <span className="text-xs uppercase tracking-wide font-semibold text-gray-400">
+                        Действия
+                      </span>
                       <button
-                        key={action.id || `${action.label}-${index}`}
                         type="button"
-                        onClick={action.onClick}
-                        disabled={!!action.disabled}
-                        className={`w-full px-3 py-2 rounded-lg text-left text-sm font-medium transition-colors disabled:opacity-50 ${getPageHeaderActionClass(action.variant)}`}
+                        onClick={() => {
+                          setRightPanelOpen(false);
+                          localStorage.setItem('rightPanelOpen', 'false');
+                        }}
+                        title="Скрыть панель"
+                        className="p-1 rounded hover:bg-gray-100 text-gray-400 hover:text-gray-600 transition-colors"
                       >
-                        {action.label}
+                        <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+                        </svg>
                       </button>
-                    )) : (
-                      <div className="text-sm text-gray-500 border border-dashed border-gray-300 rounded-lg p-3">
-                        Для этой страницы дополнительных кнопок пока нет.
-                      </div>
-                    )}
-                  </div>
-
-                  {formActions.length === 0 && (
-                    <div className="mt-4 pt-4 border-t border-gray-100 space-y-2">
+                    </div>
+                    <div className="p-3 space-y-2">
+                      {formActions.length > 0 ? formActions.map((action, index) => (
+                        <button
+                          key={action.id || `${action.label}-${index}`}
+                          type="button"
+                          onClick={action.onClick}
+                          disabled={!!action.disabled}
+                          className={`w-full px-3 py-2 rounded-lg text-left text-sm font-medium transition-colors disabled:opacity-50 ${getPageHeaderActionClass(action.variant)}`}
+                        >
+                          {action.label}
+                        </button>
+                      )) : (
+                        <div className="text-sm text-gray-400 border border-dashed border-gray-200 rounded-lg p-3">
+                          Нет действий для этой страницы
+                        </div>
+                      )}
+                    </div>
+                    <div className="px-3 pb-3 pt-1 border-t border-gray-100 space-y-2">
                       <button
                         type="button"
                         onClick={() => window.location.reload()}
-                        className="w-full px-3 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 text-left"
+                        className="w-full px-3 py-2 text-sm font-medium text-gray-600 bg-gray-50 rounded-lg hover:bg-gray-100 text-left transition-colors"
                       >
                         Обновить страницу
                       </button>
                     </div>
-                  )}
-                </div>
+                  </div>
+                ) : (
+                  <div className="sticky top-6">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setRightPanelOpen(true);
+                        localStorage.setItem('rightPanelOpen', 'true');
+                      }}
+                      title="Показать панель действий"
+                      className="flex flex-col items-center gap-1.5 px-2 py-3 rounded-xl border border-gray-200 bg-white hover:bg-gray-50 text-gray-400 hover:text-gray-600 transition-colors"
+                    >
+                      <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
+                      </svg>
+                      {formActions.length > 0 && (
+                        <span className="w-1.5 h-1.5 rounded-full bg-blue-500" title={`${formActions.length} действий`} />
+                      )}
+                    </button>
+                  </div>
+                )}
               </aside>
             )}
           </div>
