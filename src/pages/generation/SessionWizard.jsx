@@ -1,6 +1,6 @@
 import 'leaflet/dist/leaflet.css';
 import { useEffect, useMemo, useState } from 'react';
-import { useParams } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import Layout from '../../components/Layout';
 import CommonsImagePicker from '../../components/generation/CommonsImagePicker';
 import SessionWizardAttractionsStep from './session-wizard/SessionWizardAttractionsStep';
@@ -49,6 +49,7 @@ export default function SessionWizard({ components = {} } = {}) {
 
   const { confirm, confirmModal } = useConfirmModal(ConfirmModalComp);
   const { sessionId } = useParams();
+  const navigate = useNavigate();
 
   const controller = useSessionWizardController({ sessionId, confirm });
 
@@ -667,46 +668,52 @@ export default function SessionWizard({ components = {} } = {}) {
           .join(' ')}
       />
 
-      <div className="flex items-start justify-between gap-4 mb-5 pb-4 border-b border-gray-200">
-        <div>
-          <h1 className="text-xl font-bold text-gray-900">
-            {session.name || 'Сессия генерации контента'}
-          </h1>
+      <div className="flex items-center justify-between gap-4 mb-5 pb-4 border-b border-gray-200">
+        <div className="flex items-center gap-3 min-w-0">
+          <button
+            type="button"
+            onClick={() => navigate('/generation')}
+            title="Вернуться к списку сессий"
+            className="shrink-0 p-1.5 text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
+          >
+            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
+            </svg>
+          </button>
 
-          <div className="flex items-center gap-4 mt-1 text-xs text-gray-500">
-            <span>
-              <span className="text-gray-400">UID:</span>{' '}
-              <span className="font-mono">
-                {session.uuid || session.session_uuid || session.id}
-              </span>
-            </span>
+          <div className="min-w-0">
+            <div className="flex items-center gap-2">
+              <h1 className="text-lg font-bold text-gray-900 truncate">
+                {session.name || 'Сессия генерации контента'}
+              </h1>
+              <StatusBadge status={session.status} label={session.status_display} />
+            </div>
 
             {session.created_at && (
-              <span>
-                <span className="text-gray-400">Дата начала:</span>{' '}
-                {new Date(session.created_at).toLocaleString('ru-RU', {
-                  day: '2-digit',
-                  month: '2-digit',
-                  year: 'numeric',
-                  hour: '2-digit',
-                  minute: '2-digit',
-                })}
-              </span>
+              <div className="flex items-center gap-3 mt-0.5 text-xs text-gray-400">
+                <span>
+                  {new Date(session.created_at).toLocaleString('ru-RU', {
+                    day: '2-digit',
+                    month: '2-digit',
+                    year: 'numeric',
+                    hour: '2-digit',
+                    minute: '2-digit',
+                  })}
+                </span>
+                <button
+                  type="button"
+                  title="Скопировать UID"
+                  onClick={() => navigator.clipboard?.writeText(session.uuid || session.session_uuid || session.id)}
+                  className="font-mono truncate max-w-[180px] hover:text-gray-600 transition-colors cursor-copy"
+                >
+                  {(session.uuid || session.session_uuid || String(session.id)).slice(0, 8)}…
+                </button>
+              </div>
             )}
-
-            <StatusBadge status={session.status} label={session.status_display} />
           </div>
         </div>
 
         <div className="flex items-center gap-2 shrink-0">
-          <button
-            type="button"
-            onClick={() => goToStep(1)}
-            title="К шагу 1"
-            className="px-3 py-1.5 text-sm text-gray-600 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
-          >
-            ← Шаги
-          </button>
 
           <button
             type="button"

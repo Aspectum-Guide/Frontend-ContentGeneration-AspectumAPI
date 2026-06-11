@@ -424,7 +424,7 @@ export default function Layout({ children, pageHeader = null, pageHeaderMode = '
               {children}
             </div>
 
-            {!isMobile && (
+            {!isMobile && formActions.length > 0 && (
               <aside className="hidden lg:block w-72 shrink-0">
                 <div className="sticky top-6 rounded-xl border border-gray-200 bg-white p-4">
                   <div className="text-xs uppercase tracking-wide text-gray-400 mb-2">Кнопки формы</div>
