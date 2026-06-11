@@ -97,13 +97,45 @@ function LocalePills({ localeData, activeLocale, defaultLocale, onSwitch, onSetD
   );
 }
 
+function CoordinatesPanel({ lat, lon, savedLat, savedLon, setMapContainerRef, onLatChange, onLonChange, onRestoreSavedCoords }) {
+  return (
+    <div className="w-56 shrink-0 space-y-2">
+      <div className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Координаты</div>
+      <div ref={setMapContainerRef} className="w-full h-44 rounded-xl border border-gray-200 overflow-hidden z-0" />
+      <div className="grid grid-cols-2 gap-1.5">
+        <input
+          type="number" step="0.000001" value={lat}
+          onChange={(e) => onLatChange(e.target.value)}
+          placeholder="Широта"
+          className="w-full px-2 py-1.5 border border-gray-200 rounded-lg text-xs focus:outline-none focus:ring-1 focus:ring-blue-400"
+        />
+        <input
+          type="number" step="0.000001" value={lon}
+          onChange={(e) => onLonChange(e.target.value)}
+          placeholder="Долгота"
+          className="w-full px-2 py-1.5 border border-gray-200 rounded-lg text-xs focus:outline-none focus:ring-1 focus:ring-blue-400"
+        />
+      </div>
+      <button
+        type="button"
+        onClick={onRestoreSavedCoords}
+        disabled={savedLat == null || savedLon == null}
+        className="w-full px-2 py-1.5 text-xs text-gray-500 border border-gray-200 rounded-lg hover:bg-gray-50 disabled:opacity-40 transition-colors"
+      >
+        Вернуть сохранённые
+      </button>
+      <p className="text-[10px] text-gray-400 text-center">кликните по карте для выбора</p>
+    </div>
+  );
+}
+
 function PhotoPanel({
   imagePreview, photoUploading, imageOriginalUrl, imageCopyright,
   photoFileRef, onOpenCommonsModal, onPhotoFileChange,
   onImageOriginalUrlChange, onImageCopyrightChange,
 }) {
   return (
-    <div className="w-40 shrink-0 space-y-2">
+    <div className="w-48 shrink-0 space-y-2">
       <div className="relative aspect-[3/4] bg-gray-100 rounded-xl overflow-hidden border border-gray-200 flex items-center justify-center">
         {imagePreview
           ? <img src={imagePreview} alt="Фото" className="w-full h-full object-cover" />
@@ -255,7 +287,7 @@ export default function SessionWizardCityStep({
         </div>
       </SectionCard>
 
-      {/* Данные города */}
+      {/* Данные города + координаты */}
       <SectionCard title={`Данные города · ${localeLabel}`}>
         <div className="flex gap-5 items-start">
           <PhotoPanel
@@ -288,7 +320,6 @@ export default function SessionWizardCityStep({
                   }`}
                 />
               </div>
-
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Страна</label>
                 <input
@@ -312,36 +343,15 @@ export default function SessionWizardCityStep({
               />
             </div>
           </div>
-        </div>
-      </SectionCard>
 
-      {/* Координаты */}
-      <SectionCard title="Координаты">
-        <div className="space-y-3">
-          <div className="flex items-center gap-3 flex-wrap">
-            <input
-              type="number" step="0.000001" value={lat}
-              onChange={(e) => onLatChange(e.target.value)}
-              placeholder="Широта"
-              className="w-36 px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
-            <input
-              type="number" step="0.000001" value={lon}
-              onChange={(e) => onLonChange(e.target.value)}
-              placeholder="Долгота"
-              className="w-36 px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
-            <button
-              type="button"
-              onClick={onRestoreSavedCoords}
-              disabled={savedLat == null || savedLon == null}
-              className="px-3 py-2 text-xs text-gray-500 border border-gray-200 rounded-lg hover:bg-gray-50 disabled:opacity-40 transition-colors"
-            >
-              Вернуть сохранённые
-            </button>
-            <span className="text-xs text-gray-400">или кликните по карте</span>
-          </div>
-          <div ref={setMapContainerRef} className="w-full h-52 rounded-xl border border-gray-200 overflow-hidden z-0" />
+          <CoordinatesPanel
+            lat={lat} lon={lon}
+            savedLat={savedLat} savedLon={savedLon}
+            setMapContainerRef={setMapContainerRef}
+            onLatChange={onLatChange}
+            onLonChange={onLonChange}
+            onRestoreSavedCoords={onRestoreSavedCoords}
+          />
         </div>
       </SectionCard>
 
