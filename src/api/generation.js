@@ -145,6 +145,20 @@ export const attractionAudioGuidesAPI = {
       `${BASE}/sessions/${sessionId}/attraction-audio-guides/${guideId}/generate-main-text-item/`,
       payload,
     ),
+
+  generateTrackAudio: (sessionId, guideId, trackId, payload = {}) =>
+    apiClient.post(
+      `${BASE}/sessions/${sessionId}/attraction-audio-guides/${guideId}/tracks/${trackId}/generate-audio/`,
+      payload,
+    ),
+};
+
+export const ttsAPI = {
+  getElevenLabsSettings: ({ refresh = false } = {}) =>
+    apiClient.get(`${BASE}/tts/elevenlabs/settings/`, {
+      params: refresh ? { refresh: 1 } : undefined,
+      skipApiGetCache: refresh,
+    }),
 };
 
 // ─── Audio uploads / streaming ───────────────────────────────────────────────

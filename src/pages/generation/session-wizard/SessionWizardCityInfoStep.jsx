@@ -208,6 +208,8 @@ export default function SessionWizardCityInfoStep({
   cityInfoLocaleData = {},
   cityInfoActiveLocale = 'ru-RU',
   cityInfoSaving = false,
+  cityInfoAutoSaving = false,
+  cityInfoAutoSaved = false,
 
   referenceCities = [],
   cityDrafts = [],
@@ -707,7 +709,40 @@ export default function SessionWizardCityInfoStep({
               />
             </div>
 
-            <div className="flex justify-end">
+            <div className="flex items-center justify-end gap-3">
+              {(cityInfoAutoSaving || cityInfoAutoSaved) && !cityInfoSaving && (
+                <div
+                  className={`flex items-center gap-1.5 text-xs transition-opacity ${
+                    cityInfoAutoSaved && !cityInfoAutoSaving
+                      ? 'text-emerald-600'
+                      : 'text-gray-400'
+                  }`}
+                >
+                  {cityInfoAutoSaving ? (
+                    <>
+                      <span className="inline-block w-3 h-3 border-2 border-gray-300 border-t-transparent rounded-full animate-spin" />
+                      <span>Сохранение...</span>
+                    </>
+                  ) : (
+                    <>
+                      <svg
+                        className="w-3.5 h-3.5"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        stroke="currentColor"
+                        strokeWidth={2.5}
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          d="M5 13l4 4L19 7"
+                        />
+                      </svg>
+                      <span>Сохранено</span>
+                    </>
+                  )}
+                </div>
+              )}
               <button
                 type="button"
                 onClick={onSaveCurrentCityInfo}

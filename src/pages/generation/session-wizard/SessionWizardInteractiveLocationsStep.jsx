@@ -436,6 +436,8 @@ export default function SessionWizardInteractiveLocationsStep({
   ilActiveLocale,
   ilLocaleData = {},
   ilSaving,
+  ilAutoSaving = false,
+  ilAutoSaved = false,
   referenceCities = [],
   cityDrafts = [],
   eventFilterTree,
@@ -1093,7 +1095,40 @@ export default function SessionWizardInteractiveLocationsStep({
             />
           </div>
 
-          <div className="flex justify-end">
+          <div className="flex items-center justify-end gap-3">
+            {(ilAutoSaving || ilAutoSaved) && !ilSaving && (
+              <div
+                className={`flex items-center gap-1.5 text-xs transition-opacity ${
+                  ilAutoSaved && !ilAutoSaving
+                    ? 'text-emerald-600'
+                    : 'text-gray-400'
+                }`}
+              >
+                {ilAutoSaving ? (
+                  <>
+                    <span className="inline-block w-3 h-3 border-2 border-gray-300 border-t-transparent rounded-full animate-spin" />
+                    <span>Сохранение...</span>
+                  </>
+                ) : (
+                  <>
+                    <svg
+                      className="w-3.5 h-3.5"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                      strokeWidth={2.5}
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        d="M5 13l4 4L19 7"
+                      />
+                    </svg>
+                    <span>Сохранено</span>
+                  </>
+                )}
+              </div>
+            )}
             <button
               type="button"
               onClick={onSaveCurrentIl}

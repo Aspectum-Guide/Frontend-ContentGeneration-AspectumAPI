@@ -299,6 +299,138 @@ function AudioGuideDraftsPanel({
   );
 }
 
+const resolveElevenLabsSettingsDisplayMessage = (settings, error = '') => {
+  const voices = Array.isArray(settings?.voices) ? settings.voices : [];
+  const hasVoices = voices.length > 0;
+
+  if (hasVoices) {
+    return '';
+  }
+
+  if (settings?.configured === false) {
+    return 'ElevenLabs не настроен: отсутствует ELEVENLABS_API_KEY';
+  }
+
+  const category = settings?.error_category || '';
+
+  if (category === 'elevenlabs_access_restricted') {
+    return (
+      'ElevenLabs недоступен с текущего IP или региона сервера. Список голосов нельзя загрузить. ' +
+      'Генерация аудио также может быть недоступна, пока backend запущен с этого IP.'
+    );
+  }
+
+  if (category === 'elevenlabs_network_error' || category === 'elevenlabs_unavailable') {
+    return (
+      'Не удалось загрузить список голосов ElevenLabs. Генерация будет выполнена голосом по умолчанию.'
+    );
+  }
+
+  if (error) {
+    return error;
+  }
+
+  return '';
+};
+
+const buildElevenLabsVoiceLabel = (voice) => {
+  if (!voice) return '';
+
+  const parts = [`${voice.name || voice.voice_id}`, voice.category || 'voice'];
+  const labels = voice.labels || {};
+  const labelParts = [labels.gender, labels.accent, labels.language, labels.age].filter(
+    Boolean,
+  );
+
+  if (labelParts.length) {
+    parts.push(labelParts.join(', '));
+  }
+
+  return parts.join(' · ');
+};
+
+function ElevenLabsSettingsPanel({
+  settings = null,
+  loading = false,
+  error = '',
+  voiceId = '',
+  onVoiceChange,
+  onLoadSettings,
+  voiceSelectDisabled = false,
+}) {
+  const loadTriggeredRef = useRef(false);
+  const previewAudioRef = useRef(null);
+
+  useEffect(() => {
+    if (!loadTriggeredRef.current) {
+      loadTriggeredRef.current = true;
+      onLoadSettings?.();
+    }
+  }, [onLoadSettings]);
+
+  const voices = Array.isArray(settings?.voices) ? settings.voices : [];
+  const hasVoices = voices.length > 0;
+  const selectedVoice = voices.find((voice) => voice.voice_id === voiceId);
+  const previewUrl = selectedVoice?.preview_url || '';
+  const displayMessage = resolveElevenLabsSettingsDisplayMessage(settings, error);
+  const voiceSelectDisabledState = voiceSelectDisabled || loading || !hasVoices;
+
+  const handlePreview = () => {
+    if (!previewUrl) return;
+
+    if (!previewAudioRef.current) {
+      previewAudioRef.current = new Audio(previewUrl);
+    } else {
+      previewAudioRef.current.pause();
+      previewAudioRef.current.src = previewUrl;
+    }
+
+    previewAudioRef.current.play().catch(() => {});
+  };
+
+  return (
+    <div className="space-y-2 rounded-lg border border-gray-200 bg-white px-3 py-3">
+      <label className="block text-sm font-medium text-gray-800">Голос</label>
+
+      {loading ? (
+        <p className="text-xs text-gray-500">Загружаем голоса…</p>
+      ) : null}
+
+      {displayMessage ? (
+        <p className="text-xs text-amber-700">{displayMessage}</p>
+      ) : null}
+
+      <div className="flex flex-wrap items-center gap-2">
+        <select
+          value={voiceId || ''}
+          onChange={(event) => onVoiceChange?.(event.target.value)}
+          disabled={voiceSelectDisabledState}
+          className="min-w-[220px] flex-1 rounded-lg border border-gray-300 px-2 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50"
+        >
+          {!hasVoices ? (
+            <option value="">Голоса недоступны</option>
+          ) : (
+            voices.map((voice) => (
+              <option key={voice.voice_id} value={voice.voice_id}>
+                {buildElevenLabsVoiceLabel(voice)}
+              </option>
+            ))
+          )}
+        </select>
+
+        <button
+          type="button"
+          onClick={handlePreview}
+          disabled={!previewUrl || voiceSelectDisabledState}
+          className="rounded-md border border-gray-200 bg-white px-2.5 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          ▶ Прослушать
+        </button>
+      </div>
+    </div>
+  );
+}
+
 export default function SessionWizardAttractionAudioGuidesBlock({
   embedded = false,
   scopedToAttractionId = '',
@@ -308,10 +440,14 @@ export default function SessionWizardAttractionAudioGuidesBlock({
   attractionAudioGuideLocaleData = {},
   attractionAudioGuideActiveLocale = 'ru-RU',
   attractionAudioGuideSaving = false,
+  attractionAudioGuideAutoSaving = false,
+  attractionAudioGuideAutoSaved = false,
   attractionAudioUploading = false,
   audioGuideGeneratingPlan = false,
   audioGuideGeneratingAllMainText = false,
   audioGuideGeneratingItemTextById = {},
+  generatingAudioGuideTrack = false,
+  audioGuideTrackGenerationError = null,
   audioGuidePlanGenerationState = {},
 
   referenceAttractions = [],
@@ -337,6 +473,13 @@ export default function SessionWizardAttractionAudioGuidesBlock({
   onSetAttractionAudioGuidePlanItemsCount,
   onGenerateAttractionAudioGuideMainText,
   onGenerateAttractionAudioGuideMainTextItem,
+  onGenerateAttractionAudioGuideTrackAudio,
+  elevenLabsSettingsLoading = false,
+  elevenLabsSettingsError = '',
+  elevenLabsSettings = null,
+  audioGuideTtsVoiceId = '',
+  onLoadElevenLabsSettings,
+  onSetAudioGuideTtsVoiceId,
   onGoToStep,
 }) {
   const audioFileRef = useRef(null);
@@ -490,6 +633,26 @@ export default function SessionWizardAttractionAudioGuidesBlock({
 
   const trackAudioId = currentLocale.track?.audio_id || null;
   const trackAudioUrl = currentLocale.track?.audio_url || '';
+  const hasTrackAudio = Boolean(trackAudioId || trackAudioUrl);
+  const planLang = currentLocale.lang || 'ru';
+
+  const hasTextForEveryPlanItem =
+    planPoints.length > 0 &&
+    planPoints.every((point) => {
+      const itemId = point?.id;
+      if (!itemId) return false;
+      const text =
+        currentAttractionAudioGuide?.content_texts?.[planLang]?.[itemId];
+      return typeof text === 'string' && text.trim().length > 0;
+    });
+
+  const canGenerateFullAudio =
+    hasTextForEveryPlanItem &&
+    !generatingAudioGuideTrack &&
+    !audioGuideGeneratingPlan &&
+    !audioGuideGeneratingAllMainText &&
+    !attractionAudioGuideSaving &&
+    !attractionAudioUploading;
   const trackCopyright = currentLocale.track?.copyright || '';
 
   return (
@@ -848,7 +1011,6 @@ export default function SessionWizardAttractionAudioGuidesBlock({
                 const itemGenerating = Boolean(
                   itemId && audioGuideGeneratingItemTextById?.[itemId],
                 );
-
                 return (
                   <div
                     key={`ag-main-text-${point.id}`}
@@ -913,21 +1075,77 @@ export default function SessionWizardAttractionAudioGuidesBlock({
               })}
             </div>
           )}
+
+          <div className="mt-4 p-3 border border-gray-200 rounded-lg bg-gray-50 space-y-2">
+            <label className="block text-sm font-medium text-gray-800">
+              Аудиофайл аудиогида ({currentLocale.lang?.toUpperCase() || 'RU'})
+            </label>
+
+            <p className="text-xs text-gray-600">
+              Аудио будет создано из всех пунктов основного текста в порядке плана.
+            </p>
+
+            {planPoints.length > 0 && !hasTextForEveryPlanItem ? (
+              <p className="text-xs text-amber-700">
+                Сначала заполните тексты всех пунктов аудиогида.
+              </p>
+            ) : null}
+
+            {audioGuideTrackGenerationError ? (
+              <p className="text-xs text-red-600">{audioGuideTrackGenerationError}</p>
+            ) : null}
+
+            <ElevenLabsSettingsPanel
+              settings={elevenLabsSettings}
+              loading={elevenLabsSettingsLoading}
+              error={elevenLabsSettingsError}
+              voiceId={audioGuideTtsVoiceId}
+              onVoiceChange={onSetAudioGuideTtsVoiceId}
+              onLoadSettings={() => onLoadElevenLabsSettings?.()}
+              voiceSelectDisabled={generatingAudioGuideTrack}
+            />
+
+            {hasTrackAudio ? (
+              <AttractionAudioTrackPreview
+                trackAudioId={trackAudioId}
+                trackAudioUrl={trackAudioUrl}
+              />
+            ) : null}
+
+            <div className="flex flex-wrap items-center gap-2">
+              <button
+                type="button"
+                onClick={() =>
+                  onGenerateAttractionAudioGuideTrackAudio?.({
+                    languageCode: planLang,
+                    replaceExisting: hasTrackAudio,
+                  })
+                }
+                disabled={!canGenerateFullAudio}
+                className="px-3 py-1.5 text-xs font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors"
+              >
+                {generatingAudioGuideTrack
+                  ? 'Генерируем аудио...'
+                  : hasTrackAudio
+                    ? 'Перегенерировать аудиофайл'
+                    : 'Сгенерировать аудиофайл'}
+              </button>
+            </div>
+          </div>
         </div>
 
         <div className="p-3 border border-gray-200 rounded-lg bg-gray-50 space-y-2">
           <label className="block text-sm font-medium text-gray-700">
-            Аудиофайл ({currentLocale.lang?.toUpperCase() || 'RU'})
+            Загрузить аудиофайл вручную ({currentLocale.lang?.toUpperCase() || 'RU'})
           </label>
 
           {trackAudioUrl || trackAudioId ? (
-            <AttractionAudioTrackPreview
-              trackAudioId={trackAudioId}
-              trackAudioUrl={trackAudioUrl}
-            />
+            <p className="text-xs text-gray-500">
+              Можно заменить текущий файл загрузкой с диска.
+            </p>
           ) : (
             <p className="text-xs text-gray-500">
-              Файл ещё не загружен.
+              Альтернатива генерации: загрузите готовый mp3.
             </p>
           )}
 
@@ -943,13 +1161,13 @@ export default function SessionWizardAttractionAudioGuidesBlock({
             <button
               type="button"
               onClick={handlePickAudioFile}
-              disabled={attractionAudioUploading}
+              disabled={attractionAudioUploading || generatingAudioGuideTrack}
               className="px-3 py-1.5 text-xs font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors"
             >
               {attractionAudioUploading
                 ? 'Загрузка…'
                 : trackAudioUrl || trackAudioId
-                  ? 'Заменить аудио'
+                  ? 'Заменить файл'
                   : 'Загрузить аудио'}
             </button>
 
@@ -957,7 +1175,7 @@ export default function SessionWizardAttractionAudioGuidesBlock({
               <button
                 type="button"
                 onClick={() => onRemoveAttractionAudioGuideTrack?.()}
-                disabled={attractionAudioUploading}
+                disabled={attractionAudioUploading || generatingAudioGuideTrack}
                 className="px-3 py-1.5 text-xs font-medium text-red-700 bg-red-50 border border-red-200 rounded-lg hover:bg-red-100 disabled:opacity-50 transition-colors"
               >
                 Удалить аудио
@@ -966,7 +1184,41 @@ export default function SessionWizardAttractionAudioGuidesBlock({
           </div>
         </div>
 
-        <div className="flex justify-end">
+        <div className="flex items-center justify-end gap-3">
+          {(attractionAudioGuideAutoSaving || attractionAudioGuideAutoSaved) &&
+            !attractionAudioGuideSaving && (
+              <div
+                className={`flex items-center gap-1.5 text-xs transition-opacity ${
+                  attractionAudioGuideAutoSaved && !attractionAudioGuideAutoSaving
+                    ? 'text-emerald-600'
+                    : 'text-gray-400'
+                }`}
+              >
+                {attractionAudioGuideAutoSaving ? (
+                  <>
+                    <span className="inline-block w-3 h-3 border-2 border-gray-300 border-t-transparent rounded-full animate-spin" />
+                    <span>Сохранение...</span>
+                  </>
+                ) : (
+                  <>
+                    <svg
+                      className="w-3.5 h-3.5"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                      strokeWidth={2.5}
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        d="M5 13l4 4L19 7"
+                      />
+                    </svg>
+                    <span>Сохранено</span>
+                  </>
+                )}
+              </div>
+            )}
           <button
             type="button"
             onClick={onSaveCurrentAttractionAudioGuide}

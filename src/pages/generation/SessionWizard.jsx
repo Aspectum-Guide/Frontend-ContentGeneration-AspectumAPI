@@ -113,6 +113,8 @@ export default function SessionWizard({ components = {} } = {}) {
     cityInfoLocaleData,
     cityInfoActiveLocale,
     cityInfoSaving,
+    cityInfoAutoSaving,
+    cityInfoAutoSaved,
     cityInfoGenerateModalOpen,
     cityInfoGeneratePrompt,
     cityInfoGenerateCount,
@@ -134,6 +136,8 @@ export default function SessionWizard({ components = {} } = {}) {
     ilLocaleData,
     ilActiveLocale,
     ilSaving,
+    ilAutoSaving,
+    ilAutoSaved,
     ilPhotoUploading,
     ilPhotoFileRef,
     attrView,
@@ -141,6 +145,8 @@ export default function SessionWizard({ components = {} } = {}) {
     attrLocaleData,
     attrActiveLocale,
     attrSaving,
+    attrAutoSaving,
+    attrAutoSaved,
 
     attractionInfos,
     currentAttractionInfo,
@@ -153,6 +159,8 @@ export default function SessionWizard({ components = {} } = {}) {
     attractionFeedLocaleData,
     attractionFeedActiveLocale,
     attractionFeedSaving,
+    attractionFeedAutoSaving,
+    attractionFeedAutoSaved,
     attractionFeedPhotoUploading,
     attractionFeedPhotoFileRef,
 
@@ -161,10 +169,14 @@ export default function SessionWizard({ components = {} } = {}) {
     attractionAudioGuideLocaleData,
     attractionAudioGuideActiveLocale,
     attractionAudioGuideSaving,
+    attractionAudioGuideAutoSaving,
+    attractionAudioGuideAutoSaved,
     attractionAudioUploading,
     audioGuideGeneratingPlan,
     audioGuideGeneratingAllMainText,
     audioGuideGeneratingItemTextById,
+    generatingAudioGuideTrack,
+    audioGuideTrackGenerationError,
 
     attractionGenerationOpen,
     attractionGenerationPrompt,
@@ -330,6 +342,13 @@ export default function SessionWizard({ components = {} } = {}) {
     setAttractionAudioGuidePlanItemsCount,
     generateAttractionAudioGuideMainText,
     generateAttractionAudioGuideMainTextItem,
+    generateAttractionAudioGuideTrackAudio,
+    elevenLabsSettingsLoading,
+    elevenLabsSettingsError,
+    elevenLabsSettings,
+    audioGuideTtsVoiceId,
+    loadElevenLabsSettings,
+    updateAudioGuideTtsVoiceId,
 
     handleClose,
     handlePublish,
@@ -926,6 +945,8 @@ export default function SessionWizard({ components = {} } = {}) {
                 cityInfoLocaleData={cityInfoLocaleData}
                 cityInfoActiveLocale={cityInfoActiveLocale}
                 cityInfoSaving={cityInfoSaving}
+                cityInfoAutoSaving={cityInfoAutoSaving}
+                cityInfoAutoSaved={cityInfoAutoSaved}
                 referenceCities={referenceCities || []}
                 cityDrafts={cityDrafts || []}
                 onOpenCityInfoDetail={openCityInfoDetail}
@@ -996,6 +1017,8 @@ export default function SessionWizard({ components = {} } = {}) {
               attrActiveLocale={attrActiveLocale}
               attrLocaleData={attrLocaleData}
               attrSaving={attrSaving}
+              attrAutoSaving={attrAutoSaving}
+              attrAutoSaved={attrAutoSaved}
               attractions={attractions}
               activeCityDraftId={activeCityDraftId}
               localeData={localeData}
@@ -1080,6 +1103,8 @@ export default function SessionWizard({ components = {} } = {}) {
                 attractionFeedLocaleData={attractionFeedLocaleData}
                 attractionFeedActiveLocale={attractionFeedActiveLocale}
                 attractionFeedSaving={attractionFeedSaving}
+                attractionFeedAutoSaving={attractionFeedAutoSaving}
+                attractionFeedAutoSaved={attractionFeedAutoSaved}
                 attractionFeedPhotoUploading={attractionFeedPhotoUploading}
                 attractionFeedPhotoFileRef={attractionFeedPhotoFileRef}
                 referenceAttractions={referenceAttractions || []}
@@ -1107,10 +1132,14 @@ export default function SessionWizard({ components = {} } = {}) {
                 attractionAudioGuideLocaleData={attractionAudioGuideLocaleData}
                 attractionAudioGuideActiveLocale={attractionAudioGuideActiveLocale}
                 attractionAudioGuideSaving={attractionAudioGuideSaving}
+                attractionAudioGuideAutoSaving={attractionAudioGuideAutoSaving}
+                attractionAudioGuideAutoSaved={attractionAudioGuideAutoSaved}
                 attractionAudioUploading={attractionAudioUploading}
                 audioGuideGeneratingPlan={audioGuideGeneratingPlan}
                 audioGuideGeneratingAllMainText={audioGuideGeneratingAllMainText}
                 audioGuideGeneratingItemTextById={audioGuideGeneratingItemTextById}
+                generatingAudioGuideTrack={generatingAudioGuideTrack}
+                audioGuideTrackGenerationError={audioGuideTrackGenerationError}
                 audioGuidePlanGenerationState={audioGuidePlanGenerationState}
                 referenceAttractions={referenceAttractions || []}
                 attractions={attractions || []}
@@ -1140,6 +1169,15 @@ export default function SessionWizard({ components = {} } = {}) {
                 onGenerateAttractionAudioGuideMainTextItem={
                   generateAttractionAudioGuideMainTextItem
                 }
+                onGenerateAttractionAudioGuideTrackAudio={
+                  generateAttractionAudioGuideTrackAudio
+                }
+                elevenLabsSettingsLoading={elevenLabsSettingsLoading}
+                elevenLabsSettingsError={elevenLabsSettingsError}
+                elevenLabsSettings={elevenLabsSettings}
+                audioGuideTtsVoiceId={audioGuideTtsVoiceId}
+                onLoadElevenLabsSettings={loadElevenLabsSettings}
+                onSetAudioGuideTtsVoiceId={updateAudioGuideTtsVoiceId}
                 onGoToStep={goToStep}
               />
             </div>
@@ -1154,6 +1192,8 @@ export default function SessionWizard({ components = {} } = {}) {
             ilActiveLocale={ilActiveLocale}
             ilLocaleData={ilLocaleData}
             ilSaving={ilSaving}
+            ilAutoSaving={ilAutoSaving}
+            ilAutoSaved={ilAutoSaved}
             referenceCities={referenceCities || []}
             cityDrafts={cityDrafts || []}
             eventFilterTree={eventFilterTree}
