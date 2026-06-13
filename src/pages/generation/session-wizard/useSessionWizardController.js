@@ -46,7 +46,7 @@ const TOTAL_STEPS = 5;
 
 const ELEVENLABS_SETTINGS_FRONTEND_CACHE_KEY = 'aspectum:elevenlabs:settings:v1';
 const ELEVENLABS_SETTINGS_FRONTEND_CACHE_TTL_MS = 6 * 60 * 60 * 1000;
-const PREFERRED_DEFAULT_ELEVENLABS_VOICE_ID = 'blxHPCXhpXOsc7mCKk0P';
+const PREFERRED_DEFAULT_ELEVENLABS_VOICE_ID = 'ogi2DyUAKJb7CEdqqvlU';
 
 function resolveDefaultElevenLabsVoiceId(settings) {
   const voices = Array.isArray(settings?.voices) ? settings.voices : [];
