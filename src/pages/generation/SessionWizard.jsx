@@ -195,6 +195,7 @@ export default function SessionWizard({ components = {} } = {}) {
     saving,
     autoSaving,
     autoSaved,
+    preparingPublishStep,
     closeOpen,
     closeMode,
     closing,
@@ -685,9 +686,10 @@ export default function SessionWizard({ components = {} } = {}) {
       <ToastComp note={note} />
 
       <ProgressBanner
-        show={saving || publishing || closing || photoUploading || translating}
+        show={saving || publishing || closing || photoUploading || translating || preparingPublishStep}
         message={[
           saving && 'Сохраняем данные города...',
+          preparingPublishStep && 'Обновляем данные перед публикацией...',
           publishing && 'Публикуем сессию...',
           closing && 'Закрываем сессию...',
           photoUploading && 'Загружаем изображение...',

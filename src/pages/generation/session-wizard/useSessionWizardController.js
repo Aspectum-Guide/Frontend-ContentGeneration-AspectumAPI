@@ -43,6 +43,7 @@ import {
 } from './sessionWizardShared.jsx';
 
 const TOTAL_STEPS = 5;
+const PUBLISH_STEP = 5;
 
 const ELEVENLABS_SETTINGS_FRONTEND_CACHE_KEY = 'aspectum:elevenlabs:settings:v1';
 const ELEVENLABS_SETTINGS_FRONTEND_CACHE_TTL_MS = 6 * 60 * 60 * 1000;
@@ -2728,7 +2729,9 @@ export function useSessionWizardController({ sessionId, confirm: confirmProp } =
   const [saving, setSaving] = useState(false);
   const savingRef = useRef(false);
   const [autoSaving, setAutoSaving] = useState(false);
+  const autoSavingRef = useRef(false);
   const [autoSaved, setAutoSaved] = useState(false); // brief "Сохранено ✓" flash
+  const [preparingPublishStep, setPreparingPublishStep] = useState(false);
   const [closeOpen, setCloseOpen] = useState(false);
   const [closeMode, setCloseMode] = useState('save');
   const [closing, setClosing] = useState(false);
@@ -2754,6 +2757,10 @@ export function useSessionWizardController({ sessionId, confirm: confirmProp } =
   useEffect(() => {
     savingRef.current = saving;
   }, [saving]);
+
+  useEffect(() => {
+    autoSavingRef.current = autoSaving;
+  }, [autoSaving]);
 
   useEffect(() => {
     const routeDraftId = new URLSearchParams(location.search).get('cityDraftId');
@@ -2889,7 +2896,7 @@ export function useSessionWizardController({ sessionId, confirm: confirmProp } =
   }, []);
 
   const loadSession = useCallback(async (preferredDraftId = null, options = {}) => {
-    const { silent = false, force = false } = options;
+    const { silent = false, force = false, preserveCurrentEditors = false } = options;
     const seq = ++loadSessionSeqRef.current;
 
     try {
@@ -2952,8 +2959,10 @@ export function useSessionWizardController({ sessionId, confirm: confirmProp } =
 
       const sessionLegacyTags = data?.city?.tags ?? data?.city?.city_tags;
 
-      if (selectedDraft) loadCityIntoForm(selectedDraft, sessionLegacyTags);
-      else if (fallbackDraft) loadCityIntoForm(fallbackDraft, sessionLegacyTags);
+      if (!preserveCurrentEditors) {
+        if (selectedDraft) loadCityIntoForm(selectedDraft, sessionLegacyTags);
+        else if (fallbackDraft) loadCityIntoForm(fallbackDraft, sessionLegacyTags);
+      }
 
       if (Array.isArray(data?.attractions)) {
         const nextAttractions = data.attractions.map(normalizeAttraction);
@@ -2987,15 +2996,19 @@ export function useSessionWizardController({ sessionId, confirm: confirmProp } =
         setCityInfos([]);
       }
 
-      setCurrentCityInfo(null);
-      
+      if (!preserveCurrentEditors) {
+        setCurrentCityInfo(null);
+      }
+
       if (Array.isArray(data?.attraction_infos)) {
         setAttractionInfos(data.attraction_infos.map(normalizeAttractionInfo));
       } else {
         setAttractionInfos([]);
       }
 
-      setCurrentAttractionInfo(null);
+      if (!preserveCurrentEditors) {
+        setCurrentAttractionInfo(null);
+      }
 
       if (Array.isArray(data?.attraction_feed_items)) {
         setAttractionFeedItems(data.attraction_feed_items.map(normalizeAttractionFeedItem));
@@ -3003,7 +3016,9 @@ export function useSessionWizardController({ sessionId, confirm: confirmProp } =
         setAttractionFeedItems([]);
       }
 
-      setCurrentAttractionFeedItem(null);
+      if (!preserveCurrentEditors) {
+        setCurrentAttractionFeedItem(null);
+      }
 
       if (Array.isArray(data?.attraction_audio_guides)) {
         setAttractionAudioGuides(
@@ -3013,7 +3028,9 @@ export function useSessionWizardController({ sessionId, confirm: confirmProp } =
         setAttractionAudioGuides([]);
       }
 
-      setCurrentAttractionAudioGuide(null);
+      if (!preserveCurrentEditors) {
+        setCurrentAttractionAudioGuide(null);
+      }
 
     } catch (err) {
       if (seq === loadSessionSeqRef.current && !silent) {
@@ -3260,6 +3277,39 @@ export function useSessionWizardController({ sessionId, confirm: confirmProp } =
     });
   }, [sessionId]);
 
+  const mergeCitySaveResponseIntoState = useCallback((data) => {
+    if (!data || typeof data !== 'object') return;
+
+    const savedDraft = data.draft || null;
+    const savedDraftId = normalizeDraftId(data.draft_id || activeCityDraftIdRef.current);
+
+    if (data.status != null || data.city) {
+      setSession((prev) => {
+        if (!prev) return prev;
+        return {
+          ...prev,
+          ...(data.status != null ? { status: data.status } : {}),
+          ...(data.status_display != null ? { status_display: data.status_display } : {}),
+          ...(data.city ? { city: { ...(prev.city || {}), ...data.city } } : {}),
+        };
+      });
+    }
+
+    if (savedDraft && savedDraftId) {
+      const draftTags = normalizeTagIds(savedDraft.tags ?? savedDraft.city_tags ?? []);
+      setCityDrafts((prev) =>
+        prev.map((d) =>
+          normalizeDraftId(d.id) === savedDraftId
+            ? { ...d, ...savedDraft, tags: draftTags }
+            : d,
+        ),
+      );
+      if (savedDraftId === normalizeDraftId(activeCityDraftIdRef.current)) {
+        setCityTags(draftTags);
+      }
+    }
+  }, []);
+
   const saveCityForStep1 = useCallback(async () => {
     if (!defaultLocale || !localeData[defaultLocale]) {
       showNote('Необходимо установить язык по умолчанию', 'error');
@@ -3291,7 +3341,6 @@ export function useSessionWizardController({ sessionId, confirm: confirmProp } =
       if (savedCity?.image_url) setImagePreview(savedCity.image_url);
       if (savedCity?.image_id != null) setImageId(savedCity.image_id);
       if (savedCity?.image_original_url) setImageOriginalUrl(savedCity.image_original_url);
-      if (data?.status) setSession(prev => prev ? { ...prev, status: data.status, status_display: data.status_display } : prev);
 
       const savedDraftId = normalizeDraftId(data?.draft_id || activeCityDraftIdRef.current);
       if (savedDraftId) {
@@ -3301,19 +3350,7 @@ export function useSessionWizardController({ sessionId, confirm: confirmProp } =
         syncActiveDraftRoute(savedDraftId);
       }
 
-      if (savedDraft && savedDraftId) {
-        const draftTags = normalizeTagIds(savedDraft.tags ?? savedDraft.city_tags ?? []);
-        setCityDrafts((prev) =>
-          prev.map((d) =>
-            normalizeDraftId(d.id) === savedDraftId
-              ? { ...d, ...savedDraft, tags: draftTags }
-              : d
-          )
-        );
-        if (savedDraftId === normalizeDraftId(activeCityDraftIdRef.current)) {
-          setCityTags(draftTags);
-        }
-      }
+      mergeCitySaveResponseIntoState(data);
 
       await loadSession(savedDraftId);
 
@@ -3332,7 +3369,7 @@ export function useSessionWizardController({ sessionId, confirm: confirmProp } =
     } finally {
       setSaving(false);
     }
-  }, [sessionId, localeData, defaultLocale, lat, lon, cityTags, imageId, imageOriginalUrl, showNote, loadSession, syncActiveDraftRoute]);
+  }, [sessionId, localeData, defaultLocale, lat, lon, cityTags, imageId, imageOriginalUrl, showNote, loadSession, syncActiveDraftRoute, mergeCitySaveResponseIntoState]);
 
   useEffect(() => {
     currentStepRef.current = currentStep;
@@ -3340,6 +3377,47 @@ export function useSessionWizardController({ sessionId, confirm: confirmProp } =
 
   // ── тихое авто-сохранение города (шаг 1) ────────────────────────────────
   const autoSaveTimerRef = useRef(null);
+
+  const waitForCityPersistenceIdle = useCallback(async () => {
+    const deadline = Date.now() + 15000;
+    while ((savingRef.current || autoSavingRef.current) && Date.now() < deadline) {
+      await new Promise((resolve) => setTimeout(resolve, 50));
+    }
+  }, []);
+
+  const saveCitySilently = useCallback(async () => {
+    if (!sessionId || !defaultLocale || !localeData[defaultLocale]) return;
+
+    clearTimeout(autoSaveTimerRef.current);
+    await waitForCityPersistenceIdle();
+
+    if (savingRef.current) return;
+
+    const payload = buildCityStepPayload({
+      localeData,
+      defaultLocale,
+      lat,
+      lon,
+      cityTags,
+      imageId,
+      imageOriginalUrl,
+      activeCityDraftId: activeCityDraftIdRef.current,
+    });
+
+    const res = await sessionsAPI.updateCity(sessionId, payload);
+    mergeCitySaveResponseIntoState(res?.data);
+  }, [
+    sessionId,
+    defaultLocale,
+    localeData,
+    lat,
+    lon,
+    cityTags,
+    imageId,
+    imageOriginalUrl,
+    waitForCityPersistenceIdle,
+    mergeCitySaveResponseIntoState,
+  ]);
 
   useEffect(() => {
     if (currentStepRef.current !== 1 || !sessionId || !defaultLocale) return;
@@ -3361,7 +3439,8 @@ export function useSessionWizardController({ sessionId, confirm: confirmProp } =
           imageOriginalUrl,
           activeCityDraftId: activeCityDraftIdRef.current,
         });
-        await sessionsAPI.updateCity(sessionId, payload);
+        const res = await sessionsAPI.updateCity(sessionId, payload);
+        mergeCitySaveResponseIntoState(res?.data);
         setAutoSaved(true);
         setTimeout(() => setAutoSaved(false), 2500);
       } catch {
@@ -3382,6 +3461,7 @@ export function useSessionWizardController({ sessionId, confirm: confirmProp } =
     imageCopyright,
     defaultLocale,
     sessionId,
+    mergeCitySaveResponseIntoState,
   ]);
 
   const switchLocale = useCallback((key) => { setActiveLocale(key); }, []);
@@ -7870,6 +7950,11 @@ export function useSessionWizardController({ sessionId, confirm: confirmProp } =
       }
 
       const fromStep = currentStepRef.current;
+      const isGoingToPublishStep = target === PUBLISH_STEP;
+
+      if (isGoingToPublishStep) {
+        setPreparingPublishStep(true);
+      }
 
       try {
         if (fromStep === 4 && target !== 4) {
@@ -7879,14 +7964,28 @@ export function useSessionWizardController({ sessionId, confirm: confirmProp } =
         if (fromStep === 3 && target !== 3) {
           await saveCurrentAttrIfDirty({ silent: true });
         }
+
+        if (isGoingToPublishStep) {
+          await saveCitySilently();
+          await flushDirtyDraftEditorsRef.current?.();
+          await loadSession(activeCityDraftIdRef.current, {
+            silent: true,
+            force: true,
+            preserveCurrentEditors: true,
+          });
+        }
       } catch {
         return false;
+      } finally {
+        if (isGoingToPublishStep) {
+          setPreparingPublishStep(false);
+        }
       }
 
       setCurrentStep(target);
       return true;
     },
-    [saveCurrentIlIfDirty, saveCurrentAttrIfDirty],
+    [saveCurrentIlIfDirty, saveCurrentAttrIfDirty, saveCitySilently, loadSession],
   );
 
   useEffect(() => {
@@ -8456,7 +8555,7 @@ export function useSessionWizardController({ sessionId, confirm: confirmProp } =
     attractionGenerationAssignedCityType, attractionGenerationSessionCityId, attractionGenerationDatabaseCityId, attractionGenerationLang,
     attractionGenerationCount, setAttractionGenerationCount,
     attractionDedupeExistingItems, setAttractionDedupeExistingItems,
-    saving, autoSaving, autoSaved, closeOpen, closeMode, closing, publishing, translating,
+    saving, autoSaving, autoSaved, preparingPublishStep, closeOpen, closeMode, closing, publishing, translating,
     setAttrView, setCurrentAttr, setAttrActiveLocale,
     setCloseOpen, setCloseMode,
     setMapContainerRef,
