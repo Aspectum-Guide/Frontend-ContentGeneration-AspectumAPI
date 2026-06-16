@@ -2,6 +2,7 @@ import { useEffect } from 'react';
 import Layout from '../../../components/Layout';
 import DataTable from '../../../components/ui/DataTable';
 import { ConfirmModal } from '../../../components/ui/Modal';
+import Toast from '../../../components/ui/Toast';
 import { useLayoutActions } from '../../../context/useLayoutActions';
 import { getMultiLangValue } from '../shared/i18n';
 import CityEditorModal from './CityEditorModal';
@@ -166,6 +167,7 @@ export default function CitiesCatalogPage() {
         danger
         loading={c.deleting}
       />
+      <Toast note={c.toastNote} />
     </Layout>
   );
 }

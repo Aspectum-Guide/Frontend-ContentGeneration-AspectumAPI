@@ -100,6 +100,13 @@ const getSessionAttractionId = (info) => {
   );
 };
 
+const isAttractionInfoBindingIncomplete = (info) => {
+  const type = info?.assigned_attraction_type || 'none';
+  if (type === 'database') return !getDatabaseAttractionId(info);
+  if (type === 'draft') return !getSessionAttractionId(info);
+  return false;
+};
+
 const getAttractionInfoBindingLabel = (
   info,
   referenceAttractions = [],
@@ -242,6 +249,8 @@ export default function SessionWizardAttractionInfoStep({
   const selectedSessionAttractionId =
     getSessionAttractionId(currentAttractionInfo);
 
+  const isBindingIncomplete = isAttractionInfoBindingIncomplete(currentAttractionInfo);
+
   const updatePatch = (patch) => {
     onUpdateCurrentAttractionInfoPatch?.(patch);
   };
@@ -298,11 +307,12 @@ export default function SessionWizardAttractionInfoStep({
                       {getAttractionInfoName(info)}
                     </div>
 
-                    <div className="text-xs text-gray-500">
-                      {getAttractionInfoBindingLabel(
-                        info,
-                        referenceAttractions,
-                        attractions
+                    <div className="flex items-center gap-1.5 text-xs text-gray-500">
+                      {getAttractionInfoBindingLabel(info, referenceAttractions, attractions)}
+                      {isAttractionInfoBindingIncomplete(info) && (
+                        <span className="px-1.5 py-0.5 rounded bg-amber-100 text-amber-700 font-medium shrink-0">
+                          ⚠ не выбрана
+                        </span>
                       )}
                     </div>
                   </div>
@@ -526,6 +536,12 @@ export default function SessionWizardAttractionInfoStep({
               )}
             </div>
           )}
+
+          {isBindingIncomplete && (
+            <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+              ⚠ Выбран тип привязки, но достопримечательность не выбрана. Информация сохранится без привязки.
+            </p>
+          )}
         </div>
 
         <div>
@@ -550,7 +566,10 @@ export default function SessionWizardAttractionInfoStep({
           />
         </div>
 
-        <div className="flex justify-end">
+        <div className="flex items-center justify-end gap-3">
+          {isBindingIncomplete && (
+            <span className="text-xs text-amber-600">Привязка не выбрана</span>
+          )}
           <button
             type="button"
             onClick={onSaveCurrentAttractionInfo}

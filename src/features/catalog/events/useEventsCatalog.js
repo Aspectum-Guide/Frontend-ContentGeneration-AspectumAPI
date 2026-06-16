@@ -4,6 +4,7 @@ import { parseApiError } from '../../../utils/apiError';
 import { useCatalogFilters } from '../core/useCatalogFilters';
 import { buildLangOptions, pickPrimaryLangCode } from '../shared/i18n';
 import { normalizeListResponse } from '../shared/normalize';
+import { useToast } from '../../../components/ui/Toast';
 import { createEmptyEvent, fromApiEventRow, mergeEventWithDetail, toApiEventPayload } from './adapters';
 import { eventsCatalogAPI } from './api';
 
@@ -11,6 +12,7 @@ const PAGE_SIZE = 20;
 
 export function useEventsCatalog() {
   const navigate = useNavigate();
+  const { note: toastNote, showNote: showToast } = useToast();
   const { page, setPage, search, setSearch, debouncedSearch } = useCatalogFilters({ debounceMs: 400 });
 
   const [cityFilter, setCityFilter] = useState('');
@@ -148,12 +150,14 @@ export function useEventsCatalog() {
       setSaving(true);
       setSaveError(null);
       const payload = toApiEventPayload(editingEvent);
-      if (editingEvent.id) {
+      const isNew = !editingEvent.id;
+      if (!isNew) {
         await eventsCatalogAPI.update(editingEvent.id, payload);
       } else {
         await eventsCatalogAPI.create(payload);
       }
       setEditingEvent(null);
+      showToast(isNew ? 'Событие создано' : 'Событие сохранено', 'success');
       await loadEvents(page, debouncedSearch, cityFilter);
     } catch (err) {
       setSaveError(parseApiError(err, editingEvent?.id ? 'Ошибка сохранения' : 'Ошибка создания'));
@@ -162,12 +166,18 @@ export function useEventsCatalog() {
     }
   }, [editingEvent, loadEvents, page, debouncedSearch, cityFilter]);
 
+  const [togglingIds, setTogglingIds] = useState(new Set());
+
   const toggleFlag = useCallback(async (eventId, field, value) => {
+    const key = `${eventId}-${field}`;
+    setTogglingIds((prev) => new Set(prev).add(key));
     setEvents((prev) => prev.map((ev) => ev.id === eventId ? { ...ev, [field]: value } : ev));
     try {
       await eventsCatalogAPI.update(eventId, { [field]: value });
     } catch {
       setEvents((prev) => prev.map((ev) => ev.id === eventId ? { ...ev, [field]: !value } : ev));
+    } finally {
+      setTogglingIds((prev) => { const s = new Set(prev); s.delete(key); return s; });
     }
   }, []);
 
@@ -248,6 +258,8 @@ export function useEventsCatalog() {
     confirmDelete,
 
     toggleFlag,
+    togglingIds,
+    toastNote,
 
     cityOptionsError,
     filtersError,

@@ -29,21 +29,28 @@ export default function EventEditorModal({
   const [activeTab, setActiveTab] = useState('content');
   const [commonsModalOpen, setCommonsModalOpen] = useState(false);
 
-  // Черновик координат — применяются только по кнопке «Применить»
-  const [draftLat, setDraftLat] = useState('');
-  const [draftLon, setDraftLon] = useState('');
-
   const mapElRef = useRef(null);
   const mapRef = useRef(null);
   const markerRef = useRef(null);
   const leafletRef = useRef(null);
+  const snapshotRef = useRef(null);
 
-  // Синхронизируем черновик с event при открытии или смене ивента
+  // Сбрасываем таб при смене ивента
   useEffect(() => {
-    if (!open) return;
-    setDraftLat(event?.lat ?? '');
-    setDraftLon(event?.lon ?? '');
+    if (open) setActiveTab('content');
   }, [open, event?.id]);
+
+  // Снимок берём только после завершения загрузки, иначе ложный dirty при закрытии
+  useEffect(() => {
+    if (open && !editLoading) snapshotRef.current = JSON.stringify(event);
+  }, [open, event?.id, editLoading]);
+
+  const handleClose = () => {
+    if (snapshotRef.current && JSON.stringify(event) !== snapshotRef.current) {
+      if (!window.confirm('Есть несохранённые изменения. Закрыть без сохранения?')) return;
+    }
+    onClose();
+  };
 
   // Инициализация карты при переходе на вкладку «Карта»
   useEffect(() => {
@@ -58,8 +65,8 @@ export default function EventEditorModal({
           shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
         });
       }
-      const lat = parseCoord(draftLat);
-      const lon = parseCoord(draftLon);
+      const lat = parseCoord(event?.lat);
+      const lon = parseCoord(event?.lon);
       const map = L.map(mapElRef.current).setView(
         lat != null && lon != null ? [lat, lon] : [41.9028, 12.4964],
         lat != null && lon != null ? 13 : 5
@@ -69,8 +76,11 @@ export default function EventEditorModal({
         attribution: '&copy; OpenStreetMap contributors',
       }).addTo(map);
       map.on('click', (e) => {
-        setDraftLat(Number(e.latlng.lat.toFixed(6)));
-        setDraftLon(Number(e.latlng.lng.toFixed(6)));
+        setEvent((p) => ({
+          ...p,
+          lat: Number(e.latlng.lat.toFixed(6)),
+          lon: Number(e.latlng.lng.toFixed(6)),
+        }));
       });
       mapRef.current = map;
       if (lat != null && lon != null) {
@@ -81,13 +91,13 @@ export default function EventEditorModal({
     initMap();
   }, [open, activeTab]);
 
-  // Обновляем маркер при изменении черновика
+  // Обновляем маркер при изменении координат
   useEffect(() => {
     const map = mapRef.current;
     const L = leafletRef.current;
     if (!map || !L || activeTab !== 'map') return;
-    const lat = parseCoord(draftLat);
-    const lon = parseCoord(draftLon);
+    const lat = parseCoord(event?.lat);
+    const lon = parseCoord(event?.lon);
     if (lat == null || lon == null) {
       if (markerRef.current) { map.removeLayer(markerRef.current); markerRef.current = null; }
       return;
@@ -98,7 +108,7 @@ export default function EventEditorModal({
       markerRef.current.setLatLng([lat, lon]);
     }
     map.setView([lat, lon], Math.max(map.getZoom(), 13));
-  }, [draftLat, draftLon, activeTab]);
+  }, [event?.lat, event?.lon, activeTab]);
 
   // Уничтожаем карту при закрытии
   useEffect(() => {
@@ -114,7 +124,7 @@ export default function EventEditorModal({
     <>
       <Modal
         open={open}
-        onClose={onClose}
+        onClose={handleClose}
         title={event?.id ? 'Редактировать событие' : 'Создать событие'}
         size="xl"
       >
@@ -271,12 +281,16 @@ export default function EventEditorModal({
                 <Field label="Видимость">
                   <div className="flex items-center h-full pt-1">
                     <label className="flex items-center gap-2 cursor-pointer select-none">
-                      <div
+                      <button
+                        type="button"
+                        role="switch"
+                        aria-checked={!!event?.is_show}
+                        aria-label="Видимость события"
                         onClick={() => setEvent((p) => ({ ...p, is_show: !p.is_show }))}
-                        className={`relative w-10 h-5 rounded-full transition-colors cursor-pointer ${event?.is_show ? 'bg-blue-600' : 'bg-gray-300'}`}
+                        className={`relative w-10 h-5 rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-offset-1 focus:ring-blue-500 ${event?.is_show ? 'bg-blue-600' : 'bg-gray-300'}`}
                       >
                         <span className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-all ${event?.is_show ? 'left-5' : 'left-0.5'}`} />
-                      </div>
+                      </button>
                       <span className="text-sm text-gray-700">
                         {event?.is_show ? 'Показывается' : 'Скрыто'}
                       </span>
@@ -287,12 +301,16 @@ export default function EventEditorModal({
                 <Field label="В сторе">
                   <div className="flex items-center h-full pt-1">
                     <label className="flex items-center gap-2 cursor-pointer select-none">
-                      <div
+                      <button
+                        type="button"
+                        role="switch"
+                        aria-checked={!!event?.is_bookable}
+                        aria-label="Доступность в сторе"
                         onClick={() => setEvent((p) => ({ ...p, is_bookable: !p.is_bookable }))}
-                        className={`relative w-10 h-5 rounded-full transition-colors cursor-pointer ${event?.is_bookable ? 'bg-green-500' : 'bg-gray-300'}`}
+                        className={`relative w-10 h-5 rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-offset-1 focus:ring-green-500 ${event?.is_bookable ? 'bg-green-500' : 'bg-gray-300'}`}
                       >
                         <span className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-all ${event?.is_bookable ? 'left-5' : 'left-0.5'}`} />
-                      </div>
+                      </button>
                       <span className="text-sm text-gray-700">
                         {event?.is_bookable ? 'Продажи открыты' : 'Не в продаже'}
                       </span>
@@ -302,7 +320,7 @@ export default function EventEditorModal({
               </div>
             )}
 
-            {allEventFilters?.length > 0 && (
+            {activeTab === 'meta' && allEventFilters?.length > 0 && (
               <Field label="Теги / категории события">
                 <div className="flex flex-wrap gap-2 max-h-36 overflow-y-auto p-2 border border-gray-200 rounded-lg bg-gray-50">
                   {allEventFilters.map((f) => {
@@ -332,62 +350,40 @@ export default function EventEditorModal({
             )}
 
             {activeTab === 'map' && (
-              <div className="space-y-3">
-                <p className="text-xs text-gray-500">
-                  Кликните по карте или введите координаты вручную. Изменения применяются кнопкой «Применить».
-                </p>
-
-                <div ref={mapElRef} className="w-full h-64 md:h-80 rounded-xl overflow-hidden border border-gray-200 bg-gray-100" />
-
-                <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                   <Field label="Широта (lat)">
                     <TextInput
-                      value={draftLat}
-                      onChange={(e) => setDraftLat(e.target.value)}
-                      placeholder="Например: 41.902782"
-                      className="font-mono text-sm"
+                      type="number"
+                      step="any"
+                      min="-90"
+                      max="90"
+                      value={event?.lat ?? ''}
+                      onChange={(e) => setEvent((p) => ({ ...p, lat: parseFloat(e.target.value) }))}
+                      placeholder="41.902782"
                     />
                   </Field>
                   <Field label="Долгота (lon)">
                     <TextInput
-                      value={draftLon}
-                      onChange={(e) => setDraftLon(e.target.value)}
-                      placeholder="Например: 12.496366"
-                      className="font-mono text-sm"
+                      type="number"
+                      step="any"
+                      min="-180"
+                      max="180"
+                      value={event?.lon ?? ''}
+                      onChange={(e) => setEvent((p) => ({ ...p, lon: parseFloat(e.target.value) }))}
+                      placeholder="12.496366"
                     />
                   </Field>
                 </div>
 
-                {event?.lat != null && (
-                  <p className="text-xs text-gray-400">
-                    Текущие: {event.lat}, {event.lon}
-                  </p>
-                )}
-
-                <div className="flex gap-2 pt-1">
-                  <button
-                    type="button"
-                    onClick={() => { setDraftLat(event?.lat ?? ''); setDraftLon(event?.lon ?? ''); }}
-                    className="px-4 py-2 text-sm text-gray-600 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
-                  >
-                    Отмена
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      const lat = parseCoord(draftLat);
-                      const lon = parseCoord(draftLon);
-                      if (lat != null && lon != null) setEvent((p) => ({ ...p, lat, lon }));
-                    }}
-                    className="px-4 py-2 text-sm text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors"
-                  >
-                    Применить
-                  </button>
+                <div>
+                  <div className="text-xs text-gray-500 mb-2">Кликните по карте, чтобы выставить координаты</div>
+                  <div ref={mapElRef} className="w-full h-72 rounded-xl border border-gray-200 overflow-hidden" />
                 </div>
               </div>
             )}
 
-            <FormActions saving={saving} onCancel={onClose} saveLabel={event?.id ? 'Сохранить' : 'Создать'} />
+            <FormActions saving={saving} onCancel={handleClose} saveLabel={event?.id ? 'Сохранить' : 'Создать'} />
           </form>
         )}
       </Modal>

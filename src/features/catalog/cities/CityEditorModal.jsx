@@ -302,8 +302,10 @@ export default function CityEditorModal({
                     <TextInput
                       type="number"
                       step="any"
+                      min="-90"
+                      max="90"
                       value={city?.lat ?? ''}
-                      onChange={(e) => setCity((p) => ({ ...p, lat: e.target.value }))}
+                      onChange={(e) => setCity((p) => ({ ...p, lat: parseFloat(e.target.value) }))}
                       placeholder="55.7558"
                     />
                   </Field>
@@ -311,8 +313,10 @@ export default function CityEditorModal({
                     <TextInput
                       type="number"
                       step="any"
+                      min="-180"
+                      max="180"
                       value={city?.lon ?? ''}
-                      onChange={(e) => setCity((p) => ({ ...p, lon: e.target.value }))}
+                      onChange={(e) => setCity((p) => ({ ...p, lon: parseFloat(e.target.value) }))}
                       placeholder="37.6173"
                     />
                   </Field>
@@ -356,12 +360,7 @@ export default function CityEditorModal({
               </div>
             )}
 
-            <div className="hidden md:block">
-              <FormActions saving={saving} onCancel={onClose} />
-            </div>
-            <div className="md:hidden text-xs text-gray-500 border border-dashed border-gray-300 rounded-lg p-3">
-              Кнопки формы перенесены в верхнее меню «Действия».
-            </div>
+            <FormActions saving={saving} onCancel={onClose} />
           </form>
         )}
       </Modal>

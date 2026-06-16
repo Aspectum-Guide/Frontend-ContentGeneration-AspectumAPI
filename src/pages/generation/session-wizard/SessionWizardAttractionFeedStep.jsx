@@ -101,6 +101,13 @@ const getFeedItemTypeLabel = (item) => {
   return 'Текст';
 };
 
+const isFeedItemBindingIncomplete = (item) => {
+  const type = item?.assigned_attraction_type || 'none';
+  if (type === 'database') return !getDatabaseAttractionId(item);
+  if (type === 'draft') return !getSessionAttractionId(item);
+  return false;
+};
+
 const getDatabaseAttractionId = (item) => {
   return normalizeId(
     item?.event_id ??
@@ -449,6 +456,8 @@ export default function SessionWizardAttractionFeedStep({
   const selectedSessionAttractionId =
     getSessionAttractionId(currentAttractionFeedItem);
 
+  const isBindingIncomplete = isFeedItemBindingIncomplete(currentAttractionFeedItem);
+
   const updateItemPatch = (patch) => {
     if (typeof onUpdateCurrentAttractionFeedItemPatch === 'function') {
       onUpdateCurrentAttractionFeedItemPatch(patch);
@@ -529,11 +538,12 @@ export default function SessionWizardAttractionFeedStep({
                       </div>
                     </div>
 
-                    <div className="text-xs text-gray-500 mt-0.5">
-                      {getFeedItemBindingLabel(
-                        item,
-                        referenceAttractions,
-                        attractions
+                    <div className="flex items-center gap-1.5 text-xs text-gray-500 mt-0.5">
+                      {getFeedItemBindingLabel(item, referenceAttractions, attractions)}
+                      {isFeedItemBindingIncomplete(item) && (
+                        <span className="px-1.5 py-0.5 rounded bg-amber-100 text-amber-700 font-medium shrink-0">
+                          ⚠ не выбрана
+                        </span>
                       )}
                     </div>
                   </div>
@@ -636,28 +646,37 @@ export default function SessionWizardAttractionFeedStep({
               value={itemType}
               onChange={(event) => {
                 const nextType = event.target.value;
+                if (nextType === itemType) return;
+
+                const hasText = itemType === 'text' && Object.values(
+                  (typeof currentAttractionFeedItem?.text === 'object'
+                    ? currentAttractionFeedItem.text : {})
+                ).some(Boolean);
+                const hasImage = itemType === 'image' && getFeedImagePreview(currentAttractionFeedItem);
+
+                if ((hasText || hasImage) && !window.confirm(
+                  nextType === 'text'
+                    ? 'Смена типа на «Текст» сотрёт прикреплённое изображение. Продолжить?'
+                    : 'Смена типа на «Изображение» сотрёт текстовое содержимое. Продолжить?'
+                )) {
+                  event.target.value = itemType;
+                  return;
+                }
 
                 if (nextType === 'text') {
                   updateItemPatch({
                     item_type: 'text',
-
                     image: null,
                     image_id: null,
-
                     image_url: '',
                     imageUrl: '',
-
                     image_original_url: '',
                     imageOriginalUrl: '',
-
                     image_copyright: '',
                     imageCopyright: '',
                   });
                 } else {
-                  updateItemPatch({
-                    item_type: 'image',
-                    text: {},
-                  });
+                  updateItemPatch({ item_type: 'image', text: {} });
                 }
               }}
               className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -806,6 +825,12 @@ export default function SessionWizardAttractionFeedStep({
               )}
             </div>
           )}
+
+          {isBindingIncomplete && (
+            <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+              ⚠ Выбран тип привязки, но достопримечательность не выбрана. Элемент сохранится без привязки.
+            </p>
+          )}
         </div>
 
         {itemType === 'text' ? (
@@ -876,6 +901,10 @@ export default function SessionWizardAttractionFeedStep({
                 </>
               )}
             </div>
+          )}
+          {isBindingIncomplete && (
+            <span className="text-xs text-amber-600">Привязка не выбрана</span>
+          )}
           )}
           <button
             type="button"

@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import Layout from '../../../components/Layout';
 import DataTable from '../../../components/ui/DataTable';
 import { ConfirmModal } from '../../../components/ui/Modal';
+import Toast from '../../../components/ui/Toast';
 import { useLayoutActions } from '../../../context/useLayoutActions';
 import { getMultiLangValue } from '../shared/i18n';
 import EventEditorModal from './EventEditorModal';
@@ -60,28 +61,48 @@ export default function EventsCatalogPage() {
     {
       key: 'is_show',
       label: 'Виден',
-      render: (v, row) => (
-        <button
-          onClick={() => requestToggle(row.id, 'is_show', !v, `Скрыть «${getMultiLangValue(row.title) || row.id}»?`)}
-          title={v ? 'Скрыть' : 'Показать'}
-          className={`relative w-9 h-5 rounded-full transition-colors focus:outline-none ${v ? 'bg-blue-500' : 'bg-gray-300'}`}
-        >
-          <span className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-all ${v ? 'left-4' : 'left-0.5'}`} />
-        </button>
-      ),
+      render: (v, row) => {
+        const loading = e.togglingIds.has(`${row.id}-is_show`);
+        return (
+          <button
+            type="button"
+            role="switch"
+            aria-checked={v}
+            aria-label={v ? 'Скрыть событие' : 'Показать событие'}
+            onClick={() => !loading && requestToggle(row.id, 'is_show', !v, `Скрыть «${getMultiLangValue(row.title) || row.id}»?`)}
+            disabled={loading}
+            className={`relative w-9 h-5 rounded-full transition-colors focus:outline-none disabled:opacity-50 ${v ? 'bg-blue-500' : 'bg-gray-300'}`}
+          >
+            {loading
+              ? <span className="absolute inset-0 flex items-center justify-center"><span className="w-3 h-3 border border-white border-t-transparent rounded-full animate-spin" /></span>
+              : <span className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-all ${v ? 'left-4' : 'left-0.5'}`} />
+            }
+          </button>
+        );
+      },
     },
     {
       key: 'is_bookable',
       label: 'В сторе',
-      render: (v, row) => (
-        <button
-          onClick={() => requestToggle(row.id, 'is_bookable', !v, `Убрать «${getMultiLangValue(row.title) || row.id}» из стора?`)}
-          title={v ? 'Убрать из стора' : 'Добавить в стор'}
-          className={`relative w-9 h-5 rounded-full transition-colors focus:outline-none ${v ? 'bg-green-500' : 'bg-gray-300'}`}
-        >
-          <span className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-all ${v ? 'left-4' : 'left-0.5'}`} />
-        </button>
-      ),
+      render: (v, row) => {
+        const loading = e.togglingIds.has(`${row.id}-is_bookable`);
+        return (
+          <button
+            type="button"
+            role="switch"
+            aria-checked={v}
+            aria-label={v ? 'Убрать из стора' : 'Добавить в стор'}
+            onClick={() => !loading && requestToggle(row.id, 'is_bookable', !v, `Убрать «${getMultiLangValue(row.title) || row.id}» из стора?`)}
+            disabled={loading}
+            className={`relative w-9 h-5 rounded-full transition-colors focus:outline-none disabled:opacity-50 ${v ? 'bg-green-500' : 'bg-gray-300'}`}
+          >
+            {loading
+              ? <span className="absolute inset-0 flex items-center justify-center"><span className="w-3 h-3 border border-white border-t-transparent rounded-full animate-spin" /></span>
+              : <span className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-all ${v ? 'left-4' : 'left-0.5'}`} />
+            }
+          </button>
+        );
+      },
     },
     {
       key: 'image_url',
@@ -251,6 +272,7 @@ export default function EventsCatalogPage() {
         danger
         loading={e.deleting}
       />
+      <Toast note={e.toastNote} />
     </Layout>
   );
 }

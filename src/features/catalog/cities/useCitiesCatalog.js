@@ -4,6 +4,7 @@ import { useCatalogFilters } from '../core/useCatalogFilters';
 import { normalizeListResponse } from '../shared/normalize';
 import { buildLangOptions, getMultiLangValue, pickPrimaryLangCode } from '../shared/i18n';
 import { parseApiError } from '../../../utils/apiError';
+import { useToast } from '../../../components/ui/Toast';
 import { citiesCatalogAPI } from './api';
 import { fromApiCity, mergeCityRowWithApiDetail, toApiCityUpdatePayload } from './adapters';
 
@@ -11,6 +12,7 @@ const PAGE_SIZE = 20;
 
 export function useCitiesCatalog() {
   const navigate = useNavigate();
+  const { note: toastNote, showNote: showToast } = useToast();
   const { search, setSearch, page, setPage, debouncedSearch } = useCatalogFilters({ debounceMs: 250 });
 
   const [allCities, setAllCities] = useState([]);
@@ -162,6 +164,7 @@ export function useCitiesCatalog() {
       const payload = toApiCityUpdatePayload(editingCity);
       await citiesCatalogAPI.update(editingCity.id, payload);
       setEditingCity(null);
+      showToast('Город сохранён', 'success');
       await loadCities();
     } catch (err) {
       setSaveError(parseApiError(err, 'Ошибка сохранения'));
@@ -260,6 +263,7 @@ export function useCitiesCatalog() {
     requestDelete,
     setDeleteTarget,
     confirmDelete,
+    toastNote,
   };
 }
 
