@@ -1,5 +1,5 @@
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
-import ErrorBoundary from './components/ErrorBoundary';
+import ErrorBoundary, { SessionWizardErrorBoundary } from './components/ErrorBoundary';
 import ProtectedRoute from './components/ProtectedRoute';
 import { LayoutActionsProvider } from './context/LayoutActionsContext';
 import NotFound from './pages/NotFound';
@@ -61,7 +61,7 @@ function App() {
           <Route path="/generation/list" element={<ProtectedRoute><GenerationList /></ProtectedRoute>} />
           <Route path="/generation/upload" element={<ProtectedRoute><UploadFile /></ProtectedRoute>} />
           <Route path="/generation/new" element={<ProtectedRoute><NewSession /></ProtectedRoute>} />
-          <Route path="/generation/:sessionId" element={<ProtectedRoute><SessionWizard /></ProtectedRoute>} />
+          <Route path="/generation/:sessionId" element={<ProtectedRoute><SessionWizardErrorBoundary><SessionWizard /></SessionWizardErrorBoundary></ProtectedRoute>} />
 
           {/* Работа с ИИ */}
           <Route path="/ai/settings" element={<ProtectedRoute><AISettings /></ProtectedRoute>} />

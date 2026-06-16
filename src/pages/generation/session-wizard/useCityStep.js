@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from 'react';
 import { aiAPI, tasksAPI, cityInfosAPI, cityFiltersAPI, eventFiltersAPI, imagesAPI, sessionsAPI } from '../../../api/generation';
 import { trackEvent } from '../../../utils/analytics';
 import { isNotFoundError, parseApiError } from '../../../utils/apiError';
@@ -501,6 +501,8 @@ export default function useCityStep(ctx) {
   const currentCityInfoIdRef = useRef(null);
   const [cityInfoAutoSaving, setCityInfoAutoSaving] = useState(false);
   const [cityInfoAutoSaved, setCityInfoAutoSaved] = useState(false);
+  const saveCurrentCityInfoRef = useRef(null);
+  const isCurrentCityInfoDirtyRef = useRef(null);
 
   const [cityInfoGenerateModalOpen, setCityInfoGenerateModalOpen] = useState(false);
   const [cityInfoGeneratePrompt, setCityInfoGeneratePrompt] = useState('');
@@ -558,6 +560,13 @@ export default function useCityStep(ctx) {
   const deletingEventFilterPendingRef = useRef(new Set());
   const [deletingCityFilterIds, setDeletingCityFilterIds] = useState(() => new Set());
   const [deletingEventFilterIds, setDeletingEventFilterIds] = useState(() => new Set());
+
+  const deferredLocaleData = useDeferredValue(localeData);
+  const deferredLat = useDeferredValue(lat);
+  const deferredLon = useDeferredValue(lon);
+  const deferredCityTags = useDeferredValue(cityTags);
+  const deferredImageOriginalUrl = useDeferredValue(imageOriginalUrl);
+  const deferredCurrentCityInfo = useDeferredValue(currentCityInfo);
 
   const requestedCityDraftIdRef = useRef(null);
 
@@ -677,6 +686,8 @@ export default function useCityStep(ctx) {
     referenceCities,
     activeCityDraftId,
   ]);
+
+  const deferredCityInfoLocaleData = useDeferredValue(cityInfoLocaleData);
 
   useEffect(() => {
     if (!currentCityInfo) return;
@@ -1050,12 +1061,12 @@ export default function useCityStep(ctx) {
 
     return () => clearTimeout(autoSaveTimerRef.current);
   }, [
-    localeData,
-    lat,
-    lon,
-    cityTags,
+    deferredLocaleData,
+    deferredLat,
+    deferredLon,
+    deferredCityTags,
     imageId,
-    imageOriginalUrl,
+    deferredImageOriginalUrl,
     imageCopyright,
     defaultLocale,
     sessionId,
@@ -1811,6 +1822,9 @@ export default function useCityStep(ctx) {
     return snap !== cityInfoSavedSnapshotRef.current;
   }, [currentCityInfo, cityInfoLocaleData]);
 
+  saveCurrentCityInfoRef.current = saveCurrentCityInfo;
+  isCurrentCityInfoDirtyRef.current = isCurrentCityInfoDirty;
+
   const saveCurrentCityInfoIfDirty = useCallback(
     async (options = {}) => {
       if (!currentCityInfo?.id || !isCurrentCityInfoDirty()) {
@@ -1826,9 +1840,9 @@ export default function useCityStep(ctx) {
   useEffect(() => {
     clearTimeout(cityInfoAutoSaveTimerRef.current);
 
-    if (!sessionId || !currentCityInfo?.id) return;
+    if (!sessionId || !deferredCurrentCityInfo?.id) return;
 
-    if (!isCurrentCityInfoDirty()) return;
+    if (!isCurrentCityInfoDirtyRef.current?.()) return;
 
     cityInfoAutoSaveTimerRef.current = setTimeout(async () => {
       if (cityInfoSavingRef.current) return;
@@ -1837,7 +1851,7 @@ export default function useCityStep(ctx) {
       setCityInfoAutoSaved(false);
 
       try {
-        await saveCurrentCityInfo({ silent: true });
+        await saveCurrentCityInfoRef.current?.({ silent: true });
 
         setCityInfoAutoSaved(true);
 
@@ -1857,10 +1871,8 @@ export default function useCityStep(ctx) {
     };
   }, [
     sessionId,
-    currentCityInfo,
-    cityInfoLocaleData,
-    isCurrentCityInfoDirty,
-    saveCurrentCityInfo,
+    deferredCurrentCityInfo,
+    deferredCityInfoLocaleData,
   ]);
 
   const openCityInfoDetail = useCallback(

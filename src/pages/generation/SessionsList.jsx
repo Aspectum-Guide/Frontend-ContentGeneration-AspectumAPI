@@ -4,8 +4,9 @@
  * Each session is rendered as a compact group header, and each city draft is a
  * real table row inside that session.
  */
-import { Fragment, useCallback, useEffect, useMemo, useState } from 'react';
+import { Fragment, useCallback, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { sessionsAPI } from '../../api/generation';
 import Layout from '../../components/Layout';
 import { SessionStatusBadge as DefaultStatusBadge } from '../../components/ui/StatusBadge.jsx';
@@ -239,10 +240,30 @@ export default function SessionsList({ components = {} } = {}) {
   const { note, showNote } = useToast();
   const { setMobileActions } = useLayoutActions();
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
 
-  const [sessions, setSessions] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
+  const {
+    data: sessionsData,
+    isLoading: loading,
+    error: sessionsError,
+    refetch: refetchSessions,
+  } = useQuery({
+    queryKey: ['sessions'],
+    queryFn: async () => {
+      const res = await sessionsAPI.list();
+      const data = res?.data;
+      return Array.isArray(data?.results) ? data.results : Array.isArray(data) ? data : [];
+    },
+  });
+
+  const sessions = sessionsData ?? [];
+  const error = sessionsError ? parseApiError(sessionsError, 'Не удалось загрузить сессии') : null;
+
+  const invalidateSessions = useCallback(
+    () => queryClient.invalidateQueries({ queryKey: ['sessions'] }),
+    [queryClient],
+  );
+
   const [search, setSearch] = useState('');
   const [creating, setCreating] = useState(false);
   const [createError, setCreateError] = useState(null);
@@ -256,33 +277,6 @@ export default function SessionsList({ components = {} } = {}) {
   const [closeTarget, setCloseTarget] = useState(null);
   const [closeMode, setCloseMode] = useState('save');
   const [closing, setClosing] = useState(false);
-
-  const loadSessions = useCallback(async () => {
-    try {
-      setLoading(true);
-      setError(null);
-
-      const res = await sessionsAPI.list();
-      const data = res?.data;
-
-      const list = Array.isArray(data?.results)
-        ? data.results
-        : Array.isArray(data)
-          ? data
-          : [];
-
-      setSessions(list);
-      setSelected(new Set());
-    } catch (err) {
-      setError(parseApiError(err, 'Не удалось загрузить сессии'));
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    loadSessions();
-  }, [loadSessions]);
 
   const handleCreate = useCallback(async () => {
     trackEvent('create_session_requested', { source: 'sessions_list' });
@@ -300,23 +294,21 @@ export default function SessionsList({ components = {} } = {}) {
           source: 'sessions_list',
           sessionId: String(sessionId),
         });
-
         navigate(`/generation/${sessionId}`);
       } else {
         setCreateError('Сессия создана, но не удалось получить ID. Обновите страницу.');
-        await loadSessions();
+        await invalidateSessions();
       }
     } catch (err) {
       trackEvent('create_session_fail', {
         source: 'sessions_list',
         reason: parseApiError(err, 'Ошибка создания'),
       });
-
       setCreateError(parseApiError(err, 'Ошибка создания сессии'));
     } finally {
       setCreating(false);
     }
-  }, [navigate, loadSessions]);
+  }, [navigate, invalidateSessions]);
 
   const openSession = useCallback((session, cityRow, source = 'row') => {
     if (!session?.id) return;
@@ -350,7 +342,7 @@ export default function SessionsList({ components = {} } = {}) {
       await sessionsAPI.close(closeTarget.id, closeMode);
       setCloseTarget(null);
       showNote('Сессия закрыта', 'success');
-      await loadSessions();
+      await invalidateSessions();
     } catch (err) {
       showNote(parseApiError(err, 'Ошибка закрытия сессии'), 'error');
     } finally {
@@ -379,7 +371,7 @@ export default function SessionsList({ components = {} } = {}) {
       }
 
       setDeleteTarget(null);
-      await loadSessions();
+      await invalidateSessions();
     } catch (err) {
       showNote(
         parseApiError(
@@ -480,7 +472,7 @@ export default function SessionsList({ components = {} } = {}) {
       showNote(`Удалено ${totalCount} элементов`, 'success');
     }
 
-    await loadSessions();
+    await invalidateSessions();
   };
 
   const isActive = (session) => session.status === 'draft' || session.status === 'in_progress';
@@ -652,12 +644,12 @@ export default function SessionsList({ components = {} } = {}) {
       {
         id: 'refresh-sessions',
         label: 'Обновить список',
-        onClick: () => loadSessions(),
+        onClick: () => refetchSessions(),
       },
     ]);
 
     return () => setMobileActions([]);
-  }, [setMobileActions, creating, loadSessions, handleCreate]);
+  }, [setMobileActions, creating, refetchSessions, handleCreate]);
 
   const isDeleteDraftTarget = deleteTarget?.type === 'draft';
   const deleteTargetSession = deleteTarget?.session;
@@ -763,7 +755,7 @@ export default function SessionsList({ components = {} } = {}) {
         {error && (
           <div className="px-4 py-3 bg-red-50 text-sm text-red-700 border-b border-red-100">
             {error}
-            <button onClick={loadSessions} className="ml-3 underline">
+            <button onClick={refetchSessions} className="ml-3 underline">
               Повторить
             </button>
           </div>
