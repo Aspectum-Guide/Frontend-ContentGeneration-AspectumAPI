@@ -17,7 +17,7 @@ import {
   removeFilterIdsFromTree,
   upsertEventFilterInTree,
 } from '../../../features/catalog/shared/normalize';
-import { normalizeId } from './useSessionWizardHelpers';
+import { normalizeId } from './sessionWizardShared.jsx';
 
 export default function useTags({ showNote, confirm } = {}) {
   const [cityFilterTree, setCityFilterTree] = useState([]);

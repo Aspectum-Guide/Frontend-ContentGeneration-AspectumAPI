@@ -356,6 +356,24 @@ export const filterCityInfosForActiveDraft = (
   );
 };
 
+export const normalizeTagIds = (value) => {
+  if (!Array.isArray(value)) return [];
+
+  return [...new Set(
+    value
+      .map((item) => {
+        if (item == null) return '';
+
+        if (typeof item === 'object') {
+          return String(item.id ?? item.uuid ?? item.pk ?? '');
+        }
+
+        return String(item);
+      })
+      .filter(Boolean)
+  )];
+};
+
 export { SessionStatusBadge as StatusBadge } from '../../../components/ui/StatusBadge.jsx';
 
 /** Shared AI generation modal layout: `components/generation/AiGenerationModal.jsx` */

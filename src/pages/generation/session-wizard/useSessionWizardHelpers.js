@@ -11,6 +11,16 @@ import {
 } from './sessionWizardShared.jsx';
 import { interactiveLocationsAPI } from '../../../api/generation';
 
+export const normalizeServerCityDraftsFromSessionData = (sessionData) => {
+  if (!sessionData) return [];
+  const drafts = sessionData.city_drafts || [];
+  return drafts.map((d) => ({
+    ...d,
+    id: normalizeDraftId(d.id),
+    tags: normalizeTagIds(d.tags ?? d.city_tags ?? []),
+  }));
+};
+
 export const normalizeInteractiveLocation = (loc = {}) => {
   const index = Number(loc.index ?? loc.order ?? 0);
   const cityId = normalizeId(loc.city_id ?? loc.city) || null;
@@ -56,7 +66,7 @@ export const normalizeInteractiveLocation = (loc = {}) => {
   };
 };
 
-const normalizeDraftId = (value) => {
+export const normalizeDraftId = (value) => {
   if (value == null || value === '') return null;
   return String(value);
 };

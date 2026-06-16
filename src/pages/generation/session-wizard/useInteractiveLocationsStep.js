@@ -11,13 +11,12 @@ import { formatGenerationDedupeResultMessage } from '../../../components/generat
 import {
   buildGenerationPayloadFields,
 } from '../../../components/generation/AiGenerationQualitySettings.jsx';
-import { normalizeTagIds } from './sessionWizardShared.jsx';
+import { normalizeTagIds, normalizeId } from './sessionWizardShared.jsx';
 import {
   normalizeInteractiveLocation,
   buildIlPersistSnapshot,
   persistInteractiveLocationRecord,
   buildAttrLocaleDataWithPrevious,
-  normalizeId,
 } from './useSessionWizardHelpers.js';
 
 function normalizeDraftId(value) {

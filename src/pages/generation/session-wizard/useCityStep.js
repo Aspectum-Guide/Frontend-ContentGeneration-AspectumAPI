@@ -34,7 +34,7 @@ import {
   TASK_NOT_FOUND_MESSAGE,
 } from '../../../utils/generationTaskPoll';
 
-const makeLocaleData = () => {
+export const makeLocaleData = () => {
   return Object.fromEntries(
     DEFAULT_LOCALE_DEFS.map((locale) => [
       locale.key,
@@ -468,7 +468,7 @@ const createEmptyCityInfo = ({
   };
 };
 
-function extractReferenceCities(data) {
+export function extractReferenceCities(data) {
   if (Array.isArray(data)) return data;
 
   if (Array.isArray(data?.cities)) return data.cities;

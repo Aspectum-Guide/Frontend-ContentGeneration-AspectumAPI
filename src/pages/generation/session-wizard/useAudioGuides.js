@@ -4,8 +4,10 @@ import { parseApiError } from '../../../utils/apiError';
 import {
   normalizeId,
   DEFAULT_LOCALE_DEFS,
-  getMultilangKeys,
   getLocaleInfo,
+} from './sessionWizardShared.jsx';
+import {
+  getMultilangKeys,
 } from './useSessionWizardHelpers.js';
 
 const DEFAULT_AUDIO_GUIDE_PLAN_ITEMS_COUNT = 6;
