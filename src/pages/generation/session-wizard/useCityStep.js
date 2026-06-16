@@ -468,20 +468,7 @@ const createEmptyCityInfo = ({
   };
 };
 
-export function extractReferenceCities(data) {
-  if (Array.isArray(data)) return data;
-
-  if (Array.isArray(data?.cities)) return data.cities;
-  if (Array.isArray(data?.results)) return data.results;
-  if (Array.isArray(data?.items)) return data.items;
-  if (Array.isArray(data?.data)) return data.data;
-
-  if (Array.isArray(data?.data?.cities)) return data.data.cities;
-  if (Array.isArray(data?.data?.results)) return data.data.results;
-  if (Array.isArray(data?.data?.items)) return data.data.items;
-
-  return [];
-}
+export { extractReferenceCities } from './useSessionWizardHelpers.js';
 
 export default function useCityStep(ctx) {
   const {
