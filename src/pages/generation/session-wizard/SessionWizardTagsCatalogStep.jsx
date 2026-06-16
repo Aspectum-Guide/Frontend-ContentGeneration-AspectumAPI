@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { normalizeId } from './sessionWizardShared.jsx';
 
 const transliterateRu = (value) => {
   const map = {
@@ -76,16 +77,6 @@ const getMultilangDisplay = (value, fallback = '') => {
   }
 
   return fallback;
-};
-
-const normalizeId = (value) => {
-  if (value == null) return '';
-
-  if (typeof value === 'object') {
-    return String(value.id ?? value.uuid ?? value.pk ?? '');
-  }
-
-  return String(value);
 };
 
 const getTreeChildNodes = (node) => {

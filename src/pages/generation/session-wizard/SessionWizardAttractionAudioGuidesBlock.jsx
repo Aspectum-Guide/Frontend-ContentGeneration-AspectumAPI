@@ -2,17 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 
 import { audioAPI } from '../../../api/generation';
 
-import { getAttrName, getFlag } from './sessionWizardShared.jsx';
-
-const normalizeId = (value) => {
-  if (value == null) return '';
-
-  if (typeof value === 'object') {
-    return String(value.id ?? value.uuid ?? value.pk ?? '');
-  }
-
-  return String(value);
-};
+import { getAttrName, getFlag, normalizeId } from './sessionWizardShared.jsx';
 
 const getAttractionDisplayName = (attraction) => {
   if (!attraction) return 'Без названия';

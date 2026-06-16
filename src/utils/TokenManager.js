@@ -228,7 +228,8 @@ class TokenManager {
       const timeoutId = setTimeout(() => controller.abort(), this.REFRESH_TIMEOUT_MS);
 
       // Call refresh endpoint
-      const response = await fetch(`${apiUrl}/auth/token/refresh/`, {
+      const { fetchWithSlashFallback } = await import('./fetchWithSlashFallback');
+      const response = await fetchWithSlashFallback(`${apiUrl}/auth/token/refresh/`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -254,6 +255,13 @@ class TokenManager {
           return {
             success: false,
             error: `Refresh rejected: HTTP ${response.status}`,
+            isAuthError: true,
+          };
+        }
+        if (response.status === 404) {
+          return {
+            success: false,
+            error: `Refresh endpoint not found: HTTP 404`,
             isAuthError: true,
           };
         }

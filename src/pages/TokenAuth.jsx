@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import TokenManager from '../utils/TokenManager';
+import { authAPI } from '../api/auth.ts';
 import Button from '../components/ui/Button';
 
 export default function TokenAuth() {
@@ -25,8 +26,6 @@ export default function TokenAuth() {
   const handleLogin = async (e) => {
     e.preventDefault();
     
-    const apiUrl = import.meta.env.VITE_API_URL || '/api';
-
     try {
       setLoading(true);
       setError(null);
@@ -36,15 +35,9 @@ export default function TokenAuth() {
         return;
       }
 
-      const response = await fetch(`${apiUrl}/auth/login/`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          email: email.trim(),
-          password: password.trim(),
-        }),
+      const { resp: response, data: parsed } = await authAPI.loginJson({
+        email: email.trim(),
+        password: password.trim(),
       });
 
       if (response.status === 401) {
@@ -53,18 +46,16 @@ export default function TokenAuth() {
       }
 
       if (!response.ok) {
-        const data = await response.json().catch(() => ({}));
-        setError(data.detail || `Ошибка сервера: ${response.status}`);
+        setError(`Ошибка сервера: ${response.status}`);
         return;
       }
 
-      const data = await response.json();
-
-      if (!data.access || !data.refresh) {
+      if (!parsed.success) {
         setError('Сервер вернул некорректные токены');
         return;
       }
 
+      const data = parsed.data;
       TokenManager.saveTokens({
         access: data.access,
         refresh: data.refresh,

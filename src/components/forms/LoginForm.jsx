@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import TokenManager from '../../utils/TokenManager';
+import { authAPI } from '../../api/auth.ts';
 
 export default function LoginForm() {
   const [email, setEmail] = useState('');
@@ -15,16 +16,11 @@ export default function LoginForm() {
     setLoading(true);
 
     try {
-      const response = await fetch('/api/auth/login/', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          email,
-          password,
-        }),
-      });
+      // Prefer the single source of truth (authAPI).
+      const { resp: response, data: parsed } = await authAPI.loginJson(
+        { email, password },
+        { baseUrl: '/api' },
+      );
 
       if (!response.ok) {
         const data = await response.json();
@@ -32,11 +28,11 @@ export default function LoginForm() {
         return;
       }
 
-      const data = await response.json();
-      if (!data?.access || !data?.refresh) {
+      if (!parsed.success) {
         setError('Сервер вернул некорректные токены');
         return;
       }
+      const data = parsed.data;
 
       // Unified auth storage: TokenManager (`jwt_tokens`)
       TokenManager.saveTokens({

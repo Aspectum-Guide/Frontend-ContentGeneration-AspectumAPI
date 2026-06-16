@@ -3,7 +3,7 @@ import AiGenerationModal, { WizardGenerationActionFooter } from '../../../compon
 import AiGenerationQualitySettings from '../../../components/generation/AiGenerationQualitySettings.jsx';
 import AiGenerationDedupeToggle from '../../../components/generation/AiGenerationDedupeToggle.jsx';
 import AiGenerationCountField from '../../../components/generation/AiGenerationCountField.jsx';
-import { getFlag } from './sessionWizardShared.jsx';
+import { getFlag, normalizeId } from './sessionWizardShared.jsx';
 
 const AI_GENERATION_LANG_OPTIONS = [
   { value: 'ru', label: 'Русский (ru)' },
@@ -13,16 +13,6 @@ const AI_GENERATION_LANG_OPTIONS = [
   { value: 'de', label: 'Deutsch (de)' },
   { value: 'es', label: 'Español (es)' },
 ];
-
-const normalizeId = (value) => {
-  if (value == null) return '';
-
-  if (typeof value === 'object') {
-    return String(value.id ?? value.uuid ?? value.pk ?? '');
-  }
-
-  return String(value);
-};
 
 const getInfoName = (info) => {
   if (!info) return '(без названия)';

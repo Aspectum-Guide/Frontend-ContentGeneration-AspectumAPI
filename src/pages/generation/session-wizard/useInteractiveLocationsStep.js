@@ -17,12 +17,8 @@ import {
   buildIlPersistSnapshot,
   persistInteractiveLocationRecord,
   buildAttrLocaleDataWithPrevious,
+  normalizeDraftId,
 } from './useSessionWizardHelpers.js';
-
-function normalizeDraftId(value) {
-  if (value == null || value === '') return null;
-  return String(value);
-}
 
 function getAttrName(attr) {
   const name = attr?.name || {};

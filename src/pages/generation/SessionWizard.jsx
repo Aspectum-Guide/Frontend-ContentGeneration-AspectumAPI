@@ -22,7 +22,7 @@ import {
   itemBelongsToActiveCityDraft,
   normalizeId,
 } from './session-wizard/sessionWizardShared.jsx';
-import { useSessionWizardController } from './session-wizard/useSessionWizardController';
+import { useSessionWizardController } from './session-wizard/useSessionWizardController.ts';
 import DefaultToast from '../../components/ui/Toast.jsx';
 import DefaultInlineProgressBanner from '../../components/ui/InlineProgressBanner.jsx';
 import { ConfirmModal as DefaultConfirmModal } from '../../components/ui/Modal.jsx';

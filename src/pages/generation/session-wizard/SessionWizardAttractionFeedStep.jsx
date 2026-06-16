@@ -1,14 +1,4 @@
-import { getFlag } from './sessionWizardShared.jsx';
-
-const normalizeId = (value) => {
-  if (value == null) return '';
-
-  if (typeof value === 'object') {
-    return String(value.id ?? value.uuid ?? value.pk ?? '');
-  }
-
-  return String(value);
-};
+import { getFlag, normalizeId } from './sessionWizardShared.jsx';
 
 const getMultilangDisplay = (value, fallback = '') => {
   if (!value) return fallback;

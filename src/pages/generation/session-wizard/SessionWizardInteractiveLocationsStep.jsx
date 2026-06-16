@@ -4,7 +4,7 @@ import AiGenerationModal, { WizardGenerationActionFooter } from '../../../compon
 import AiGenerationQualitySettings from '../../../components/generation/AiGenerationQualitySettings.jsx';
 import AiGenerationDedupeToggle from '../../../components/generation/AiGenerationDedupeToggle.jsx';
 import AiGenerationCountField from '../../../components/generation/AiGenerationCountField.jsx';
-import { getAttrName, getFlag, getSessionEntityImagePreview, resolveSessionEntityImageOriginalUrl, resolveSessionEntityImageCopyright } from './sessionWizardShared.jsx';
+import { getAttrName, getFlag, getSessionEntityImagePreview, resolveSessionEntityImageOriginalUrl, resolveSessionEntityImageCopyright, normalizeId } from './sessionWizardShared.jsx';
 import SessionWizardAttractionTagsPicker from './SessionWizardAttractionTagsPicker.jsx';
 
 const getCityDisplayName = (city) => {
@@ -51,16 +51,6 @@ const AI_GENERATION_LANG_OPTIONS = [
   { value: 'de', label: 'Deutsch (de)' },
   { value: 'es', label: 'Español (es)' },
 ];
-
-const normalizeId = (value) => {
-  if (value == null) return '';
-
-  if (typeof value === 'object') {
-    return String(value.id ?? value.uuid ?? value.pk ?? '');
-  }
-
-  return String(value);
-};
 
 const getIlDatabaseCityId = (item) => normalizeId(item?.city_id ?? item?.city);
 

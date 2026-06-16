@@ -22,34 +22,13 @@ import {
   resolveSessionEntityImageUrl,
   resolveSessionEntityImageOriginalUrl,
   resolveSessionEntityImageCopyright,
+  normalizeTagIds,
 } from './sessionWizardShared.jsx';
 import {
   getMultilangKeys,
   getAttractionLocaleSourceEntries,
+  normalizeDraftId,
 } from './useSessionWizardHelpers.js';
-
-const normalizeTagIds = (value) => {
-  if (!Array.isArray(value)) return [];
-
-  return [...new Set(
-    value
-      .map((item) => {
-        if (item == null) return '';
-
-        if (typeof item === 'object') {
-          return String(item.id ?? item.uuid ?? item.pk ?? '');
-        }
-
-        return String(item);
-      })
-      .filter(Boolean)
-  )];
-};
-
-const normalizeDraftId = (value) => {
-  if (value == null || value === '') return null;
-  return String(value);
-};
 
 function sortLocaleSourceEntries(entries) {
   if (!Array.isArray(entries) || entries.length <= 1) return entries;

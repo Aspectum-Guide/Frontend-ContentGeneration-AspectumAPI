@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { aiAPI, tasksAPI, cityInfosAPI, cityFiltersAPI, eventFiltersAPI, citiesAPI, imagesAPI, sessionsAPI, referenceAttractionsAPI } from '../../../api/generation';
+import { aiAPI, tasksAPI, cityInfosAPI, cityFiltersAPI, eventFiltersAPI, imagesAPI, sessionsAPI } from '../../../api/generation';
 import { trackEvent } from '../../../utils/analytics';
 import { isNotFoundError, parseApiError } from '../../../utils/apiError';
 import {
@@ -27,7 +27,10 @@ import {
   isLocaleCodeUsedAsCountry,
   normalizeLocaleCountryForSave,
   normalizeLocaleDescriptionForSave,
+  normalizeId,
+  normalizeTagIds,
 } from './sessionWizardShared.jsx';
+import { normalizeDraftId } from './useSessionWizardHelpers.js';
 import {
   pollGenerationTask,
   isPollCancelledError,
@@ -81,11 +84,6 @@ function resolveBackendLanguageCode(langName) {
   return '';
 }
 
-function normalizeDraftId(value) {
-  if (value == null || value === '') return null;
-  return String(value);
-}
-
 function parseMapCoord(value) {
   if (value === null || value === undefined) return NaN;
 
@@ -105,34 +103,6 @@ function hasValidMapCoords(latValue, lonValue) {
     parsedLon <= 180
   );
 }
-
-export const normalizeId = (value) => {
-  if (value == null) return '';
-
-  if (typeof value === 'object') {
-    return String(value.id ?? value.uuid ?? value.pk ?? '');
-  }
-
-  return String(value);
-};
-
-export const normalizeTagIds = (value) => {
-  if (!Array.isArray(value)) return [];
-
-  return [...new Set(
-    value
-      .map((item) => {
-        if (item == null) return '';
-
-        if (typeof item === 'object') {
-          return String(item.id ?? item.uuid ?? item.pk ?? '');
-        }
-
-        return String(item);
-      })
-      .filter(Boolean)
-  )];
-};
 
 const buildCityStepPayload = ({
   localeData,
@@ -468,8 +438,6 @@ const createEmptyCityInfo = ({
   };
 };
 
-export { extractReferenceCities } from './useSessionWizardHelpers.js';
-
 export default function useCityStep(ctx) {
   const {
     sessionId,
@@ -777,51 +745,6 @@ export default function useCityStep(ctx) {
     };
   }, []);
 
-  useEffect(() => {
-    citiesAPI.list({ page_size: 1000, limit: 1000 })
-      .then((res) => {
-        const cities = extractReferenceCities(res?.data);
-        if (import.meta.env.DEV) {
-          console.log('🏙️ Reference cities loaded:', {
-            raw: res?.data,
-            count: cities.length,
-            cities,
-          });
-        }
-      })
-      .catch((err) => {
-        console.error('Не удалось загрузить города из базы:', err);
-      });
-  }, []);
-
-  useEffect(() => {
-    referenceAttractionsAPI.list({ page_size: 1000, limit: 1000 })
-      .then((res) => {
-        const data = res?.data;
-
-        const items = Array.isArray(data)
-          ? data
-          : Array.isArray(data?.results)
-            ? data.results
-            : Array.isArray(data?.data)
-              ? data.data
-              : Array.isArray(data?.items)
-                ? data.items
-                : [];
-
-        if (import.meta.env.DEV) {
-          console.log('🏛️ EventsAPI attractions loaded:', {
-            raw: data,
-            count: items.length,
-            items,
-          });
-        }
-      })
-      .catch((err) => {
-        console.error('Не удалось загрузить достопримечательности из EventsAPI:', err);
-      });
-  }, []);
-
   const markCityDraftCreatedLocally = useCallback((draft) => {
     const draftId = normalizeDraftId(draft?.id);
 
@@ -1058,7 +981,7 @@ export default function useCityStep(ctx) {
   }, []);
 
   const saveCitySilently = useCallback(async () => {
-    if (!sessionId || !defaultLocale || !localeData[defaultLocale]) return;
+    if (!sessionId || !session || !defaultLocale || !localeData[defaultLocale]) return;
 
     clearTimeout(autoSaveTimerRef.current);
     await waitForCityPersistenceIdle();
@@ -1080,6 +1003,7 @@ export default function useCityStep(ctx) {
     mergeCitySaveResponseIntoState(res?.data);
   }, [
     sessionId,
+    session,
     defaultLocale,
     localeData,
     lat,
@@ -1092,7 +1016,7 @@ export default function useCityStep(ctx) {
   ]);
 
   useEffect(() => {
-    if (currentStepRef.current !== 1 || !sessionId || !defaultLocale) return;
+    if (currentStepRef.current !== 1 || !sessionId || !session || !defaultLocale) return;
     if (!localeData[defaultLocale]) return;
 
     hasUnsavedChangesRef.current = true;
@@ -1135,6 +1059,7 @@ export default function useCityStep(ctx) {
     imageCopyright,
     defaultLocale,
     sessionId,
+    session,
     mergeCitySaveResponseIntoState,
   ]);
 

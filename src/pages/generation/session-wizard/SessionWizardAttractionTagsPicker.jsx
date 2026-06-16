@@ -1,14 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-
-function normalizeId(value) {
-  if (value == null) return '';
-
-  if (typeof value === 'object') {
-    return String(value.id ?? value.uuid ?? value.pk ?? '');
-  }
-
-  return String(value);
-}
+import { normalizeId } from './sessionWizardShared.jsx';
 
 function getMultilangDisplay(value, fallback = '') {
   if (!value) return fallback;
