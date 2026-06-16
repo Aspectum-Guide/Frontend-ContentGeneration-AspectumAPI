@@ -311,6 +311,13 @@ export default function Layout({ children, pageHeader = null, pageHeaderMode = '
             </svg>
             {(sidebarExpanded || isMobile) && 'Выход'}
           </button>
+
+          {/* Build version */}
+          {(sidebarExpanded || isMobile) && (
+            <div className="text-center text-[10px] text-gray-400 pt-1">
+              v{__APP_VERSION__} · {__APP_BUILD_DATE__}
+            </div>
+          )}
         </div>
       </aside>
 

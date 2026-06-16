@@ -1,6 +1,10 @@
 module.exports = {
   root: true,
   env: { browser: true, es2020: true },
+  globals: {
+    __APP_VERSION__: 'readonly',
+    __APP_BUILD_DATE__: 'readonly',
+  },
   extends: [
     'eslint:recommended',
     'plugin:react/recommended',
