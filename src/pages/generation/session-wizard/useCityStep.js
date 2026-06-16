@@ -515,6 +515,12 @@ export default function useCityStep(ctx) {
   const cityInfoGenPollCancelledRef = useRef(false);
   const cityInfoGenInFlightRef = useRef(false);
 
+  useEffect(() => {
+    if (!session?.id || !Array.isArray(session.city_infos)) return;
+    if (cityInfoSavingRef.current || cityInfoAutoSaving) return;
+    setCityInfos(session.city_infos.map(normalizeCityInfo));
+  }, [session?.id, session?.city_infos, cityInfoAutoSaving]);
+
   const [aiGenerationMode, setAiGenerationMode] = useState(DEFAULT_GENERATION_MODE);
   const [aiUseWebSearch, setAiUseWebSearch] = useState(false);
   const [aiAdvancedGenerationAvailable, setAiAdvancedGenerationAvailable] = useState(true);

@@ -74,15 +74,8 @@ export function getAttrName(attr) {
   return name.ru || name.en || name.it || Object.values(name).find(Boolean) || '(без названия)';
 }
 
-export const normalizeId = (value) => {
-  if (value === null || value === undefined) return '';
-
-  if (typeof value === 'object') {
-    return String(value.id ?? value.uuid ?? value.pk ?? '').trim();
-  }
-
-  return String(value).trim();
-};
+import { normalizeId, normalizeTagIds } from '../../../utils/normalization';
+export { normalizeId, normalizeTagIds };
 
 const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -354,24 +347,6 @@ export const filterCityInfosForActiveDraft = (
   return (items || []).filter((item) =>
     itemBelongsToActiveCityDraft(item, { activeCityDraftId, activeDatabaseCityId })
   );
-};
-
-export const normalizeTagIds = (value) => {
-  if (!Array.isArray(value)) return [];
-
-  return [...new Set(
-    value
-      .map((item) => {
-        if (item == null) return '';
-
-        if (typeof item === 'object') {
-          return String(item.id ?? item.uuid ?? item.pk ?? '');
-        }
-
-        return String(item);
-      })
-      .filter(Boolean)
-  )];
 };
 
 export { SessionStatusBadge as StatusBadge } from '../../../components/ui/StatusBadge.jsx';

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { interactiveLocationsAPI, imagesAPI as defaultImagesAPI, aiAPI, tasksAPI } from '../../../api/generation';
+import { interactiveLocationsAPI, imagesAPI as defaultImagesAPI, aiAPI, tasksAPI, sessionsAPI } from '../../../api/generation';
 import {
   pollGenerationTask,
   isPollCancelledError,
@@ -39,6 +39,7 @@ export default function useInteractiveLocationsStep({
   aiUseWebSearch,
   imagesAPI: imagesApiOverride,
   collectWizardLanguageCodes,
+  session,
 }) {
   const imagesAPI = imagesApiOverride || defaultImagesAPI;
 
@@ -82,6 +83,32 @@ export default function useInteractiveLocationsStep({
       clearTimeout(ilAutoSavedTimerRef.current);
     };
   }, []);
+
+  const reloadInteractiveLocationsFromServer = useCallback(async () => {
+    if (!sessionId) return null;
+    try {
+      const res = await sessionsAPI.get(sessionId, { skipApiGetCache: true });
+      const list = res?.data?.interactive_locations;
+      if (Array.isArray(list)) {
+        setInteractiveLocations(list.map(normalizeInteractiveLocation));
+      }
+      return res?.data || null;
+    } catch (e) {
+      showNote('Не удалось загрузить интерактивные локации', 'error');
+      return null;
+    }
+  }, [sessionId, showNote]);
+
+  useEffect(() => {
+    if (!sessionId) return;
+    reloadInteractiveLocationsFromServer();
+  }, [sessionId, reloadInteractiveLocationsFromServer]);
+
+  useEffect(() => {
+    if (!session?.id || !Array.isArray(session.interactive_locations)) return;
+    if (ilSavingRef.current || ilAutoSaving) return;
+    setInteractiveLocations(session.interactive_locations.map(normalizeInteractiveLocation));
+  }, [session?.id, session?.interactive_locations, ilAutoSaving]);
 
   useEffect(() => {
     ilSavingRef.current = ilSaving;
@@ -576,9 +603,17 @@ export default function useInteractiveLocationsStep({
     setIlGenerationError('');
     setIlGenerationPrompt('');
     setIlGenerationTaskId(null);
-    setIlGenerationAssignedCityType('none');
-    setIlGenerationSessionCityId('');
-    setIlGenerationDatabaseCityId('');
+
+    const draftId = normalizeDraftId(activeCityDraftIdRef.current);
+    if (draftId && draftId !== 'legacy') {
+      setIlGenerationAssignedCityType('draft');
+      setIlGenerationSessionCityId(draftId);
+      setIlGenerationDatabaseCityId('');
+    } else {
+      setIlGenerationAssignedCityType('none');
+      setIlGenerationSessionCityId('');
+      setIlGenerationDatabaseCityId('');
+    }
 
     const loc = ilLocaleData[ilActiveLocale] || localeData[activeCityDraftIdRef?.current ? Object.keys(localeData)[0] : 'ru-RU'];
     const locLang = (loc?.lang || '').trim().toLowerCase();
@@ -619,8 +654,9 @@ export default function useInteractiveLocationsStep({
     let session_city_id = null;
     let city_id = null;
 
+    const activeDraftId = normalizeDraftId(activeCityDraftIdRef.current);
     if (assigned_city_type === 'draft') {
-      const sid = normalizeDraftId(ilGenerationSessionCityId);
+      const sid = normalizeDraftId(ilGenerationSessionCityId) || activeDraftId;
       if (!sid || sid === 'legacy') {
         setIlGenerationError('Выберите город сессии');
         return;
@@ -633,6 +669,8 @@ export default function useInteractiveLocationsStep({
         return;
       }
       city_id = cid;
+    } else if (activeDraftId && activeDraftId !== 'legacy') {
+      session_city_id = activeDraftId;
     }
 
     const langRaw = (ilGenerationLang || 'ru').trim().toLowerCase();
@@ -654,9 +692,13 @@ export default function useInteractiveLocationsStep({
         requested_count: clampGenerationCount(ilGenerationCount, 'interactive_locations'),
         lang,
         languages,
-        assigned_city_type,
-        session_city_id: assigned_city_type === 'draft' ? session_city_id : null,
-        city_id: assigned_city_type === 'database' ? city_id : null,
+        assigned_city_type: session_city_id
+          ? 'draft'
+          : city_id
+            ? 'database'
+            : 'none',
+        session_city_id: session_city_id || null,
+        city_id: city_id || null,
         dedupe_existing_locations: ilDedupeExistingLocations,
         ...buildGenerationPayloadFields(aiGenerationMode, aiUseWebSearch),
       });
@@ -686,15 +728,26 @@ export default function useInteractiveLocationsStep({
         dedupe_existing_locations: ilDedupeExistingLocations,
       });
       const createData = createRes?.data || {};
-      const list = createData.interactive_locations || [];
+      if (createData.success === false) {
+        throw new Error(createData.error || 'Не удалось добавить интерактивные локации в сессию');
+      }
+
+      const list = (createData.interactive_locations || []).map(normalizeInteractiveLocation);
       const createdCount =
         typeof createData.created_count === 'number'
           ? createData.created_count
-          : Array.isArray(list)
-            ? list.length
-            : 0;
+          : list.length;
+
+      if (list.length > 0) {
+        setInteractiveLocations((prev) => {
+          const existingIds = new Set(prev.map((item) => String(item.id)));
+          const toAdd = list.filter((item) => item.id && !existingIds.has(String(item.id)));
+          return toAdd.length > 0 ? [...prev, ...toAdd] : prev;
+        });
+      }
 
       const keepDraft = normalizeDraftId(activeCityDraftIdRef.current);
+      await reloadInteractiveLocationsFromServer();
       await loadSession(keepDraft);
 
       if (!ilGenPollCancelledRef.current) {
@@ -742,6 +795,7 @@ export default function useInteractiveLocationsStep({
     openIlDetail,
     showNote,
     activeCityDraftIdRef,
+    reloadInteractiveLocationsFromServer,
   ]);
 
   return {

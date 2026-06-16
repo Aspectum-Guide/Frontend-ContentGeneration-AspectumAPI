@@ -49,56 +49,56 @@ function App() {
       <BrowserRouter>
         <Routes>
           {/* Страница ввода токена */}
-          <Route path="/token-auth" element={<TokenAuth />} />
+          <Route path="/token-auth" element={<ErrorBoundary><TokenAuth /></ErrorBoundary>} />
 
           {/* Открытые маршруты */}
-          <Route path="/" element={<Home />} />
-          {ENABLE_LOGIN && <Route path="/login" element={<Login />} />}
+          <Route path="/" element={<ErrorBoundary><Home /></ErrorBoundary>} />
+          {ENABLE_LOGIN && <Route path="/login" element={<ErrorBoundary><Login /></ErrorBoundary>} />}
 
           {/* Защищённые маршруты - требуют токена */}
 
           {/* Сессии */}
-          <Route path="/generation" element={<ProtectedRoute><SessionsList /></ProtectedRoute>} />
-          <Route path="/generation/list" element={<ProtectedRoute><GenerationList /></ProtectedRoute>} />
-          <Route path="/generation/upload" element={<ProtectedRoute><UploadFile /></ProtectedRoute>} />
-          <Route path="/generation/new" element={<ProtectedRoute><NewSession /></ProtectedRoute>} />
+          <Route path="/generation" element={<ProtectedRoute><ErrorBoundary><SessionsList /></ErrorBoundary></ProtectedRoute>} />
+          <Route path="/generation/list" element={<ProtectedRoute><ErrorBoundary><GenerationList /></ErrorBoundary></ProtectedRoute>} />
+          <Route path="/generation/upload" element={<ProtectedRoute><ErrorBoundary><UploadFile /></ErrorBoundary></ProtectedRoute>} />
+          <Route path="/generation/new" element={<ProtectedRoute><ErrorBoundary><NewSession /></ErrorBoundary></ProtectedRoute>} />
           <Route path="/generation/:sessionId" element={<ProtectedRoute><SessionWizardErrorBoundary><SessionWizard /></SessionWizardErrorBoundary></ProtectedRoute>} />
 
           {/* Работа с ИИ */}
-          <Route path="/ai/settings" element={<ProtectedRoute><AISettings /></ProtectedRoute>} />
-          <Route path="/ai/tts" element={<ProtectedRoute><TTSSettings /></ProtectedRoute>} />
-          <Route path="/ai/playground" element={<ProtectedRoute><Playground /></ProtectedRoute>} />
-          <Route path="/ai/images" element={<ProtectedRoute><ImageGeneration /></ProtectedRoute>} />
-          <Route path="/ai/cities" element={<ProtectedRoute><CityGeneration /></ProtectedRoute>} />
+          <Route path="/ai/settings" element={<ProtectedRoute><ErrorBoundary><AISettings /></ErrorBoundary></ProtectedRoute>} />
+          <Route path="/ai/tts" element={<ProtectedRoute><ErrorBoundary><TTSSettings /></ErrorBoundary></ProtectedRoute>} />
+          <Route path="/ai/playground" element={<ProtectedRoute><ErrorBoundary><Playground /></ErrorBoundary></ProtectedRoute>} />
+          <Route path="/ai/images" element={<ProtectedRoute><ErrorBoundary><ImageGeneration /></ErrorBoundary></ProtectedRoute>} />
+          <Route path="/ai/cities" element={<ProtectedRoute><ErrorBoundary><CityGeneration /></ErrorBoundary></ProtectedRoute>} />
           <Route path="/ai/events" element={<Navigate to="/generation" replace />} />
 
           {/* Задачи генерации */}
-          <Route path="/tasks" element={<ProtectedRoute><MyTasks /></ProtectedRoute>} />
+          <Route path="/tasks" element={<ProtectedRoute><ErrorBoundary><MyTasks /></ErrorBoundary></ProtectedRoute>} />
 
           {/* Справочники */}
-          <Route path="/catalog" element={<ProtectedRoute><CatalogHome /></ProtectedRoute>} />
-          <Route path="/catalog/cities" element={<ProtectedRoute><CitiesCatalog /></ProtectedRoute>} />
-          <Route path="/catalog/events" element={<ProtectedRoute><EventsCatalog /></ProtectedRoute>} />
-          <Route path="/catalog/ticket-types" element={<ProtectedRoute><TicketTypesCatalog /></ProtectedRoute>} />
-          <Route path="/catalog/slot-availabilities" element={<ProtectedRoute><SlotAvailabilitiesCatalog /></ProtectedRoute>} />
-          <Route path="/catalog/ticket-prices" element={<ProtectedRoute><TicketPricesCatalog /></ProtectedRoute>} />
-          <Route path="/catalog/booking-setup" element={<ProtectedRoute><BookingSetupWorkbench /></ProtectedRoute>} />
-          <Route path="/catalog/reservations" element={<ProtectedRoute><BookingReservationsCatalog /></ProtectedRoute>} />
-          <Route path="/catalog/base-prices" element={<ProtectedRoute><BasePricesCatalog /></ProtectedRoute>} />
-          <Route path="/catalog/pricing-rules" element={<ProtectedRoute><PricingRulesCatalog /></ProtectedRoute>} />
-          <Route path="/catalog/analytics" element={<ProtectedRoute><BookingAnalytics /></ProtectedRoute>} />
-          <Route path="/catalog/audio-guides" element={<ProtectedRoute><AudioGuidesCatalog /></ProtectedRoute>} />
-          <Route path="/catalog/interactive-locations" element={<ProtectedRoute><InteractiveLocationsCatalog /></ProtectedRoute>} />
-          <Route path="/catalog/subscription-types" element={<ProtectedRoute><SubscriptionTypesCatalog /></ProtectedRoute>} />
-          <Route path="/catalog/activation-codes" element={<ProtectedRoute><ActivationCodesCatalog /></ProtectedRoute>} />
-          <Route path="/catalog/photos" element={<ProtectedRoute><PhotosCatalog /></ProtectedRoute>} />
-          <Route path="/catalog/tags" element={<ProtectedRoute><TagsFilters /></ProtectedRoute>} />
+          <Route path="/catalog" element={<ProtectedRoute><ErrorBoundary><CatalogHome /></ErrorBoundary></ProtectedRoute>} />
+          <Route path="/catalog/cities" element={<ProtectedRoute><ErrorBoundary><CitiesCatalog /></ErrorBoundary></ProtectedRoute>} />
+          <Route path="/catalog/events" element={<ProtectedRoute><ErrorBoundary><EventsCatalog /></ErrorBoundary></ProtectedRoute>} />
+          <Route path="/catalog/ticket-types" element={<ProtectedRoute><ErrorBoundary><TicketTypesCatalog /></ErrorBoundary></ProtectedRoute>} />
+          <Route path="/catalog/slot-availabilities" element={<ProtectedRoute><ErrorBoundary><SlotAvailabilitiesCatalog /></ErrorBoundary></ProtectedRoute>} />
+          <Route path="/catalog/ticket-prices" element={<ProtectedRoute><ErrorBoundary><TicketPricesCatalog /></ErrorBoundary></ProtectedRoute>} />
+          <Route path="/catalog/booking-setup" element={<ProtectedRoute><ErrorBoundary><BookingSetupWorkbench /></ErrorBoundary></ProtectedRoute>} />
+          <Route path="/catalog/reservations" element={<ProtectedRoute><ErrorBoundary><BookingReservationsCatalog /></ErrorBoundary></ProtectedRoute>} />
+          <Route path="/catalog/base-prices" element={<ProtectedRoute><ErrorBoundary><BasePricesCatalog /></ErrorBoundary></ProtectedRoute>} />
+          <Route path="/catalog/pricing-rules" element={<ProtectedRoute><ErrorBoundary><PricingRulesCatalog /></ErrorBoundary></ProtectedRoute>} />
+          <Route path="/catalog/analytics" element={<ProtectedRoute><ErrorBoundary><BookingAnalytics /></ErrorBoundary></ProtectedRoute>} />
+          <Route path="/catalog/audio-guides" element={<ProtectedRoute><ErrorBoundary><AudioGuidesCatalog /></ErrorBoundary></ProtectedRoute>} />
+          <Route path="/catalog/interactive-locations" element={<ProtectedRoute><ErrorBoundary><InteractiveLocationsCatalog /></ErrorBoundary></ProtectedRoute>} />
+          <Route path="/catalog/subscription-types" element={<ProtectedRoute><ErrorBoundary><SubscriptionTypesCatalog /></ErrorBoundary></ProtectedRoute>} />
+          <Route path="/catalog/activation-codes" element={<ProtectedRoute><ErrorBoundary><ActivationCodesCatalog /></ErrorBoundary></ProtectedRoute>} />
+          <Route path="/catalog/photos" element={<ProtectedRoute><ErrorBoundary><PhotosCatalog /></ErrorBoundary></ProtectedRoute>} />
+          <Route path="/catalog/tags" element={<ProtectedRoute><ErrorBoundary><TagsFilters /></ErrorBoundary></ProtectedRoute>} />
 
           {/* Экспорт / Импорт */}
-          <Route path="/export/zip" element={<ProtectedRoute><ExportZip /></ProtectedRoute>} />
-          <Route path="/export/cities" element={<ProtectedRoute><ExportCities /></ProtectedRoute>} />
-          <Route path="/export/events" element={<ProtectedRoute><ExportEvents /></ProtectedRoute>} />
-          <Route path="/import/google-sheet" element={<ProtectedRoute><ImportGoogleSheet /></ProtectedRoute>} />
+          <Route path="/export/zip" element={<ProtectedRoute><ErrorBoundary><ExportZip /></ErrorBoundary></ProtectedRoute>} />
+          <Route path="/export/cities" element={<ProtectedRoute><ErrorBoundary><ExportCities /></ErrorBoundary></ProtectedRoute>} />
+          <Route path="/export/events" element={<ProtectedRoute><ErrorBoundary><ExportEvents /></ErrorBoundary></ProtectedRoute>} />
+          <Route path="/import/google-sheet" element={<ProtectedRoute><ErrorBoundary><ImportGoogleSheet /></ErrorBoundary></ProtectedRoute>} />
 
           {/* 404 */}
           <Route path="*" element={<NotFound />} />

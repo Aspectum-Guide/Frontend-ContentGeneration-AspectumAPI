@@ -4,7 +4,7 @@
  * Each session is rendered as a compact group header, and each city draft is a
  * real table row inside that session.
  */
-import { Fragment, useCallback, useMemo, useState } from 'react';
+import { Fragment, useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { sessionsAPI } from '../../api/generation';

@@ -599,6 +599,7 @@ export function useAttractionsStep(ctx) {
     aiUseWebSearch,
     getSessionUuid,
     imagesAPI: imagesAPIProp,
+    session,
   } = ctx;
 
   const imagesAPI = imagesAPIProp || defaultImagesAPI;
@@ -684,6 +685,56 @@ export function useAttractionsStep(ctx) {
       clearTimeout(attractionFeedAutoSavedTimerRef.current);
     };
   }, []);
+
+  const reloadAttractionsFromServer = useCallback(async () => {
+    if (!sessionId) return null;
+    try {
+      const res = await sessionsAPI.get(sessionId, { skipApiGetCache: true });
+      const data = res?.data || {};
+
+      if (Array.isArray(data.attractions)) {
+        setAttractions(data.attractions.map(normalizeAttraction));
+      }
+      if (Array.isArray(data.attraction_infos)) {
+        setAttractionInfos(data.attraction_infos.map(normalizeAttractionInfo));
+      }
+      if (Array.isArray(data.attraction_feed_items)) {
+        setAttractionFeedItems(data.attraction_feed_items.map(normalizeAttractionFeedItem));
+      }
+
+      setAttractionsLoaded(true);
+      return data;
+    } catch (e) {
+      showNote('Не удалось загрузить достопримечательности', 'error');
+      return null;
+    }
+  }, [sessionId, showNote]);
+
+  useEffect(() => {
+    if (!sessionId) return;
+    reloadAttractionsFromServer();
+  }, [sessionId, reloadAttractionsFromServer]);
+
+  useEffect(() => {
+    if (!session?.id || !Array.isArray(session.attractions)) return;
+    if (attrSavingRef.current || attrAutoSaving) return;
+
+    setAttractions(session.attractions.map(normalizeAttraction));
+    setAttractionsLoaded(true);
+
+    if (Array.isArray(session.attraction_infos)) {
+      setAttractionInfos(session.attraction_infos.map(normalizeAttractionInfo));
+    }
+    if (Array.isArray(session.attraction_feed_items)) {
+      setAttractionFeedItems(session.attraction_feed_items.map(normalizeAttractionFeedItem));
+    }
+  }, [
+    session?.id,
+    session?.attractions,
+    session?.attraction_infos,
+    session?.attraction_feed_items,
+    attrAutoSaving,
+  ]);
 
   // ─── buildAttrLocaleData ───────────────────────────────────────────────────
   const buildAttrLocaleData = useCallback((attr = {}, previousData = null) => {
@@ -2290,9 +2341,17 @@ export function useAttractionsStep(ctx) {
     setAttractionGenerationError('');
     setAttractionGenerationPrompt('');
     setAttractionGenerationTaskId(null);
-    setAttractionGenerationAssignedCityType('none');
-    setAttractionGenerationSessionCityId('');
-    setAttractionGenerationDatabaseCityId('');
+
+    const draftId = normalizeDraftId(activeCityDraftIdRef.current);
+    if (draftId && draftId !== 'legacy') {
+      setAttractionGenerationAssignedCityType('draft');
+      setAttractionGenerationSessionCityId(draftId);
+      setAttractionGenerationDatabaseCityId('');
+    } else {
+      setAttractionGenerationAssignedCityType('none');
+      setAttractionGenerationSessionCityId('');
+      setAttractionGenerationDatabaseCityId('');
+    }
 
     const resolveDefaultAiLang = () => {
       const entries = Object.values(localeData || {});
@@ -2361,8 +2420,9 @@ export function useAttractionsStep(ctx) {
     let session_city_id = null;
     let city_id = null;
 
+    const activeDraftId = normalizeDraftId(activeCityDraftIdRef.current);
     if (assigned_city_type === 'draft') {
-      const sid = normalizeDraftId(attractionGenerationSessionCityId);
+      const sid = normalizeDraftId(attractionGenerationSessionCityId) || activeDraftId;
       if (!sid || sid === 'legacy') {
         setAttractionGenerationError('Выберите город сессии');
         return;
@@ -2375,6 +2435,8 @@ export function useAttractionsStep(ctx) {
         return;
       }
       city_id = cid;
+    } else if (activeDraftId && activeDraftId !== 'legacy') {
+      session_city_id = activeDraftId;
     }
 
     const langRaw = (attractionGenerationLang || 'ru').trim().toLowerCase();
@@ -2393,9 +2455,13 @@ export function useAttractionsStep(ctx) {
         requested_count: clampGenerationCount(attractionGenerationCount, 'attractions'),
         dedupe_existing_items: attractionDedupeExistingItems,
         lang,
-        assigned_city_type,
-        session_city_id: assigned_city_type === 'draft' ? session_city_id : null,
-        city_id: assigned_city_type === 'database' ? city_id : null,
+        assigned_city_type: session_city_id
+          ? 'draft'
+          : city_id
+            ? 'database'
+            : 'none',
+        session_city_id: session_city_id || null,
+        city_id: city_id || null,
         ...buildGenerationPayloadFields(aiGenerationMode, aiUseWebSearch),
       });
       const taskId = startRes?.data?.task_id;
@@ -2426,10 +2492,28 @@ export function useAttractionsStep(ctx) {
         dedupe_existing_items: attractionDedupeExistingItems,
       });
       const createData = createRes?.data || {};
-      const list = createData.attractions || [];
-      const n = typeof createData.created_count === 'number' ? createData.created_count : list.length;
+      if (createData.success === false) {
+        throw new Error(createData.error || 'Не удалось добавить достопримечательности в сессию');
+      }
+
+      const createdList = (createData.attractions || []).map(normalizeAttraction);
+      if (createdList.length > 0) {
+        setAttractions((prev) => {
+          const existingIds = new Set(prev.map((item) => String(item.id)));
+          const toAdd = createdList.filter(
+            (item) => item.id && !existingIds.has(String(item.id)),
+          );
+          return toAdd.length > 0 ? [...prev, ...toAdd] : prev;
+        });
+      }
+
+      const n =
+        typeof createData.created_count === 'number'
+          ? createData.created_count
+          : createdList.length;
 
       const keepDraft = normalizeDraftId(activeCityDraftIdRef.current);
+      await reloadAttractionsFromServer();
       await loadSession(keepDraft);
 
       if (!attractionGenPollCancelledRef.current) {
@@ -2470,19 +2554,8 @@ export function useAttractionsStep(ctx) {
     loadSession,
     showNote,
     activeCityDraftIdRef,
+    reloadAttractionsFromServer,
   ]);
-
-  // ─── loadAttractions ───────────────────────────────────────────────────────
-  const loadAttractions = useCallback(async () => {
-    try {
-      const res = await sessionsAPI.get(sessionId);
-      const list = res?.data?.attractions || [];
-      setAttractions(list.map(normalizeAttraction));
-      setAttractionsLoaded(true);
-    } catch (e) {
-      showNote('Не удалось загрузить достопримечательности', 'error');
-    }
-  }, [sessionId, showNote]);
 
   // ─── Return ────────────────────────────────────────────────────────────────
   return {
@@ -2597,6 +2670,6 @@ export function useAttractionsStep(ctx) {
     setAttractionGenerationAssignedCityTypeSafe,
     generateAttractionsFromPrompt,
 
-    loadAttractions,
+    reloadAttractionsFromServer,
   };
 }

@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { tasksAPI } from '../../api/generation';
+import { Link } from 'react-router-dom';
+import { tasksAPI, aiAPI } from '../../api/generation';
 import Layout from '../../components/Layout';
 import DataTable from '../../components/ui/DataTable';
 import Modal from '../../components/ui/Modal';
@@ -26,6 +27,24 @@ const STATUS_LABELS = {
   cancelled: 'Отменена',
 };
 
+const APPLY_TASK_TYPES = {
+  generate_attractions: {
+    label: 'Добавить достопримечательности в сессию',
+    apply: (taskId, sessionId) =>
+      aiAPI.attractionsCreateFromTask(taskId, { session_id: sessionId }),
+  },
+  generate_interactive_locations: {
+    label: 'Добавить интерактивные локации в сессию',
+    apply: (taskId, sessionId) =>
+      aiAPI.interactiveLocationsCreateFromTask(taskId, { session_id: sessionId }),
+  },
+  generate_city_info: {
+    label: 'Добавить полезную информацию в сессию',
+    apply: (taskId, sessionId) =>
+      aiAPI.cityInfoCreateFromTask(taskId, { session_id: sessionId }),
+  },
+};
+
 export default function MyTasks() {
   const { setMobileActions } = useLayoutActions();
   const [tasks, setTasks] = useState([]);
@@ -38,6 +57,8 @@ export default function MyTasks() {
   const [taskDetails, setTaskDetails] = useState(null);
   const [detailsLoading, setDetailsLoading] = useState(false);
   const [detailsError, setDetailsError] = useState(null);
+  const [applyingTask, setApplyingTask] = useState(false);
+  const [applyMessage, setApplyMessage] = useState(null);
   const intervalRef = useRef(null);
   const detailsIntervalRef = useRef(null);
 
@@ -103,6 +124,7 @@ export default function MyTasks() {
     setSelectedTaskId(task.id);
     setTaskDetails(null);
     setDetailsError(null);
+    setApplyMessage(null);
     setDetailsOpen(true);
   };
 
@@ -111,7 +133,46 @@ export default function MyTasks() {
     setSelectedTaskId(null);
     setTaskDetails(null);
     setDetailsError(null);
+    setApplyMessage(null);
   };
+
+  const applyTaskResultToSession = useCallback(async () => {
+    if (!taskDetails?.id || !taskDetails?.status || taskDetails.status !== 'completed') return;
+
+    const handler = APPLY_TASK_TYPES[taskDetails.task_type];
+    if (!handler) return;
+
+    const sessionId =
+      taskDetails.session_id ||
+      taskDetails.result_data?.target_session_id ||
+      null;
+    if (!sessionId) {
+      setApplyMessage({ type: 'error', text: 'У задачи нет ID сессии' });
+      return;
+    }
+
+    setApplyingTask(true);
+    setApplyMessage(null);
+    try {
+      const response = await handler.apply(taskDetails.id, sessionId);
+      const data = response?.data || {};
+      const created = data.created_count ?? data.generated_count ?? data.attractions?.length ?? 0;
+      setApplyMessage({
+        type: 'success',
+        text: data.warning || data.partial
+          ? (data.warning || `Создано записей: ${created} (частично)`)
+          : `Создано записей: ${created}`,
+      });
+      await loadTaskDetails(taskDetails.id, true);
+    } catch (err) {
+      setApplyMessage({
+        type: 'error',
+        text: parseApiError(err, 'Не удалось применить результат задачи к сессии'),
+      });
+    } finally {
+      setApplyingTask(false);
+    }
+  }, [taskDetails, loadTaskDetails]);
 
   const formatDateTime = (value) => (value ? new Date(value).toLocaleString('ru-RU') : '—');
 
@@ -353,6 +414,45 @@ export default function MyTasks() {
                 {JSON.stringify(taskDetails.result_data ?? null, null, 2)}
               </pre>
             </section>
+
+            {taskDetails.status === 'completed' && APPLY_TASK_TYPES[taskDetails.task_type] && (
+              <section className="rounded-lg border border-blue-200 bg-blue-50 p-3 space-y-2">
+                <h3 className="text-sm font-semibold text-blue-900">Применить к сессии</h3>
+                <p className="text-xs text-blue-800">
+                  Генерация только сохраняет JSON в задачу. Чтобы записи появились в сессии,
+                  нажмите кнопку ниже (в визарде это происходит автоматически после генерации).
+                </p>
+                {applyMessage && (
+                  <div
+                    className={`text-xs rounded-md px-3 py-2 ${
+                      applyMessage.type === 'error'
+                        ? 'bg-red-100 text-red-800 border border-red-200'
+                        : 'bg-green-100 text-green-800 border border-green-200'
+                    }`}
+                  >
+                    {applyMessage.text}
+                  </div>
+                )}
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    onClick={applyTaskResultToSession}
+                    disabled={applyingTask}
+                    className="px-3 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 disabled:opacity-60"
+                  >
+                    {applyingTask ? 'Применение…' : APPLY_TASK_TYPES[taskDetails.task_type].label}
+                  </button>
+                  {taskDetails.session_id && (
+                    <Link
+                      to={`/generation/${taskDetails.session_id}`}
+                      className="px-3 py-2 text-sm font-medium text-blue-700 border border-blue-300 rounded-md hover:bg-blue-100"
+                    >
+                      Открыть сессию
+                    </Link>
+                  )}
+                </div>
+              </section>
+            )}
 
             <div className="flex justify-end pt-1">
               <button
