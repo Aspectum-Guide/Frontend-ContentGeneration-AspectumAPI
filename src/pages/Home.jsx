@@ -18,7 +18,7 @@ export default function Home() {
               Управление сессиями
             </Button>
           </Link>
-          <Link to="/ai-settings">
+          <Link to="/ai/settings">
             <Button variant="secondary" className="text-lg px-8 py-3">
               Настройки AI
             </Button>

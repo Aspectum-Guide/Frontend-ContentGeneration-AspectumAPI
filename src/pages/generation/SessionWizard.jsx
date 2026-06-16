@@ -775,7 +775,9 @@ export default function SessionWizard({ components = {} } = {}) {
                   if (currentCityInfo) {
                     await saveCurrentCityInfo?.();
                   }
-                })().catch(() => {});
+                })().catch((err) => {
+                  showNote('Ошибка сохранения шага 1: ' + (err?.message || 'Неизвестная ошибка'), 'error');
+                });
 
                 return;
               }
@@ -804,14 +806,18 @@ export default function SessionWizard({ components = {} } = {}) {
                   if (currentAttractionAudioGuide) {
                     await saveCurrentAttractionAudioGuide?.();
                   }
-                })().catch(() => {});
+                })().catch((err) => {
+                  showNote('Ошибка сохранения: ' + (err?.message || 'Неизвестная ошибка'), 'error');
+                });
 
                 return;
               }
 
               if (currentStep === 4) {
                 if (currentIl) {
-                  void saveCurrentIlIfDirty?.().catch(() => {});
+                  void saveCurrentIlIfDirty?.().catch((err) => {
+                    showNote('Ошибка сохранения локации: ' + (err?.message || 'Неизвестная ошибка'), 'error');
+                  });
                 }
                 return;
               }

@@ -223,7 +223,7 @@ class TokenManager {
       }
 
       // Get API URL from environment
-      const apiUrl = import.meta.env.VITE_API_URL || '/api';
+      const apiUrl = import.meta.env.VITE_API_URL || '/api/v1';
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), this.REFRESH_TIMEOUT_MS);
 

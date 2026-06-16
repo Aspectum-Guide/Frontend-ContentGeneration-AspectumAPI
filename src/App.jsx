@@ -2,6 +2,7 @@ import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
 import ErrorBoundary from './components/ErrorBoundary';
 import ProtectedRoute from './components/ProtectedRoute';
 import { LayoutActionsProvider } from './context/LayoutActionsContext';
+import NotFound from './pages/NotFound';
 import AISettings from './pages/ai/AISettings';
 import CityGeneration from './pages/ai/CityGeneration';
 import ImageGeneration from './pages/ai/ImageGeneration';
@@ -96,6 +97,9 @@ function App() {
           <Route path="/export/cities" element={<ProtectedRoute><ExportCities /></ProtectedRoute>} />
           <Route path="/export/events" element={<ProtectedRoute><ExportEvents /></ProtectedRoute>} />
           <Route path="/import/google-sheet" element={<ProtectedRoute><ImportGoogleSheet /></ProtectedRoute>} />
+
+          {/* 404 */}
+          <Route path="*" element={<NotFound />} />
         </Routes>
       </BrowserRouter>
     </LayoutActionsProvider>

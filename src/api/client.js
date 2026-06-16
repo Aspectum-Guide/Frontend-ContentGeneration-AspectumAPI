@@ -16,6 +16,8 @@ const apiClient = axios.create({
   baseURL: API_BASE_URL,
   // JWT-only: не используем cookie-based auth/CSRF
   withCredentials: false,
+  // Не считаем 3xx успешными — ловим 302 в интерсепторе
+  validateStatus: (status) => status >= 200 && status < 300,
   headers: {
     'Content-Type': 'application/json',
   },
@@ -133,6 +135,26 @@ apiClient.interceptors.response.use(
         message: error.message,
         retry: config?._retry,
       });
+    }
+
+    // Обработка 302 — бэкенд вернул редирект вместо JSON
+    // (случается если @login_required сработал до ApiLoginRequiredRedirectMiddleware)
+    if (error.response?.status === 302) {
+      console.warn('⚠️ [APIClient] 302 redirect received — token may be invalid');
+      const tokens = TokenManager.getTokens();
+      if (tokens?.refresh) {
+        try {
+          const refreshResult = await TokenManager.refreshTokens(tokens.refresh);
+          if (refreshResult.success && refreshResult.data) {
+            config.headers = config.headers || {};
+            config.headers.Authorization = `Bearer ${refreshResult.data.access}`;
+            return apiClient(config);
+          }
+        } catch { /* ignore */ }
+      }
+      TokenManager.clearTokens();
+      window.location.replace('/token-auth');
+      return Promise.reject(error);
     }
 
     // Обработка 401 ошибки - попытка обновить токен и повторить запрос
