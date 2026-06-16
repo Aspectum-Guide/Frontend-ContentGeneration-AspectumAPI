@@ -3451,8 +3451,8 @@ export function useSessionWizardController({ sessionId, confirm: confirmProp } =
         setAutoSaved(true);
         hasUnsavedChangesRef.current = false;
         setTimeout(() => setAutoSaved(false), 2500);
-      } catch {
-        // авто-сохранение не должно мешать пользователю — ошибку игнорируем
+      } catch (e) {
+        showNote('Ошибка автосохранения города: ' + parseApiError(e, 'Неизвестная ошибка'), 'error');
       } finally {
         setAutoSaving(false);
       }
@@ -4205,8 +4205,8 @@ export function useSessionWizardController({ sessionId, confirm: confirmProp } =
         attractionFeedAutoSavedTimerRef.current = setTimeout(() => {
           setAttractionFeedAutoSaved(false);
         }, 2500);
-      } catch {
-        // autosave не должен мешать пользователю
+      } catch (e) {
+        showNote('Ошибка автосохранения ленты: ' + parseApiError(e, 'Неизвестная ошибка'), 'error');
       } finally {
         setAttractionFeedAutoSaving(false);
       }
@@ -4985,8 +4985,8 @@ export function useSessionWizardController({ sessionId, confirm: confirmProp } =
         cityInfoAutoSavedTimerRef.current = setTimeout(() => {
           setCityInfoAutoSaved(false);
         }, 2500);
-      } catch {
-        // autosave не должен мешать пользователю
+      } catch (e) {
+        showNote('Ошибка автосохранения информации: ' + parseApiError(e, 'Неизвестная ошибка'), 'error');
       } finally {
         setCityInfoAutoSaving(false);
       }
@@ -5976,8 +5976,8 @@ export function useSessionWizardController({ sessionId, confirm: confirmProp } =
         attractionAudioGuideAutoSavedTimerRef.current = setTimeout(() => {
           setAttractionAudioGuideAutoSaved(false);
         }, 2500);
-      } catch {
-        // autosave не должен мешать пользователю
+      } catch (e) {
+        showNote('Ошибка автосохранения аудиогида: ' + parseApiError(e, 'Неизвестная ошибка'), 'error');
       } finally {
         setAttractionAudioGuideAutoSaving(false);
       }
@@ -7346,8 +7346,8 @@ export function useSessionWizardController({ sessionId, confirm: confirmProp } =
         attrAutoSavedTimerRef.current = setTimeout(() => {
           setAttrAutoSaved(false);
         }, 2500);
-      } catch {
-        // autosave не должен мешать пользователю
+      } catch (e) {
+        showNote('Ошибка автосохранения достопримечательности: ' + parseApiError(e, 'Неизвестная ошибка'), 'error');
       } finally {
         setAttrAutoSaving(false);
       }
@@ -7766,8 +7766,8 @@ export function useSessionWizardController({ sessionId, confirm: confirmProp } =
         ilAutoSavedTimerRef.current = setTimeout(() => {
           setIlAutoSaved(false);
         }, 2500);
-      } catch {
-        // autosave не должен мешать пользователю
+      } catch (e) {
+        showNote('Ошибка автосохранения локации: ' + parseApiError(e, 'Неизвестная ошибка'), 'error');
       } finally {
         setIlAutoSaving(false);
       }
@@ -7961,6 +7961,16 @@ export function useSessionWizardController({ sessionId, confirm: confirmProp } =
       }
 
       const fromStep = currentStepRef.current;
+
+      // Валидация: с шага 1 нельзя перейти дальше без названия города
+      if (fromStep === 1 && target > 1) {
+        const name = localeData[defaultLocale]?.name;
+        if (!name || !name.trim()) {
+          showNote('Укажите название города перед переходом дальше', 'error');
+          return false;
+        }
+      }
+
       const isGoingToPublishStep = target === PUBLISH_STEP;
 
       if (isGoingToPublishStep) {
@@ -7996,7 +8006,7 @@ export function useSessionWizardController({ sessionId, confirm: confirmProp } =
       setCurrentStep(target);
       return true;
     },
-    [saveCurrentIlIfDirty, saveCurrentAttrIfDirty, saveCitySilently, loadSession],
+    [localeData, defaultLocale, showNote, saveCurrentIlIfDirty, saveCurrentAttrIfDirty, saveCitySilently, loadSession],
   );
 
   useEffect(() => {
