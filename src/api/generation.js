@@ -57,8 +57,8 @@ export const attractionsAPI = {
     apiClient.get(`${BASE}/sessions/${sessionId}/attractions/`),
   create: (sessionId, data) =>
     apiClient.post(`${BASE}/sessions/${sessionId}/attractions/`, data),
-  get: (sessionId, attrId) =>
-    apiClient.get(`${BASE}/sessions/${sessionId}/attractions/${attrId}/`),
+  get: (sessionId, attrId, config = {}) =>
+    apiClient.get(`${BASE}/sessions/${sessionId}/attractions/${attrId}/`, config),
   update: (sessionId, attrId, data) =>
     apiClient.patch(`${BASE}/sessions/${sessionId}/attractions/${attrId}/update/`, data),
   delete: (sessionId, attrId) =>
