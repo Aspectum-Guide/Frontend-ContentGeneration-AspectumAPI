@@ -195,6 +195,7 @@ export default function SessionWizard({ components = {} } = {}) {
     saving,
     autoSaving,
     autoSaved,
+    hasUnsavedChangesRef,
     preparingPublishStep,
     closeOpen,
     closeMode,
@@ -357,6 +358,18 @@ export default function SessionWizard({ components = {} } = {}) {
 
     goToStep,
   } = controller;
+
+  // Предупреждение при закрытии вкладки если есть несохранённые изменения
+  useEffect(() => {
+    const handler = (e) => {
+      if (hasUnsavedChangesRef.current) {
+        e.preventDefault();
+        e.returnValue = '';
+      }
+    };
+    window.addEventListener('beforeunload', handler);
+    return () => window.removeEventListener('beforeunload', handler);
+  }, [hasUnsavedChangesRef]);
 
   const currentLocale = localeData[activeLocale] || {};
 
@@ -703,7 +716,12 @@ export default function SessionWizard({ components = {} } = {}) {
         <div className="flex items-center gap-3 min-w-0">
           <button
             type="button"
-            onClick={() => navigate('/generation')}
+            onClick={() => {
+              if (hasUnsavedChangesRef.current) {
+                if (!window.confirm('Есть несохранённые изменения. Покинуть страницу?')) return;
+              }
+              navigate('/generation');
+            }}
             title="Вернуться к списку сессий"
             className="shrink-0 p-1.5 text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
           >

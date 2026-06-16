@@ -2731,6 +2731,7 @@ export function useSessionWizardController({ sessionId, confirm: confirmProp } =
   const [autoSaving, setAutoSaving] = useState(false);
   const autoSavingRef = useRef(false);
   const [autoSaved, setAutoSaved] = useState(false); // brief "Сохранено ✓" flash
+  const hasUnsavedChangesRef = useRef(false);
   const [preparingPublishStep, setPreparingPublishStep] = useState(false);
   const [closeOpen, setCloseOpen] = useState(false);
   const [closeMode, setCloseMode] = useState('save');
@@ -2967,6 +2968,7 @@ export function useSessionWizardController({ sessionId, confirm: confirmProp } =
       if (Array.isArray(data?.attractions)) {
         const nextAttractions = data.attractions.map(normalizeAttraction);
         setAttractions(nextAttractions);
+        setAttractionsLoaded(true);
         setCurrentAttr((prev) => {
           if (!prev?.id) return prev;
           const fresh = nextAttractions.find(
@@ -3034,8 +3036,12 @@ export function useSessionWizardController({ sessionId, confirm: confirmProp } =
 
     } catch (err) {
       if (seq === loadSessionSeqRef.current && !silent) {
-        showNote('Не удалось загрузить сессию: ' + parseApiError(err, 'Ошибка загрузки'), 'error');
-        navigate('/generation');
+        if (err?.response?.status === 404) {
+          showNote('Сессия не найдена', 'error');
+          navigate('/generation');
+        } else {
+          showNote('Не удалось загрузить сессию: ' + parseApiError(err, 'Ошибка загрузки'), 'error');
+        }
       }
     } finally {
       if (!silent) setLoading(false);
@@ -3352,7 +3358,7 @@ export function useSessionWizardController({ sessionId, confirm: confirmProp } =
 
       mergeCitySaveResponseIntoState(data);
 
-      await loadSession(savedDraftId);
+      await loadSession(savedDraftId, { force: true });
 
       if (!firstCitySaveAtRef.current) {
         firstCitySaveAtRef.current = Date.now();
@@ -3423,6 +3429,7 @@ export function useSessionWizardController({ sessionId, confirm: confirmProp } =
     if (currentStepRef.current !== 1 || !sessionId || !defaultLocale) return;
     if (!localeData[defaultLocale]) return;
 
+    hasUnsavedChangesRef.current = true;
     clearTimeout(autoSaveTimerRef.current);
     autoSaveTimerRef.current = setTimeout(async () => {
       if (savingRef.current) return;
@@ -3442,6 +3449,7 @@ export function useSessionWizardController({ sessionId, confirm: confirmProp } =
         const res = await sessionsAPI.updateCity(sessionId, payload);
         mergeCitySaveResponseIntoState(res?.data);
         setAutoSaved(true);
+        hasUnsavedChangesRef.current = false;
         setTimeout(() => setAutoSaved(false), 2500);
       } catch {
         // авто-сохранение не должно мешать пользователю — ошибку игнорируем
@@ -3579,7 +3587,7 @@ export function useSessionWizardController({ sessionId, confirm: confirmProp } =
     }
 
     if (newDraftId) {
-      void loadSession(newDraftId, { silent: true }).catch((error) => {
+      void loadSession(newDraftId, { silent: true, force: true }).catch((error) => {
         console.error('Silent loadSession after create draft failed', error);
       });
     }
@@ -3674,7 +3682,7 @@ export function useSessionWizardController({ sessionId, confirm: confirmProp } =
       );
     }
 
-    void loadSession(nextDraftIdForReload, { silent: true }).catch((error) => {
+    void loadSession(nextDraftIdForReload, { silent: true, force: true }).catch((error) => {
       console.error('Silent loadSession after delete draft failed', error);
     });
   }, [
@@ -3984,7 +3992,7 @@ export function useSessionWizardController({ sessionId, confirm: confirmProp } =
       );
 
       const rawItem = res?.data?.attraction_feed_item || res?.data;
-      const item = normalizeAttractionFeedItem(rawItem || emptyItem);
+      const item = rawItem?.id != null ? normalizeAttractionFeedItem(rawItem) : null;
 
       if (item?.id) {
         const nextItemId = normalizeId(item.id);
@@ -4800,7 +4808,7 @@ export function useSessionWizardController({ sessionId, confirm: confirmProp } =
       );
 
       const rawInfo = res?.data?.city_info || res?.data;
-      const info = normalizeCityInfo(rawInfo || emptyInfo);
+      const info = rawInfo?.id != null ? normalizeCityInfo(rawInfo) : null;
 
       if (info?.id) {
         const localeKeys = Object.keys(localeData || {});
@@ -5075,7 +5083,7 @@ export function useSessionWizardController({ sessionId, confirm: confirmProp } =
       );
 
       const rawInfo = res?.data?.attraction_info || res?.data;
-      const info = normalizeAttractionInfo(rawInfo || emptyInfo);
+      const info = rawInfo?.id != null ? normalizeAttractionInfo(rawInfo) : null;
 
       if (info?.id) {
         const localeKeys = Object.keys(attrLocaleData || {});
@@ -5544,9 +5552,8 @@ export function useSessionWizardController({ sessionId, confirm: confirmProp } =
         buildAttractionAudioGuidePayload(emptyGuide, { includeTracks: false }),
       );
 
-      const rawGuide =
-        res?.data?.attraction_audio_guide || res?.data || emptyGuide;
-      const guide = normalizeAttractionAudioGuide(rawGuide);
+      const rawGuide = res?.data?.attraction_audio_guide || res?.data;
+      const guide = rawGuide?.id != null ? normalizeAttractionAudioGuide(rawGuide) : null;
 
       if (guide?.id) {
         const localeKeys = Object.keys(attrLocaleData || {});
@@ -7322,6 +7329,7 @@ export function useSessionWizardController({ sessionId, confirm: confirmProp } =
 
     if (!isCurrentAttrDirty()) return;
 
+    hasUnsavedChangesRef.current = true;
     attrAutoSaveTimerRef.current = setTimeout(async () => {
       if (attrSavingRef.current) return;
 
@@ -7332,6 +7340,7 @@ export function useSessionWizardController({ sessionId, confirm: confirmProp } =
         await saveCurrentAttr({ silent: true });
 
         setAttrAutoSaved(true);
+        hasUnsavedChangesRef.current = false;
 
         clearTimeout(attrAutoSavedTimerRef.current);
         attrAutoSavedTimerRef.current = setTimeout(() => {
@@ -7740,6 +7749,7 @@ export function useSessionWizardController({ sessionId, confirm: confirmProp } =
 
     if (!isCurrentIlDirty()) return;
 
+    hasUnsavedChangesRef.current = true;
     ilAutoSaveTimerRef.current = setTimeout(async () => {
       if (ilSavingRef.current || ilPhotoUploadingRef.current) return;
 
@@ -7750,6 +7760,7 @@ export function useSessionWizardController({ sessionId, confirm: confirmProp } =
         await saveCurrentIl({ silent: true });
 
         setIlAutoSaved(true);
+        hasUnsavedChangesRef.current = false;
 
         clearTimeout(ilAutoSavedTimerRef.current);
         ilAutoSavedTimerRef.current = setTimeout(() => {
@@ -8555,7 +8566,7 @@ export function useSessionWizardController({ sessionId, confirm: confirmProp } =
     attractionGenerationAssignedCityType, attractionGenerationSessionCityId, attractionGenerationDatabaseCityId, attractionGenerationLang,
     attractionGenerationCount, setAttractionGenerationCount,
     attractionDedupeExistingItems, setAttractionDedupeExistingItems,
-    saving, autoSaving, autoSaved, preparingPublishStep, closeOpen, closeMode, closing, publishing, translating,
+    saving, autoSaving, autoSaved, hasUnsavedChangesRef, preparingPublishStep, closeOpen, closeMode, closing, publishing, translating,
     setAttrView, setCurrentAttr, setAttrActiveLocale,
     setCloseOpen, setCloseMode,
     setMapContainerRef,
