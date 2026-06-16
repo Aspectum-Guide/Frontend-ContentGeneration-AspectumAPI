@@ -4,6 +4,7 @@ import ProtectedRoute from './components/ProtectedRoute';
 import { LayoutActionsProvider } from './context/LayoutActionsContext';
 import NotFound from './pages/NotFound';
 import AISettings from './pages/ai/AISettings';
+import TTSSettings from './pages/ai/TTSSettings';
 import CityGeneration from './pages/ai/CityGeneration';
 import ImageGeneration from './pages/ai/ImageGeneration';
 import Playground from './pages/ai/Playground';
@@ -65,6 +66,7 @@ function App() {
 
           {/* Работа с ИИ */}
           <Route path="/ai/settings" element={<ProtectedRoute><AISettings /></ProtectedRoute>} />
+          <Route path="/ai/tts" element={<ProtectedRoute><TTSSettings /></ProtectedRoute>} />
           <Route path="/ai/playground" element={<ProtectedRoute><Playground /></ProtectedRoute>} />
           <Route path="/ai/images" element={<ProtectedRoute><ImageGeneration /></ProtectedRoute>} />
           <Route path="/ai/cities" element={<ProtectedRoute><CityGeneration /></ProtectedRoute>} />

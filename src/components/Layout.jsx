@@ -93,6 +93,7 @@ export default function Layout({ children, pageHeader = null, pageHeaderMode = '
       title: 'Работа с ИИ',
       items: [
         { label: 'Настройки ИИ', to: '/ai/settings' },
+        { label: 'Настройки TTS', to: '/ai/tts' },
         { label: 'Тестовый стенд', to: '/ai/playground' },
         { label: 'Поиск картинок', to: '/ai/images' },
         { label: 'Генерация городов', to: '/ai/cities', badge: 'AI' },
@@ -145,6 +146,7 @@ export default function Layout({ children, pageHeader = null, pageHeaderMode = '
     { startsWith: '/generation/list', title: 'Список генерации' },
     { startsWith: '/generation/', title: 'Редактор сессии' },
     { startsWith: '/generation', title: 'Сессии' },
+    { startsWith: '/ai/tts', title: 'Настройки TTS' },
     { startsWith: '/ai/settings', title: 'Настройки ИИ' },
     { startsWith: '/ai/playground', title: 'Тестовый стенд' },
     { startsWith: '/ai/images', title: 'Поиск картинок' },
