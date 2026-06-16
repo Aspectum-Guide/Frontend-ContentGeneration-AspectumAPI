@@ -61,7 +61,6 @@ export interface SessionCity {
   image_url: string | null;
   image_original_url: string | null;
   image_copyright: string | null;
-  [key: string]: unknown;
 }
 
 export interface CityDraft {
@@ -72,6 +71,8 @@ export interface CityDraft {
   lat: number | null;
   lon: number | null;
   tags: string[];
+  city_tags?: string[];
+  isPending?: boolean;
   order: number;
   is_primary: boolean;
   image_id: UUID | null;
@@ -79,7 +80,6 @@ export interface CityDraft {
   image_original_url: string | null;
   image_copyright: string | null;
   created_at?: string;
-  [key: string]: unknown;
 }
 
 // ─── Attraction ──────────────────────────────────────────────────────────────
@@ -297,7 +297,9 @@ export interface LocaleDataEntry {
   country: string;
   isDefault: boolean;
   lang?: string;
-  [key: string]: unknown;
+  code?: string;
+  langName?: string;
+  isCustom?: boolean;
 }
 
 export type LocaleData = Record<string, LocaleDataEntry>;

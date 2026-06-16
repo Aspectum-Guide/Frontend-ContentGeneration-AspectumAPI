@@ -1,5 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
+
+interface WizardLocationState {
+  cityDraftId?: string;
+}
 import {
   referenceAttractionsAPI,
   citiesAPI,
@@ -13,8 +17,10 @@ import { useToast } from '../../../components/ui/Toast.jsx';
 import {
   normalizeDraftId,
   normalizeServerCityDraftsFromSessionData,
+  extractReferenceCities,
 } from './useSessionWizardHelpers.js';
-import { makeLocaleData, extractReferenceCities } from './useCityStep.js';
+import { normalizeTagIds } from './sessionWizardShared.jsx';
+import { makeLocaleData } from './useCityStep.js';
 
 import useCityStep from './useCityStep.js';
 import { useAttractionsStep } from './useAttractionsStep.js';
@@ -108,13 +114,12 @@ export function useSessionWizardController({
     const nonLegacy = arr.filter((d) => normalizeDraftId(d?.id) !== 'legacy');
 
     let next = nonLegacy
-      .filter((draft) => !deletedIds.has(normalizeDraftId(draft?.id) as UUID))
+      .filter((draft) => !deletedIds.has(normalizeDraftId(draft?.id) ?? ''))
       .map((draft) => {
         const id = normalizeDraftId(draft?.id);
         if (!id) return null;
-        const n = { ...draft, tags: normalizeDraftId(draft.tags ?? (draft as Record<string, unknown>).city_tags ?? []) };
-        delete (n as Record<string, unknown>).isPending;
-        return n as CityDraft;
+        const { isPending: _removed, ...rest } = draft;
+        return { ...rest, tags: normalizeTagIds(draft.tags ?? draft.city_tags ?? []) } as CityDraft;
       })
       .filter(Boolean) as CityDraft[];
 
@@ -145,9 +150,8 @@ export function useSessionWizardController({
       .map((d) => {
         const id = normalizeDraftId(d?.id);
         if (!id) return null;
-        const n = { ...d, tags: normalizeDraftId(d.tags ?? (d as Record<string, unknown>).city_tags ?? []) };
-        delete (n as Record<string, unknown>).isPending;
-        return n as CityDraft;
+        const { isPending: _removed, ...rest } = d;
+        return { ...rest, tags: normalizeTagIds(d.tags ?? d.city_tags ?? []) } as CityDraft;
       })
       .filter(Boolean) as CityDraft[];
     legacyNorm.sort(sortFn);
@@ -225,7 +229,7 @@ export function useSessionWizardController({
       activeCityDraftIdRef.current = resolvedDraftId;
       setActiveCityDraftId(resolvedDraftId);
 
-      const sessionLegacyTags = data?.city?.tags ?? (data?.city as Record<string, unknown>)?.city_tags as string[] | undefined;
+      const sessionLegacyTags = data?.city?.tags ?? data?.city?.city_tags;
 
       if (!preserveCurrentEditors && loadCityIntoFormRef.current) {
         if (selectedDraft) loadCityIntoFormRef.current(selectedDraft, sessionLegacyTags);
@@ -405,7 +409,8 @@ export function useSessionWizardController({
   const syncActiveDraftRoute = useCallback((draftId: UUID | null) => {
     const normalizedDraftId = normalizeDraftId(draftId);
     const params = new URLSearchParams(location.search);
-    const currentDraftId = normalizeDraftId(params.get('cityDraftId') || (location.state as Record<string, unknown>)?.cityDraftId as string);
+    const state = location.state as WizardLocationState | null;
+    const currentDraftId = normalizeDraftId(params.get('cityDraftId') || state?.cityDraftId);
 
     if (currentDraftId === normalizedDraftId) return;
 
@@ -426,7 +431,8 @@ export function useSessionWizardController({
 
   useEffect(() => {
     const routeDraftId = new URLSearchParams(location.search).get('cityDraftId');
-    requestedCityDraftIdRef.current = normalizeDraftId(routeDraftId || (location.state as Record<string, unknown>)?.cityDraftId as string);
+    const state = location.state as WizardLocationState | null;
+    requestedCityDraftIdRef.current = normalizeDraftId(routeDraftId || state?.cityDraftId);
   }, [location.search, location.state]);
 
   const navigateToStep = useCallback(
