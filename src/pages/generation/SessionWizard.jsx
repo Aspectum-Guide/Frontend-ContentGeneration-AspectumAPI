@@ -174,6 +174,9 @@ export default function SessionWizard({ components = {} } = {}) {
     attractionAudioUploading,
     audioGuideGeneratingPlan,
     audioGuideGeneratingAllMainText,
+    audioGuideMainTextGenerateModalOpen,
+    audioGuideMainTextGeneratePrompt,
+    audioGuideMainTextGenerationError,
     audioGuideGeneratingItemTextById,
     generatingAudioGuideTrack,
     audioGuideTrackGenerationError,
@@ -342,11 +345,27 @@ export default function SessionWizard({ components = {} } = {}) {
     uploadAttractionAudioGuideTrack,
     removeAttractionAudioGuideTrack,
     generateAttractionAudioGuidePlan,
+    openAttractionAudioGuidePlanGenerateModal,
+    closeAttractionAudioGuidePlanGenerateModal,
+    setAudioGuidePlanGeneratePrompt,
+    audioGuidePlanGenerateModalOpen,
+    audioGuidePlanGeneratePrompt,
+    audioGuidePlanGenerationError,
     audioGuidePlanGenerationState,
-    setAttractionAudioGuidePlanGenerationPrompt,
     setAttractionAudioGuidePlanItemsCount,
     generateAttractionAudioGuideMainText,
+    openAttractionAudioGuideMainTextGenerateModal,
+    closeAttractionAudioGuideMainTextGenerateModal,
+    setAudioGuideMainTextGeneratePrompt,
     generateAttractionAudioGuideMainTextItem,
+    openAttractionAudioGuideMainTextItemGenerateModal,
+    closeAttractionAudioGuideMainTextItemGenerateModal,
+    setAudioGuideItemTextGeneratePrompt,
+    audioGuideItemTextGenerateModalOpen,
+    audioGuideItemTextGenerateItemId,
+    audioGuideItemTextGenerateItemTitle,
+    audioGuideItemTextGeneratePrompt,
+    audioGuideItemTextGenerationError,
     generateAttractionAudioGuideTrackAudio,
     elevenLabsSettingsLoading,
     elevenLabsSettingsError,
@@ -1169,7 +1188,13 @@ export default function SessionWizard({ components = {} } = {}) {
                 attractionAudioGuideAutoSaved={attractionAudioGuideAutoSaved}
                 attractionAudioUploading={attractionAudioUploading}
                 audioGuideGeneratingPlan={audioGuideGeneratingPlan}
+                audioGuidePlanGenerateModalOpen={audioGuidePlanGenerateModalOpen}
+                audioGuidePlanGeneratePrompt={audioGuidePlanGeneratePrompt}
+                audioGuidePlanGenerationError={audioGuidePlanGenerationError}
                 audioGuideGeneratingAllMainText={audioGuideGeneratingAllMainText}
+                audioGuideMainTextGenerateModalOpen={audioGuideMainTextGenerateModalOpen}
+                audioGuideMainTextGeneratePrompt={audioGuideMainTextGeneratePrompt}
+                audioGuideMainTextGenerationError={audioGuideMainTextGenerationError}
                 audioGuideGeneratingItemTextById={audioGuideGeneratingItemTextById}
                 generatingAudioGuideTrack={generatingAudioGuideTrack}
                 audioGuideTrackGenerationError={audioGuideTrackGenerationError}
@@ -1192,16 +1217,44 @@ export default function SessionWizard({ components = {} } = {}) {
                 onUploadAttractionAudioGuideTrack={uploadAttractionAudioGuideTrack}
                 onRemoveAttractionAudioGuideTrack={removeAttractionAudioGuideTrack}
                 onGenerateAttractionAudioGuidePlan={generateAttractionAudioGuidePlan}
-                onSetAttractionAudioGuidePlanGenerationPrompt={
-                  setAttractionAudioGuidePlanGenerationPrompt
+                onOpenAttractionAudioGuidePlanGenerateModal={
+                  openAttractionAudioGuidePlanGenerateModal
                 }
+                onCloseAttractionAudioGuidePlanGenerateModal={
+                  closeAttractionAudioGuidePlanGenerateModal
+                }
+                onSetAudioGuidePlanGeneratePrompt={setAudioGuidePlanGeneratePrompt}
                 onSetAttractionAudioGuidePlanItemsCount={
                   setAttractionAudioGuidePlanItemsCount
                 }
+                onOpenAttractionAudioGuideMainTextGenerateModal={
+                  openAttractionAudioGuideMainTextGenerateModal
+                }
+                onCloseAttractionAudioGuideMainTextGenerateModal={
+                  closeAttractionAudioGuideMainTextGenerateModal
+                }
+                onSetAudioGuideMainTextGeneratePrompt={setAudioGuideMainTextGeneratePrompt}
                 onGenerateAttractionAudioGuideMainText={generateAttractionAudioGuideMainText}
                 onGenerateAttractionAudioGuideMainTextItem={
                   generateAttractionAudioGuideMainTextItem
                 }
+                onOpenAttractionAudioGuideMainTextItemGenerateModal={
+                  openAttractionAudioGuideMainTextItemGenerateModal
+                }
+                onCloseAttractionAudioGuideMainTextItemGenerateModal={
+                  closeAttractionAudioGuideMainTextItemGenerateModal
+                }
+                onSetAudioGuideItemTextGeneratePrompt={setAudioGuideItemTextGeneratePrompt}
+                audioGuideItemTextGenerateModalOpen={audioGuideItemTextGenerateModalOpen}
+                audioGuideItemTextGenerateItemId={audioGuideItemTextGenerateItemId}
+                audioGuideItemTextGenerateItemTitle={audioGuideItemTextGenerateItemTitle}
+                audioGuideItemTextGeneratePrompt={audioGuideItemTextGeneratePrompt}
+                audioGuideItemTextGenerationError={audioGuideItemTextGenerationError}
+                aiGenerationMode={aiGenerationMode}
+                aiUseWebSearch={aiUseWebSearch}
+                aiAdvancedGenerationAvailable={aiAdvancedGenerationAvailable}
+                onAiGenerationModeChange={setAiGenerationMode}
+                onAiUseWebSearchChange={setAiUseWebSearch}
                 onGenerateAttractionAudioGuideTrackAudio={
                   generateAttractionAudioGuideTrackAudio
                 }

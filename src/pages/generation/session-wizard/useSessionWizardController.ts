@@ -382,6 +382,7 @@ export function useSessionWizardController({
     currentAttr: attractionsStep.currentAttr, attrLocaleData: attractionsStep.attrLocaleData,
     attractions: attractionsStep.attractions, referenceAttractions,
     getSessionUuid: cityStep.getSessionUuid,
+    aiGenerationMode: cityStep.aiGenerationMode, aiUseWebSearch: cityStep.aiUseWebSearch,
   });
 
   const publishStep = usePublishStep({

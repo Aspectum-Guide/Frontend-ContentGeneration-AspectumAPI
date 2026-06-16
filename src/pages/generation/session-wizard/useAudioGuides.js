@@ -9,6 +9,7 @@ import {
 import {
   getMultilangKeys,
 } from './useSessionWizardHelpers.js';
+import { buildGenerationPayloadFields } from '../../../components/generation/AiGenerationQualitySettings.jsx';
 
 const DEFAULT_AUDIO_GUIDE_PLAN_ITEMS_COUNT = 6;
 const PREFERRED_DEFAULT_ELEVENLABS_VOICE_ID = 'ogi2DyUAKJb7CEdqqvlU';
@@ -690,6 +691,8 @@ export function useAudioGuides({
   attractions,
   referenceAttractions,
   getSessionUuid,
+  aiGenerationMode,
+  aiUseWebSearch,
 }) {
   const [attractionAudioGuides, setAttractionAudioGuides] = useState([]);
   const [currentAttractionAudioGuide, setCurrentAttractionAudioGuide] = useState(null);
@@ -708,8 +711,31 @@ export function useAudioGuides({
   const attractionAudioGuideActiveLocaleRef = useRef('ru-RU');
   const attractionAudioGuideLocaleDataRef = useRef({});
   const [audioGuideGeneratingPlan, setAudioGuideGeneratingPlan] = useState(false);
+  const [audioGuidePlanGenerateModalOpen, setAudioGuidePlanGenerateModalOpen] =
+    useState(false);
+  const [audioGuidePlanGeneratePrompt, setAudioGuidePlanGeneratePrompt] =
+    useState('');
+  const [audioGuidePlanGenerationError, setAudioGuidePlanGenerationError] =
+    useState('');
   const [audioGuideGeneratingAllMainText, setAudioGuideGeneratingAllMainText] = useState(false);
+  const [audioGuideMainTextGenerateModalOpen, setAudioGuideMainTextGenerateModalOpen] =
+    useState(false);
+  const [audioGuideMainTextGeneratePrompt, setAudioGuideMainTextGeneratePrompt] =
+    useState('');
+  const [audioGuideMainTextGenerationError, setAudioGuideMainTextGenerationError] =
+    useState('');
   const [audioGuideGeneratingItemTextById, setAudioGuideGeneratingItemTextById] = useState({});
+  const [audioGuideItemTextGenerateModalOpen, setAudioGuideItemTextGenerateModalOpen] =
+    useState(false);
+  const [audioGuideItemTextGenerateItemId, setAudioGuideItemTextGenerateItemId] =
+    useState(null);
+  const [audioGuideItemTextGenerateItemTitle, setAudioGuideItemTextGenerateItemTitle] =
+    useState('');
+  const audioGuideItemTextGeneratePlanItemRef = useRef(null);
+  const [audioGuideItemTextGeneratePrompt, setAudioGuideItemTextGeneratePrompt] =
+    useState('');
+  const [audioGuideItemTextGenerationError, setAudioGuideItemTextGenerationError] =
+    useState('');
   const [generatingAudioGuideTrack, setGeneratingAudioGuideTrack] = useState(false);
   const [audioGuideTrackGenerationError, setAudioGuideTrackGenerationError] = useState(null);
   const [audioGuidePlanGenerationState, setAudioGuidePlanGenerationState] = useState({});
@@ -1955,6 +1981,110 @@ export function useAudioGuides({
     [sessionId, showNote, audioGuideTtsVoiceId, audioGuideTtsModelId],
   );
 
+  const pendingPlanGenerationRef = useRef(null);
+
+  const runAttractionAudioGuidePlanGeneration = useCallback(
+    async (snapshot, { closeSettingsModalOnSuccess = true } = {}) => {
+      const {
+        guideId,
+        lang,
+        assigned,
+        eventId,
+        sessionAttractionId,
+        title,
+        desired_items_count,
+        prompt,
+        generation_mode,
+        use_web_search,
+      } = snapshot;
+
+      const expectedGuideId = normalizeId(guideId);
+      setAudioGuideGeneratingPlan(true);
+      setAudioGuidePlanGenerationError('');
+
+      try {
+        const planPayload = {
+          lang,
+          title,
+          assigned_attraction_type: assigned,
+          session_attraction_id: sessionAttractionId,
+          event_id: eventId,
+          desired_items_count,
+          generation_mode,
+          use_web_search,
+        };
+        if (prompt) {
+          planPayload.prompt = prompt;
+        }
+
+        const res = await attractionAudioGuidesAPI.generatePlan(
+          sessionId,
+          guideId,
+          planPayload,
+        );
+
+        if (res?.data?.success === false) {
+          const message = res?.data?.error || 'Не удалось сгенерировать план';
+          setAudioGuidePlanGenerationError(message);
+          showNote(message, 'error');
+          return;
+        }
+
+        const rawPlan = res?.data?.content_plan?.[lang];
+        const newPlan = normalizeAudioGuidePlanItemsForLang(rawPlan);
+
+        if (!newPlan.length) {
+          const message = 'План не получен';
+          setAudioGuidePlanGenerationError(message);
+          showNote(message, 'error');
+          return;
+        }
+
+        const freshTexts = {};
+        newPlan.forEach((item) => {
+          freshTexts[item.id] = '';
+        });
+
+        setCurrentAttractionAudioGuide((prev) => {
+          if (!prev || normalizeId(prev.id) !== expectedGuideId) return prev;
+
+          const updated = normalizeAttractionAudioGuide({
+            ...prev,
+            content_plan: {
+              ...(prev.content_plan || {}),
+              [lang]: newPlan,
+            },
+            content_texts: {
+              ...(prev.content_texts || {}),
+              [lang]: freshTexts,
+            },
+          });
+
+          setAttractionAudioGuides((items) =>
+            items.map((item) =>
+              normalizeId(item.id) === expectedGuideId ? updated : item,
+            ),
+          );
+
+          return updated;
+        });
+
+        if (closeSettingsModalOnSuccess) {
+          setAudioGuidePlanGenerateModalOpen(false);
+          setAudioGuidePlanGeneratePrompt('');
+        }
+        showNote('План сгенерирован', 'success');
+      } catch (e) {
+        const message = 'Ошибка генерации плана: ' + parseApiError(e);
+        setAudioGuidePlanGenerationError(message);
+        showNote(message, 'error');
+      } finally {
+        setAudioGuideGeneratingPlan(false);
+      }
+    },
+    [sessionId, showNote],
+  );
+
   const generateAttractionAudioGuidePlan = useCallback(async () => {
     const g = currentAttractionAudioGuideRef.current;
     const activeLoc = attractionAudioGuideActiveLocaleRef.current;
@@ -1969,100 +2099,182 @@ export function useAudioGuides({
     const guideId = g?.id;
 
     if (!g?.id || !guideId) {
+      setAudioGuidePlanGenerationError('Сначала откройте аудиогид');
       showNote('Сначала откройте аудиогид', 'error');
       return;
     }
 
     const planItems = normalizeAudioGuidePlanItemsForLang(g.content_plan?.[lang]);
     const hasPlan = planItems.length > 0;
-    const hasTexts = langHasNonEmptyAudioGuideTexts(g, lang);
-
-    if (hasPlan || hasTexts) {
-      const ok = await confirm({
-        message:
-          'Текущий план и связанные тексты для этого языка будут заменены. Продолжить?',
-        danger: true,
-      });
-      if (!ok) return;
-    }
 
     const expectedGuideId = normalizeId(guideId);
     const planGenState =
       audioGuidePlanGenerationStateRef.current[expectedGuideId]?.[lang] ?? {};
-    const planGenerationPrompt = String(planGenState.prompt ?? '').trim();
     const desiredItemsCount = normalizeAudioGuidePlanItemsCount(
       planGenState.desiredItemsCount,
     );
-    setAudioGuideGeneratingPlan(true);
+    const generationFields = buildGenerationPayloadFields(
+      aiGenerationMode,
+      aiUseWebSearch,
+    );
+    const payloadSnapshot = {
+      guideId,
+      lang,
+      assigned,
+      eventId,
+      sessionAttractionId,
+      title: g.title ?? {},
+      desired_items_count: desiredItemsCount,
+      prompt: audioGuidePlanGeneratePrompt.trim(),
+      generation_mode: generationFields.generation_mode,
+      use_web_search: generationFields.use_web_search,
+    };
 
-    try {
-      const planPayload = {
-        lang,
-        title: g.title ?? {},
-        assigned_attraction_type: assigned,
-        session_attraction_id: sessionAttractionId,
-        event_id: eventId,
-        desired_items_count: desiredItemsCount,
-      };
-      if (planGenerationPrompt) {
-        planPayload.prompt = planGenerationPrompt;
-      }
-
-      const res = await attractionAudioGuidesAPI.generatePlan(
-        sessionId,
-        guideId,
-        planPayload,
-      );
-
-      if (res?.data?.success === false) {
-        showNote(res?.data?.error || 'Не удалось сгенерировать план', 'error');
-        return;
-      }
-
-      const rawPlan = res?.data?.content_plan?.[lang];
-      const newPlan = normalizeAudioGuidePlanItemsForLang(rawPlan);
-
-      if (!newPlan.length) {
-        showNote('План не получен', 'error');
-        return;
-      }
-
-      const freshTexts = {};
-      newPlan.forEach((item) => {
-        freshTexts[item.id] = '';
+    if (hasPlan) {
+      pendingPlanGenerationRef.current = payloadSnapshot;
+      const ok = await confirm({
+        message:
+          'Существующий план для этого языка будет заменён. Продолжить?',
+        danger: true,
+        confirmLabel: 'Продолжить',
       });
+      if (!ok) {
+        pendingPlanGenerationRef.current = null;
+        return;
+      }
 
-      setCurrentAttractionAudioGuide((prev) => {
-        if (!prev || normalizeId(prev.id) !== expectedGuideId) return prev;
+      const pendingPayload = pendingPlanGenerationRef.current;
+      pendingPlanGenerationRef.current = null;
+      setAudioGuidePlanGenerateModalOpen(false);
+      await runAttractionAudioGuidePlanGeneration(pendingPayload, {
+        closeSettingsModalOnSuccess: false,
+      });
+      return;
+    }
 
-        const updated = normalizeAttractionAudioGuide({
-          ...prev,
-          content_plan: {
-            ...(prev.content_plan || {}),
-            [lang]: newPlan,
+    await runAttractionAudioGuidePlanGeneration(payloadSnapshot);
+  }, [
+    confirm,
+    showNote,
+    audioGuidePlanGeneratePrompt,
+    aiGenerationMode,
+    aiUseWebSearch,
+    runAttractionAudioGuidePlanGeneration,
+  ]);
+
+  const openAttractionAudioGuidePlanGenerateModal = useCallback(() => {
+    const g = currentAttractionAudioGuideRef.current;
+
+    if (!g?.id) {
+      showNote('Сначала откройте аудиогид', 'error');
+      return;
+    }
+
+    setAudioGuidePlanGenerationError('');
+    setAudioGuidePlanGeneratePrompt('');
+    setAudioGuidePlanGenerateModalOpen(true);
+  }, [showNote]);
+
+  const closeAttractionAudioGuidePlanGenerateModal = useCallback(() => {
+    if (audioGuideGeneratingPlan) return;
+    setAudioGuidePlanGenerateModalOpen(false);
+    setAudioGuidePlanGenerationError('');
+  }, [audioGuideGeneratingPlan]);
+
+  const pendingMainTextGenerationRef = useRef(null);
+
+  const runAttractionAudioGuideMainTextGeneration = useCallback(
+    async (snapshot, { closeSettingsModalOnSuccess = true } = {}) => {
+      const {
+        guideId,
+        lang,
+        assigned,
+        eventId,
+        sessionAttractionId,
+        title,
+        content_plan,
+        content_texts,
+        prompt,
+        generation_mode,
+        use_web_search,
+      } = snapshot;
+
+      const expectedGuideId = normalizeId(guideId);
+      setAudioGuideGeneratingAllMainText(true);
+      setAudioGuideMainTextGenerationError('');
+
+      try {
+        const res = await attractionAudioGuidesAPI.generateMainText(
+          sessionId,
+          guideId,
+          {
+            lang,
+            title,
+            assigned_attraction_type: assigned,
+            session_attraction_id: sessionAttractionId,
+            event_id: eventId,
+            content_plan,
+            content_texts,
+            prompt,
+            generation_mode,
+            use_web_search,
           },
-          content_texts: {
-            ...(prev.content_texts || {}),
-            [lang]: freshTexts,
-          },
-        });
-
-        setAttractionAudioGuides((items) =>
-          items.map((item) =>
-            normalizeId(item.id) === expectedGuideId ? updated : item,
-          ),
         );
 
-        return updated;
-      });
+        if (res?.data?.success === false) {
+          const message =
+            res?.data?.error || 'Не удалось сгенерировать основной текст';
+          setAudioGuideMainTextGenerationError(message);
+          showNote(message, 'error');
+          return;
+        }
 
-      showNote('План сгенерирован', 'success');
-    } catch (e) {
-      showNote('Ошибка генерации плана: ' + parseApiError(e), 'error');
-    } finally {
-      setAudioGuideGeneratingPlan(false);
-    }
-  }, [sessionId, confirm, showNote]);
+        const incoming = res?.data?.content_texts?.[lang];
+        if (!incoming || typeof incoming !== 'object') {
+          const message = 'Ответ сервера не содержит текстов';
+          setAudioGuideMainTextGenerationError(message);
+          showNote(message, 'error');
+          return;
+        }
+
+        setCurrentAttractionAudioGuide((prev) => {
+          if (!prev || normalizeId(prev.id) !== expectedGuideId) return prev;
+
+          const mergedLang = { ...(prev.content_texts?.[lang] || {}), ...incoming };
+
+          const updated = normalizeAttractionAudioGuide({
+            ...prev,
+            content_texts: {
+              ...(prev.content_texts || {}),
+              [lang]: mergedLang,
+            },
+          });
+
+          setAttractionAudioGuides((items) =>
+            items.map((item) =>
+              normalizeId(item.id) === expectedGuideId ? updated : item,
+            ),
+          );
+
+          return updated;
+        });
+
+        if (closeSettingsModalOnSuccess) {
+          setAudioGuideMainTextGenerateModalOpen(false);
+          setAudioGuideMainTextGeneratePrompt('');
+        }
+        showNote('Основной текст сгенерирован', 'success');
+      } catch (e) {
+        const message =
+          'Ошибка генерации основного текста: ' + parseApiError(e);
+        setAudioGuideMainTextGenerationError(message);
+        showNote(message, 'error');
+      } finally {
+        setAudioGuideGeneratingAllMainText(false);
+      }
+    },
+    [sessionId, showNote],
+  );
 
   const generateAttractionAudioGuideMainText = useCallback(async () => {
     const g = currentAttractionAudioGuideRef.current;
@@ -2078,6 +2290,79 @@ export function useAudioGuides({
     const guideId = g?.id;
 
     if (!g?.id || !guideId) {
+      setAudioGuideMainTextGenerationError('Сначала откройте аудиогид');
+      showNote('Сначала откройте аудиогид', 'error');
+      return;
+    }
+
+    const planItems = normalizeAudioGuidePlanItemsForLang(g.content_plan?.[lang]);
+    if (planItems.length === 0) {
+      setAudioGuideMainTextGenerationError('Сначала добавьте или сгенерируйте план аудиогида.');
+      showNote('Сначала добавьте или сгенерируйте план аудиогида.', 'error');
+      return;
+    }
+
+    const hasAnyText = planItems.some((p) =>
+      String(g.content_texts?.[lang]?.[p.id] || '').trim(),
+    );
+
+    const generationFields = buildGenerationPayloadFields(
+      aiGenerationMode,
+      aiUseWebSearch,
+    );
+    const payloadSnapshot = {
+      guideId,
+      lang,
+      assigned,
+      eventId,
+      sessionAttractionId,
+      title: g.title ?? {},
+      content_plan: g.content_plan ?? {},
+      content_texts: g.content_texts ?? {},
+      prompt: audioGuideMainTextGeneratePrompt.trim(),
+      generation_mode: generationFields.generation_mode,
+      use_web_search: generationFields.use_web_search,
+    };
+
+    if (hasAnyText) {
+      pendingMainTextGenerationRef.current = payloadSnapshot;
+      const ok = await confirm({
+        message:
+          'Существующий основной текст для этого языка будет заменён. Продолжить?',
+        danger: true,
+        confirmLabel: 'Продолжить',
+      });
+      if (!ok) {
+        pendingMainTextGenerationRef.current = null;
+        return;
+      }
+
+      const pendingPayload = pendingMainTextGenerationRef.current;
+      pendingMainTextGenerationRef.current = null;
+      setAudioGuideMainTextGenerateModalOpen(false);
+      await runAttractionAudioGuideMainTextGeneration(pendingPayload, {
+        closeSettingsModalOnSuccess: false,
+      });
+      return;
+    }
+
+    await runAttractionAudioGuideMainTextGeneration(payloadSnapshot);
+  }, [
+    confirm,
+    showNote,
+    audioGuideMainTextGeneratePrompt,
+    aiGenerationMode,
+    aiUseWebSearch,
+    runAttractionAudioGuideMainTextGeneration,
+  ]);
+
+  const openAttractionAudioGuideMainTextGenerateModal = useCallback(() => {
+    const g = currentAttractionAudioGuideRef.current;
+    const activeLoc = attractionAudioGuideActiveLocaleRef.current;
+    const loc = attractionAudioGuideLocaleDataRef.current?.[activeLoc];
+    const lang = loc?.lang || getLocaleLang(activeLoc) || 'ru';
+
+    if (!g?.id) {
       showNote('Сначала откройте аудиогид', 'error');
       return;
     }
@@ -2088,103 +2373,36 @@ export function useAudioGuides({
       return;
     }
 
-    const hasAnyText = planItems.some((p) =>
-      String(g.content_texts?.[lang]?.[p.id] || '').trim(),
-    );
+    setAudioGuideMainTextGenerationError('');
+    setAudioGuideMainTextGeneratePrompt('');
+    setAudioGuideMainTextGenerateModalOpen(true);
+  }, [showNote]);
 
-    if (hasAnyText) {
-      const ok = await confirm({
-        message:
-          'Существующий основной текст для этого языка будет заменён. Продолжить?',
-        danger: true,
-      });
-      if (!ok) return;
-    }
+  const closeAttractionAudioGuideMainTextGenerateModal = useCallback(() => {
+    if (audioGuideGeneratingAllMainText) return;
+    setAudioGuideMainTextGenerateModalOpen(false);
+    setAudioGuideMainTextGenerationError('');
+  }, [audioGuideGeneratingAllMainText]);
 
-    const expectedGuideId = normalizeId(guideId);
-    setAudioGuideGeneratingAllMainText(true);
+  const pendingItemTextGenerationRef = useRef(null);
 
-    try {
-      const res = await attractionAudioGuidesAPI.generateMainText(
-        sessionId,
+  const runAttractionAudioGuideMainTextItemGeneration = useCallback(
+    async (snapshot, { closeSettingsModalOnSuccess = true } = {}) => {
+      const {
         guideId,
-        {
-          lang,
-          title: g.title ?? {},
-          assigned_attraction_type: assigned,
-          session_attraction_id: sessionAttractionId,
-          event_id: eventId,
-          content_plan: g.content_plan ?? {},
-          content_texts: g.content_texts ?? {},
-        },
-      );
-
-      if (res?.data?.success === false) {
-        showNote(
-          res?.data?.error || 'Не удалось сгенерировать основной текст',
-          'error',
-        );
-        return;
-      }
-
-      const incoming = res?.data?.content_texts?.[lang];
-      if (!incoming || typeof incoming !== 'object') {
-        showNote('Ответ сервера не содержит текстов', 'error');
-        return;
-      }
-
-      setCurrentAttractionAudioGuide((prev) => {
-        if (!prev || normalizeId(prev.id) !== expectedGuideId) return prev;
-
-        const mergedLang = { ...(prev.content_texts?.[lang] || {}), ...incoming };
-
-        const updated = normalizeAttractionAudioGuide({
-          ...prev,
-          content_texts: {
-            ...(prev.content_texts || {}),
-            [lang]: mergedLang,
-          },
-        });
-
-        setAttractionAudioGuides((items) =>
-          items.map((item) =>
-            normalizeId(item.id) === expectedGuideId ? updated : item,
-          ),
-        );
-
-        return updated;
-      });
-
-      showNote('Основной текст сгенерирован', 'success');
-    } catch (e) {
-      showNote(
-        'Ошибка генерации основного текста: ' + parseApiError(e),
-        'error',
-      );
-    } finally {
-      setAudioGuideGeneratingAllMainText(false);
-    }
-  }, [sessionId, confirm, showNote]);
-
-  const generateAttractionAudioGuideMainTextItem = useCallback(
-    async (planItem, additionalPrompt = '') => {
-      const g = currentAttractionAudioGuideRef.current;
-      const activeLoc = attractionAudioGuideActiveLocaleRef.current;
-      const loc = attractionAudioGuideLocaleDataRef.current?.[activeLoc];
-      const lang = loc?.lang || getLocaleLang(activeLoc) || 'ru';
-
-      const assigned = g?.assigned_attraction_type ?? 'none';
-      const eventId =
-        g?.event_id ?? g?.event ?? g?.attraction_id ?? g?.attraction ?? null;
-      const sessionAttractionId =
-        g?.session_attraction_id ?? g?.session_attraction ?? null;
-      const guideId = g?.id;
-
-      const itemId = String(planItem?.id || '').trim();
-      if (!g?.id || !guideId || !itemId) {
-        showNote('Не удалось определить пункт плана', 'error');
-        return;
-      }
+        lang,
+        assigned,
+        eventId,
+        sessionAttractionId,
+        title,
+        content_plan,
+        itemId,
+        itemTitle,
+        current_text,
+        additional_prompt,
+        generation_mode,
+        use_web_search,
+      } = snapshot;
 
       const expectedGuideId = normalizeId(guideId);
 
@@ -2192,6 +2410,7 @@ export function useAudioGuides({
         ...prev,
         [itemId]: true,
       }));
+      setAudioGuideItemTextGenerationError('');
 
       try {
         const res = await attractionAudioGuidesAPI.generateMainTextItem(
@@ -2199,25 +2418,27 @@ export function useAudioGuides({
           guideId,
           {
             lang,
-            title: g.title ?? {},
+            title,
             assigned_attraction_type: assigned,
             session_attraction_id: sessionAttractionId,
             event_id: eventId,
             plan_item: {
               id: itemId,
-              title: planItem?.title != null ? String(planItem.title) : '',
+              title: itemTitle,
             },
-            content_plan: g.content_plan ?? {},
-            current_text: String(g.content_texts?.[lang]?.[itemId] ?? ''),
-            additional_prompt: String(additionalPrompt || ''),
+            content_plan,
+            current_text,
+            additional_prompt,
+            generation_mode,
+            use_web_search,
           },
         );
 
         if (res?.data?.success === false) {
-          showNote(
-            res?.data?.error || 'Не удалось сгенерировать текст раздела',
-            'error',
-          );
+          const message =
+            res?.data?.error || 'Не удалось сгенерировать текст раздела';
+          setAudioGuideItemTextGenerationError(message);
+          showNote(message, 'error');
           return;
         }
 
@@ -2225,7 +2446,9 @@ export function useAudioGuides({
         const outId = String(res?.data?.plan_item_id || itemId).trim();
 
         if (typeof text !== 'string' || !text.trim()) {
-          showNote('Пустой ответ модели', 'error');
+          const message = 'Пустой ответ модели';
+          setAudioGuideItemTextGenerationError(message);
+          showNote(message, 'error');
           return;
         }
 
@@ -2252,12 +2475,19 @@ export function useAudioGuides({
           return updated;
         });
 
+        if (closeSettingsModalOnSuccess) {
+          setAudioGuideItemTextGenerateModalOpen(false);
+          setAudioGuideItemTextGenerateItemId(null);
+          setAudioGuideItemTextGenerateItemTitle('');
+          audioGuideItemTextGeneratePlanItemRef.current = null;
+          setAudioGuideItemTextGeneratePrompt('');
+        }
         showNote('Текст раздела обновлён', 'success');
       } catch (e) {
-        showNote(
-          'Ошибка генерации текста раздела: ' + parseApiError(e),
-          'error',
-        );
+        const message =
+          'Ошибка генерации текста раздела: ' + parseApiError(e);
+        setAudioGuideItemTextGenerationError(message);
+        showNote(message, 'error');
       } finally {
         setAudioGuideGeneratingItemTextById((prev) => {
           const next = { ...prev };
@@ -2268,6 +2498,124 @@ export function useAudioGuides({
     },
     [sessionId, showNote],
   );
+
+  const generateAttractionAudioGuideMainTextItem = useCallback(async () => {
+    const planItem = audioGuideItemTextGeneratePlanItemRef.current;
+    const g = currentAttractionAudioGuideRef.current;
+    const activeLoc = attractionAudioGuideActiveLocaleRef.current;
+    const loc = attractionAudioGuideLocaleDataRef.current?.[activeLoc];
+    const lang = loc?.lang || getLocaleLang(activeLoc) || 'ru';
+
+    const assigned = g?.assigned_attraction_type ?? 'none';
+    const eventId =
+      g?.event_id ?? g?.event ?? g?.attraction_id ?? g?.attraction ?? null;
+    const sessionAttractionId =
+      g?.session_attraction_id ?? g?.session_attraction ?? null;
+    const guideId = g?.id;
+
+    const itemId = String(planItem?.id || audioGuideItemTextGenerateItemId || '').trim();
+    if (!g?.id || !guideId || !itemId) {
+      setAudioGuideItemTextGenerationError('Не удалось определить пункт плана');
+      showNote('Не удалось определить пункт плана', 'error');
+      return;
+    }
+
+    const itemTitle =
+      planItem?.title != null
+        ? String(planItem.title)
+        : String(audioGuideItemTextGenerateItemTitle || '');
+
+    const existingText = String(g.content_texts?.[lang]?.[itemId] ?? '').trim();
+    const generationFields = buildGenerationPayloadFields(
+      aiGenerationMode,
+      aiUseWebSearch,
+    );
+    const payloadSnapshot = {
+      guideId,
+      lang,
+      assigned,
+      eventId,
+      sessionAttractionId,
+      title: g.title ?? {},
+      content_plan: g.content_plan ?? {},
+      itemId,
+      itemTitle,
+      current_text: String(g.content_texts?.[lang]?.[itemId] ?? ''),
+      additional_prompt: audioGuideItemTextGeneratePrompt.trim(),
+      generation_mode: generationFields.generation_mode,
+      use_web_search: generationFields.use_web_search,
+    };
+
+    if (existingText) {
+      pendingItemTextGenerationRef.current = payloadSnapshot;
+      const ok = await confirm({
+        message:
+          'Существующий текст этого пункта будет заменён. Продолжить?',
+        danger: true,
+        confirmLabel: 'Продолжить',
+      });
+      if (!ok) {
+        pendingItemTextGenerationRef.current = null;
+        return;
+      }
+
+      const pendingPayload = pendingItemTextGenerationRef.current;
+      pendingItemTextGenerationRef.current = null;
+      setAudioGuideItemTextGenerateModalOpen(false);
+      await runAttractionAudioGuideMainTextItemGeneration(pendingPayload, {
+        closeSettingsModalOnSuccess: false,
+      });
+      return;
+    }
+
+    await runAttractionAudioGuideMainTextItemGeneration(payloadSnapshot);
+  }, [
+    confirm,
+    showNote,
+    audioGuideItemTextGenerateItemId,
+    audioGuideItemTextGenerateItemTitle,
+    audioGuideItemTextGeneratePrompt,
+    aiGenerationMode,
+    aiUseWebSearch,
+    runAttractionAudioGuideMainTextItemGeneration,
+  ]);
+
+  const openAttractionAudioGuideMainTextItemGenerateModal = useCallback(
+    (planItem) => {
+      const g = currentAttractionAudioGuideRef.current;
+      const itemId = String(planItem?.id || '').trim();
+
+      if (!g?.id) {
+        showNote('Сначала откройте аудиогид', 'error');
+        return;
+      }
+      if (!itemId) {
+        showNote('Не удалось определить пункт плана', 'error');
+        return;
+      }
+
+      audioGuideItemTextGeneratePlanItemRef.current = planItem;
+      setAudioGuideItemTextGenerateItemId(itemId);
+      setAudioGuideItemTextGenerateItemTitle(
+        planItem?.title != null ? String(planItem.title) : '',
+      );
+      setAudioGuideItemTextGenerationError('');
+      setAudioGuideItemTextGeneratePrompt('');
+      setAudioGuideItemTextGenerateModalOpen(true);
+    },
+    [showNote],
+  );
+
+  const closeAttractionAudioGuideMainTextItemGenerateModal = useCallback(() => {
+    const itemId = audioGuideItemTextGenerateItemId;
+    if (itemId && audioGuideGeneratingItemTextById?.[itemId]) return;
+
+    setAudioGuideItemTextGenerateModalOpen(false);
+    setAudioGuideItemTextGenerateItemId(null);
+    setAudioGuideItemTextGenerateItemTitle('');
+    audioGuideItemTextGeneratePlanItemRef.current = null;
+    setAudioGuideItemTextGenerationError('');
+  }, [audioGuideItemTextGenerateItemId, audioGuideGeneratingItemTextById]);
 
   return {
     attractionAudioGuides,
@@ -2281,8 +2629,19 @@ export function useAudioGuides({
     attractionAudioGuideAutoSaved,
     attractionAudioUploading,
     audioGuideGeneratingPlan,
+    audioGuidePlanGenerateModalOpen,
+    audioGuidePlanGeneratePrompt,
+    audioGuidePlanGenerationError,
     audioGuideGeneratingAllMainText,
+    audioGuideMainTextGenerateModalOpen,
+    audioGuideMainTextGeneratePrompt,
+    audioGuideMainTextGenerationError,
     audioGuideGeneratingItemTextById,
+    audioGuideItemTextGenerateModalOpen,
+    audioGuideItemTextGenerateItemId,
+    audioGuideItemTextGenerateItemTitle,
+    audioGuideItemTextGeneratePrompt,
+    audioGuideItemTextGenerationError,
     generatingAudioGuideTrack,
     audioGuideTrackGenerationError,
     audioGuidePlanGenerationState,
@@ -2310,8 +2669,17 @@ export function useAudioGuides({
     uploadAttractionAudioGuideTrack,
     generateAttractionAudioGuideTrackAudio,
     generateAttractionAudioGuidePlan,
+    openAttractionAudioGuidePlanGenerateModal,
+    closeAttractionAudioGuidePlanGenerateModal,
+    setAudioGuidePlanGeneratePrompt,
     generateAttractionAudioGuideMainText,
+    openAttractionAudioGuideMainTextGenerateModal,
+    closeAttractionAudioGuideMainTextGenerateModal,
+    setAudioGuideMainTextGeneratePrompt,
     generateAttractionAudioGuideMainTextItem,
+    openAttractionAudioGuideMainTextItemGenerateModal,
+    closeAttractionAudioGuideMainTextItemGenerateModal,
+    setAudioGuideItemTextGeneratePrompt,
     patchAudioGuidePlanGenerationState,
     setAttractionAudioGuidePlanGenerationPrompt,
     setAttractionAudioGuidePlanItemsCount,

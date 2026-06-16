@@ -11,7 +11,7 @@ import { useEffect, useState } from 'react';
  *   size      — 'sm' | 'md' | 'lg' | 'xl'  (default 'md')
  *   footer    — ReactNode  (если задан — рендерится под children)
  */
-export default function Modal({ open, onClose, title, children, size = 'md', footer }) {
+export default function Modal({ open, onClose, title, children, size = 'md', footer, priority = false }) {
   useEffect(() => {
     if (!open) return;
     const handler = (e) => { if (e.key === 'Escape') onClose?.(); };
@@ -28,8 +28,10 @@ export default function Modal({ open, onClose, title, children, size = 'md', foo
     xl: 'max-w-4xl',
   }[size] || 'max-w-lg';
 
+  const overlayZ = priority ? 'z-[110]' : 'z-50';
+
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+    <div className={`fixed inset-0 ${overlayZ} flex items-center justify-center p-4`}>
       {/* Overlay */}
       <div
         className="absolute inset-0 bg-black/40 backdrop-blur-sm"
@@ -118,7 +120,7 @@ export function ConfirmModal({
   const busy = loading || internalLoading;
 
   return (
-    <Modal open={open} onClose={busy ? undefined : onClose} title={title} size="sm">
+    <Modal open={open} onClose={busy ? undefined : onClose} title={title} size="sm" priority>
       {message && (
         <p className="text-sm text-gray-600">{message}</p>
       )}

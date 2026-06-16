@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
 
 import { audioAPI } from '../../../api/generation';
+import AiGenerationModal, { WizardGenerationActionFooter } from '../../../components/generation/AiGenerationModal.jsx';
+import AiGenerationQualitySettings from '../../../components/generation/AiGenerationQualitySettings.jsx';
 
 import { getAttrName, getFlag, normalizeId } from './sessionWizardShared.jsx';
 
@@ -434,8 +436,19 @@ export default function SessionWizardAttractionAudioGuidesBlock({
   attractionAudioGuideAutoSaved = false,
   attractionAudioUploading = false,
   audioGuideGeneratingPlan = false,
+  audioGuidePlanGenerateModalOpen = false,
+  audioGuidePlanGeneratePrompt = '',
+  audioGuidePlanGenerationError = '',
   audioGuideGeneratingAllMainText = false,
+  audioGuideMainTextGenerateModalOpen = false,
+  audioGuideMainTextGeneratePrompt = '',
+  audioGuideMainTextGenerationError = '',
   audioGuideGeneratingItemTextById = {},
+  audioGuideItemTextGenerateModalOpen = false,
+  audioGuideItemTextGenerateItemId = null,
+  audioGuideItemTextGenerateItemTitle = '',
+  audioGuideItemTextGeneratePrompt = '',
+  audioGuideItemTextGenerationError = '',
   generatingAudioGuideTrack = false,
   audioGuideTrackGenerationError = null,
   audioGuidePlanGenerationState = {},
@@ -458,10 +471,23 @@ export default function SessionWizardAttractionAudioGuidesBlock({
   onUploadAttractionAudioGuideTrack,
   onRemoveAttractionAudioGuideTrack,
   onGenerateAttractionAudioGuidePlan,
-  onSetAttractionAudioGuidePlanGenerationPrompt,
+  onOpenAttractionAudioGuidePlanGenerateModal,
+  onCloseAttractionAudioGuidePlanGenerateModal,
+  onSetAudioGuidePlanGeneratePrompt,
   onSetAttractionAudioGuidePlanItemsCount,
+  onOpenAttractionAudioGuideMainTextGenerateModal,
+  onCloseAttractionAudioGuideMainTextGenerateModal,
+  onSetAudioGuideMainTextGeneratePrompt,
   onGenerateAttractionAudioGuideMainText,
   onGenerateAttractionAudioGuideMainTextItem,
+  onOpenAttractionAudioGuideMainTextItemGenerateModal,
+  onCloseAttractionAudioGuideMainTextItemGenerateModal,
+  onSetAudioGuideItemTextGeneratePrompt,
+  aiGenerationMode = 'instant',
+  aiUseWebSearch = false,
+  aiAdvancedGenerationAvailable = true,
+  onAiGenerationModeChange,
+  onAiUseWebSearchChange,
   onGenerateAttractionAudioGuideTrackAudio,
   elevenLabsSettingsLoading = false,
   elevenLabsSettingsError = '',
@@ -472,7 +498,11 @@ export default function SessionWizardAttractionAudioGuidesBlock({
   onGoToStep,
 }) {
   const audioFileRef = useRef(null);
-  const [itemAdditionalPrompts, setItemAdditionalPrompts] = useState({});
+
+  const itemTextModalGenerating = Boolean(
+    audioGuideItemTextGenerateItemId &&
+      audioGuideGeneratingItemTextById?.[audioGuideItemTextGenerateItemId],
+  );
 
   const currentLocale =
     attractionAudioGuideLocaleData[attractionAudioGuideActiveLocale] || {};
@@ -605,12 +635,6 @@ export default function SessionWizardAttractionAudioGuidesBlock({
   const planContentLang = currentLocale.lang || 'ru';
   const planGenLocaleState =
     audioGuidePlanGenerationState?.[currentGuideId]?.[planContentLang];
-  const planGenerationPrompt =
-    (typeof planGenLocaleState === 'object' && planGenLocaleState !== null
-      ? planGenLocaleState.prompt
-      : typeof planGenLocaleState === 'string'
-        ? planGenLocaleState
-        : '') ?? '';
   const planItemsCountRaw =
     typeof planGenLocaleState === 'object' && planGenLocaleState !== null
       ? planGenLocaleState.desiredItemsCount
@@ -844,51 +868,116 @@ export default function SessionWizardAttractionAudioGuidesBlock({
 
           </div>
 
-          <label className="block text-xs font-medium text-gray-600 mb-1">
-            Количество пунктов плана
-          </label>
-          <input
-            type="number"
-            min={1}
-            max={20}
-            value={planItemsCountRaw ?? 6}
-            onChange={(e) =>
-              onSetAttractionAudioGuidePlanItemsCount?.(
-                currentGuideId,
-                planContentLang,
-                e.target.value,
-              )
-            }
-            disabled={planGenerationControlsDisabled}
-            className="mb-3 w-24 px-3 py-1.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
-          />
+          <div className="space-y-2 mb-3">
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-1">
+                Количество пунктов плана
+              </label>
+              <input
+                type="number"
+                min={1}
+                max={20}
+                value={planItemsCountRaw ?? 6}
+                onChange={(e) =>
+                  onSetAttractionAudioGuidePlanItemsCount?.(
+                    currentGuideId,
+                    planContentLang,
+                    e.target.value,
+                  )
+                }
+                disabled={planGenerationControlsDisabled}
+                className="block w-24 px-3 py-1.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
+              />
+            </div>
 
-          <label className="block text-xs font-medium text-gray-600 mb-1">
-            Дополнительный промпт
-          </label>
-          <textarea
-            value={planGenerationPrompt}
-            onChange={(e) =>
-              onSetAttractionAudioGuidePlanGenerationPrompt?.(
-                currentGuideId,
-                planContentLang,
-                e.target.value,
-              )
-            }
-            disabled={planGenerationControlsDisabled}
-            rows={2}
-            placeholder="Например: сделай стиль живым, для туристов, акцент на архитектуре"
-            className="mb-3 w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-y min-h-[56px] disabled:opacity-50 disabled:cursor-not-allowed"
-          />
+            <button
+              type="button"
+              onClick={() => onOpenAttractionAudioGuidePlanGenerateModal?.()}
+              disabled={planGenerationControlsDisabled}
+              className="w-fit px-3 py-1.5 text-xs font-medium text-gray-700 bg-gray-100 border border-gray-200 rounded-lg hover:bg-gray-200 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {audioGuideGeneratingPlan ? 'Генерация...' : 'Сгенерировать план'}
+            </button>
+          </div>
 
-          <button
-            type="button"
-            onClick={() => onGenerateAttractionAudioGuidePlan?.()}
-            disabled={planGenerationControlsDisabled}
-            className="mb-3 px-3 py-1.5 text-xs font-medium text-gray-700 bg-gray-100 border border-gray-200 rounded-lg hover:bg-gray-200 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          <AiGenerationModal
+            open={audioGuidePlanGenerateModalOpen}
+            onBackdropClick={() => {
+              if (!audioGuideGeneratingPlan) {
+                onCloseAttractionAudioGuidePlanGenerateModal?.();
+              }
+            }}
+            titleId="audio-guide-plan-gen-title"
+            busy={audioGuideGeneratingPlan}
+            busyLabel="Генерация плана…"
+            footer={(
+              <WizardGenerationActionFooter>
+                <button
+                  type="button"
+                  onClick={() => onCloseAttractionAudioGuidePlanGenerateModal?.()}
+                  disabled={audioGuideGeneratingPlan}
+                  className="px-4 py-2 text-sm font-medium text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50"
+                >
+                  Отмена
+                </button>
+                <button
+                  type="button"
+                  onClick={() => onGenerateAttractionAudioGuidePlan?.()}
+                  disabled={audioGuideGeneratingPlan}
+                  className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-50"
+                >
+                  Сгенерировать
+                </button>
+              </WizardGenerationActionFooter>
+            )}
           >
-            {audioGuideGeneratingPlan ? 'Генерация...' : 'Сгенерировать план'}
-          </button>
+            <h2
+              id="audio-guide-plan-gen-title"
+              className="text-lg font-semibold text-gray-900"
+            >
+              Настройки генерации плана аудиогида
+            </h2>
+
+            <p className="text-sm text-gray-600">
+              Выберите качество генерации и добавьте указания для структуры плана.
+            </p>
+
+            {audioGuidePlanGenerationError ? (
+              <div className="text-sm text-red-700 bg-red-50 border border-red-200 rounded-lg p-3">
+                {audioGuidePlanGenerationError}
+              </div>
+            ) : null}
+
+            <AiGenerationQualitySettings
+              generationMode={aiGenerationMode}
+              onGenerationModeChange={onAiGenerationModeChange}
+              useWebSearch={aiUseWebSearch}
+              onUseWebSearchChange={onAiUseWebSearchChange}
+              disabled={audioGuideGeneratingPlan}
+              advancedDisabled={!aiAdvancedGenerationAvailable}
+            />
+
+            <div>
+              <label
+                htmlFor="audio-guide-plan-gen-prompt"
+                className="block text-sm font-medium text-gray-700 mb-1"
+              >
+                Дополнительный промпт
+              </label>
+
+              <textarea
+                id="audio-guide-plan-gen-prompt"
+                rows={4}
+                value={audioGuidePlanGeneratePrompt}
+                onChange={(e) =>
+                  onSetAudioGuidePlanGeneratePrompt?.(e.target.value)
+                }
+                disabled={audioGuideGeneratingPlan}
+                placeholder="Например: Сделай план на 6 пунктов, с акцентом на архитектуру и ключевые экспонаты."
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 resize-none"
+              />
+            </div>
+          </AiGenerationModal>
 
           <div className="space-y-2">
             {planPoints.length === 0 ? (
@@ -961,7 +1050,7 @@ export default function SessionWizardAttractionAudioGuidesBlock({
 
           <button
             type="button"
-            onClick={() => onGenerateAttractionAudioGuideMainText?.()}
+            onClick={() => onOpenAttractionAudioGuideMainTextGenerateModal?.()}
             disabled={
               audioGuideGeneratingAllMainText ||
               audioGuideGeneratingPlan ||
@@ -973,6 +1062,85 @@ export default function SessionWizardAttractionAudioGuidesBlock({
               ? 'Генерация...'
               : 'Сгенерировать весь основной текст'}
           </button>
+
+          <AiGenerationModal
+            open={audioGuideMainTextGenerateModalOpen}
+            onBackdropClick={() => {
+              if (!audioGuideGeneratingAllMainText) {
+                onCloseAttractionAudioGuideMainTextGenerateModal?.();
+              }
+            }}
+            titleId="audio-guide-main-text-gen-title"
+            busy={audioGuideGeneratingAllMainText}
+            busyLabel="Генерация основного текста…"
+            footer={(
+              <WizardGenerationActionFooter>
+                <button
+                  type="button"
+                  onClick={() => onCloseAttractionAudioGuideMainTextGenerateModal?.()}
+                  disabled={audioGuideGeneratingAllMainText}
+                  className="px-4 py-2 text-sm font-medium text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50"
+                >
+                  Отмена
+                </button>
+                <button
+                  type="button"
+                  onClick={() => onGenerateAttractionAudioGuideMainText?.()}
+                  disabled={audioGuideGeneratingAllMainText}
+                  className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-50"
+                >
+                  Сгенерировать
+                </button>
+              </WizardGenerationActionFooter>
+            )}
+          >
+            <h2
+              id="audio-guide-main-text-gen-title"
+              className="text-lg font-semibold text-gray-900"
+            >
+              Сгенерировать весь основной текст
+            </h2>
+
+            <p className="text-sm text-gray-600">
+              Будет сгенерирован основной текст для всех пунктов плана текущего языка.
+            </p>
+
+            {audioGuideMainTextGenerationError ? (
+              <div className="text-sm text-red-700 bg-red-50 border border-red-200 rounded-lg p-3">
+                {audioGuideMainTextGenerationError}
+              </div>
+            ) : null}
+
+            <AiGenerationQualitySettings
+              generationMode={aiGenerationMode}
+              onGenerationModeChange={onAiGenerationModeChange}
+              useWebSearch={aiUseWebSearch}
+              onUseWebSearchChange={onAiUseWebSearchChange}
+              disabled={audioGuideGeneratingAllMainText}
+              advancedDisabled={!aiAdvancedGenerationAvailable}
+            />
+
+            <div>
+              <label
+                htmlFor="audio-guide-main-text-gen-prompt"
+                className="block text-sm font-medium text-gray-700 mb-1"
+              >
+                Дополнительный промпт
+              </label>
+
+              <textarea
+                id="audio-guide-main-text-gen-prompt"
+                rows={4}
+                value={audioGuideMainTextGeneratePrompt}
+                onChange={(e) =>
+                  onSetAudioGuideMainTextGeneratePrompt?.(e.target.value)
+                }
+                disabled={audioGuideGeneratingAllMainText}
+                placeholder="Например: сделай стиль спокойным, как профессиональный аудиогид"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 resize-none"
+              />
+            </div>
+          </AiGenerationModal>
 
           {planPoints.length === 0 ? (
             <p className="text-xs text-gray-500">
@@ -994,8 +1162,6 @@ export default function SessionWizardAttractionAudioGuidesBlock({
                   rawText != null && rawText !== undefined
                     ? String(rawText)
                     : '';
-                const promptKey = `${planLang}:${itemId}`;
-                const extraPrompt = itemAdditionalPrompts[promptKey] ?? '';
                 const itemGenerating = Boolean(
                   itemId && audioGuideGeneratingItemTextById?.[itemId],
                 );
@@ -1026,27 +1192,10 @@ export default function SessionWizardAttractionAudioGuidesBlock({
                       className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-y min-h-[88px]"
                     />
 
-                    <label className="block text-xs font-medium text-gray-600">
-                      Дополнительный промпт
-                    </label>
-
-                    <textarea
-                      value={extraPrompt}
-                      onChange={(e) =>
-                        setItemAdditionalPrompts((prev) => ({
-                          ...prev,
-                          [promptKey]: e.target.value,
-                        }))
-                      }
-                      rows={2}
-                      placeholder="Например: добавь больше дат и исторических деталей"
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-y min-h-[56px]"
-                    />
-
                     <button
                       type="button"
                       onClick={() =>
-                        onGenerateAttractionAudioGuideMainTextItem?.(point, extraPrompt)
+                        onOpenAttractionAudioGuideMainTextItemGenerateModal?.(point)
                       }
                       disabled={
                         itemGenerating ||
@@ -1054,7 +1203,7 @@ export default function SessionWizardAttractionAudioGuidesBlock({
                         audioGuideGeneratingAllMainText ||
                         attractionAudioGuideSaving
                       }
-                      className="text-xs font-medium text-gray-700 bg-white border border-gray-200 rounded-md px-2.5 py-1 hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                      className="w-fit px-3 py-1.5 text-xs font-medium text-gray-700 bg-gray-100 border border-gray-200 rounded-lg hover:bg-gray-200 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                       {itemGenerating ? 'Генерация...' : 'Сгенерировать этот пункт'}
                     </button>
@@ -1063,6 +1212,91 @@ export default function SessionWizardAttractionAudioGuidesBlock({
               })}
             </div>
           )}
+
+          <AiGenerationModal
+            open={audioGuideItemTextGenerateModalOpen}
+            onBackdropClick={() => {
+              if (!itemTextModalGenerating) {
+                onCloseAttractionAudioGuideMainTextItemGenerateModal?.();
+              }
+            }}
+            titleId="audio-guide-item-text-gen-title"
+            busy={itemTextModalGenerating}
+            busyLabel="Генерация текста пункта…"
+            footer={(
+              <WizardGenerationActionFooter>
+                <button
+                  type="button"
+                  onClick={() => onCloseAttractionAudioGuideMainTextItemGenerateModal?.()}
+                  disabled={itemTextModalGenerating}
+                  className="px-4 py-2 text-sm font-medium text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50"
+                >
+                  Отмена
+                </button>
+                <button
+                  type="button"
+                  onClick={() => onGenerateAttractionAudioGuideMainTextItem?.()}
+                  disabled={itemTextModalGenerating}
+                  className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-50"
+                >
+                  Сгенерировать
+                </button>
+              </WizardGenerationActionFooter>
+            )}
+          >
+            <h2
+              id="audio-guide-item-text-gen-title"
+              className="text-lg font-semibold text-gray-900"
+            >
+              Настройки генерации пункта аудиогида
+            </h2>
+
+            <p className="text-sm text-gray-600">
+              Выберите качество генерации и добавьте указания для текста этого пункта.
+            </p>
+
+            {audioGuideItemTextGenerateItemTitle ? (
+              <p className="text-sm text-gray-800 bg-gray-50 border border-gray-200 rounded-lg px-3 py-2">
+                {audioGuideItemTextGenerateItemTitle}
+              </p>
+            ) : null}
+
+            {audioGuideItemTextGenerationError ? (
+              <div className="text-sm text-red-700 bg-red-50 border border-red-200 rounded-lg p-3">
+                {audioGuideItemTextGenerationError}
+              </div>
+            ) : null}
+
+            <AiGenerationQualitySettings
+              generationMode={aiGenerationMode}
+              onGenerationModeChange={onAiGenerationModeChange}
+              useWebSearch={aiUseWebSearch}
+              onUseWebSearchChange={onAiUseWebSearchChange}
+              disabled={itemTextModalGenerating}
+              advancedDisabled={!aiAdvancedGenerationAvailable}
+            />
+
+            <div>
+              <label
+                htmlFor="audio-guide-item-text-gen-prompt"
+                className="block text-sm font-medium text-gray-700 mb-1"
+              >
+                Дополнительный промпт
+              </label>
+
+              <textarea
+                id="audio-guide-item-text-gen-prompt"
+                rows={4}
+                value={audioGuideItemTextGeneratePrompt}
+                onChange={(e) =>
+                  onSetAudioGuideItemTextGeneratePrompt?.(e.target.value)
+                }
+                disabled={itemTextModalGenerating}
+                placeholder="Например: добавь больше дат и исторических деталей"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 resize-none"
+              />
+            </div>
+          </AiGenerationModal>
 
           <div className="mt-4 p-3 border border-gray-200 rounded-lg bg-gray-50 space-y-2">
             <label className="block text-sm font-medium text-gray-800">
