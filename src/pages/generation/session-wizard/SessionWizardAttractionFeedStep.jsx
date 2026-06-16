@@ -905,7 +905,6 @@ export default function SessionWizardAttractionFeedStep({
           {isBindingIncomplete && (
             <span className="text-xs text-amber-600">Привязка не выбрана</span>
           )}
-          )}
           <button
             type="button"
             onClick={onSaveCurrentAttractionFeedItem}

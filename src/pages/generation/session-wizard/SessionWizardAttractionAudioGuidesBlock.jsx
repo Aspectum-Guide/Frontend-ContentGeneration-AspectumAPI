@@ -463,7 +463,6 @@ export default function SessionWizardAttractionAudioGuidesBlock({
   onAddAttractionAudioGuidePlanPoint,
   onRemoveAttractionAudioGuidePlanPoint,
   onUpdateAttractionAudioGuidePlanItemText,
-  onShowNote,
   onSaveCurrentAttractionAudioGuide,
   onDeleteCurrentAttractionAudioGuide,
   onUploadAttractionAudioGuideTrack,
@@ -653,7 +652,6 @@ export default function SessionWizardAttractionAudioGuidesBlock({
     !audioGuideGeneratingAllMainText &&
     !attractionAudioGuideSaving &&
     !attractionAudioUploading;
-  const trackCopyright = currentLocale.track?.copyright || '';
 
   return (
     <section className="space-y-4">

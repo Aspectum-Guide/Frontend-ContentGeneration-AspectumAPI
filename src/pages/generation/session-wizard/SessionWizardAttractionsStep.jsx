@@ -456,9 +456,7 @@ export default function SessionWizardAttractionsStep({
   attrAutoSaved = false,
   attractions,
 
-  activeCityDraftId = null,
-  localeData = {},
-  activeLocale = 'ru-RU',
+  attractionGenerationProgress = null,
 
   referenceCities = [],
   cityDrafts = [],
@@ -488,7 +486,6 @@ export default function SessionWizardAttractionsStep({
   attractionGenerationOpen = false,
   attractionGenerationPrompt = '',
   attractionGenerating = false,
-  attractionGenerationTaskId = null,
   attractionGenerationError = '',
   attractionGenerationAssignedCityType = 'none',
   attractionGenerationSessionCityId = '',

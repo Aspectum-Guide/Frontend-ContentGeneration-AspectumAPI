@@ -3,7 +3,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { ilCatalogAPI } from '../../../api/generation';
 import Layout from '../../../components/Layout';
 import DataTable from '../../../components/ui/DataTable';
-import { Field, TextInput, Textarea } from '../../../components/ui/FormField';
+import { Field, TextInput } from '../../../components/ui/FormField';
 import Modal, { ConfirmModal } from '../../../components/ui/Modal';
 import { useLayoutActions } from '../../../context/useLayoutActions';
 import { parseApiError } from '../../../utils/apiError';

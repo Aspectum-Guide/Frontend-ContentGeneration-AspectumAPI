@@ -121,6 +121,7 @@ export function stripLegacyImageFields(raw = {}) {
     return {};
   }
 
+  /* eslint-disable no-unused-vars */
   const {
     image,
     imagePreview,
@@ -129,6 +130,7 @@ export function stripLegacyImageFields(raw = {}) {
     photo_preview,
     ...rest
   } = raw;
+  /* eslint-enable no-unused-vars */
 
   return rest;
 }

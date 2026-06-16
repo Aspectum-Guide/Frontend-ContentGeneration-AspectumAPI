@@ -231,7 +231,6 @@ export default function SessionWizardCityInfoStep({
   onCityInfoDedupeExistingItemsChange,
   cityInfoGenerating = false,
   cityInfoGenerationError = '',
-  cityInfoGenerationTaskId = null,
   cityInfoGenerationLang = 'ru',
   onOpenCityInfoGenerateModal,
   onCloseCityInfoGenerateModal,
