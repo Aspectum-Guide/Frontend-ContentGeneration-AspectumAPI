@@ -249,9 +249,6 @@ export function useSessionWizardController({
       if (Array.isArray(data?.attraction_feed_items)) {
         setCityDrafts((prev) => prev);
       }
-      if (Array.isArray(data?.attraction_audio_guides)) {
-        setCityDrafts((prev) => prev);
-      }
 
     } catch (err) {
       if (seq === loadSessionSeqRef.current && !silent) {
@@ -378,7 +375,7 @@ export function useSessionWizardController({
   });
 
   const audioGuides = useAudioGuides({
-    sessionId, showNote, confirm,
+    sessionId, session, showNote, confirm,
     currentAttr: attractionsStep.currentAttr, attrLocaleData: attractionsStep.attrLocaleData,
     attractions: attractionsStep.attractions, referenceAttractions,
     getSessionUuid: cityStep.getSessionUuid,

@@ -684,6 +684,7 @@ function resolveElevenLabsSettingsUiMessage(settings, fallbackError = '') {
 
 export function useAudioGuides({
   sessionId,
+  session,
   showNote,
   confirm,
   currentAttr,
@@ -768,6 +769,21 @@ export function useAudioGuides({
   useEffect(() => {
     attractionAudioGuideSavingRef.current = attractionAudioGuideSaving;
   }, [attractionAudioGuideSaving]);
+
+  useEffect(() => {
+    if (!session?.id) return;
+    if (attractionAudioGuideSavingRef.current || attractionAudioGuideAutoSaving) return;
+
+    const guides = Array.isArray(session.attraction_audio_guides)
+      ? session.attraction_audio_guides.map(normalizeAttractionAudioGuide)
+      : [];
+
+    setAttractionAudioGuides(guides);
+  }, [
+    session?.id,
+    session?.attraction_audio_guides,
+    attractionAudioGuideAutoSaving,
+  ]);
 
   useEffect(() => {
     attractionAudioGuideBusyRef.current =
