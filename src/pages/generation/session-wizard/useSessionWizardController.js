@@ -2586,6 +2586,7 @@ export function useSessionWizardController({ sessionId, confirm: confirmProp } =
   const [attractionGenerationPrompt, setAttractionGenerationPrompt] = useState('');
   const [attractionGenerating, setAttractionGenerating] = useState(false);
   const [attractionGenerationTaskId, setAttractionGenerationTaskId] = useState(null);
+  const [attractionGenerationProgress, setAttractionGenerationProgress] = useState(null);
   const [attractionGenerationError, setAttractionGenerationError] = useState('');
   const [attractionGenerationAssignedCityType, setAttractionGenerationAssignedCityType] =
     useState('none');
@@ -2601,6 +2602,7 @@ export function useSessionWizardController({ sessionId, confirm: confirmProp } =
   const [ilGenerationPrompt, setIlGenerationPrompt] = useState('');
   const [ilGenerating, setIlGenerating] = useState(false);
   const [ilGenerationTaskId, setIlGenerationTaskId] = useState(null);
+  const [ilGenerationProgress, setIlGenerationProgress] = useState(null);
   const [ilGenerationError, setIlGenerationError] = useState('');
   const [ilGenerationAssignedCityType, setIlGenerationAssignedCityType] = useState('none');
   const [ilGenerationSessionCityId, setIlGenerationSessionCityId] = useState('');
@@ -3530,16 +3532,26 @@ export function useSessionWizardController({ sessionId, confirm: confirmProp } =
     setLocaleData(prev => ({ ...prev, [activeLocale]: { ...prev[activeLocale], [field]: value } }));
   }, [activeLocale]);
 
-  const handleSelectDraft = useCallback((draftId) => {
+  const handleSelectDraft = useCallback(async (draftId) => {
     const normalizedDraftId = normalizeDraftId(draftId);
     const draft = cityDrafts.find((item) => normalizeDraftId(item.id) === normalizedDraftId);
     if (!draft) return;
+
+    // Сохраняем текущий черновик перед переключением
+    if (hasUnsavedChangesRef.current) {
+      try {
+        await saveCitySilently();
+      } catch {
+        // не блокируем переключение из-за ошибки сохранения
+      }
+    }
+
     requestedCityDraftIdRef.current = normalizedDraftId;
     activeCityDraftIdRef.current = normalizedDraftId;
     setActiveCityDraftId(normalizedDraftId);
     syncActiveDraftRoute(normalizedDraftId);
     loadCityIntoForm(draft);
-  }, [cityDrafts, loadCityIntoForm, syncActiveDraftRoute]);
+  }, [cityDrafts, loadCityIntoForm, syncActiveDraftRoute, saveCitySilently]);
 
   const handleCreateDraft = useCallback(async () => {
     let newDraftId = null;
@@ -3726,6 +3738,15 @@ export function useSessionWizardController({ sessionId, confirm: confirmProp } =
       setPhotoUploading(false);
     }
   }, [session, localeData, activeLocale, imageCopyright, showNote]);
+
+  const handlePhotoDelete = useCallback(() => {
+    setImageId(null);
+    setImagePreview(null);
+    setImageOriginalUrl('');
+    setImageCopyright('');
+    hasUnsavedChangesRef.current = true;
+    showNote('Изображение удалено', 'info');
+  }, [showNote]);
 
   const updateCurrentAttractionFeedItemPatch = useCallback((patch) => {
     setCurrentAttractionFeedItem((prev) => {
@@ -6974,6 +6995,13 @@ export function useSessionWizardController({ sessionId, confirm: confirmProp } =
         tasksAPI,
         maxWaitMs: 20 * 60 * 1000,
         isCancelled: () => attractionGenPollCancelledRef.current,
+        onProgress: (task) => {
+          setAttractionGenerationProgress({
+            status: task?.status,
+            progress: task?.progress || 0,
+            step: task?.current_step || '',
+          });
+        },
       });
 
       if (attractionGenPollCancelledRef.current) {
@@ -8181,6 +8209,13 @@ export function useSessionWizardController({ sessionId, confirm: confirmProp } =
         tasksAPI,
         maxWaitMs: 20 * 60 * 1000,
         isCancelled: () => ilGenPollCancelledRef.current,
+        onProgress: (task) => {
+          setIlGenerationProgress({
+            status: task?.status,
+            progress: task?.progress || 0,
+            step: task?.current_step || '',
+          });
+        },
       });
 
       if (ilGenPollCancelledRef.current) return;
@@ -8572,7 +8607,7 @@ export function useSessionWizardController({ sessionId, confirm: confirmProp } =
     audioGuidePlanGenerationState,
     elevenLabsSettingsLoading, elevenLabsSettingsError, elevenLabsSettings,
     audioGuideTtsVoiceId, audioGuideTtsModelId,
-    attractionGenerationOpen, attractionGenerationPrompt, attractionGenerating, attractionGenerationTaskId, attractionGenerationError,
+    attractionGenerationOpen, attractionGenerationPrompt, attractionGenerating, attractionGenerationTaskId, attractionGenerationProgress, attractionGenerationError,
     attractionGenerationAssignedCityType, attractionGenerationSessionCityId, attractionGenerationDatabaseCityId, attractionGenerationLang,
     attractionGenerationCount, setAttractionGenerationCount,
     attractionDedupeExistingItems, setAttractionDedupeExistingItems,
@@ -8586,7 +8621,7 @@ export function useSessionWizardController({ sessionId, confirm: confirmProp } =
     navigateToStep,
     switchLocale, addLocale, removeLocale, updateLocaleField,
     handleSelectDraft, handleCreateDraft, handleDeleteDraft,
-    handlePhotoFile, getSessionUuid,
+    handlePhotoFile, handlePhotoDelete, getSessionUuid,
     addTag, removeTag, handleTagKeyDown, handleTagBlur, toggleCityTag,
     uploadCityFilterImage,
     createCityFilterFolder, createCityFilterTag, createCityTag, updateCityFilter, deleteCityFilter,
@@ -8619,7 +8654,7 @@ export function useSessionWizardController({ sessionId, confirm: confirmProp } =
     updateIlLocaleField, updateCurrentIlPatch, persistInteractiveLocationImage,
     leaveIlDetailView,
     toggleCurrentIlTag, handleIlPhotoFile,
-    ilGenerationOpen, ilGenerationPrompt, ilGenerating, ilGenerationTaskId, ilGenerationError,
+    ilGenerationOpen, ilGenerationPrompt, ilGenerating, ilGenerationTaskId, ilGenerationProgress, ilGenerationError,
     ilGenerationAssignedCityType, ilGenerationSessionCityId, ilGenerationDatabaseCityId, ilGenerationLang,
     ilDedupeExistingLocations, setIlDedupeExistingLocations,
     ilGenerationCount, setIlGenerationCount,

@@ -577,6 +577,7 @@ export default function SessionWizardAttractionsStep({
         }}
         titleId="attraction-gen-title"
         busy={attractionGenerating}
+        progress={attractionGenerationProgress?.progress}
         footer={(
           <WizardGenerationActionFooter>
             <button

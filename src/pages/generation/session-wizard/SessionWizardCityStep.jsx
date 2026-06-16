@@ -131,7 +131,7 @@ function CoordinatesPanel({ lat, lon, savedLat, savedLon, setMapContainerRef, on
 
 function PhotoPanel({
   imagePreview, photoUploading, imageOriginalUrl, imageCopyright,
-  photoFileRef, onOpenCommonsModal, onPhotoFileChange,
+  photoFileRef, onOpenCommonsModal, onPhotoFileChange, onPhotoDelete,
   onImageOriginalUrlChange, onImageCopyrightChange,
 }) {
   return (
@@ -145,6 +145,14 @@ function PhotoPanel({
           <div className="absolute inset-0 bg-black/40 flex items-center justify-center">
             <div className="animate-spin w-5 h-5 border-2 border-white border-t-transparent rounded-full" />
           </div>
+        )}
+        {imagePreview && onPhotoDelete && (
+          <button
+            type="button" onClick={onPhotoDelete}
+            className="absolute top-2 left-2 px-1.5 py-0.5 text-[10px] bg-red-600 text-white rounded hover:bg-red-700 shadow transition-colors"
+          >
+            ✕ Удалить
+          </button>
         )}
         <button
           type="button" onClick={onOpenCommonsModal}
@@ -183,7 +191,7 @@ export default function SessionWizardCityStep({
   lat, lon, savedLat, savedLon,
   imagePreview, photoUploading, imageOriginalUrl, imageCopyright,
   setMapContainerRef, photoFileRef,
-  onOpenCommonsModal, onPhotoFileChange,
+  onOpenCommonsModal, onPhotoFileChange, onPhotoDelete,
   onImageOriginalUrlChange, onImageCopyrightChange,
   onCreateDraft, onSelectDraft, onDeleteDraft,
   onSwitchLocale, onSetDefaultLocale, onAddLocale, onRemoveLocale,
@@ -298,6 +306,7 @@ export default function SessionWizardCityStep({
             photoFileRef={photoFileRef}
             onOpenCommonsModal={onOpenCommonsModal}
             onPhotoFileChange={onPhotoFileChange}
+            onPhotoDelete={onPhotoDelete}
             onImageOriginalUrlChange={onImageOriginalUrlChange}
             onImageCopyrightChange={onImageCopyrightChange}
           />

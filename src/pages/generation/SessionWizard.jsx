@@ -182,6 +182,7 @@ export default function SessionWizard({ components = {} } = {}) {
     attractionGenerationPrompt,
     attractionGenerating,
     attractionGenerationTaskId,
+    attractionGenerationProgress,
     attractionGenerationError,
     attractionGenerationAssignedCityType,
     attractionGenerationSessionCityId,
@@ -220,6 +221,7 @@ export default function SessionWizard({ components = {} } = {}) {
     handleDeleteDraft,
 
     handlePhotoFile,
+    handlePhotoDelete,
     handleCommonsImageSelect,
     getSessionUuid,
 
@@ -283,6 +285,7 @@ export default function SessionWizard({ components = {} } = {}) {
     ilGenerationPrompt,
     ilGenerating,
     ilGenerationTaskId,
+    ilGenerationProgress,
     ilGenerationError,
     ilGenerationAssignedCityType,
     ilGenerationSessionCityId,
@@ -845,6 +848,7 @@ export default function SessionWizard({ components = {} } = {}) {
               }
             }}
             disabled={
+              currentStep === 2 || currentStep === 5 ||
               saving ||
               cityInfoSaving ||
               attrSaving ||
@@ -853,7 +857,8 @@ export default function SessionWizard({ components = {} } = {}) {
               attractionFeedSaving ||
               attractionAudioGuideSaving
             }
-            title="Сохранить текущие данные"
+            style={currentStep === 2 || currentStep === 5 ? { visibility: 'hidden' } : undefined}
+            title={currentStep === 2 || currentStep === 5 ? '' : 'Сохранить текущие данные'}
             className="px-3 py-1.5 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors"
           >
             {saving ||
@@ -925,6 +930,7 @@ export default function SessionWizard({ components = {} } = {}) {
               photoFileRef={photoFileRef}
               onOpenCommonsModal={openCityCommonsModal}
               onPhotoFileChange={handlePhotoFile}
+              onPhotoDelete={handlePhotoDelete}
               onImageOriginalUrlChange={setImageOriginalUrl}
               onImageCopyrightChange={setImageCopyright}
               onCreateDraft={handleCreateDraft}
@@ -1056,6 +1062,7 @@ export default function SessionWizard({ components = {} } = {}) {
               onOpenAttractionCommonsModal={openAttractionCommonsModal}
               onAddAttraction={addAttraction}
               attractionGenerationOpen={attractionGenerationOpen}
+              attractionGenerationProgress={attractionGenerationProgress}
               attractionGenerationPrompt={attractionGenerationPrompt}
               attractionGenerating={attractionGenerating}
               attractionGenerationTaskId={attractionGenerationTaskId}
@@ -1242,6 +1249,7 @@ export default function SessionWizard({ components = {} } = {}) {
             onOpenCommonsModal={openInteractiveLocationCommonsModal}
             onPhotoFileChange={handleIlPhotoFile}
             ilGenerationOpen={ilGenerationOpen}
+            ilGenerationProgress={ilGenerationProgress}
             ilGenerationPrompt={ilGenerationPrompt}
             ilGenerating={ilGenerating}
             ilGenerationTaskId={ilGenerationTaskId}

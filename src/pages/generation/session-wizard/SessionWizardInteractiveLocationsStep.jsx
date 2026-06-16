@@ -552,6 +552,7 @@ export default function SessionWizardInteractiveLocationsStep({
           }}
           titleId="il-gen-title"
           busy={ilGenerating}
+          progress={ilGenerationProgress?.progress}
           footer={(
             <WizardGenerationActionFooter>
               <button

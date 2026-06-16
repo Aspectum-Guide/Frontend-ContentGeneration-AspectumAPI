@@ -12,6 +12,7 @@ export default function AiGenerationModal({
   titleId,
   busy = false,
   busyLabel = 'Генерация…',
+  progress = null,
   children,
   footer,
   maxWidthClass = 'max-w-lg',
@@ -33,8 +34,20 @@ export default function AiGenerationModal({
         onClick={(e) => e.stopPropagation()}
       >
         {busy && (
-          <div className="absolute inset-0 bg-white/70 rounded-xl flex items-center justify-center z-20 pointer-events-none">
+          <div className="absolute inset-0 bg-white/70 rounded-xl flex flex-col items-center justify-center gap-3 z-20 pointer-events-none">
+            <div className="animate-spin w-6 h-6 border-2 border-blue-500 border-t-transparent rounded-full" />
             <div className="text-sm text-gray-700 font-medium">{busyLabel}</div>
+            {progress != null && (
+              <div className="w-48">
+                <div className="h-1.5 bg-gray-200 rounded-full overflow-hidden">
+                  <div
+                    className="h-full bg-blue-500 rounded-full transition-all duration-500"
+                    style={{ width: `${Math.min(progress, 100)}%` }}
+                  />
+                </div>
+                <div className="text-xs text-gray-500 text-center mt-1">{progress}%</div>
+              </div>
+            )}
           </div>
         )}
 
