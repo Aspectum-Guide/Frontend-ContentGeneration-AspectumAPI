@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 
 /**
  * Универсальный модальный диалог.
@@ -46,7 +46,9 @@ export default function Modal({ open, onClose, title, children, size = 'md', foo
             )}
             {onClose && (
               <button
+                type="button"
                 onClick={onClose}
+                aria-label="Закрыть"
                 className="ml-auto text-gray-400 hover:text-gray-600 transition-colors w-8 h-8 flex items-center justify-center rounded-lg hover:bg-gray-100"
               >
                 ✕
@@ -94,26 +96,55 @@ export function ConfirmModal({
   danger = false,
   loading = false,
 }) {
+  const [internalLoading, setInternalLoading] = useState(false);
+  const [internalError, setInternalError] = useState(null);
+
+  useEffect(() => {
+    if (open) setInternalError(null);
+  }, [open]);
+
+  const handleConfirm = async () => {
+    setInternalError(null);
+    setInternalLoading(true);
+    try {
+      await onConfirm();
+    } catch (err) {
+      setInternalError(err?.message || 'Произошла ошибка. Попробуйте ещё раз.');
+    } finally {
+      setInternalLoading(false);
+    }
+  };
+
+  const busy = loading || internalLoading;
+
   return (
-    <Modal open={open} onClose={onClose} title={title} size="sm">
+    <Modal open={open} onClose={busy ? undefined : onClose} title={title} size="sm">
       {message && (
         <p className="text-sm text-gray-600">{message}</p>
       )}
+      {internalError && (
+        <p className="mt-2 text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">{internalError}</p>
+      )}
       <div className="flex gap-3 mt-4">
         <button
-          onClick={onConfirm}
-          disabled={loading}
+          onClick={handleConfirm}
+          disabled={busy}
           className={`flex-1 py-2 text-sm font-medium rounded-lg transition-colors disabled:opacity-50 ${
             danger
               ? 'bg-red-600 text-white hover:bg-red-700'
               : 'bg-blue-600 text-white hover:bg-blue-700'
           }`}
         >
-          {loading ? 'Подождите...' : confirmLabel}
+          {busy ? (
+            <span className="flex items-center justify-center gap-2">
+              <span className="animate-spin w-3 h-3 border-2 border-white border-t-transparent rounded-full inline-block" />
+              Подождите...
+            </span>
+          ) : confirmLabel}
         </button>
         <button
           onClick={onClose}
-          disabled={loading}
+          disabled={busy}
           className="flex-1 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors disabled:opacity-50"
         >
           {cancelLabel}
