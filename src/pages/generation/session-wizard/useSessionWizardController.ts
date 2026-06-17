@@ -27,7 +27,6 @@ import { useAttractionsStep } from './useAttractionsStep.js';
 import useInteractiveLocationsStep from './useInteractiveLocationsStep.js';
 import { useAudioGuides } from './useAudioGuides.js';
 import usePublishStep from './usePublishStep.js';
-import useTags from './useTags.js';
 
 import type {
   UUID,
@@ -332,8 +331,6 @@ export function useSessionWizardController({
     return Array.from(codes);
   }, [localeData]);
 
-  const tags = useTags({ showNote, confirm });
-
   const cityStep = useCityStep({
     sessionId, session, showNote, confirm,
     localeData, setLocaleData, activeLocale, setActiveLocale, defaultLocale, setDefaultLocale,
@@ -345,7 +342,6 @@ export function useSessionWizardController({
     clearCityWizardForm,
     localCreatedCityDraftsRef, localDeletedCityDraftIdsRef,
     loadSessionSeqRef,
-    ...tags,
   });
 
   useEffect(() => {
@@ -562,7 +558,6 @@ export function useSessionWizardController({
     PUBLISH_STEP,
 
     ...cityStep,
-    ...tags,
     ...attractionsStep,
     ...ilStep,
     ...audioGuides,
