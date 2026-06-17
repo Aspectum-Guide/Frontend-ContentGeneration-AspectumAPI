@@ -463,6 +463,7 @@ export default function useCityStep(ctx) {
     navigate,
     location,
     loadSession,
+    setSession,
   } = ctx;
 
   const [lat, setLat] = useState('');
@@ -912,22 +913,46 @@ export default function useCityStep(ctx) {
     if (!data || typeof data !== 'object') return;
 
     const savedDraft = data.draft || null;
-    const savedDraftId = normalizeDraftId(data.draft_id || activeCityDraftIdRef.current);
+    const savedDraftId = normalizeDraftId(
+      data.draft_id || savedDraft?.id || activeCityDraftIdRef.current,
+    );
+    const savedCity = data.city || null;
 
     if (savedDraft && savedDraftId) {
       const draftTags = normalizeTagIds(savedDraft.tags ?? savedDraft.city_tags ?? []);
-      setCityDrafts((prev) =>
-        prev.map((d) =>
-          normalizeDraftId(d.id) === savedDraftId
-            ? { ...d, ...savedDraft, tags: draftTags }
-            : d,
-        ),
-      );
-      if (savedDraftId === normalizeDraftId(activeCityDraftIdRef.current)) {
-        setCityTags(draftTags);
-      }
+      const normalizedDraft = { ...savedDraft, id: savedDraftId, tags: draftTags };
+
+      setCityDrafts((prev) => upsertCityDraft(prev, normalizedDraft));
+
+      requestedCityDraftIdRef.current = savedDraftId;
+      activeCityDraftIdRef.current = savedDraftId;
+      setActiveCityDraftId(savedDraftId);
+      syncActiveDraftRoute(savedDraftId);
+      setCityTags(draftTags);
     }
-  }, [setCityDrafts]);
+
+    if (setSession) {
+      setSession((prev) => {
+        if (!prev) return prev;
+
+        let nextDrafts = prev.city_drafts || [];
+        if (savedDraft && savedDraftId) {
+          const draftTags = normalizeTagIds(savedDraft.tags ?? savedDraft.city_tags ?? []);
+          nextDrafts = upsertCityDraft(nextDrafts, {
+            ...savedDraft,
+            id: savedDraftId,
+            tags: draftTags,
+          });
+        }
+
+        return {
+          ...prev,
+          ...(savedCity ? { city: { ...(prev.city || {}), ...savedCity } } : {}),
+          city_drafts: nextDrafts,
+        };
+      });
+    }
+  }, [setCityDrafts, setSession, setActiveCityDraftId, syncActiveDraftRoute]);
 
   const saveCityForStep1 = useCallback(async () => {
     if (!defaultLocale || !localeData[defaultLocale]) {
@@ -1833,6 +1858,15 @@ export default function useCityStep(ctx) {
 
   const saveCurrentCityInfoIfDirty = useCallback(
     async (options = {}) => {
+      clearTimeout(cityInfoAutoSaveTimerRef.current);
+      const deadline = Date.now() + 15000;
+      while (
+        (cityInfoSavingRef.current || cityInfoAutoSaving) &&
+        Date.now() < deadline
+      ) {
+        await new Promise((resolve) => setTimeout(resolve, 50));
+      }
+
       if (!currentCityInfo?.id || !isCurrentCityInfoDirty()) {
         return true;
       }
@@ -1840,7 +1874,7 @@ export default function useCityStep(ctx) {
       await saveCurrentCityInfo(options);
       return true;
     },
-    [currentCityInfo, isCurrentCityInfoDirty, saveCurrentCityInfo],
+    [currentCityInfo, isCurrentCityInfoDirty, saveCurrentCityInfo, cityInfoAutoSaving],
   );
 
   useEffect(() => {

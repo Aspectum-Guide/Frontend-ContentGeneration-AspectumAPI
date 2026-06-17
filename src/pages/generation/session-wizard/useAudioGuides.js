@@ -8,6 +8,9 @@ import {
 } from './sessionWizardShared.jsx';
 import {
   getMultilangKeys,
+  mergeServerCollection,
+  upsertById,
+  waitForPersistenceIdle,
 } from './useSessionWizardHelpers.js';
 import { buildGenerationPayloadFields } from '../../../components/generation/AiGenerationQualitySettings.jsx';
 
@@ -685,6 +688,7 @@ function resolveElevenLabsSettingsUiMessage(settings, fallbackError = '') {
 export function useAudioGuides({
   sessionId,
   session,
+  setSession,
   showNote,
   confirm,
   currentAttr,
@@ -708,6 +712,7 @@ export function useAudioGuides({
   const attractionAudioGuideBusyRef = useRef(false);
   const [attractionAudioGuideAutoSaving, setAttractionAudioGuideAutoSaving] = useState(false);
   const [attractionAudioGuideAutoSaved, setAttractionAudioGuideAutoSaved] = useState(false);
+  const attractionAudioGuideAutoSavingRef = useRef(false);
   const currentAttractionAudioGuideRef = useRef(null);
   const attractionAudioGuideActiveLocaleRef = useRef('ru-RU');
   const attractionAudioGuideLocaleDataRef = useRef({});
@@ -771,18 +776,25 @@ export function useAudioGuides({
   }, [attractionAudioGuideSaving]);
 
   useEffect(() => {
+    attractionAudioGuideAutoSavingRef.current = attractionAudioGuideAutoSaving;
+  }, [attractionAudioGuideAutoSaving]);
+
+  useEffect(() => {
     if (!session?.id) return;
-    if (attractionAudioGuideSavingRef.current || attractionAudioGuideAutoSaving) return;
+    if (attractionAudioGuideSavingRef.current || attractionAudioGuideAutoSavingRef.current) {
+      return;
+    }
 
-    const guides = Array.isArray(session.attraction_audio_guides)
-      ? session.attraction_audio_guides.map(normalizeAttractionAudioGuide)
-      : [];
-
-    setAttractionAudioGuides(guides);
+    setAttractionAudioGuides((prev) =>
+      mergeServerCollection(
+        prev,
+        session.attraction_audio_guides,
+        normalizeAttractionAudioGuide,
+      ),
+    );
   }, [
     session?.id,
     session?.attraction_audio_guides,
-    attractionAudioGuideAutoSaving,
   ]);
 
   useEffect(() => {
@@ -1170,6 +1182,20 @@ export function useAudioGuides({
         setCurrentAttractionAudioGuide(guide);
         setAttractionAudioGuideActiveLocale(nextActiveLocale);
 
+        if (setSession) {
+          setSession((prev) =>
+            prev
+              ? {
+                  ...prev,
+                  attraction_audio_guides: upsertById(
+                    prev.attraction_audio_guides || [],
+                    guide,
+                  ),
+                }
+              : prev,
+          );
+        }
+
         showNote(
           activeAttractionId
             ? 'Аудиогид добавлен и привязан к текущей достопримечательности'
@@ -1189,6 +1215,7 @@ export function useAudioGuides({
     attrLocaleData,
     attractionAudioGuideActiveLocale,
     showNote,
+    setSession,
   ]);
 
   const updateCurrentAttractionAudioGuidePatch = useCallback((patch) => {
@@ -1483,15 +1510,23 @@ export function useAudioGuides({
             {},
         });
 
-        setAttractionAudioGuides((prev) =>
-          prev.map((item) =>
-            normalizeId(item.id) === normalizeId(currentAttractionAudioGuide.id)
-              ? updatedGuide
-              : item,
-          ),
-        );
+        setAttractionAudioGuides((prev) => upsertById(prev, updatedGuide));
 
         setCurrentAttractionAudioGuide(updatedGuide);
+
+        if (setSession) {
+          setSession((prev) =>
+            prev
+              ? {
+                  ...prev,
+                  attraction_audio_guides: upsertById(
+                    prev.attraction_audio_guides || [],
+                    updatedGuide,
+                  ),
+                }
+              : prev,
+          );
+        }
 
         attractionAudioGuideSavedSnapshotRef.current =
           buildAttractionAudioGuidePersistSnapshot(
@@ -1521,6 +1556,7 @@ export function useAudioGuides({
       currentAttractionAudioGuide,
       attractionAudioGuideLocaleData,
       showNote,
+      setSession,
     ],
   );
 
@@ -1537,6 +1573,13 @@ export function useAudioGuides({
 
   const saveCurrentAttractionAudioGuideIfDirty = useCallback(
     async (options = {}) => {
+      clearTimeout(attractionAudioGuideAutoSaveTimerRef.current);
+      await waitForPersistenceIdle(
+        () =>
+          attractionAudioGuideSavingRef.current ||
+          attractionAudioGuideAutoSavingRef.current,
+      );
+
       if (
         !currentAttractionAudioGuide?.id ||
         !isCurrentAttractionAudioGuideDirty()

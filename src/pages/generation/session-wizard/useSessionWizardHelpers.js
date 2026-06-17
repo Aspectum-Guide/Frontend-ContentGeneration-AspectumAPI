@@ -454,3 +454,55 @@ export function extractReferenceCities(data) {
 
   return [];
 }
+
+export function upsertById(list = [], item) {
+  if (!item?.id) return Array.isArray(list) ? list : [];
+
+  const id = String(item.id);
+  const source = Array.isArray(list) ? list : [];
+  const exists = source.some((entry) => String(entry?.id) === id);
+
+  if (!exists) return [item, ...source];
+
+  return source.map((entry) =>
+    String(entry?.id) === id ? { ...entry, ...item } : entry,
+  );
+}
+
+export async function waitForPersistenceIdle(isBusy, timeoutMs = 15000) {
+  const deadline = Date.now() + timeoutMs;
+
+  while (isBusy() && Date.now() < deadline) {
+    await new Promise((resolve) => setTimeout(resolve, 50));
+  }
+
+  if (isBusy()) {
+    console.warn(
+      `[wizard] waitForPersistenceIdle timed out after ${timeoutMs}ms`,
+    );
+    return false;
+  }
+
+  return true;
+}
+
+export function mergeServerCollection(localList = [], serverList = [], normalize) {
+  const normalizedServer = (Array.isArray(serverList) ? serverList : []).map(normalize);
+  const serverById = new Map(
+    normalizedServer.map((item) => [String(item.id), item]),
+  );
+
+  const localOnly = (Array.isArray(localList) ? localList : []).filter(
+    (item) => item?.id != null && !serverById.has(String(item.id)),
+  );
+
+  const mergedServer = normalizedServer.map((serverItem) => {
+    const localItem = (localList || []).find(
+      (entry) => String(entry?.id) === String(serverItem.id),
+    );
+
+    return localItem ? { ...serverItem, ...localItem } : serverItem;
+  });
+
+  return [...mergedServer, ...localOnly];
+}

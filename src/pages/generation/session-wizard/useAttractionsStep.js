@@ -28,6 +28,9 @@ import {
   getMultilangKeys,
   getAttractionLocaleSourceEntries,
   normalizeDraftId,
+  upsertById,
+  mergeServerCollection,
+  waitForPersistenceIdle,
 } from './useSessionWizardHelpers.js';
 
 function sortLocaleSourceEntries(entries) {
@@ -593,6 +596,7 @@ export function useAttractionsStep(ctx) {
     activeCityDraftIdRef,
     hasUnsavedChangesRef,
     loadSession,
+    setSession,
     setCommonsTarget,
     setCommonsModalOpen,
     aiGenerationMode,
@@ -618,6 +622,7 @@ export function useAttractionsStep(ctx) {
   const attrLocaleDataAttractionIdRef = useRef(null);
   const attrSavedSnapshotRef = useRef(null);
   const attrSavingRef = useRef(false);
+  const attrAutoSavingRef = useRef(false);
   const attrAutoSaveTimerRef = useRef(null);
   const attrAutoSavedTimerRef = useRef(null);
 
@@ -670,6 +675,10 @@ export function useAttractionsStep(ctx) {
   }, [attrSaving]);
 
   useEffect(() => {
+    attrAutoSavingRef.current = attrAutoSaving;
+  }, [attrAutoSaving]);
+
+  useEffect(() => {
     attractionFeedSavingRef.current = attractionFeedSaving;
   }, [attractionFeedSaving]);
 
@@ -717,9 +726,11 @@ export function useAttractionsStep(ctx) {
 
   useEffect(() => {
     if (!session?.id || !Array.isArray(session.attractions)) return;
-    if (attrSavingRef.current || attrAutoSaving) return;
+    if (attrSavingRef.current || attrAutoSavingRef.current) return;
 
-    setAttractions(session.attractions.map(normalizeAttraction));
+    setAttractions((prev) =>
+      mergeServerCollection(prev, session.attractions, normalizeAttraction),
+    );
     setAttractionsLoaded(true);
 
     if (Array.isArray(session.attraction_infos)) {
@@ -733,7 +744,6 @@ export function useAttractionsStep(ctx) {
     session?.attractions,
     session?.attraction_infos,
     session?.attraction_feed_items,
-    attrAutoSaving,
   ]);
 
   // ─── buildAttrLocaleData ───────────────────────────────────────────────────
@@ -956,6 +966,14 @@ export function useAttractionsStep(ctx) {
         attrSavedSnapshotRef.current = buildAttrPersistSnapshot(attr, nextLocaleData);
         setAttrView('detail');
 
+        if (setSession) {
+          setSession((prev) =>
+            prev
+              ? { ...prev, attractions: upsertById(prev.attractions || [], attr) }
+              : prev,
+          );
+        }
+
         showNote(
           shouldAttachToDraft
             ? 'Достопримечательность добавлена и привязана к текущему городу'
@@ -972,6 +990,7 @@ export function useAttractionsStep(ctx) {
     buildAttrLocaleData,
     showNote,
     activeCityDraftIdRef,
+    setSession,
   ]);
 
   // ─── deleteCurrentAttr ─────────────────────────────────────────────────────
@@ -1067,11 +1086,20 @@ export function useAttractionsStep(ctx) {
           tags: normalizeTagIds(responseAttr.tags ?? currentAttr.tags ?? []),
         });
 
-        setAttractions((prev) =>
-          prev.map((item) => (item.id === currentAttr.id ? updatedAttr : item)),
-        );
+        setAttractions((prev) => upsertById(prev, updatedAttr));
 
         setCurrentAttr(updatedAttr);
+
+        if (setSession) {
+          setSession((prev) =>
+            prev
+              ? {
+                  ...prev,
+                  attractions: upsertById(prev.attractions || [], updatedAttr),
+                }
+              : prev,
+          );
+        }
 
         await Promise.all(
           Object.values(attrLocaleData).map((d) =>
@@ -1104,12 +1132,17 @@ export function useAttractionsStep(ctx) {
         setAttrSaving(false);
       }
     },
-    [sessionId, currentAttr, attrLocaleData, showNote],
+    [sessionId, currentAttr, attrLocaleData, showNote, setSession],
   );
 
   // ─── saveCurrentAttrIfDirty ────────────────────────────────────────────────
   const saveCurrentAttrIfDirty = useCallback(
     async (options = {}) => {
+      clearTimeout(attrAutoSaveTimerRef.current);
+      await waitForPersistenceIdle(
+        () => attrSavingRef.current || attrAutoSavingRef.current,
+      );
+
       if (!currentAttr?.id || !isCurrentAttrDirty()) {
         return true;
       }
@@ -2115,6 +2148,17 @@ export function useAttractionsStep(ctx) {
   // ─── saveCurrentAttractionFeedItemIfDirty ──────────────────────────────────
   const saveCurrentAttractionFeedItemIfDirty = useCallback(
     async (options = {}) => {
+      clearTimeout(attractionFeedAutoSaveTimerRef.current);
+      const deadline = Date.now() + 15000;
+      while (
+        (attractionFeedSavingRef.current ||
+          attractionFeedAutoSaving ||
+          attractionFeedPhotoUploadingRef.current) &&
+        Date.now() < deadline
+      ) {
+        await new Promise((resolve) => setTimeout(resolve, 50));
+      }
+
       if (
         !currentAttractionFeedItem?.id ||
         !isCurrentAttractionFeedItemDirty()
@@ -2129,6 +2173,7 @@ export function useAttractionsStep(ctx) {
       currentAttractionFeedItem,
       isCurrentAttractionFeedItemDirty,
       saveCurrentAttractionFeedItem,
+      attractionFeedAutoSaving,
     ],
   );
 

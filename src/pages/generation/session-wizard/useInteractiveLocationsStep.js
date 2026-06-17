@@ -18,6 +18,7 @@ import {
   persistInteractiveLocationRecord,
   buildAttrLocaleDataWithPrevious,
   normalizeDraftId,
+  waitForPersistenceIdle,
 } from './useSessionWizardHelpers.js';
 
 function getAttrName(attr) {
@@ -57,6 +58,7 @@ export default function useInteractiveLocationsStep({
   const ilLocaleDataIlIdRef = useRef(null);
   const ilSavedSnapshotRef = useRef(null);
   const ilSavingRef = useRef(false);
+  const ilAutoSavingRef = useRef(false);
   const ilPhotoUploadingRef = useRef(false);
 
   const ilAutoSaveTimerRef = useRef(null);
@@ -113,6 +115,10 @@ export default function useInteractiveLocationsStep({
   useEffect(() => {
     ilSavingRef.current = ilSaving;
   }, [ilSaving]);
+
+  useEffect(() => {
+    ilAutoSavingRef.current = ilAutoSaving;
+  }, [ilAutoSaving]);
 
   useEffect(() => {
     ilPhotoUploadingRef.current = ilPhotoUploading;
@@ -209,6 +215,11 @@ export default function useInteractiveLocationsStep({
 
   const saveCurrentIlIfDirty = useCallback(
     async (options = {}) => {
+      clearTimeout(ilAutoSaveTimerRef.current);
+      await waitForPersistenceIdle(
+        () => ilSavingRef.current || ilAutoSavingRef.current,
+      );
+
       if (!currentIl?.id || !isCurrentIlDirty()) {
         return true;
       }

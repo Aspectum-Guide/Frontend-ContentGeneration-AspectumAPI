@@ -40,7 +40,7 @@ export default function usePublishStep(ctx) {
   const [closing, setClosing] = useState(false);
   const [publishing, setPublishing] = useState(false);
   const [translating, setTranslating] = useState(false);
-  const [preparingPublishStep] = useState(false);
+  const [preparingPublishStep, setPreparingPublishStep] = useState(false);
 
   const handleClose = useCallback(async () => {
     setClosing(true);
@@ -271,6 +271,7 @@ export default function usePublishStep(ctx) {
     publishing,
     translating,
     preparingPublishStep,
+    setPreparingPublishStep,
     handleClose,
     handlePublish,
     handleTranslateSession,
