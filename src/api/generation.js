@@ -313,6 +313,13 @@ export const aiAPI = {
     apiClient.post(`${BASE}/ai/city-info-json/start/`, data),
   cityInfoCreateFromTask: (taskId, payload = {}) =>
     apiClient.post(`${BASE}/ai/city-info-json/tasks/${taskId}/create-city-info/`, payload),
+  attractionInfoJsonStart: (data) =>
+    apiClient.post(`${BASE}/ai/attraction-info-json/start/`, data),
+  attractionInfoCreateFromTask: (taskId, payload = {}) =>
+    apiClient.post(
+      `${BASE}/ai/attraction-info-json/tasks/${taskId}/create-attraction-info/`,
+      payload,
+    ),
 };
 
 // ─── Events (reference) ───────────────────────────────────────────────────────

@@ -3,6 +3,7 @@ const COUNT_LIMITS = {
   attractions: { min: 1, max: 50, default: 5 },
   interactive_locations: { min: 1, max: 50, default: 5 },
   city_info: { min: 1, max: 20, default: 5 },
+  attraction_info: { min: 1, max: 20, default: 5 },
 };
 
 export function clampGenerationCount(value, generationType = 'cities') {

@@ -264,6 +264,23 @@ export default function SessionWizard({ components = {} } = {}) {
     setAttractionGenerationDatabaseCityId,
     setAttractionGenerationLang,
     generateAttractionsFromPrompt,
+    attractionInfoGenerateModalOpen,
+    attractionInfoGeneratePrompt,
+    attractionInfoGenerateCount,
+    attractionInfoDedupeExistingItems,
+    setAttractionInfoDedupeExistingItems,
+    attractionInfoGenerating,
+    attractionInfoGenerationError,
+    attractionInfoGenerationLang,
+    setAttractionInfoGenerationLang,
+    attractionInfoGenerationTargetId,
+    setAttractionInfoGenerationTargetId,
+    openAttractionInfoGenerateModal,
+    handleOpenAttractionInfoGenerateModal,
+    closeAttractionInfoGenerateModal,
+    setAttractionInfoGeneratePrompt,
+    setAttractionInfoGenerateCount,
+    generateAttractionInfoFromPrompt,
     deleteCurrentAttr,
     saveCurrentAttr,
     saveCurrentAttrIfDirty,
@@ -1104,6 +1121,7 @@ export default function SessionWizard({ components = {} } = {}) {
               onAttractionGenerationDatabaseCityIdChange={setAttractionGenerationDatabaseCityId}
               onAttractionGenerationLangChange={setAttractionGenerationLang}
               onGenerateAttractionsFromPrompt={generateAttractionsFromPrompt}
+              onOpenAttractionInfoGenerateModal={handleOpenAttractionInfoGenerateModal}
               aiGenerationMode={aiGenerationMode}
               aiUseWebSearch={aiUseWebSearch}
               aiAdvancedGenerationAvailable={aiAdvancedGenerationAvailable}
@@ -1143,6 +1161,27 @@ export default function SessionWizard({ components = {} } = {}) {
                 onSaveCurrentAttractionInfo={saveCurrentAttractionInfo}
                 onDeleteCurrentAttractionInfo={deleteCurrentAttractionInfo}
                 onGoToStep={goToStep}
+                attractionInfoGenerateModalOpen={attractionInfoGenerateModalOpen}
+                attractionInfoGeneratePrompt={attractionInfoGeneratePrompt}
+                attractionInfoGenerateCount={attractionInfoGenerateCount}
+                attractionInfoDedupeExistingItems={attractionInfoDedupeExistingItems}
+                onAttractionInfoDedupeExistingItemsChange={setAttractionInfoDedupeExistingItems}
+                attractionInfoGenerating={attractionInfoGenerating}
+                attractionInfoGenerationError={attractionInfoGenerationError}
+                attractionInfoGenerationLang={attractionInfoGenerationLang}
+                attractionInfoGenerationTargetId={attractionInfoGenerationTargetId}
+                onOpenAttractionInfoGenerateModal={handleOpenAttractionInfoGenerateModal}
+                onCloseAttractionInfoGenerateModal={closeAttractionInfoGenerateModal}
+                onAttractionInfoGeneratePromptChange={setAttractionInfoGeneratePrompt}
+                onAttractionInfoGenerateCountChange={setAttractionInfoGenerateCount}
+                onAttractionInfoGenerationLangChange={setAttractionInfoGenerationLang}
+                onAttractionInfoGenerationTargetIdChange={setAttractionInfoGenerationTargetId}
+                onGenerateAttractionInfoFromPrompt={generateAttractionInfoFromPrompt}
+                aiGenerationMode={aiGenerationMode}
+                aiUseWebSearch={aiUseWebSearch}
+                aiAdvancedGenerationAvailable={aiAdvancedGenerationAvailable}
+                onAiGenerationModeChange={setAiGenerationMode}
+                onAiUseWebSearchChange={setAiUseWebSearch}
               />
             </div>
 

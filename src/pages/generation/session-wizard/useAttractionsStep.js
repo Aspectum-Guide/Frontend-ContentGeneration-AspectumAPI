@@ -23,6 +23,8 @@ import {
   resolveSessionEntityImageOriginalUrl,
   resolveSessionEntityImageCopyright,
   normalizeTagIds,
+  filterPersistedSessionAttractions,
+  isPersistedSessionAttractionId,
 } from './sessionWizardShared.jsx';
 import {
   getMultilangKeys,
@@ -666,6 +668,19 @@ export function useAttractionsStep(ctx) {
   const [attractionDedupeExistingItems, setAttractionDedupeExistingItems] = useState(true);
   const attractionGenPollCancelledRef = useRef(false);
   const attractionGenInFlightRef = useRef(false);
+
+  // ─── Attraction useful info generation state ───────────────────────────────
+  const [attractionInfoGenerateModalOpen, setAttractionInfoGenerateModalOpen] = useState(false);
+  const [attractionInfoGeneratePrompt, setAttractionInfoGeneratePrompt] = useState('');
+  const [attractionInfoGenerateCount, setAttractionInfoGenerateCount] = useState(5);
+  const [attractionInfoDedupeExistingItems, setAttractionInfoDedupeExistingItems] = useState(true);
+  const [attractionInfoGenerating, setAttractionInfoGenerating] = useState(false);
+  const [attractionInfoGenerationTaskId, setAttractionInfoGenerationTaskId] = useState(null);
+  const [attractionInfoGenerationError, setAttractionInfoGenerationError] = useState('');
+  const [attractionInfoGenerationLang, setAttractionInfoGenerationLang] = useState('ru');
+  const [attractionInfoGenerationTargetId, setAttractionInfoGenerationTargetId] = useState('');
+  const attractionInfoGenPollCancelledRef = useRef(false);
+  const attractionInfoGenInFlightRef = useRef(false);
 
   const attractionFeedPhotoFileRef = useRef(null);
 
@@ -2602,6 +2617,259 @@ export function useAttractionsStep(ctx) {
     reloadAttractionsFromServer,
   ]);
 
+  // ─── Attraction useful info generation ─────────────────────────────────────
+  const resolveDefaultAttractionInfoAiLang = useCallback(() => {
+    const entries = Object.values(attrLocaleData || {});
+    if (entries.length > 0) {
+      const locLang = (entries[0]?.lang || '').trim().toLowerCase();
+      if (locLang) {
+        const base = locLang.split('-')[0];
+        return base || 'ru';
+      }
+    }
+    return 'ru';
+  }, [attrLocaleData]);
+
+  const openAttractionInfoGenerateModal = useCallback(() => {
+    attractionInfoGenPollCancelledRef.current = false;
+    setAttractionInfoGenerationError('');
+    setAttractionInfoGeneratePrompt('');
+    setAttractionInfoGenerateCount(5);
+    setAttractionInfoGenerationTaskId(null);
+    setAttractionInfoGenerationLang(resolveDefaultAttractionInfoAiLang());
+
+    const persistedAttractions = filterPersistedSessionAttractions(attractions);
+    let targetId = '';
+    const currentAttrId = normalizeId(currentAttr?.id);
+
+    if (
+      currentAttrId &&
+      persistedAttractions.some((item) => normalizeId(item.id) === currentAttrId)
+    ) {
+      targetId = currentAttrId;
+    } else if (persistedAttractions.length === 1) {
+      targetId = normalizeId(persistedAttractions[0]?.id);
+    }
+
+    setAttractionInfoGenerationTargetId(targetId);
+    setAttractionInfoGenerateModalOpen(true);
+  }, [
+    resolveDefaultAttractionInfoAiLang,
+    currentAttr,
+    attractions,
+  ]);
+
+  const handleOpenAttractionInfoGenerateModal = useCallback(() => {
+    const persistedAttractions = filterPersistedSessionAttractions(attractions);
+    if (!persistedAttractions.length) {
+      showNote('Сначала добавьте достопримечательность.', 'warning');
+      return;
+    }
+    openAttractionInfoGenerateModal();
+  }, [attractions, showNote, openAttractionInfoGenerateModal]);
+
+  const closeAttractionInfoGenerateModal = useCallback(() => {
+    attractionInfoGenPollCancelledRef.current = true;
+    attractionInfoGenInFlightRef.current = false;
+    setAttractionInfoGenerateModalOpen(false);
+    setAttractionInfoGenerating(false);
+    setAttractionInfoGenerationTaskId(null);
+    setAttractionInfoGenerationError('');
+  }, []);
+
+  const ensureAttractionSavedForInfoGeneration = useCallback(async () => {
+    const targetId = normalizeId(attractionInfoGenerationTargetId);
+    if (!targetId || !isPersistedSessionAttractionId(targetId)) {
+      throw new Error('Выберите достопримечательность.');
+    }
+
+    const currentAttrId = normalizeId(currentAttr?.id);
+    if (currentAttr && currentAttrId === targetId) {
+      await saveCurrentAttrIfDirty({ silent: true });
+
+      const sessionAttractionId = normalizeId(currentAttr?.id);
+      if (sessionAttractionId && isPersistedSessionAttractionId(sessionAttractionId)) {
+        return sessionAttractionId;
+      }
+
+      const { name, description } = collectAttrLocaleTexts(attrLocaleData);
+      const res = await attractionsAPI.create(
+        sessionId,
+        buildAttractionPayload(currentAttr, name, description),
+      );
+      const rawAttr = res?.data?.attraction || res?.data;
+      const attr = normalizeAttraction(rawAttr || {});
+      const createdId = normalizeId(attr?.id);
+
+      if (!createdId || !isPersistedSessionAttractionId(createdId)) {
+        throw new Error('Не удалось сохранить достопримечательность перед генерацией');
+      }
+
+      setAttractions((prev) => upsertById(prev, attr));
+      setCurrentAttr(attr);
+      setAttractionInfoGenerationTargetId(createdId);
+      attrSavedSnapshotRef.current = buildAttrPersistSnapshot(attr, attrLocaleData);
+
+      if (setSession) {
+        setSession((prev) =>
+          prev
+            ? { ...prev, attractions: upsertById(prev.attractions || [], attr) }
+            : prev,
+        );
+      }
+
+      await Promise.all(
+        Object.values(attrLocaleData).map((d) =>
+          attractionsAPI.saveContent(sessionId, createdId, {
+            language: d.lang,
+            text: d.contentText || '',
+          }),
+        ),
+      );
+
+      return createdId;
+    }
+
+    const exists = attractions.some(
+      (item) => normalizeId(item?.id) === targetId,
+    );
+    if (exists) {
+      return targetId;
+    }
+
+    throw new Error('Выбранная достопримечательность не найдена в сессии');
+  }, [
+    attractionInfoGenerationTargetId,
+    currentAttr,
+    attrLocaleData,
+    sessionId,
+    attractions,
+    saveCurrentAttrIfDirty,
+    setSession,
+  ]);
+
+  const generateAttractionInfoFromPrompt = useCallback(async () => {
+    if (attractionInfoGenerating || attractionInfoGenInFlightRef.current) return;
+
+    if (!normalizeId(attractionInfoGenerationTargetId)) {
+      const msg = 'Выберите достопримечательность.';
+      setAttractionInfoGenerationError(msg);
+      showNote(msg, 'warning');
+      return;
+    }
+
+    const prompt = attractionInfoGeneratePrompt.trim();
+    const userPrompt = prompt || 'Сгенерируй полезную информацию для туристов о достопримечательности';
+
+    const langRaw = (attractionInfoGenerationLang || 'ru').trim().toLowerCase();
+    const lang = (langRaw.split('-')[0] || 'ru').slice(0, 8) || 'ru';
+
+    const requested_count = clampGenerationCount(attractionInfoGenerateCount, 'attraction_info');
+
+    attractionInfoGenPollCancelledRef.current = false;
+    attractionInfoGenInFlightRef.current = true;
+    setAttractionInfoGenerating(true);
+    setAttractionInfoGenerationError('');
+    setAttractionInfoGenerationTaskId(null);
+
+    try {
+      const sessionAttractionId = await ensureAttractionSavedForInfoGeneration();
+
+      const startRes = await aiAPI.attractionInfoJsonStart({
+        session_id: sessionId,
+        prompt: userPrompt,
+        lang,
+        requested_count,
+        dedupe_existing_items: attractionInfoDedupeExistingItems,
+        assigned_attraction_type: 'draft',
+        session_attraction_id: sessionAttractionId,
+        event_id: null,
+        ...buildGenerationPayloadFields(aiGenerationMode, aiUseWebSearch),
+      });
+      const taskId = startRes?.data?.task_id;
+      if (!taskId) {
+        throw new Error('Сервер не вернул task_id');
+      }
+      setAttractionInfoGenerationTaskId(taskId);
+
+      await pollGenerationTask(taskId, {
+        tasksAPI,
+        maxWaitMs: 20 * 60 * 1000,
+        isCancelled: () => attractionInfoGenPollCancelledRef.current,
+      });
+
+      if (attractionInfoGenPollCancelledRef.current) {
+        return;
+      }
+
+      const createRes = await aiAPI.attractionInfoCreateFromTask(taskId, {
+        session_id: sessionId,
+        dedupe_existing_items: attractionInfoDedupeExistingItems,
+      });
+      const createData = createRes?.data || {};
+      const createdRaw = createData.attraction_infos || [];
+      const created = (Array.isArray(createdRaw) ? createdRaw : []).map(normalizeAttractionInfo);
+      const n = typeof createData.created_count === 'number'
+        ? createData.created_count
+        : created.length;
+
+      if (created.length > 0) {
+        setAttractionInfos((prev) => {
+          const existingIds = new Set(prev.map((item) => String(item.id)));
+          const toAdd = created.filter((item) => item.id && !existingIds.has(String(item.id)));
+          return [...prev, ...toAdd];
+        });
+
+        if (setSession) {
+          setSession((prev) => {
+            if (!prev) return prev;
+            const existing = Array.isArray(prev.attraction_infos) ? prev.attraction_infos : [];
+            const existingIds = new Set(existing.map((item) => String(item.id)));
+            const toAdd = created.filter((item) => item.id && !existingIds.has(String(item.id)));
+            return { ...prev, attraction_infos: [...existing, ...toAdd] };
+          });
+        }
+      }
+
+      if (!attractionInfoGenPollCancelledRef.current) {
+        if (createData.partial && createData.warning) {
+          showNote(createData.warning, 'warning');
+        }
+        showNote(
+          formatGenerationDedupeResultMessage(createData, { dedupeField: 'dedupe_existing_items' })
+            || `Сгенерировано блоков полезной информации: ${n}`,
+          createData.partial ? 'warning' : 'success',
+        );
+        setAttractionInfoGenerateModalOpen(false);
+        setAttractionInfoGeneratePrompt('');
+        setAttractionInfoGenerationTaskId(null);
+      }
+    } catch (e) {
+      if (!attractionInfoGenPollCancelledRef.current && !isPollCancelledError(e)) {
+        const msg = e?.message || parseApiError(e, TASK_NOT_FOUND_MESSAGE);
+        setAttractionInfoGenerationError(msg);
+        showNote(msg, 'error');
+      }
+      setAttractionInfoGenerationTaskId(null);
+    } finally {
+      attractionInfoGenInFlightRef.current = false;
+      setAttractionInfoGenerating(false);
+    }
+  }, [
+    sessionId,
+    attractionInfoGeneratePrompt,
+    attractionInfoGenerateCount,
+    attractionInfoDedupeExistingItems,
+    attractionInfoGenerationLang,
+    aiGenerationMode,
+    aiUseWebSearch,
+    showNote,
+    setSession,
+    ensureAttractionSavedForInfoGeneration,
+    attractionInfoGenerating,
+    attractionInfoGenerationTargetId,
+  ]);
+
   // ─── Return ────────────────────────────────────────────────────────────────
   return {
     attractions,
@@ -2714,6 +2982,26 @@ export function useAttractionsStep(ctx) {
     closeAttractionGenerationModal,
     setAttractionGenerationAssignedCityTypeSafe,
     generateAttractionsFromPrompt,
+
+    attractionInfoGenerateModalOpen,
+    setAttractionInfoGenerateModalOpen,
+    attractionInfoGeneratePrompt,
+    setAttractionInfoGeneratePrompt,
+    attractionInfoGenerateCount,
+    setAttractionInfoGenerateCount,
+    attractionInfoDedupeExistingItems,
+    setAttractionInfoDedupeExistingItems,
+    attractionInfoGenerating,
+    attractionInfoGenerationTaskId,
+    attractionInfoGenerationError,
+    attractionInfoGenerationLang,
+    setAttractionInfoGenerationLang,
+    attractionInfoGenerationTargetId,
+    setAttractionInfoGenerationTargetId,
+    openAttractionInfoGenerateModal,
+    handleOpenAttractionInfoGenerateModal,
+    closeAttractionInfoGenerateModal,
+    generateAttractionInfoFromPrompt,
 
     reloadAttractionsFromServer,
   };

@@ -493,6 +493,7 @@ export default function SessionWizardAttractionsStep({
   onAttractionGenerationDatabaseCityIdChange,
   onAttractionGenerationLangChange,
   onGenerateAttractionsFromPrompt,
+  onOpenAttractionInfoGenerateModal,
   aiGenerationMode = 'instant',
   aiUseWebSearch = false,
   aiAdvancedGenerationAvailable = true,
@@ -1100,14 +1101,23 @@ export default function SessionWizardAttractionsStep({
               </div>
 
               <div>
-                <div className="flex items-center gap-2 mb-1">
-                  <label className="text-sm font-medium text-gray-700">
-                    Текст
-                  </label>
-
-                  <span className="px-1.5 py-0.5 bg-blue-100 text-blue-700 text-xs rounded font-mono">
-                    {localeLabel}
-                  </span>
+                <div className="flex items-center justify-between gap-3 mb-1">
+                  <div className="flex items-center gap-2">
+                    <label className="text-sm font-medium text-gray-700">
+                      Текст
+                    </label>
+                    <span className="px-1.5 py-0.5 bg-blue-100 text-blue-700 text-xs rounded font-mono">
+                      {localeLabel}
+                    </span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => onOpenAttractionInfoGenerateModal?.()}
+                    disabled={!currentAttr}
+                    className="px-3 py-1.5 text-xs font-medium text-blue-700 bg-blue-50 border border-blue-200 rounded-lg hover:bg-blue-100 disabled:opacity-50 transition-colors"
+                  >
+                    Сгенерировать полезную информацию
+                  </button>
                 </div>
 
                 <textarea

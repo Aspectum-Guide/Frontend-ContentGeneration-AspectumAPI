@@ -77,6 +77,20 @@ export function getAttrName(attr) {
 import { normalizeId, normalizeTagIds } from '../../../utils/normalization';
 export { normalizeId, normalizeTagIds };
 
+const PERSISTED_UUID_RE =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+export function isPersistedSessionAttractionId(value) {
+  const id = normalizeId(value);
+  return Boolean(id && PERSISTED_UUID_RE.test(id));
+}
+
+export function filterPersistedSessionAttractions(attractions = []) {
+  return (Array.isArray(attractions) ? attractions : []).filter((item) =>
+    isPersistedSessionAttractionId(item?.id),
+  );
+}
+
 const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 

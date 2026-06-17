@@ -1,4 +1,18 @@
-import { getAttrName, getFlag, normalizeId } from './sessionWizardShared.jsx';
+import { useMemo } from 'react';
+import AiGenerationModal, { WizardGenerationActionFooter } from '../../../components/generation/AiGenerationModal.jsx';
+import AiGenerationQualitySettings from '../../../components/generation/AiGenerationQualitySettings.jsx';
+import AiGenerationDedupeToggle from '../../../components/generation/AiGenerationDedupeToggle.jsx';
+import AiGenerationCountField from '../../../components/generation/AiGenerationCountField.jsx';
+import { getAttrName, getFlag, normalizeId, filterPersistedSessionAttractions } from './sessionWizardShared.jsx';
+
+const AI_GENERATION_LANG_OPTIONS = [
+  { value: 'ru', label: 'Русский (ru)' },
+  { value: 'en', label: 'English (en)' },
+  { value: 'it', label: 'Italiano (it)' },
+  { value: 'fr', label: 'Français (fr)' },
+  { value: 'de', label: 'Deutsch (de)' },
+  { value: 'es', label: 'Español (es)' },
+];
 
 const getAttractionDisplayName = (attraction) => {
   if (!attraction) return 'Без названия';
@@ -226,9 +240,212 @@ export default function SessionWizardAttractionInfoStep({
   onSaveCurrentAttractionInfo,
   onDeleteCurrentAttractionInfo,
   onGoToStep,
+
+  attractionInfoGenerateModalOpen = false,
+  attractionInfoGeneratePrompt = '',
+  attractionInfoGenerateCount = 5,
+  attractionInfoDedupeExistingItems = true,
+  onAttractionInfoDedupeExistingItemsChange,
+  attractionInfoGenerating = false,
+  attractionInfoGenerationError = '',
+  attractionInfoGenerationLang = 'ru',
+  attractionInfoGenerationTargetId = '',
+  onOpenAttractionInfoGenerateModal,
+  onCloseAttractionInfoGenerateModal,
+  onAttractionInfoGeneratePromptChange,
+  onAttractionInfoGenerateCountChange,
+  onAttractionInfoGenerationLangChange,
+  onAttractionInfoGenerationTargetIdChange,
+  onGenerateAttractionInfoFromPrompt,
+  aiGenerationMode = 'instant',
+  aiUseWebSearch = false,
+  aiAdvancedGenerationAvailable = true,
+  onAiGenerationModeChange,
+  onAiUseWebSearchChange,
 }) {
   const currentLocale =
     attractionInfoLocaleData[attractionInfoActiveLocale] || {};
+
+  const savedAttractions = useMemo(
+    () => filterPersistedSessionAttractions(attractions),
+    [attractions],
+  );
+
+  const selectedGenerationAttraction = useMemo(() => {
+    const targetId = normalizeId(attractionInfoGenerationTargetId);
+    if (!targetId) return null;
+    return savedAttractions.find((item) => normalizeId(item?.id) === targetId) || null;
+  }, [savedAttractions, attractionInfoGenerationTargetId]);
+
+  const attractionSelectLocked = savedAttractions.length === 1;
+  const canSubmitAttractionInfoGeneration =
+    Boolean(normalizeId(attractionInfoGenerationTargetId)) && !attractionInfoGenerating;
+
+  const attractionInfoHeaderActions = (
+    <div className="flex items-center gap-2 shrink-0">
+      <button
+        type="button"
+        onClick={() => onOpenAttractionInfoGenerateModal?.()}
+        className="px-3 py-1.5 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors"
+      >
+        Сгенерировать
+      </button>
+      <button
+        type="button"
+        onClick={onAddAttractionInfo}
+        className="px-3 py-1.5 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors"
+      >
+        + Добавить
+      </button>
+    </div>
+  );
+
+  const attractionInfoGenerationModal = (
+    <AiGenerationModal
+      open={attractionInfoGenerateModalOpen}
+      onBackdropClick={() => {
+        if (!attractionInfoGenerating) onCloseAttractionInfoGenerateModal?.();
+      }}
+      titleId="attraction-info-gen-title"
+      busy={attractionInfoGenerating}
+      footer={(
+        <WizardGenerationActionFooter>
+          <button
+            type="button"
+            onClick={() => onCloseAttractionInfoGenerateModal?.()}
+            disabled={attractionInfoGenerating}
+            className="px-4 py-2 text-sm font-medium text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50"
+          >
+            Отмена
+          </button>
+          <button
+            type="button"
+            onClick={() => onGenerateAttractionInfoFromPrompt?.()}
+            disabled={!canSubmitAttractionInfoGeneration}
+            className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-50"
+          >
+            Сгенерировать
+          </button>
+        </WizardGenerationActionFooter>
+      )}
+    >
+      <h2
+        id="attraction-info-gen-title"
+        className="text-lg font-semibold text-gray-900"
+      >
+        Сгенерировать полезную информацию
+      </h2>
+
+      {savedAttractions.length > 0 ? (
+        <div>
+          <label
+            htmlFor="attraction-info-gen-attraction"
+            className="block text-sm font-medium text-gray-700 mb-1"
+          >
+            Достопримечательность
+          </label>
+          <select
+            id="attraction-info-gen-attraction"
+            value={attractionInfoGenerationTargetId || ''}
+            onChange={(e) => onAttractionInfoGenerationTargetIdChange?.(e.target.value)}
+            disabled={attractionInfoGenerating || attractionSelectLocked}
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
+          >
+            {savedAttractions.length > 1 && (
+              <option value="">— Выберите достопримечательность —</option>
+            )}
+            {savedAttractions.map((attr) => (
+              <option key={String(attr.id)} value={String(attr.id)}>
+                {getAttrName(attr)}
+              </option>
+            ))}
+          </select>
+          {attractionSelectLocked && selectedGenerationAttraction && (
+            <p className="mt-1 text-xs text-gray-500">
+              В сессии одна достопримечательность — выбрана автоматически.
+            </p>
+          )}
+        </div>
+      ) : (
+        <p className="text-sm text-amber-700 bg-amber-50 border border-amber-200 rounded-lg p-3">
+          Сначала добавьте достопримечательность.
+        </p>
+      )}
+
+      <div>
+        <label
+          htmlFor="attraction-info-gen-lang"
+          className="block text-sm font-medium text-gray-700 mb-1"
+        >
+          Язык
+        </label>
+        <select
+          id="attraction-info-gen-lang"
+          value={attractionInfoGenerationLang || 'ru'}
+          onChange={(e) => onAttractionInfoGenerationLangChange?.(e.target.value)}
+          disabled={attractionInfoGenerating}
+          className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
+        >
+          {AI_GENERATION_LANG_OPTIONS.map((opt) => (
+            <option key={opt.value} value={opt.value}>
+              {opt.label}
+            </option>
+          ))}
+        </select>
+      </div>
+
+      <div>
+        <AiGenerationCountField
+          id="attraction-info-gen-count"
+          label="Количество блоков полезной информации"
+          value={attractionInfoGenerateCount}
+          onChange={onAttractionInfoGenerateCountChange}
+          generationType="attraction_info"
+          disabled={attractionInfoGenerating}
+        />
+      </div>
+
+      {attractionInfoGenerationError && (
+        <div className="text-sm text-red-700 bg-red-50 border border-red-200 rounded-lg p-3">
+          {attractionInfoGenerationError}
+        </div>
+      )}
+
+      <AiGenerationQualitySettings
+        generationMode={aiGenerationMode}
+        onGenerationModeChange={onAiGenerationModeChange}
+        useWebSearch={aiUseWebSearch}
+        onUseWebSearchChange={onAiUseWebSearchChange}
+        disabled={attractionInfoGenerating}
+        advancedDisabled={!aiAdvancedGenerationAvailable}
+      />
+
+      <AiGenerationDedupeToggle
+        checked={attractionInfoDedupeExistingItems}
+        onChange={onAttractionInfoDedupeExistingItemsChange}
+        disabled={attractionInfoGenerating}
+        entityType="attraction_info"
+      />
+
+      <div>
+        <label
+          htmlFor="attraction-info-gen-prompt"
+          className="block text-sm font-medium text-gray-700 mb-1"
+        >
+          Дополнительный промпт
+        </label>
+        <textarea
+          id="attraction-info-gen-prompt"
+          rows={4}
+          value={attractionInfoGeneratePrompt}
+          onChange={(e) => onAttractionInfoGeneratePromptChange?.(e.target.value)}
+          disabled={attractionInfoGenerating}
+          placeholder="Например: режим работы, билеты, как добраться, советы для семей"
+          className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 resize-none"
+        />
+      </div>
+    </AiGenerationModal>
+  );
 
   const assignedAttractionType =
     currentAttractionInfo?.assigned_attraction_type || 'none';
@@ -248,6 +465,8 @@ export default function SessionWizardAttractionInfoStep({
   if (!currentAttractionInfo) {
     return (
       <section className="space-y-4">
+        {attractionInfoGenerationModal}
+
         <div className="flex items-center justify-between gap-3">
           <div>
             <h2 className="text-lg font-semibold text-gray-900">
@@ -260,13 +479,7 @@ export default function SessionWizardAttractionInfoStep({
             </p>
           </div>
 
-          <button
-            type="button"
-            onClick={onAddAttractionInfo}
-            className="px-3 py-1.5 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors shrink-0"
-          >
-            + Добавить
-          </button>
+          {attractionInfoHeaderActions}
         </div>
 
         {attractionInfos.length === 0 ? (
@@ -341,6 +554,8 @@ export default function SessionWizardAttractionInfoStep({
 
   return (
     <section className="space-y-4">
+      {attractionInfoGenerationModal}
+
       <div className="flex items-center gap-3">
         <button
           type="button"
