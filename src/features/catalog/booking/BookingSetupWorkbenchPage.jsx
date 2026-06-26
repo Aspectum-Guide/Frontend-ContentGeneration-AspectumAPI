@@ -384,6 +384,7 @@ export default function BookingSetupWorkbenchPage() {
   // ── state per section ────────────────────────────────────────────────────
   const [ticketTypes, setTicketTypes] = useState([]);
   const [ttLoading, setTtLoading] = useState(false);
+  const [ttLoadError, setTtLoadError] = useState('');
 
   const [slotsTotal, setSlotsTotal] = useState(null);
   const [recentSlots, setRecentSlots] = useState([]);
@@ -445,12 +446,16 @@ export default function BookingSetupWorkbenchPage() {
   // ── loaders ──────────────────────────────────────────────────────────────
 
   const loadTicketTypes = useCallback(async (evId) => {
-    if (!evId) { setTicketTypes([]); return; }
+    if (!evId) { setTicketTypes([]); setTtLoadError(''); return; }
     setTtLoading(true);
+    setTtLoadError('');
     try {
       const r = await ticketTypesAPI.list({ event: evId, page_size: 100, ordering: 'sort_order' });
       setTicketTypes(normalizeListResponse(r?.data, ['results', 'data']));
-    } catch { setTicketTypes([]); } finally { setTtLoading(false); }
+    } catch (err) {
+      setTicketTypes([]);
+      setTtLoadError(parseApiError(err, 'Не удалось загрузить типы билетов'));
+    } finally { setTtLoading(false); }
   }, []);
 
   const loadSlots = useCallback(async (evId) => {
@@ -728,6 +733,11 @@ export default function BookingSetupWorkbenchPage() {
             >
               {ttLoading ? (
                 <div className="flex items-center gap-2 text-sm text-gray-400"><Spinner /> Загрузка...</div>
+              ) : ttLoadError ? (
+                <div className="flex items-center gap-2">
+                  <Err msg={ttLoadError} />
+                  <button onClick={() => loadTicketTypes(eventId)} className="text-xs text-blue-600 hover:underline">Повторить</button>
+                </div>
               ) : (
                 <div className="flex flex-wrap gap-2">
                   {ticketTypes.map((tt) => (
