@@ -1,7 +1,11 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Link } from 'react-router-dom';
 import {
   eventSlotAvailabilitiesAPI,
+  eventSlotPricingAPI,
   eventTicketTypePricesAPI,
+  pricingRulesAPI,
+  ticketTypesForceAPI,
   ticketPricesAPI,
   ticketTypesAPI,
 } from '../../../api/booking';
@@ -11,9 +15,8 @@ import { Field, TextInput } from '../../../components/ui/FormField';
 import { parseApiError } from '../../../utils/apiError';
 import { useEventOptions } from '../shared/bookingOptions';
 import EventSelect from '../shared/components/EventSelect';
-import TicketTypeSelect from '../shared/components/TicketTypeSelect';
 import { DEFAULT_CURRENCY, normalizeCurrency } from '../shared/currencies';
-import { getTicketTypeLabel } from '../shared/labels';
+import { getTicketTypeLabel, filterTicketTypesForEvent, resolveTicketTypeEventId } from '../shared/labels';
 import { normalizeListResponse } from '../shared/normalize';
 import {
   buildFromInterval,
@@ -22,6 +25,21 @@ import {
   formatSlot as fmtSlot,
   parseInputToIso,
 } from '../shared/scheduleParsers';
+import {
+  PricePreviewPanel,
+  PriceStatusBadge,
+  ReadinessChecklist,
+  SlotPriceOverrideMatrix,
+} from './BookingSetupPricingPanels';
+import {
+  buildReadinessItems,
+  buildRulesCountByType,
+  buildSlotPriceMap,
+  collectDirtyPriceEntries,
+  countSlotOnlyPrices,
+  getPriceRowStatus,
+  isSlotBookable,
+} from './bookingSetupPricingHelpers';
 
 // ─── sub-components ──────────────────────────────────────────────────────────
 
@@ -52,6 +70,88 @@ function Err({ msg }) {
 
 function Ok({ msg }) {
   return msg ? <p className="text-xs text-emerald-700 bg-emerald-50 rounded px-2 py-1 mt-1">{msg}</p> : null;
+}
+
+/** Подставляет цены из базовых и уже назначенных на слоты (не затирает ручной ввод). */
+function hydratePriceByType(types, basePrices, slotPrices, prev, editedIds, defaultCurrency) {
+  const baseByType = Object.fromEntries(
+    (basePrices || []).map((bp) => [String(bp.ticket_type), bp]),
+  );
+  const sampleSlotByType = {};
+  for (const p of slotPrices || []) {
+    const tid = String(p.ticket_type);
+    if (!sampleSlotByType[tid]) sampleSlotByType[tid] = p;
+  }
+  const next = { ...prev };
+  for (const tt of types || []) {
+    const id = String(tt.id);
+    if (editedIds.has(id)) continue;
+    const bp = baseByType[id];
+    const sp = sampleSlotByType[id];
+    next[id] = {
+      price: bp ? String(bp.base_price) : sp ? String(sp.price) : (next[id]?.price ?? ''),
+      currency: normalizeCurrency(bp?.currency || sp?.currency || next[id]?.currency || defaultCurrency),
+    };
+  }
+  return next;
+}
+
+const DEFAULT_EVENT_TICKET_TYPES = [
+  { code: 'adult', name_ru: 'Взрослый', sort_order: 0 },
+  { code: 'child', name_ru: 'Детский', sort_order: 10 },
+];
+
+/** Все глобальные типы из каталога (event = null). */
+async function fetchGlobalTicketTypes() {
+  const r = await ticketTypesAPI.list({
+    page_size: 1000,
+    ordering: 'sort_order',
+    is_active: 'true',
+  });
+  return normalizeListResponse(r?.data, ['results', 'data']).filter(
+    (tt) => !resolveTicketTypeEventId(tt),
+  );
+}
+
+/** Создаёт adult/child в глобальном каталоге, если он пуст. */
+async function ensureGlobalTicketCatalog() {
+  const existing = await fetchGlobalTicketTypes();
+  if (existing.length) return existing;
+
+  for (const item of DEFAULT_EVENT_TICKET_TYPES) {
+    try {
+      await ticketTypesAPI.create({
+        code: item.code,
+        name: { ru: item.name_ru },
+        description: {},
+        sort_order: item.sort_order,
+        is_active: true,
+      });
+    } catch (err) {
+      const msg = parseApiError(err, '').toLowerCase();
+      if (!msg.includes('code') && !msg.includes('unique')) throw err;
+    }
+  }
+  return fetchGlobalTicketTypes();
+}
+
+function extractCityMeta(eventItem) {
+  const cityObj = eventItem?.city && typeof eventItem.city === 'object' ? eventItem.city : null;
+  const cityId = String(
+    eventItem?.city_id
+      || cityObj?.id
+      || (typeof eventItem?.city === 'string' ? eventItem.city : '')
+      || ''
+  );
+  const cityNameValue = cityObj?.name ?? cityObj?.title ?? cityObj?.label ?? null;
+  const cityLabel =
+    eventItem?.city_display_name
+    || eventItem?.city_name
+    || (typeof cityNameValue === 'string'
+      ? cityNameValue
+      : cityNameValue?.ru || cityNameValue?.en || cityNameValue?.de || cityNameValue?.it || null)
+    || cityId;
+  return { cityId, cityLabel: String(cityLabel || '') };
 }
 
 // ─── SlotsManagerModal ───────────────────────────────────────────────────────
@@ -378,8 +478,25 @@ function SlotsManagerModal({ open, eventId, onClose, onChanged }) {
 // ─── main ────────────────────────────────────────────────────────────────────
 
 export default function BookingSetupWorkbenchPage() {
-  const { eventOptions, eventsLoading } = useEventOptions();
+  const { eventOptions, cityOptions: refCityOptions, eventsLoading, eventsError, reloadEvents } = useEventOptions();
+  const [cityFilter, setCityFilter] = useState('');
   const [eventId, setEventId] = useState('');
+  const cityOptions = useMemo(() => {
+    if (refCityOptions?.length) return refCityOptions;
+    const unique = new Map();
+    for (const ev of eventOptions || []) {
+      const { cityId, cityLabel } = extractCityMeta(ev);
+      if (!cityId) continue;
+      if (!unique.has(cityId)) unique.set(cityId, cityLabel || cityId);
+    }
+    return Array.from(unique.entries())
+      .map(([id, label]) => ({ id, label }))
+      .sort((a, b) => a.label.localeCompare(b.label, 'ru'));
+  }, [refCityOptions, eventOptions]);
+  const filteredEventOptions = useMemo(() => {
+    if (!cityFilter) return eventOptions;
+    return (eventOptions || []).filter((ev) => extractCityMeta(ev).cityId === cityFilter);
+  }, [eventOptions, cityFilter]);
 
   // ── state per section ────────────────────────────────────────────────────
   const [ticketTypes, setTicketTypes] = useState([]);
@@ -390,15 +507,9 @@ export default function BookingSetupWorkbenchPage() {
   const [recentSlots, setRecentSlots] = useState([]);
   const [slotsLoading, setSlotsLoading] = useState(false);
 
-  const [coverage, setCoverage] = useState([]); // [{tt, covered, total}]
-  const [coverageLoading, setCoverageLoading] = useState(false);
-
-  const [basePrices, setBasePrices] = useState([]);
-  const [basePricesLoading, setBasePricesLoading] = useState(false);
-
   // ── ticket type form ─────────────────────────────────────────────────────
   const [showTtForm, setShowTtForm] = useState(false);
-  const [ttForm, setTtForm] = useState({ name_ru: '', code: '', sort_order: 0 });
+  const [ttForm, setTtForm] = useState({ name_ru: '', code: '', sort_order: 0, initial_price: '' });
   const [ttSaving, setTtSaving] = useState(false);
   const [ttError, setTtError] = useState('');
   const [ttOk, setTtOk] = useState('');
@@ -418,30 +529,45 @@ export default function BookingSetupWorkbenchPage() {
     schedule_days: { mon: true, tue: true, wed: true, thu: true, fri: true, sat: false, sun: false },
     schedule_times_text: '10:00\n12:00\n14:00',
     booking_closes_minutes_before: 60, available_seats: 0,
+    ticket_type_ids: [],
+    also_create_prices: false,
   });
   const [slotSaving, setSlotSaving] = useState(false);
   const [slotError, setSlotError] = useState('');
   const [slotOk, setSlotOk] = useState('');
 
-  // ── coverage fill ────────────────────────────────────────────────────────
-  const [fillTtId, setFillTtId] = useState('');
-  const [fillPrice, setFillPrice] = useState('');
-  const [fillCurrency, setFillCurrency] = useState(DEFAULT_CURRENCY);
-  const [fillSaving, setFillSaving] = useState(false);
-  const [fillError, setFillError] = useState('');
-  const [fillOk, setFillOk] = useState('');
-  const [fillConfirm, setFillConfirm] = useState(null); // { slotIds, slotCount, ttLabel, price, currency }
+  // ── prices (unified matrix) ───────────────────────────────────────────────
+  const [priceByType, setPriceByType] = useState({});
+  const [priceCurrency, setPriceCurrency] = useState(DEFAULT_CURRENCY);
+  const [assignSlotPrices, setAssignSlotPrices] = useState(false);
+  const [priceSaving, setPriceSaving] = useState(false);
+  const [priceError, setPriceError] = useState('');
+  const [priceOk, setPriceOk] = useState('');
+  const [priceConfirm, setPriceConfirm] = useState(null);
+  const [uniformPrice, setUniformPrice] = useState('');
+  const priceEditsRef = useRef(new Set());
+  const autoProvisionRef = useRef(new Set());
+  const [savingRowId, setSavingRowId] = useState(null);
+  const [matrixSavingKey, setMatrixSavingKey] = useState(null);
 
-  // ── base price form ──────────────────────────────────────────────────────
-  const [showBpForm, setShowBpForm] = useState(false);
-  const [bpForm, setBpForm] = useState({ ticket_type: '', base_price: '', currency: DEFAULT_CURRENCY });
-  const [bpSaving, setBpSaving] = useState(false);
-  const [bpError, setBpError] = useState('');
-  const [bpOk, setBpOk] = useState('');
-  const [editingBp, setEditingBp] = useState(null); // bp object being edited
-  const [editBpForm, setEditBpForm] = useState({ base_price: '', currency: DEFAULT_CURRENCY });
-  const [editBpSaving, setEditBpSaving] = useState(false);
-  const [editBpError, setEditBpError] = useState('');
+  const [pricingRules, setPricingRules] = useState([]);
+  const [pricingRulesLoading, setPricingRulesLoading] = useState(false);
+  const [slotPricesList, setSlotPricesList] = useState([]);
+  const [allActiveSlots, setAllActiveSlots] = useState([]);
+  const [slotsMetaLoading, setSlotsMetaLoading] = useState(false);
+
+  const [pricePreview, setPricePreview] = useState(null);
+  const [pricePreviewLoading, setPricePreviewLoading] = useState(false);
+  const [pricePreviewError, setPricePreviewError] = useState('');
+  const [priceDirtyTick, setPriceDirtyTick] = useState(0);
+
+  const [syncSlotsSaving, setSyncSlotsSaving] = useState(false);
+  const [syncSlotsError, setSyncSlotsError] = useState('');
+  const [syncSlotsOk, setSyncSlotsOk] = useState('');
+  const autoForcePurgeRef = useRef(new Set());
+
+  const [basePrices, setBasePrices] = useState([]);
+  const [basePricesLoading, setBasePricesLoading] = useState(false);
 
   // ── loaders ──────────────────────────────────────────────────────────────
 
@@ -450,8 +576,11 @@ export default function BookingSetupWorkbenchPage() {
     setTtLoading(true);
     setTtLoadError('');
     try {
-      const r = await ticketTypesAPI.list({ event: evId, page_size: 100, ordering: 'sort_order' });
-      setTicketTypes(normalizeListResponse(r?.data, ['results', 'data']));
+      let list = await fetchGlobalTicketTypes();
+      if (!list.length) {
+        list = await ensureGlobalTicketCatalog();
+      }
+      setTicketTypes(list);
     } catch (err) {
       setTicketTypes([]);
       setTtLoadError(parseApiError(err, 'Не удалось загрузить типы билетов'));
@@ -459,53 +588,494 @@ export default function BookingSetupWorkbenchPage() {
   }, []);
 
   const loadSlots = useCallback(async (evId) => {
-    if (!evId) { setSlotsTotal(null); setRecentSlots([]); return; }
+    if (!evId) {
+      setSlotsTotal(null);
+      setRecentSlots([]);
+      setAllActiveSlots([]);
+      return;
+    }
     setSlotsLoading(true);
+    setSlotsMetaLoading(true);
     try {
-      const r = await eventSlotAvailabilitiesAPI.list({ event: evId, page_size: 5, ordering: 'slot_datetime' });
-      const data = r?.data;
-      setSlotsTotal(data?.count ?? data?.total ?? normalizeListResponse(data, ['results', 'data']).length);
-      setRecentSlots(normalizeListResponse(data, ['results', 'data']).slice(0, 5));
-    } catch { setSlotsTotal(null); setRecentSlots([]); } finally { setSlotsLoading(false); }
-  }, []);
-
-  const loadCoverage = useCallback(async (evId, tts) => {
-    if (!evId || !tts.length) { setCoverage([]); return; }
-    setCoverageLoading(true);
-    try {
-      const [slotsR, pricesR] = await Promise.all([
-        eventSlotAvailabilitiesAPI.list({ event: evId, page_size: 1, is_active: 'true' }),
-        ticketPricesAPI.list({ event: evId, page_size: 1000, is_active: 'true' }),
+      const [recentR, allR] = await Promise.all([
+        eventSlotAvailabilitiesAPI.list({ event: evId, page_size: 5, ordering: 'slot_datetime' }),
+        eventSlotAvailabilitiesAPI.list({
+          event: evId,
+          page_size: 500,
+          ordering: 'slot_datetime',
+          is_active: 'true',
+        }),
       ]);
-      const total = slotsR?.data?.count ?? slotsR?.data?.total ?? 0;
-      const prices = normalizeListResponse(pricesR?.data, ['results', 'data']);
-      const cov = tts.map((tt) => {
-        const covered = new Set(prices.filter((p) => String(p.ticket_type) === String(tt.id)).map((p) => String(p.slot))).size;
-        return { tt, covered, total };
-      });
-      setCoverage(cov);
-    } catch { setCoverage([]); } finally { setCoverageLoading(false); }
+      const recentData = recentR?.data;
+      setSlotsTotal(recentData?.count ?? recentData?.total ?? normalizeListResponse(recentData, ['results', 'data']).length);
+      setRecentSlots(normalizeListResponse(recentData, ['results', 'data']).slice(0, 5));
+      setAllActiveSlots(normalizeListResponse(allR?.data, ['results', 'data']));
+    } catch {
+      setSlotsTotal(null);
+      setRecentSlots([]);
+      setAllActiveSlots([]);
+    } finally {
+      setSlotsLoading(false);
+      setSlotsMetaLoading(false);
+    }
   }, []);
 
-  const loadBasePrices = useCallback(async (evId) => {
-    if (!evId) { setBasePrices([]); return; }
+  const loadPricingRules = useCallback(async (evId) => {
+    if (!evId) {
+      setPricingRules([]);
+      return;
+    }
+    setPricingRulesLoading(true);
+    try {
+      const r = await pricingRulesAPI.list({
+        event: evId,
+        page_size: 500,
+        is_active: 'true',
+      });
+      setPricingRules(normalizeListResponse(r?.data, ['results', 'data']));
+    } catch {
+      setPricingRules([]);
+    } finally {
+      setPricingRulesLoading(false);
+    }
+  }, []);
+
+  const loadPricePreview = useCallback(async (evId, slots, tts, { refetchSlots = false } = {}) => {
+    if (!evId || !tts?.length) {
+      setPricePreview(null);
+      setPricePreviewError('');
+      return;
+    }
+    let slotList = slots;
+    if (refetchSlots || !slotList?.length) {
+      try {
+        const r = await eventSlotAvailabilitiesAPI.list({
+          event: evId,
+          page_size: 500,
+          ordering: 'slot_datetime',
+          is_active: 'true',
+        });
+        slotList = normalizeListResponse(r?.data, ['results', 'data']);
+      } catch {
+        slotList = [];
+      }
+    }
+    const openSlots = (slotList || []).filter(isSlotBookable);
+    const target = openSlots.find((s) => {
+      const linked = s.ticket_types;
+      return Array.isArray(linked) && linked.length > 0;
+    }) || openSlots[0];
+    if (!target?.id) {
+      setPricePreview(null);
+      setPricePreviewError(openSlots.length ? 'У слотов нет привязанных типов билетов' : '');
+      return;
+    }
+    setPricePreviewLoading(true);
+    setPricePreviewError('');
+    try {
+      const r = await eventSlotPricingAPI.get(evId, { slot_id: target.id });
+      setPricePreview({
+        slotDatetime: target.slot_datetime,
+        prices: r?.data?.prices || [],
+      });
+    } catch (err) {
+      setPricePreview(null);
+      setPricePreviewError(parseApiError(err, 'Не удалось загрузить превью цен'));
+    } finally {
+      setPricePreviewLoading(false);
+    }
+  }, []);
+
+  const loadPricingData = useCallback(async (evId, tts, currency = DEFAULT_CURRENCY) => {
+    if (!evId || !tts.length) {
+      setBasePrices([]);
+      setSlotPricesList([]);
+      return;
+    }
     setBasePricesLoading(true);
     try {
-      const r = await eventTicketTypePricesAPI.list({ event: evId, page_size: 100 });
-      setBasePrices(normalizeListResponse(r?.data, ['results', 'data']));
-    } catch { setBasePrices([]); } finally { setBasePricesLoading(false); }
+      const [pricesR, baseR] = await Promise.all([
+        ticketPricesAPI.list({ event: evId, page_size: 1000, is_active: 'true' }),
+        eventTicketTypePricesAPI.list({ event: evId, page_size: 100 }),
+      ]);
+      const prices = normalizeListResponse(pricesR?.data, ['results', 'data']);
+      const bps = normalizeListResponse(baseR?.data, ['results', 'data']);
+
+      setBasePrices(bps);
+      setSlotPricesList(prices);
+
+      setPriceByType((prev) => hydratePriceByType(tts, bps, prices, prev, priceEditsRef.current, currency));
+      if (!priceEditsRef.current.size) {
+        const cur = bps.find((b) => b.currency)?.currency || prices.find((p) => p.currency)?.currency;
+        if (cur) setPriceCurrency(normalizeCurrency(cur));
+      }
+    } catch {
+      setBasePrices([]);
+      setSlotPricesList([]);
+    } finally {
+      setBasePricesLoading(false);
+    }
   }, []);
 
-  const loadAll = useCallback((evId) => {
-    loadTicketTypes(evId);
-    loadSlots(evId);
-    loadBasePrices(evId);
-  }, [loadTicketTypes, loadSlots, loadBasePrices]);
+  const loadAll = useCallback(async (evId) => {
+    if (!evId) return;
+    const evKey = String(evId);
+    if (!autoForcePurgeRef.current.has(evKey)) {
+      autoForcePurgeRef.current.add(evKey);
+      try {
+        await ticketTypesForceAPI.purgeEventTicketTypes(evId);
+      } catch (e) {
+        autoForcePurgeRef.current.delete(evKey);
+        console.warn('[booking-setup] auto force purge failed', e);
+      }
+    }
+    await Promise.all([
+      loadTicketTypes(evId),
+      loadSlots(evId),
+      loadPricingRules(evId),
+    ]);
+  }, [loadTicketTypes, loadSlots, loadPricingRules]);
 
-  useEffect(() => { loadAll(eventId); }, [eventId, loadAll]);
-  useEffect(() => { if (ticketTypes.length) loadCoverage(eventId, ticketTypes); }, [ticketTypes, eventId, loadCoverage]);
+  const eventTicketTypes = useMemo(
+    () => filterTicketTypesForEvent(ticketTypes, eventId),
+    [ticketTypes, eventId],
+  );
 
-  // ── actions ───────────────────────────────────────────────────────────────
+  const basePriceByType = useMemo(
+    () => Object.fromEntries(basePrices.map((bp) => [String(bp.ticket_type), bp])),
+    [basePrices],
+  );
+
+  const selectedEvent = useMemo(
+    () => (eventOptions || []).find((ev) => String(ev.id) === String(eventId)) || null,
+    [eventOptions, eventId],
+  );
+
+  const rulesCountByType = useMemo(
+    () => buildRulesCountByType(pricingRules),
+    [pricingRules],
+  );
+
+  const slotPriceMap = useMemo(
+    () => buildSlotPriceMap(slotPricesList),
+    [slotPricesList],
+  );
+
+  const openSlots = useMemo(
+    () => (allActiveSlots || []).filter(isSlotBookable),
+    [allActiveSlots],
+  );
+
+  const slotsWithoutTypesCount = useMemo(
+    () => openSlots.filter((s) => !Array.isArray(s.ticket_types) || !s.ticket_types.length).length,
+    [openSlots],
+  );
+
+  const usedTicketTypeIdsInOpenSlots = useMemo(() => {
+    const set = new Set();
+    for (const slot of openSlots || []) {
+      for (const id of slot?.ticket_types || []) {
+        if (!id) continue;
+        set.add(String(id));
+      }
+    }
+    return set;
+  }, [openSlots]);
+
+  const savedBaseForUsed = useMemo(() => {
+    return basePrices.filter((bp) => usedTicketTypeIdsInOpenSlots.has(String(bp.ticket_type))).length;
+  }, [basePrices, usedTicketTypeIdsInOpenSlots]);
+
+  const dirtyPriceIds = useMemo(() => {
+    void priceDirtyTick;
+    return new Set(priceEditsRef.current);
+  }, [priceDirtyTick]);
+
+  const dirtyPriceCount = dirtyPriceIds.size;
+
+  const readinessItems = useMemo(
+    () => buildReadinessItems({
+      selectedEvent,
+      usedTypesCount: usedTicketTypeIdsInOpenSlots.size,
+      savedBaseCount: savedBaseForUsed,
+      openSlotsCount: openSlots.length,
+      slotsWithoutTypesCount,
+      loading: ttLoading || slotsMetaLoading || basePricesLoading,
+    }),
+    [
+      selectedEvent,
+      usedTicketTypeIdsInOpenSlots.size,
+      savedBaseForUsed,
+      openSlots.length,
+      slotsWithoutTypesCount,
+      ttLoading,
+      slotsMetaLoading,
+      basePricesLoading,
+    ],
+  );
+
+  const readinessReadyCount = useMemo(
+    () => readinessItems.filter((item) => item.ok).length,
+    [readinessItems],
+  );
+
+  const allPricesSaved = useMemo(
+    () => usedTicketTypeIdsInOpenSlots.size > 0 && savedBaseForUsed >= usedTicketTypeIdsInOpenSlots.size,
+    [usedTicketTypeIdsInOpenSlots.size, savedBaseForUsed],
+  );
+
+  useEffect(() => {
+    if (!eventId) {
+      setTicketTypes([]);
+      setTtLoadError('');
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      await loadAll(eventId);
+      if (cancelled) return;
+    })();
+    return () => { cancelled = true; };
+  }, [eventId, loadAll]);
+  useEffect(() => {
+    if (eventTicketTypes.length) loadPricingData(eventId, eventTicketTypes, priceCurrency);
+  }, [eventTicketTypes, eventId, loadPricingData]);
+  useEffect(() => {
+    if (eventId && eventTicketTypes.length) {
+      loadPricePreview(eventId, allActiveSlots, eventTicketTypes);
+    }
+  }, [eventId, eventTicketTypes, allActiveSlots, loadPricePreview]);
+
+  useEffect(() => {
+    priceEditsRef.current = new Set();
+    autoProvisionRef.current = new Set();
+    setPriceByType({});
+    setPriceError('');
+    setPriceOk('');
+    setPricePreview(null);
+    setPricePreviewError('');
+    setPriceDirtyTick((t) => t + 1);
+  }, [eventId]);
+
+  useEffect(() => {
+    const ids = eventTicketTypes.map((tt) => String(tt.id));
+    setSlotForm((prev) => ({
+      ...prev,
+      ticket_type_ids: prev.ticket_type_ids?.length
+        ? prev.ticket_type_ids.filter((id) => ids.includes(String(id)))
+        : ids,
+    }));
+  }, [eventTicketTypes]);
+  useEffect(() => {
+    if (!eventId) return;
+    const stillVisible = filteredEventOptions.some((ev) => String(ev.id) === String(eventId));
+    if (!stillVisible) setEventId('');
+  }, [filteredEventOptions, eventId]);
+
+  const setPriceForType = useCallback((typeId, patch) => {
+    const id = String(typeId);
+    priceEditsRef.current.add(id);
+    setPriceDirtyTick((t) => t + 1);
+    setPriceByType((prev) => ({
+      ...prev,
+      [id]: { price: '', currency: priceCurrency, ...prev[id], ...patch },
+    }));
+  }, [priceCurrency]);
+
+  const applyUniformPrice = useCallback((price) => {
+    const value = String(price ?? '');
+    setPriceByType((prev) => {
+      const next = { ...prev };
+      for (const tt of eventTicketTypes) {
+        const id = String(tt.id);
+        priceEditsRef.current.add(id);
+        next[id] = { ...(next[id] || {}), price: value, currency: priceCurrency };
+      }
+      return next;
+    });
+    setPriceDirtyTick((t) => t + 1);
+  }, [eventTicketTypes, priceCurrency]);
+
+  const upsertBasePrices = useCallback(async (entries) => {
+    for (const entry of entries) {
+      const existing = basePriceByType[entry.id];
+      if (existing) {
+        await eventTicketTypePricesAPI.update(existing.id, {
+          base_price: entry.price,
+          currency: entry.currency,
+          is_active: true,
+        });
+      } else {
+        await eventTicketTypePricesAPI.create({
+          event: eventId,
+          ticket_type: entry.id,
+          base_price: entry.price,
+          currency: entry.currency,
+          is_active: true,
+        });
+      }
+    }
+  }, [basePriceByType, eventId]);
+
+  const assignPricesToSlots = useCallback(async (entries, slotIds) => {
+    if (!slotIds.length) return;
+    for (const entry of entries) {
+      await ticketPricesAPI.bulkCreate({
+        event: eventId,
+        slot_ids: slotIds,
+        ticket_types: [entry.id],
+        price: entry.price,
+        currency: entry.currency,
+        is_active: true,
+      });
+    }
+  }, [eventId]);
+
+  const collectPriceEntries = useCallback(() => {
+    const entries = [];
+    const errors = [];
+    for (const tt of eventTicketTypes) {
+      const id = String(tt.id);
+      const row = priceByType[id] || {};
+      const price = Number(row.price);
+      if (!Number.isFinite(price) || price < 0) {
+        errors.push(getTicketTypeLabel(tt));
+        continue;
+      }
+      entries.push({
+        id,
+        tt,
+        price,
+        currency: normalizeCurrency(row.currency || priceCurrency),
+      });
+    }
+    return { entries, errors };
+  }, [eventTicketTypes, priceByType, priceCurrency]);
+
+  const saveRowPrice = useCallback(async (typeId, { quiet = false } = {}) => {
+    const id = String(typeId);
+    const row = priceByType[id] || {};
+    const price = Number(row.price);
+    if (!Number.isFinite(price) || price < 0) return false;
+    const tt = eventTicketTypes.find((t) => String(t.id) === id);
+    setSavingRowId(id);
+    setPriceError('');
+    try {
+      await upsertBasePrices([{
+        id,
+        price,
+        currency: normalizeCurrency(row.currency || priceCurrency),
+      }]);
+      priceEditsRef.current.delete(id);
+      setPriceDirtyTick((t) => t + 1);
+      await loadPricingData(eventId, eventTicketTypes, priceCurrency);
+      await loadPricePreview(eventId, allActiveSlots, eventTicketTypes);
+      if (!quiet) setPriceOk(`Сохранена цена: ${getTicketTypeLabel(tt || { id })}`);
+      return true;
+    } catch (err) {
+      setPriceError(parseApiError(err, 'Ошибка сохранения цены'));
+      return false;
+    } finally {
+      setSavingRowId(null);
+    }
+  }, [
+    priceByType,
+    eventTicketTypes,
+    upsertBasePrices,
+    loadPricingData,
+    eventId,
+    priceCurrency,
+    loadPricePreview,
+    allActiveSlots,
+  ]);
+
+  const handlePriceBlur = useCallback((typeId) => {
+    const id = String(typeId);
+    if (!priceEditsRef.current.has(id)) return;
+    const row = priceByType[id] || {};
+    const price = Number(row.price);
+    if (!Number.isFinite(price) || price < 0) return;
+    saveRowPrice(id, { quiet: true });
+  }, [priceByType, saveRowPrice]);
+
+  const handleSaveChangedPrices = async (e) => {
+    e.preventDefault();
+    setPriceError('');
+    setPriceOk('');
+    const { entries, errors } = collectDirtyPriceEntries(
+      eventTicketTypes,
+      priceByType,
+      priceCurrency,
+      dirtyPriceIds,
+    );
+    if (!entries.length) {
+      setPriceError(errors.length
+        ? `Исправьте цены: ${errors.join(', ')}`
+        : 'Нет несохранённых изменений');
+      return;
+    }
+    if (errors.length) {
+      setPriceError(`Некорректные цены: ${errors.join(', ')}`);
+      return;
+    }
+    try {
+      setPriceSaving(true);
+      await upsertBasePrices(entries);
+      for (const entry of entries) priceEditsRef.current.delete(entry.id);
+      setPriceDirtyTick((t) => t + 1);
+      setPriceOk(`Сохранено изменений: ${entries.length}`);
+      await loadPricingData(eventId, eventTicketTypes, priceCurrency);
+      await loadPricePreview(eventId, allActiveSlots, eventTicketTypes);
+    } catch (err) {
+      setPriceError(parseApiError(err, 'Ошибка сохранения цен'));
+    } finally {
+      setPriceSaving(false);
+    }
+  };
+
+  const handleMatrixCellSave = useCallback(async ({
+    slotId,
+    typeId,
+    price,
+    currency,
+    existingId,
+  }) => {
+    const key = `${slotId}:${typeId}`;
+    setMatrixSavingKey(key);
+    setPriceError('');
+    try {
+      if (existingId) {
+        await ticketPricesAPI.update(existingId, {
+          price,
+          currency: normalizeCurrency(currency),
+          is_active: true,
+        });
+      } else {
+        await ticketPricesAPI.bulkCreate({
+          event: eventId,
+          slot_ids: [slotId],
+          ticket_types: [typeId],
+          price,
+          currency: normalizeCurrency(currency),
+          is_active: true,
+        });
+      }
+      await loadPricingData(eventId, eventTicketTypes, priceCurrency);
+      await loadPricePreview(eventId, allActiveSlots, eventTicketTypes);
+      setPriceOk('Цена на слоте сохранена');
+    } catch (err) {
+      setPriceError(parseApiError(err, 'Ошибка сохранения цены на слоте'));
+    } finally {
+      setMatrixSavingKey(null);
+    }
+  }, [
+    eventId,
+    eventTicketTypes,
+    priceCurrency,
+    loadPricingData,
+    loadPricePreview,
+    allActiveSlots,
+  ]);
 
   const handleCreateTt = async (e) => {
     e.preventDefault();
@@ -515,17 +1085,53 @@ export default function BookingSetupWorkbenchPage() {
     if (!nameRu) { setTtError('Введите название'); return; }
     try {
       setTtSaving(true);
-      await ticketTypesAPI.create({
-        event: eventId, code,
+      const createRes = await ticketTypesAPI.create({
+        code,
         name: nameRu ? { ru: nameRu } : {},
         sort_order: Number(ttForm.sort_order || 0),
         is_active: true,
       });
+      const newTypeId = createRes?.data?.id;
+      const initialPrice = Number(ttForm.initial_price);
+      if (newTypeId && Number.isFinite(initialPrice) && initialPrice >= 0) {
+        await eventTicketTypePricesAPI.create({
+          event: eventId,
+          ticket_type: newTypeId,
+          base_price: initialPrice,
+          currency: normalizeCurrency(priceCurrency),
+          is_active: true,
+        });
+        priceEditsRef.current.add(String(newTypeId));
+        setPriceByType((prev) => ({
+          ...prev,
+          [String(newTypeId)]: { price: String(initialPrice), currency: normalizeCurrency(priceCurrency) },
+        }));
+      }
       setTtOk(`Создан: ${nameRu}`);
-      setTtForm({ name_ru: '', code: '', sort_order: Number(ttForm.sort_order || 0) + 10 });
+      setTtForm({ name_ru: '', code: '', sort_order: Number(ttForm.sort_order || 0) + 10, initial_price: '' });
       await loadTicketTypes(eventId);
     } catch (err) { setTtError(parseApiError(err, 'Ошибка создания')); }
     finally { setTtSaving(false); }
+  };
+
+  const handleCloneTypeToEvent = async (tt) => {
+    if (!eventId || resolveTicketTypeEventId(tt)) return;
+    setTtError('');
+    try {
+      await ticketTypesAPI.create({
+        event: eventId,
+        code: tt.code || '',
+        name: tt.name || {},
+        description: tt.description || {},
+        sort_order: tt.sort_order ?? 0,
+        is_active: true,
+      });
+      setTtOk(`Тип «${getTicketTypeLabel(tt)}» привязан к событию`);
+      await loadTicketTypes(eventId);
+    } catch (err) {
+      setTtError(parseApiError(err, 'Не удалось привязать тип к событию'));
+      setShowTtForm(true);
+    }
   };
 
   const handleDeleteTt = async (tt) => {
@@ -569,11 +1175,16 @@ export default function BookingSetupWorkbenchPage() {
         ? buildFromSchedule({ startDate: slotForm.schedule_start_date, endDate: slotForm.schedule_end_date, days: slotForm.schedule_days, timesText: slotForm.schedule_times_text })
         : buildFromList(slotForm.datetimes_text);
     if (!datetimes.length) { setSlotError('Нет корректных дат'); return; }
+    const selectedTypeIds = (slotForm.ticket_type_ids || []).filter(Boolean);
+    if (!selectedTypeIds.length) {
+      setSlotError('Выберите хотя бы один тип билета для слотов');
+      return;
+    }
     try {
       setSlotSaving(true);
       const r = await eventSlotAvailabilitiesAPI.bulkCreate({
         event: eventId, slot_datetimes: datetimes,
-        ticket_types: ticketTypes.map((t) => t.id),
+        ticket_types: selectedTypeIds,
         booking_closes_minutes_before: Number(slotForm.booking_closes_minutes_before || 0),
         available_seats: Number(slotForm.available_seats || 0),
         is_active: true,
@@ -581,105 +1192,283 @@ export default function BookingSetupWorkbenchPage() {
       const res = r?.data;
       setSlotOk(`Создано: ${res?.created_count ?? 0}, пропущено: ${res?.skipped_existing ?? 0}`);
       await loadSlots(eventId);
-      await loadCoverage(eventId, ticketTypes);
+      await loadPricePreview(eventId, null, eventTicketTypes, { refetchSlots: true });
+      if (slotForm.also_create_prices) {
+        const selectedEntries = selectedTypeIds
+          .map((typeId) => {
+            const row = priceByType[String(typeId)] || {};
+            const price = Number(row.price);
+            if (!Number.isFinite(price) || price < 0) return null;
+            return {
+              id: String(typeId),
+              price,
+              currency: normalizeCurrency(row.currency || priceCurrency),
+            };
+          })
+          .filter(Boolean);
+        if (selectedEntries.length) {
+          await upsertBasePrices(selectedEntries);
+          const slotIds = Array.isArray(res?.created_ids) ? res.created_ids : [];
+          if (slotIds.length) await assignPricesToSlots(selectedEntries, slotIds);
+        }
+      }
+      await loadPricingData(eventId, eventTicketTypes, priceCurrency);
     } catch (err) { setSlotError(parseApiError(err, 'Ошибка создания слотов')); }
     finally { setSlotSaving(false); }
   };
 
-  const handleFillPrices = async (e) => {
-    e.preventDefault();
-    setFillError(''); setFillOk('');
-    const price = Number(fillPrice);
-    if (!fillTtId) { setFillError('Выберите тип билета'); return; }
-    if (!Number.isFinite(price) || price < 0) { setFillError('Введите корректную цену'); return; }
+  const handleSyncSlotTicketTypes = async () => {
+    if (!eventId || !eventTicketTypes.length) return;
+    setSyncSlotsError(''); setSyncSlotsOk('');
+    setSyncSlotsSaving(true);
     try {
-      setFillSaving(true);
-      const r = await eventSlotAvailabilitiesAPI.list({ event: eventId, page_size: 1000, is_active: 'true' });
-      const activeSlots = normalizeListResponse(r?.data, ['results', 'data']);
-      if (!activeSlots.length) { setFillError('Нет активных слотов'); return; }
-      const tt = ticketTypes.find((t) => String(t.id) === String(fillTtId));
-      setFillConfirm({
-        slotIds: activeSlots.map((s) => s.id),
+      // Приводим ticket_types на слотах к глобальным типам по `code` (без event-owned копий).
+      const [typesR, slotsR, basePricesR] = await Promise.all([
+        ticketTypesAPI.list({ event: eventId, page_size: 1000, ordering: 'sort_order', is_active: 'true' }),
+        eventSlotAvailabilitiesAPI.list({ event: eventId, page_size: 1000 }),
+        eventTicketTypePricesAPI.list({ event: eventId, page_size: 1000, is_active: 'true' }),
+      ]);
+
+      const allTypes = normalizeListResponse(typesR?.data, ['results', 'data']);
+      const slots = normalizeListResponse(slotsR?.data, ['results', 'data']);
+      const baseRows = normalizeListResponse(basePricesR?.data, ['results', 'data']);
+
+      const globalByCode = new Map(); // code -> global ticket_type_id
+      const codeById = new Map(); // ticket_type_id -> code
+      for (const tt of allTypes || []) {
+        const tid = String(tt?.id || '');
+        const code = String(tt?.code || '').trim().toLowerCase();
+        if (!tid || !code) continue;
+        codeById.set(tid, code);
+        if (!resolveTicketTypeEventId(tt)) {
+          globalByCode.set(code, tid);
+        }
+      }
+
+      const globalIdsFallback = eventTicketTypes.map((tt) => String(tt.id));
+      const mapIdToGlobal = (id) => {
+        const code = codeById.get(String(id));
+        if (!code) return null;
+        return globalByCode.get(code) || null;
+      };
+
+      // 1) Мигрируем base_price на глобальные типы (по code) при необходимости.
+      const baseByTicketType = new Map();
+      for (const row of baseRows || []) {
+        const tid = String(row?.ticket_type || '');
+        if (!tid) continue;
+        baseByTicketType.set(tid, row);
+      }
+
+      let migratedBase = 0;
+      for (const row of baseRows || []) {
+        const oldTid = String(row?.ticket_type || '');
+        if (!oldTid) continue;
+        const newTid = mapIdToGlobal(oldTid);
+        if (!newTid || newTid === oldTid) continue;
+
+        if (baseByTicketType.has(newTid)) {
+          // Обновим существующую запись
+          await eventTicketTypePricesAPI.update(baseByTicketType.get(newTid).id, {
+            base_price: row.base_price,
+            currency: row.currency || 'EUR',
+            is_active: true,
+          });
+        } else {
+          await eventTicketTypePricesAPI.create({
+            event: eventId,
+            ticket_type: newTid,
+            base_price: row.base_price,
+            currency: row.currency || 'EUR',
+            is_active: true,
+          });
+          baseByTicketType.set(newTid, { id: null });
+        }
+        migratedBase += 1;
+      }
+
+      // 2) Обновляем M2M на слотах: заменяем ticket_types на глобальные по code.
+      let updatedSlots = 0;
+      const typeIdsBySlot = slots.map((slot) => {
+        const current = Array.isArray(slot.ticket_types) ? slot.ticket_types : [];
+        if (!current.length) return globalIdsFallback;
+        const desired = current.map((id) => mapIdToGlobal(id)).filter(Boolean);
+        if (!desired.length) return globalIdsFallback;
+        return Array.from(new Set(desired.map((x) => String(x))));
+      });
+
+      // Обновляем только отличающиеся слоты.
+      for (let i = 0; i < slots.length; i += 1) {
+        const slot = slots[i];
+        const desired = typeIdsBySlot[i] || [];
+        const current = Array.isArray(slot.ticket_types) ? slot.ticket_types.map((x) => String(x)) : [];
+        const eq =
+          desired.length === current.length &&
+          desired.every((id) => current.includes(String(id)));
+        if (!eq) {
+          await eventSlotAvailabilitiesAPI.update(slot.id, { ticket_types: desired });
+          updatedSlots += 1;
+        }
+      }
+
+      // 3) Перенос PricingRule и TicketPrice на глобальные типы по `code`
+      let migratedRules = 0;
+      let migratedTicketPrices = 0;
+      let mergedTicketPrices = 0;
+      try {
+        const [rulesR2, ticketPricesR2] = await Promise.all([
+          pricingRulesAPI.list({ event: eventId, page_size: 1000 }),
+          ticketPricesAPI.list({ event: eventId, page_size: 1000 }),
+        ]);
+
+        const rules = normalizeListResponse(rulesR2?.data, ['results', 'data']);
+        const ticketPrices = normalizeListResponse(ticketPricesR2?.data, ['results', 'data']);
+
+        for (const rule of rules || []) {
+          const oldTid = String(rule?.ticket_type || '');
+          const newTid = mapIdToGlobal(oldTid);
+          if (!newTid || newTid === oldTid) continue;
+          await pricingRulesAPI.update(rule.id, { ticket_type: newTid });
+          migratedRules += 1;
+        }
+
+        const tpKey = (slotId, typeId) => `${String(slotId)}|${String(typeId)}`;
+        const existingByKey = new Map();
+        for (const row of ticketPrices || []) {
+          const slotId = row?.slot;
+          const typeId = row?.ticket_type;
+          if (!slotId || !typeId) continue;
+          existingByKey.set(tpKey(slotId, typeId), row);
+        }
+
+        for (const row of ticketPrices || []) {
+          const oldTid = String(row?.ticket_type || '');
+          const newTid = mapIdToGlobal(oldTid);
+          if (!newTid || newTid === oldTid) continue;
+
+          const slotId = row?.slot;
+          if (!slotId) continue;
+
+          const oldKey = tpKey(slotId, oldTid);
+          const newKey = tpKey(slotId, newTid);
+
+          const existing = existingByKey.get(newKey);
+          if (existing?.id) {
+            // Если конфликт уже есть — обновим existing значением старого и удалим старое.
+            await ticketPricesAPI.update(existing.id, {
+              price: row.price,
+              currency: row.currency || 'EUR',
+              is_active: row.is_active !== false,
+            });
+            await ticketPricesAPI.delete(row.id);
+            mergedTicketPrices += 1;
+            existingByKey.delete(oldKey);
+            continue;
+          }
+
+          await ticketPricesAPI.update(row.id, { ticket_type: newTid, is_active: row.is_active !== false });
+          migratedTicketPrices += 1;
+
+          const oldObj = existingByKey.get(oldKey);
+          existingByKey.delete(oldKey);
+          if (oldObj) {
+            existingByKey.set(newKey, { ...oldObj, ticket_type: newTid });
+          }
+        }
+      } catch (e) {
+        // Переносы pricing могут быть неактуальны, если у события нет PricingRule/TicketPrice.
+        // Не валим основной sync, но сообщаем пользователю ошибку в OK/ERR.
+        console.warn('[booking-setup] pricing migration skipped/failed', e);
+      }
+
+      setSyncSlotsOk(
+        `Типы приведены к глобальным: слоты обновлены=${updatedSlots}, база перенесена=${migratedBase}, rules перенесены=${migratedRules}, ticket-prices обновлены=${migratedTicketPrices}, объединены=${mergedTicketPrices}.`,
+      );
+
+      // 3.1) Радикальная очистка: удалить все TicketType с event=<event>.
+      // Бэкенд сам:
+      // - перелинкует BookingReservation.ticket_type на глобальные по code (или ставит null)
+      // - перелинкует slot.ticket_types на глобальные по code (или очищает)
+      // - удалит event-owned TicketType.
+      const purgeRes = await ticketTypesForceAPI.purgeEventTicketTypes(eventId);
+      const purgeData = purgeRes?.data || {};
+      if (purgeData?.success) {
+        setSyncSlotsOk((prev) => {
+          const deleted = purgeData.deleted ?? 0;
+          const reboundReservations = purgeData.rebound_reservations ?? purgeData.reboundReservations ?? 0;
+          const updatedSlots2 = purgeData.updated_slots ?? purgeData.updatedSlots ?? 0;
+          return `${prev} Force-purge: deleted=${deleted}, rebound_reservations=${reboundReservations}, updated_slots=${updatedSlots2}.`;
+        });
+      }
+
+      await loadSlots(eventId);
+      await loadPricingData(eventId, eventTicketTypes, priceCurrency);
+      await loadPricePreview(eventId, null, eventTicketTypes, { refetchSlots: true });
+    } catch (err) {
+      setSyncSlotsError(parseApiError(err, 'Ошибка синхронизации типов'));
+    } finally {
+      setSyncSlotsSaving(false);
+    }
+  };
+
+  const handleSaveAllPrices = async (e) => {
+    e.preventDefault();
+    setPriceError(''); setPriceOk('');
+    const { entries, errors } = collectPriceEntries();
+    if (!entries.length) {
+      setPriceError(errors.length
+        ? `Укажите корректные цены для: ${errors.join(', ')}`
+        : 'Добавьте типы билетов и укажите цены');
+      return;
+    }
+    if (errors.length) {
+      setPriceError(`Не для всех типов указана цена: ${errors.join(', ')}`);
+      return;
+    }
+    try {
+      setPriceSaving(true);
+      const slotsR = await eventSlotAvailabilitiesAPI.list({ event: eventId, page_size: 1000, is_active: 'true' });
+      const activeSlots = normalizeListResponse(slotsR?.data, ['results', 'data']);
+      setPriceConfirm({
+        entries,
         slotCount: activeSlots.length,
-        ttLabel: tt ? getTicketTypeLabel(tt) : fillTtId,
-        price,
-        currency: normalizeCurrency(fillCurrency),
+        slotIds: activeSlots.map((s) => s.id),
+        assignSlotPrices,
       });
-    } catch (err) { setFillError(parseApiError(err, 'Ошибка загрузки слотов')); }
-    finally { setFillSaving(false); }
+    } catch (err) {
+      setPriceError(parseApiError(err, 'Ошибка подготовки сохранения цен'));
+    } finally {
+      setPriceSaving(false);
+    }
   };
 
-  const handleFillPricesConfirm = useCallback(async () => {
-    if (!fillConfirm) return;
-    const { slotIds, slotCount, price, currency } = fillConfirm;
-    setFillConfirm(null);
-    setFillError(''); setFillOk('');
+  const handleSaveAllPricesConfirm = useCallback(async () => {
+    if (!priceConfirm) return;
+    const { entries, slotIds, assignSlotPrices: assignSlots } = priceConfirm;
+    setPriceConfirm(null);
+    setPriceError(''); setPriceOk('');
     try {
-      setFillSaving(true);
-      await ticketPricesAPI.bulkCreate({
-        event: eventId,
-        slot_ids: slotIds,
-        ticket_types: [fillTtId],
-        price, currency, is_active: true,
-      });
-      setFillOk(`Готово: цены назначены для ${slotCount} слотов`);
-      await loadCoverage(eventId, ticketTypes);
-    } catch (err) { setFillError(parseApiError(err, 'Ошибка назначения цен')); }
-    finally { setFillSaving(false); }
-  }, [fillConfirm, eventId, fillTtId, loadCoverage, ticketTypes]);
-
-  const handleCreateBp = async (e) => {
-    e.preventDefault();
-    setBpError(''); setBpOk('');
-    if (!bpForm.ticket_type) { setBpError('Выберите тип билета'); return; }
-    const price = Number(bpForm.base_price);
-    if (!Number.isFinite(price) || price < 0) { setBpError('Введите корректную цену'); return; }
-    try {
-      setBpSaving(true);
-      await eventTicketTypePricesAPI.create({
-        event: eventId, ticket_type: bpForm.ticket_type,
-        base_price: price, currency: normalizeCurrency(bpForm.currency), is_active: true,
-      });
-      setBpOk('Базовая цена добавлена');
-      setBpForm({ ticket_type: '', base_price: '', currency: DEFAULT_CURRENCY });
-      await loadBasePrices(eventId);
-    } catch (err) { setBpError(parseApiError(err, 'Ошибка создания')); }
-    finally { setBpSaving(false); }
-  };
-
-  const handleDeleteBp = async (bp) => {
-    if (!confirm('Удалить базовую цену?')) return;
-    try {
-      await eventTicketTypePricesAPI.delete(bp.id);
-      await loadBasePrices(eventId);
-    } catch (err) { setBpError(parseApiError(err, 'Ошибка удаления базовой цены')); setShowBpForm(true); }
-  };
-
-  const openEditBp = (bp) => {
-    setEditBpForm({ base_price: String(bp.base_price), currency: bp.currency || DEFAULT_CURRENCY });
-    setEditBpError('');
-    setEditingBp(bp);
-  };
-
-  const handleSaveEditBp = async (e) => {
-    e.preventDefault();
-    const price = parseFloat(editBpForm.base_price);
-    if (!Number.isFinite(price) || price < 0) { setEditBpError('Введите корректную цену'); return; }
-    setEditBpSaving(true); setEditBpError('');
-    try {
-      await eventTicketTypePricesAPI.update(editingBp.id, {
-        base_price: price,
-        currency: normalizeCurrency(editBpForm.currency),
-      });
-      setEditingBp(null);
-      await loadBasePrices(eventId);
-    } catch (err) { setEditBpError(parseApiError(err, 'Ошибка сохранения')); }
-    finally { setEditBpSaving(false); }
-  };
+      setPriceSaving(true);
+      await upsertBasePrices(entries);
+      if (assignSlots && slotIds?.length) {
+        await assignPricesToSlots(entries, slotIds);
+      }
+      priceEditsRef.current = new Set();
+      setPriceDirtyTick((t) => t + 1);
+      const slotPart = assignSlots && slotIds?.length
+        ? ` и назначены на ${slotIds.length} слотов`
+        : '';
+      setPriceOk(`Сохранены базовые цены для ${entries.length} типов${slotPart}`);
+      await loadPricingData(eventId, eventTicketTypes, priceCurrency);
+      await loadPricePreview(eventId, allActiveSlots, eventTicketTypes);
+    } catch (err) {
+      setPriceError(parseApiError(err, 'Ошибка сохранения цен'));
+    } finally {
+      setPriceSaving(false);
+    }
+  }, [priceConfirm, upsertBasePrices, assignPricesToSlots, loadPricingData, eventId, eventTicketTypes, priceCurrency, loadPricePreview, allActiveSlots]);
 
   // ── render ────────────────────────────────────────────────────────────────
-
-  const ttById = Object.fromEntries(ticketTypes.map((t) => [String(t.id), t]));
 
   return (
     <Layout>
@@ -688,27 +1477,65 @@ export default function BookingSetupWorkbenchPage() {
         {/* Event selector */}
         <div className="bg-white rounded-xl border border-gray-200 p-4">
           <h1 className="text-xl font-bold text-gray-900 mb-3">Настройка продаж</h1>
+          {eventsError && (
+            <div className="mb-3 flex items-center gap-2">
+              <Err msg={eventsError} />
+              <button onClick={reloadEvents} className="text-xs text-blue-600 hover:underline">Повторить</button>
+            </div>
+          )}
+          <div className="mb-3">
+            <Field label="Город">
+              <select
+                value={cityFilter}
+                onChange={(e) => setCityFilter(e.target.value)}
+                className="w-full md:w-96 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+              >
+                <option value="">— Все города —</option>
+                {cityOptions.map((city) => (
+                  <option key={city.id} value={city.id}>{city.label}</option>
+                ))}
+              </select>
+            </Field>
+          </div>
           <EventSelect
             value={eventId}
-            onChange={(v) => { setEventId(v); setShowTtForm(false); setShowSlotForm(false); setShowBpForm(false); setTtOk(''); setSlotOk(''); setBpOk(''); setFillOk(''); }}
-            options={eventOptions}
+            onChange={(v) => { setEventId(v); setShowTtForm(false); setShowSlotForm(false); setTtOk(''); setSlotOk(''); setPriceOk(''); }}
+            options={filteredEventOptions}
             disabled={eventsLoading}
-            placeholder={eventsLoading ? 'Загрузка…' : '— Выберите событие —'}
+            placeholder={eventsLoading ? 'Загрузка…' : (cityFilter ? '— Выберите событие в городе —' : '— Выберите событие —')}
             className={`w-full md:w-96 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none ${eventsLoading ? 'opacity-60 cursor-wait' : ''}`}
           />
 
           {eventId && (
             <div className="mt-3 flex flex-wrap gap-3 text-sm">
               <span className="px-3 py-1 bg-blue-50 text-blue-700 rounded-full">
-                {ttLoading ? '…' : ticketTypes.length} типов билетов
-              </span>
-              <span className="px-3 py-1 bg-purple-50 text-purple-700 rounded-full">
-                {slotsLoading ? '…' : slotsTotal ?? '?'} слотов
+                {ttLoading ? '…' : eventTicketTypes.length} типов билетов
               </span>
               <span className="px-3 py-1 bg-amber-50 text-amber-700 rounded-full">
-                {basePricesLoading ? '…' : basePrices.length} базовых цен
+                {basePricesLoading
+                  ? '…'
+                  : `${savedBaseForUsed}/${usedTicketTypeIdsInOpenSlots.size || '?'}`} в БД
               </span>
+              <span className="px-3 py-1 bg-purple-50 text-purple-700 rounded-full">
+                {slotsLoading ? '…' : `${openSlots.length} откр. слотов`}
+              </span>
+              {dirtyPriceCount > 0 && (
+                <span className="px-3 py-1 bg-sky-50 text-sky-700 rounded-full">
+                  {dirtyPriceCount} черновик(ов)
+                </span>
+              )}
+              {allPricesSaved && (
+                <span className="px-3 py-1 bg-emerald-50 text-emerald-700 rounded-full">цены в БД</span>
+              )}
             </div>
+          )}
+
+          {eventId && (
+            <ReadinessChecklist
+              items={readinessItems}
+              readyCount={readinessReadyCount}
+              totalCount={readinessItems.length}
+            />
           )}
         </div>
 
@@ -721,7 +1548,7 @@ export default function BookingSetupWorkbenchPage() {
             {/* ── 1. Ticket types ─────────────────────────────────────────── */}
             <SectionCard
               title="Типы билетов"
-              badge={ticketTypes.length}
+              badge={eventTicketTypes.length}
               action={
                 <button
                   onClick={() => setShowTtForm((v) => !v)}
@@ -740,30 +1567,51 @@ export default function BookingSetupWorkbenchPage() {
                 </div>
               ) : (
                 <div className="flex flex-wrap gap-2">
-                  {ticketTypes.map((tt) => (
+                  {eventTicketTypes.map((tt) => (
                     <div key={tt.id} className="flex items-center gap-1.5 px-3 py-1.5 bg-gray-100 rounded-lg text-sm">
                       <span className="font-medium text-gray-800">{getTicketTypeLabel(tt)}</span>
                       {tt.code && <span className="font-mono text-xs text-gray-400">({tt.code})</span>}
-                      <button onClick={() => openEditTt(tt)} className="text-gray-300 hover:text-blue-500 transition-colors ml-0.5 text-xs" title="Редактировать">✎</button>
-                      <button onClick={() => handleDeleteTt(tt)} className="text-gray-300 hover:text-red-500 transition-colors text-xs" title="Удалить">✕</button>
+                      <>
+                        <button
+                          onClick={() => openEditTt(tt)}
+                          className="text-gray-300 hover:text-blue-500 transition-colors ml-0.5 text-xs"
+                          title="Редактировать"
+                        >
+                          ✎
+                        </button>
+                        <button
+                          onClick={() => handleDeleteTt(tt)}
+                          className="text-gray-300 hover:text-red-500 transition-colors text-xs"
+                          title="Удалить"
+                        >
+                          ✕
+                        </button>
+                      </>
                     </div>
                   ))}
-                  {!ticketTypes.length && <p className="text-sm text-gray-400">Нет типов билетов — добавьте первый</p>}
+                  {!eventTicketTypes.length && (
+                    <p className="text-sm text-gray-400">
+                      В глобальном каталоге нет типов — создайте вручную или обновите страницу (adult/child создаются автоматически).
+                    </p>
+                  )}
                 </div>
               )}
 
               {showTtForm && (
-                <form onSubmit={handleCreateTt} className="mt-4 pt-4 border-t border-gray-100 grid grid-cols-1 md:grid-cols-3 gap-3">
+                <form onSubmit={handleCreateTt} className="mt-4 pt-4 border-t border-gray-100 grid grid-cols-1 md:grid-cols-4 gap-3">
                   <Field label="Название (RU)" required>
                     <TextInput value={ttForm.name_ru} onChange={(e) => setTtForm((p) => ({ ...p, name_ru: e.target.value }))} placeholder="Взрослый" required />
                   </Field>
                   <Field label="Код" hint="adult / child / vip">
                     <TextInput value={ttForm.code} onChange={(e) => setTtForm((p) => ({ ...p, code: e.target.value }))} placeholder="adult" />
                   </Field>
+                  <Field label="Цена" hint="сразу сохранится как базовая">
+                    <TextInput type="number" step="0.01" min={0} value={ttForm.initial_price} onChange={(e) => setTtForm((p) => ({ ...p, initial_price: e.target.value }))} placeholder="25.00" />
+                  </Field>
                   <Field label="Порядок">
                     <TextInput type="number" min={0} value={ttForm.sort_order} onChange={(e) => setTtForm((p) => ({ ...p, sort_order: +e.target.value || 0 }))} />
                   </Field>
-                  <div className="md:col-span-3 flex items-center gap-3">
+                  <div className="md:col-span-4 flex items-center gap-3">
                     <button type="submit" disabled={ttSaving} className="px-4 py-2 text-sm text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors">
                       {ttSaving ? 'Создание…' : 'Создать тип'}
                     </button>
@@ -774,7 +1622,200 @@ export default function BookingSetupWorkbenchPage() {
               )}
             </SectionCard>
 
-            {/* ── 2. Slots ──────────────────────────────────────────────────── */}
+            {/* ── 2. Prices (unified) ───────────────────────────────────────── */}
+            <SectionCard
+              title="Цены"
+              badge={usedTicketTypeIdsInOpenSlots.size ? `${savedBaseForUsed}/${usedTicketTypeIdsInOpenSlots.size}` : '…'}
+            >
+              <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
+                <p className="text-xs text-gray-500">
+                  Базовая цена действует на все слоты. Правила и цены на слоте перебивают базовую.
+                </p>
+                {eventId && (
+                  <Link
+                    to={`/catalog/pricing-rules${eventId ? `?event=${eventId}` : ''}`}
+                    className="text-xs text-blue-600 hover:underline whitespace-nowrap"
+                  >
+                    {pricingRulesLoading
+                      ? 'Правила…'
+                      : pricingRules.length
+                        ? `Правила цен (${pricingRules.length}) →`
+                        : 'Правила цен →'}
+                  </Link>
+                )}
+              </div>
+
+              <PricePreviewPanel
+                preview={pricePreview}
+                loading={pricePreviewLoading}
+                error={pricePreviewError}
+              />
+
+              {basePricesLoading ? (
+                <div className="flex items-center gap-2 text-sm text-gray-400 mt-3"><Spinner /> Загрузка цен...</div>
+              ) : !eventTicketTypes.length ? (
+                <p className="text-sm text-gray-400 mt-3">Добавьте типы билетов, чтобы настроить цены</p>
+              ) : (
+                <form id="price-form" onSubmit={handleSaveAllPrices} className="space-y-4 mt-3">
+                  <div className="flex flex-wrap items-end gap-3">
+                    <Field label="Валюта для всех типов">
+                      <TextInput
+                        value={priceCurrency}
+                        maxLength={3}
+                        onChange={(e) => {
+                          const cur = e.target.value.toUpperCase();
+                          setPriceCurrency(cur);
+                          setPriceByType((prev) => {
+                            const next = { ...prev };
+                            for (const tt of eventTicketTypes) {
+                              const id = String(tt.id);
+                              next[id] = { ...(next[id] || {}), currency: normalizeCurrency(cur) };
+                            }
+                            return next;
+                          });
+                        }}
+                        className="w-24"
+                      />
+                    </Field>
+                    <div className="flex-1 min-w-[180px]">
+                      <Field label="Одна цена для всех">
+                        <div className="flex gap-2">
+                          <TextInput
+                            type="number"
+                            step="0.01"
+                            min={0}
+                            placeholder="25.00"
+                            value={uniformPrice}
+                            onChange={(e) => setUniformPrice(e.target.value)}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter') {
+                                e.preventDefault();
+                                applyUniformPrice(uniformPrice);
+                              }
+                            }}
+                          />
+                          <button
+                            type="button"
+                            onClick={() => applyUniformPrice(uniformPrice)}
+                            className="px-3 py-2 text-xs font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 whitespace-nowrap"
+                          >
+                            Применить
+                          </button>
+                        </div>
+                      </Field>
+                    </div>
+                  </div>
+
+                  <div className="overflow-x-auto rounded-xl border border-gray-200">
+                    <table className="w-full text-sm">
+                      <thead className="bg-gray-50 text-xs text-gray-500 uppercase">
+                        <tr>
+                          <th className="px-3 py-2 text-left">Тип билета</th>
+                          <th className="px-3 py-2 text-right w-36">Цена</th>
+                          <th className="px-3 py-2 text-center w-40">Статус</th>
+                          <th className="px-3 py-2 text-right w-20" />
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-100">
+                        {eventTicketTypes.map((tt) => {
+                          const id = String(tt.id);
+                          const row = priceByType[id] || {};
+                          const savedBase = basePriceByType[id];
+                          const isDirty = dirtyPriceIds.has(id);
+                          const status = getPriceRowStatus({
+                            typeId: id,
+                            row,
+                            savedBase,
+                            isDirty,
+                            rulesCount: rulesCountByType[id] || 0,
+                            slotOnlyCount: countSlotOnlyPrices(slotPricesList, id, !!savedBase),
+                          });
+                          return (
+                            <tr key={id} className={`hover:bg-gray-50 ${isDirty ? 'bg-sky-50/40' : ''}`}>
+                              <td className="px-3 py-2">
+                                <div className="font-medium text-gray-800">{getTicketTypeLabel(tt)}</div>
+                                {tt.code && <div className="text-xs text-gray-400 font-mono">{tt.code}</div>}
+                              </td>
+                              <td className="px-3 py-2">
+                                <TextInput
+                                  type="number"
+                                  step="0.01"
+                                  min={0}
+                                  value={row.price ?? ''}
+                                  onChange={(e) => setPriceForType(id, { price: e.target.value, currency: priceCurrency })}
+                                  onBlur={() => handlePriceBlur(id)}
+                                  placeholder="0.00"
+                                  className="text-right"
+                                />
+                              </td>
+                              <td className="px-3 py-2 text-center">
+                                <PriceStatusBadge status={status} />
+                              </td>
+                              <td className="px-3 py-2 text-right">
+                                <button
+                                  type="button"
+                                  disabled={savingRowId === id || !isDirty}
+                                  onClick={() => saveRowPrice(id)}
+                                  className="text-xs text-blue-600 hover:underline disabled:opacity-40 disabled:no-underline"
+                                  title="Сохранить базовую цену"
+                                >
+                                  {savingRowId === id ? '…' : '✓'}
+                                </button>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+
+                  <SlotPriceOverrideMatrix
+                    slots={openSlots}
+                    ticketTypes={eventTicketTypes}
+                    slotPriceMap={slotPriceMap}
+                    basePriceByType={basePriceByType}
+                    defaultCurrency={priceCurrency}
+                    onSaveCell={handleMatrixCellSave}
+                    savingKey={matrixSavingKey}
+                  />
+
+                  <label className="flex items-start gap-2 text-sm text-gray-600 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={assignSlotPrices}
+                      onChange={(e) => setAssignSlotPrices(e.target.checked)}
+                      className="mt-0.5 rounded border-gray-300 text-blue-600"
+                    />
+                    <span>
+                      При «Сохранить все» — дополнительно зафиксировать на каждом слоте
+                      <span className="block text-xs text-gray-400">Обычно не нужно: базовой цены достаточно</span>
+                    </span>
+                  </label>
+
+                  <div className="flex flex-wrap items-center gap-3">
+                    <button
+                      type="button"
+                      onClick={handleSaveChangedPrices}
+                      disabled={priceSaving || dirtyPriceCount === 0}
+                      className="px-4 py-2.5 text-sm font-medium text-blue-700 bg-blue-50 rounded-lg hover:bg-blue-100 disabled:opacity-50 transition-colors"
+                    >
+                      {priceSaving ? 'Сохранение…' : `Сохранить изменённые (${dirtyPriceCount})`}
+                    </button>
+                    <button
+                      type="submit"
+                      disabled={priceSaving || !eventTicketTypes.length}
+                      className="px-5 py-2.5 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors"
+                    >
+                      {priceSaving ? 'Сохранение…' : 'Сохранить все типы'}
+                    </button>
+                    <Err msg={priceError} />
+                    <Ok msg={priceOk} />
+                  </div>
+                </form>
+              )}
+            </SectionCard>
+
+            {/* ── 3. Slots ──────────────────────────────────────────────────── */}
             <SectionCard
               title="Слоты"
               badge={slotsTotal != null ? slotsTotal : '…'}
@@ -811,6 +1852,12 @@ export default function BookingSetupWorkbenchPage() {
                 </div>
               ) : (
                 <p className="text-sm text-gray-400">Слотов нет — добавьте первый</p>
+              )}
+              {(syncSlotsError || syncSlotsOk) && (
+                <div className="mt-2 flex gap-2">
+                  <Err msg={syncSlotsError} />
+                  <Ok msg={syncSlotsOk} />
+                </div>
               )}
 
               {showSlotForm && (
@@ -891,6 +1938,72 @@ export default function BookingSetupWorkbenchPage() {
                     <Field label="Закрытие брони (мин до)"><TextInput type="number" min={0} value={slotForm.booking_closes_minutes_before} onChange={(e) => setSlotForm((p) => ({ ...p, booking_closes_minutes_before: +e.target.value || 0 }))} /></Field>
                   </div>
 
+                  <Field label="Типы билетов для слотов" required>
+                    {!eventTicketTypes.length ? (
+                      <p className="text-sm text-gray-400">Сначала добавьте типы билетов для события</p>
+                    ) : (
+                      <div className="space-y-2">
+                        <div className="flex flex-wrap gap-2">
+                          <button
+                            type="button"
+                            onClick={() => setSlotForm((p) => ({ ...p, ticket_type_ids: eventTicketTypes.map((tt) => String(tt.id)) }))}
+                            className="px-2 py-1 text-xs rounded border border-gray-200 bg-gray-50 hover:bg-gray-100"
+                          >
+                            Выбрать все
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setSlotForm((p) => ({ ...p, ticket_type_ids: [] }))}
+                            className="px-2 py-1 text-xs rounded border border-gray-200 bg-gray-50 hover:bg-gray-100"
+                          >
+                            Снять выбор
+                          </button>
+                          <span className="text-xs text-gray-500 self-center">
+                            Выбрано: {slotForm.ticket_type_ids?.length || 0} из {eventTicketTypes.length}
+                          </span>
+                        </div>
+                        <div className="flex flex-wrap gap-2">
+                          {eventTicketTypes.map((tt) => {
+                            const id = String(tt.id);
+                            const checked = (slotForm.ticket_type_ids || []).includes(id);
+                            return (
+                              <label key={id} className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg border text-sm cursor-pointer transition-colors ${checked ? 'bg-purple-50 border-purple-300 text-purple-800' : 'bg-white border-gray-200 text-gray-600 hover:bg-gray-50'}`}>
+                                <input
+                                  type="checkbox"
+                                  checked={checked}
+                                  onChange={(e) => {
+                                    setSlotForm((p) => {
+                                      const curr = Array.isArray(p.ticket_type_ids) ? p.ticket_type_ids : [];
+                                      if (e.target.checked) {
+                                        return { ...p, ticket_type_ids: Array.from(new Set([...curr, id])) };
+                                      }
+                                      return { ...p, ticket_type_ids: curr.filter((x) => x !== id) };
+                                    });
+                                  }}
+                                  className="rounded border-gray-300 text-purple-600"
+                                />
+                                {getTicketTypeLabel(tt)}
+                              </label>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
+                  </Field>
+
+                  <label className="flex items-center gap-2 text-sm text-gray-700 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={!!slotForm.also_create_prices}
+                      onChange={(e) => setSlotForm((p) => ({ ...p, also_create_prices: e.target.checked }))}
+                      className="rounded border-gray-300 text-purple-600"
+                    />
+                    <span>
+                      Сразу сохранить цены из раздела «Цены» на новые слоты
+                      <span className="block text-xs text-gray-400">По умолчанию выкл. — для приложения достаточно базовых цен</span>
+                    </span>
+                  </label>
+
                   <div className="flex items-center gap-3">
                     <button type="submit" disabled={slotSaving} className="px-4 py-2 text-sm text-white bg-purple-600 rounded-lg hover:bg-purple-700 disabled:opacity-50 transition-colors">
                       {slotSaving ? 'Создание…' : 'Создать слоты'}
@@ -902,133 +2015,7 @@ export default function BookingSetupWorkbenchPage() {
               )}
             </SectionCard>
 
-            {/* ── 3. Price coverage ─────────────────────────────────────────── */}
-            <SectionCard title="Покрытие ценами">
-              {coverageLoading ? (
-                <div className="flex items-center gap-2 text-sm text-gray-400"><Spinner /> Загрузка...</div>
-              ) : !coverage.length ? (
-                <p className="text-sm text-gray-400">Добавьте типы билетов и слоты чтобы увидеть покрытие</p>
-              ) : (
-                <div className="space-y-3">
-                  {coverage.map(({ tt, covered, total }) => {
-                    const pct = total > 0 ? Math.round((covered / total) * 100) : 0;
-                    const full = pct === 100;
-                    return (
-                      <div key={tt.id} className="flex items-center gap-3">
-                        <div className="w-28 text-sm font-medium text-gray-700 truncate">{getTicketTypeLabel(tt)}</div>
-                        <div className="flex-1 h-2 bg-gray-100 rounded-full overflow-hidden">
-                          <div className={`h-full rounded-full transition-all ${full ? 'bg-green-500' : 'bg-blue-400'}`} style={{ width: `${pct}%` }} />
-                        </div>
-                        <div className="text-xs text-gray-500 w-20 text-right">{covered}/{total} слотов</div>
-                        {!full && (
-                          <button
-                            onClick={() => { setFillTtId(tt.id); setFillPrice(''); document.getElementById('fill-form')?.scrollIntoView({ behavior: 'smooth' }); }}
-                            className="px-2 py-1 text-xs text-blue-600 bg-blue-50 rounded-md hover:bg-blue-100 transition-colors whitespace-nowrap"
-                          >
-                            Заполнить
-                          </button>
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
 
-              {/* Fill prices form */}
-              {!!ticketTypes.length && (
-                <form id="fill-form" onSubmit={handleFillPrices} className="mt-4 pt-4 border-t border-gray-100">
-                  <p className="text-xs text-gray-500 mb-3">Назначить цену всем активным слотам события:</p>
-                  <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
-                    <Field label="Тип билета" required>
-                      <TicketTypeSelect
-                        value={fillTtId}
-                        onChange={setFillTtId}
-                        options={ticketTypes}
-                        required
-                        placeholder="Выберите тип"
-                      />
-                    </Field>
-                    <Field label="Цена" required>
-                      <TextInput type="number" step="0.01" min={0} value={fillPrice} onChange={(e) => setFillPrice(e.target.value)} required />
-                    </Field>
-                    <Field label="Валюта">
-                      <TextInput value={fillCurrency} maxLength={3} onChange={(e) => setFillCurrency(e.target.value.toUpperCase())} />
-                    </Field>
-                    <div className="flex items-end">
-                      <button type="submit" disabled={fillSaving} className="w-full px-4 py-2 text-sm text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors">
-                        {fillSaving ? 'Назначение…' : 'Назначить'}
-                      </button>
-                    </div>
-                  </div>
-                  <div className="mt-1 flex gap-2">
-                    <Err msg={fillError} />
-                    <Ok msg={fillOk} />
-                  </div>
-                </form>
-              )}
-            </SectionCard>
-
-            {/* ── 4. Base prices ────────────────────────────────────────────── */}
-            <SectionCard
-              title="Базовые цены"
-              badge={basePrices.length}
-              action={
-                <button onClick={() => setShowBpForm((v) => !v)}
-                  className="px-3 py-1 text-xs font-medium text-amber-600 bg-amber-50 rounded-md hover:bg-amber-100 transition-colors">
-                  {showBpForm ? 'Скрыть' : '+ Добавить'}
-                </button>
-              }
-            >
-              <p className="text-xs text-gray-400 mb-3">Fallback-цена ценового движка когда нет конкретной цены для слота.</p>
-              {basePricesLoading ? (
-                <div className="flex items-center gap-2 text-sm text-gray-400"><Spinner /> Загрузка...</div>
-              ) : basePrices.length ? (
-                <div className="flex flex-wrap gap-2">
-                  {basePrices.map((bp) => {
-                    const tt = ttById[String(bp.ticket_type)];
-                    return (
-                      <div key={bp.id} className="flex items-center gap-2 px-3 py-1.5 bg-amber-50 border border-amber-200 rounded-lg text-sm">
-                        <span className="text-gray-700">{tt ? getTicketTypeLabel(tt) : bp.ticket_type}</span>
-                        <span className="font-medium text-amber-800">{bp.base_price} {bp.currency}</span>
-                        <button onClick={() => openEditBp(bp)} className="text-amber-300 hover:text-blue-500 transition-colors text-xs" title="Редактировать">✎</button>
-                        <button onClick={() => handleDeleteBp(bp)} className="text-amber-300 hover:text-red-500 transition-colors text-xs" title="Удалить">✕</button>
-                      </div>
-                    );
-                  })}
-                </div>
-              ) : (
-                <p className="text-sm text-gray-400">Базовых цен нет</p>
-              )}
-
-              {showBpForm && (
-                <form onSubmit={handleCreateBp} className="mt-4 pt-4 border-t border-gray-100 grid grid-cols-1 md:grid-cols-4 gap-3">
-                  <Field label="Тип билета" required>
-                    <TicketTypeSelect
-                      value={bpForm.ticket_type}
-                      onChange={(v) => setBpForm((p) => ({ ...p, ticket_type: v }))}
-                      options={ticketTypes}
-                      required
-                      placeholder="Выберите тип"
-                    />
-                  </Field>
-                  <Field label="Базовая цена" required>
-                    <TextInput type="number" step="0.01" min={0} value={bpForm.base_price} onChange={(e) => setBpForm((p) => ({ ...p, base_price: e.target.value }))} required />
-                  </Field>
-                  <Field label="Валюта">
-                    <TextInput value={bpForm.currency} maxLength={3} onChange={(e) => setBpForm((p) => ({ ...p, currency: e.target.value.toUpperCase() }))} />
-                  </Field>
-                  <div className="flex items-end">
-                    <button type="submit" disabled={bpSaving} className="w-full px-4 py-2 text-sm text-white bg-amber-500 rounded-lg hover:bg-amber-600 disabled:opacity-50 transition-colors">
-                      {bpSaving ? 'Создание…' : 'Добавить'}
-                    </button>
-                  </div>
-                  <div className="md:col-span-4 flex gap-2">
-                    <Err msg={bpError} />
-                    <Ok msg={bpOk} />
-                  </div>
-                </form>
-              )}
-            </SectionCard>
           </>
         )}
       </div>
@@ -1059,32 +2046,6 @@ export default function BookingSetupWorkbenchPage() {
         )}
       </Modal>
 
-      {/* Edit Base Price Modal */}
-      <Modal open={!!editingBp} onClose={() => setEditingBp(null)} title="Редактировать базовую цену" size="sm">
-        {editingBp && (
-          <form onSubmit={handleSaveEditBp} className="space-y-3">
-            <p className="text-sm text-gray-500">
-              Тип: <span className="font-medium text-gray-800">{getTicketTypeLabel(ttById[String(editingBp.ticket_type)] || { name: String(editingBp.ticket_type) })}</span>
-            </p>
-            <Field label="Базовая цена" required>
-              <TextInput type="number" step="0.01" min={0} value={editBpForm.base_price} onChange={(e) => setEditBpForm((p) => ({ ...p, base_price: e.target.value }))} required autoFocus />
-            </Field>
-            <Field label="Валюта">
-              <TextInput value={editBpForm.currency} maxLength={3} onChange={(e) => setEditBpForm((p) => ({ ...p, currency: e.target.value.toUpperCase() }))} />
-            </Field>
-            <div className="flex items-center gap-3 pt-1">
-              <button type="submit" disabled={editBpSaving} className="px-4 py-2 text-sm text-white bg-amber-500 rounded-lg hover:bg-amber-600 disabled:opacity-50 transition-colors">
-                {editBpSaving ? 'Сохранение…' : 'Сохранить'}
-              </button>
-              <button type="button" onClick={() => setEditingBp(null)} className="px-4 py-2 text-sm text-gray-600 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors">
-                Отмена
-              </button>
-              <Err msg={editBpError} />
-            </div>
-          </form>
-        )}
-      </Modal>
-
       <SlotsManagerModal
         open={showSlotsManager}
         eventId={eventId}
@@ -1093,14 +2054,16 @@ export default function BookingSetupWorkbenchPage() {
       />
 
       <ConfirmModal
-        open={!!fillConfirm}
-        onClose={() => setFillConfirm(null)}
-        onConfirm={handleFillPricesConfirm}
-        title="Подтвердите назначение цен"
-        message={fillConfirm
-          ? `Назначить цену ${fillConfirm.price} ${fillConfirm.currency} для типа «${fillConfirm.ttLabel}» на ${fillConfirm.slotCount} слотов? Существующие цены будут перезаписаны.`
+        open={!!priceConfirm}
+        onClose={() => setPriceConfirm(null)}
+        onConfirm={handleSaveAllPricesConfirm}
+        title="Сохранить цены?"
+        message={priceConfirm
+          ? `Сохранить базовые цены для ${priceConfirm.entries.length} типов билетов?${priceConfirm.assignSlotPrices && priceConfirm.slotCount
+            ? ` Также зафиксировать на ${priceConfirm.slotCount} слотах.`
+            : ''}`
           : ''}
-        confirmLabel="Назначить"
+        confirmLabel="Сохранить"
       />
     </Layout>
   );

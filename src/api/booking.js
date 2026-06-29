@@ -1,8 +1,16 @@
 import apiClient from './client';
 
-/** Типы билетов (event-scoped). */
+const bookingGet = (url, params = {}, { skipCache = false } = {}) => {
+  const { skipApiGetCache, ...query } = params;
+  return apiClient.get(url, {
+    params: query,
+    skipApiGetCache: skipCache || skipApiGetCache === true,
+  });
+};
+
+/** Типы билетов (global catalog, optional event-compat filter). */
 export const ticketTypesAPI = {
-  list: (params) => apiClient.get('/booking/ticket-types/', { params }),
+  list: (params = {}) => bookingGet('/booking/ticket-types/', params, { skipCache: true }),
   get: (ticketTypeId) => apiClient.get(`/booking/ticket-types/${ticketTypeId}/`),
   create: (data) => apiClient.post('/booking/ticket-types/', data),
   update: (ticketTypeId, data) => apiClient.patch(`/booking/ticket-types/${ticketTypeId}/`, data),
@@ -51,6 +59,20 @@ export const pricingRulesAPI = {
   create: (data) => apiClient.post('/booking/pricing-rules/', data),
   update: (id, data) => apiClient.patch(`/booking/pricing-rules/${id}/`, data),
   delete: (id) => apiClient.delete(`/booking/pricing-rules/${id}/`),
+};
+
+/** Публичные цены слота (тот же движок, что в приложении). */
+export const eventSlotPricingAPI = {
+  get: (eventId, params) => apiClient.get(`/booking/events/${eventId}/pricing/`, { params }),
+};
+
+export const ticketTypesForceAPI = {
+  /**
+   * POST /api/v1/booking/force-purge-event-ticket-types/
+   * Radical: rebind reservations/slot ticket_types to global by `code`, then delete TicketType.event=<event>.
+   */
+  purgeEventTicketTypes: (eventId) =>
+    apiClient.post('/booking/force-purge-event-ticket-types/', { event: eventId }),
 };
 
 export const bookingAnalyticsAPI = {

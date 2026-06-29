@@ -1,21 +1,71 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { eventsAPI } from '../../../api/generation';
 import { bookingReferenceAPI, ticketTypesAPI } from '../../../api/booking';
-import { getTicketTypeLabel } from './labels';
+import { getTicketTypeLabel, filterTicketTypesForEvent } from './labels';
 import { normalizeListResponse } from './normalize';
 
-export function useEventOptions(pageSize = 500) {
+const REFERENCE_PAGE_SIZE = 100;
+
+async function loadAllReferenceEvents(pageSize = REFERENCE_PAGE_SIZE) {
+  const allEvents = [];
+  let cities = [];
+  let page = 1;
+  let totalPages = 1;
+
+  while (page <= totalPages) {
+    const response = await eventsAPI.list({ page, page_size: pageSize });
+    const data = response?.data;
+    const list = normalizeListResponse(data, ['events', 'results', 'data']);
+    allEvents.push(...list);
+    totalPages = Number(data?.total_pages) || 1;
+    if (Array.isArray(data?.reference?.cities) && data.reference.cities.length) {
+      cities = data.reference.cities;
+    }
+    page += 1;
+  }
+
+  return { events: allEvents, cities };
+}
+
+export function useEventOptions(pageSize = REFERENCE_PAGE_SIZE) {
   const [eventOptions, setEventOptions] = useState([]);
+  const [cityOptions, setCityOptions] = useState([]);
   const [eventsLoading, setEventsLoading] = useState(true);
+  const [eventsError, setEventsError] = useState('');
 
   const loadEvents = useCallback(async () => {
     try {
       setEventsLoading(true);
-      const response = await bookingReferenceAPI.events({ page_size: pageSize });
-      const data = response?.data;
-      const list = normalizeListResponse(data, ['results', 'data']);
-      setEventOptions(list);
-    } catch {
+      setEventsError('');
+      const { events, cities } = await loadAllReferenceEvents(pageSize);
+      setEventOptions(events);
+
+      const cityRows = cities.length
+        ? cities.map((c) => ({
+            id: String(c.id),
+            label: String(c.name || c.display_name || c.id),
+          }))
+        : [];
+      if (cityRows.length) {
+        setCityOptions(cityRows.sort((a, b) => a.label.localeCompare(b.label, 'ru')));
+      } else {
+        const unique = new Map();
+        for (const ev of events) {
+          const id = String(ev.city_id || '');
+          if (!id) continue;
+          const label = String(ev.city_display_name || ev.city_name || id);
+          if (!unique.has(id)) unique.set(id, label);
+        }
+        setCityOptions(
+          Array.from(unique.entries())
+            .map(([id, label]) => ({ id, label }))
+            .sort((a, b) => a.label.localeCompare(b.label, 'ru')),
+        );
+      }
+    } catch (err) {
       setEventOptions([]);
+      setCityOptions([]);
+      setEventsError(err?.message || 'Не удалось загрузить события');
     } finally {
       setEventsLoading(false);
     }
@@ -25,7 +75,7 @@ export function useEventOptions(pageSize = 500) {
     loadEvents();
   }, [loadEvents]);
 
-  return { eventOptions, eventsLoading, reloadEvents: loadEvents };
+  return { eventOptions, cityOptions, eventsLoading, eventsError, reloadEvents: loadEvents };
 }
 
 export function useBookableEventOptions(pageSize = 500) {
@@ -51,21 +101,23 @@ export function useTicketTypeOptions(eventId, pageSize = 500) {
   const [ticketTypesLoading, setTicketTypesLoading] = useState(false);
 
   const loadTicketTypes = useCallback(async () => {
-    const normalizedEventId = eventId || '';
-    if (!normalizedEventId) {
+    if (!eventId) {
       setTicketTypeOptions([]);
       return;
     }
-
     try {
       setTicketTypesLoading(true);
       const response = await ticketTypesAPI.list({
-        event: normalizedEventId,
+        event: eventId,
         page_size: pageSize,
-        ordering: 'code',
+        ordering: 'sort_order',
+        is_active: 'true',
       });
       const data = response?.data;
-      const list = normalizeListResponse(data, ['results', 'data']);
+      const list = filterTicketTypesForEvent(
+        normalizeListResponse(data, ['results', 'data']),
+        eventId,
+      );
       setTicketTypeOptions(list);
     } catch {
       setTicketTypeOptions([]);
@@ -127,16 +179,13 @@ export function useTicketTypeMapForEvents(eventIds, pageSize = 500) {
 
   useEffect(() => {
     if (!idsKey) return;
-    const ids = idsKey.split('|');
     let cancelled = false;
 
     (async () => {
       try {
-        const responses = await Promise.all(
-          ids.map((eventId) =>
-            ticketTypesAPI.list({ event: eventId, page_size: pageSize, ordering: 'code' })
-          )
-        );
+        const responses = [
+          await ticketTypesAPI.list({ page_size: pageSize, ordering: 'code' }),
+        ];
         if (cancelled) return;
 
         let changed = false;

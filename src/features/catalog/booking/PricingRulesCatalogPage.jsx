@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { pricingRulesAPI } from '../../../api/booking';
 import Layout from '../../../components/Layout';
 import DataTable from '../../../components/ui/DataTable';
@@ -49,13 +50,14 @@ function createEmpty() {
 export default function PricingRulesCatalogPage() {
   const { setMobileActions } = useLayoutActions();
   const { page, setPage } = useCatalogFilters();
+  const [searchParams] = useSearchParams();
 
   const [rows, setRows] = useState([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
   const [listError, setListError] = useState(null);
 
-  const [eventFilter, setEventFilter] = useState('');
+  const [eventFilter, setEventFilter] = useState(() => searchParams.get('event') || '');
   const { eventOptions, eventsLoading } = useEventOptions();
 
   const [editing, setEditing] = useState(null);
