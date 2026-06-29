@@ -1,4 +1,4 @@
-import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
+import { createBrowserRouter, Navigate, RouterProvider } from 'react-router-dom';
 import ErrorBoundary, { SessionWizardErrorBoundary } from './components/ErrorBoundary';
 import ProtectedRoute from './components/ProtectedRoute';
 import { LayoutActionsProvider } from './context/LayoutActionsContext';
@@ -9,6 +9,7 @@ import CityGeneration from './pages/ai/CityGeneration';
 import ImageGeneration from './pages/ai/ImageGeneration';
 import Playground from './pages/ai/Playground';
 import CatalogHome from './pages/catalog/CatalogHome';
+import BookingCatalogHome from './pages/catalog/BookingCatalogHome';
 import CitiesCatalog from './pages/catalog/CitiesCatalog';
 import EventsCatalog from './pages/catalog/EventsCatalog';
 import PhotosCatalog from './pages/catalog/PhotosCatalog';
@@ -39,72 +40,175 @@ import Login from './pages/Login';
 import MyTasks from './pages/tasks/MyTasks';
 import TokenAuth from './pages/TokenAuth';
 
-// TODO: Включить маршрут входа когда будет готов
 const ENABLE_LOGIN = false;
+
+const routes = [
+  {
+    path: '/token-auth',
+    element: <ErrorBoundary><TokenAuth /></ErrorBoundary>,
+  },
+  {
+    path: '/',
+    element: <ErrorBoundary><Home /></ErrorBoundary>,
+  },
+  ...(ENABLE_LOGIN
+    ? [{ path: '/login', element: <ErrorBoundary><Login /></ErrorBoundary> }]
+    : []),
+  {
+    path: '/generation',
+    element: <ProtectedRoute><ErrorBoundary><SessionsList /></ErrorBoundary></ProtectedRoute>,
+  },
+  {
+    path: '/generation/list',
+    element: <ProtectedRoute><ErrorBoundary><GenerationList /></ErrorBoundary></ProtectedRoute>,
+  },
+  {
+    path: '/generation/upload',
+    element: <ProtectedRoute><ErrorBoundary><UploadFile /></ErrorBoundary></ProtectedRoute>,
+  },
+  {
+    path: '/generation/new',
+    element: <ProtectedRoute><ErrorBoundary><NewSession /></ErrorBoundary></ProtectedRoute>,
+  },
+  {
+    path: '/generation/:sessionId',
+    element: <ProtectedRoute><SessionWizardErrorBoundary><SessionWizard /></SessionWizardErrorBoundary></ProtectedRoute>,
+  },
+  {
+    path: '/ai/settings',
+    element: <ProtectedRoute><ErrorBoundary><AISettings /></ErrorBoundary></ProtectedRoute>,
+  },
+  {
+    path: '/ai/tts',
+    element: <ProtectedRoute><ErrorBoundary><TTSSettings /></ErrorBoundary></ProtectedRoute>,
+  },
+  {
+    path: '/ai/playground',
+    element: <ProtectedRoute><ErrorBoundary><Playground /></ErrorBoundary></ProtectedRoute>,
+  },
+  {
+    path: '/ai/images',
+    element: <ProtectedRoute><ErrorBoundary><ImageGeneration /></ErrorBoundary></ProtectedRoute>,
+  },
+  {
+    path: '/ai/cities',
+    element: <ProtectedRoute><ErrorBoundary><CityGeneration /></ErrorBoundary></ProtectedRoute>,
+  },
+  {
+    path: '/ai/events',
+    element: <Navigate to="/generation" replace />,
+  },
+  {
+    path: '/tasks',
+    element: <ProtectedRoute><ErrorBoundary><MyTasks /></ErrorBoundary></ProtectedRoute>,
+  },
+  {
+    path: '/catalog',
+    element: <ProtectedRoute><ErrorBoundary><CatalogHome /></ErrorBoundary></ProtectedRoute>,
+  },
+  {
+    path: '/catalog/booking',
+    element: <ProtectedRoute><ErrorBoundary><BookingCatalogHome /></ErrorBoundary></ProtectedRoute>,
+  },
+  {
+    path: '/catalog/cities',
+    element: <ProtectedRoute><ErrorBoundary><CitiesCatalog /></ErrorBoundary></ProtectedRoute>,
+  },
+  {
+    path: '/catalog/events',
+    element: <ProtectedRoute><ErrorBoundary><EventsCatalog /></ErrorBoundary></ProtectedRoute>,
+  },
+  {
+    path: '/catalog/ticket-types',
+    element: <ProtectedRoute><ErrorBoundary><TicketTypesCatalog /></ErrorBoundary></ProtectedRoute>,
+  },
+  {
+    path: '/catalog/slot-availabilities',
+    element: <ProtectedRoute><ErrorBoundary><SlotAvailabilitiesCatalog /></ErrorBoundary></ProtectedRoute>,
+  },
+  {
+    path: '/catalog/ticket-prices',
+    element: <ProtectedRoute><ErrorBoundary><TicketPricesCatalog /></ErrorBoundary></ProtectedRoute>,
+  },
+  {
+    path: '/catalog/booking-setup',
+    element: <ProtectedRoute><ErrorBoundary><BookingSetupWorkbench /></ErrorBoundary></ProtectedRoute>,
+  },
+  {
+    path: '/catalog/reservations',
+    element: <ProtectedRoute><ErrorBoundary><BookingReservationsCatalog /></ErrorBoundary></ProtectedRoute>,
+  },
+  {
+    path: '/catalog/base-prices',
+    element: <ProtectedRoute><ErrorBoundary><BasePricesCatalog /></ErrorBoundary></ProtectedRoute>,
+  },
+  {
+    path: '/catalog/pricing-rules',
+    element: <ProtectedRoute><ErrorBoundary><PricingRulesCatalog /></ErrorBoundary></ProtectedRoute>,
+  },
+  {
+    path: '/catalog/analytics',
+    element: <ProtectedRoute><ErrorBoundary><BookingAnalytics /></ErrorBoundary></ProtectedRoute>,
+  },
+  {
+    path: '/catalog/audio-guides',
+    element: <ProtectedRoute><ErrorBoundary><AudioGuidesCatalog /></ErrorBoundary></ProtectedRoute>,
+  },
+  {
+    path: '/catalog/interactive-locations',
+    element: <ProtectedRoute><ErrorBoundary><InteractiveLocationsCatalog /></ErrorBoundary></ProtectedRoute>,
+  },
+  {
+    path: '/catalog/subscription-types',
+    element: <ProtectedRoute><ErrorBoundary><SubscriptionTypesCatalog /></ErrorBoundary></ProtectedRoute>,
+  },
+  {
+    path: '/catalog/activation-codes',
+    element: <ProtectedRoute><ErrorBoundary><ActivationCodesCatalog /></ErrorBoundary></ProtectedRoute>,
+  },
+  {
+    path: '/catalog/photos',
+    element: <ProtectedRoute><ErrorBoundary><PhotosCatalog /></ErrorBoundary></ProtectedRoute>,
+  },
+  {
+    path: '/catalog/tags',
+    element: <ProtectedRoute><ErrorBoundary><TagsFilters /></ErrorBoundary></ProtectedRoute>,
+  },
+  {
+    path: '/export/zip',
+    element: <ProtectedRoute><ErrorBoundary><ExportZip /></ErrorBoundary></ProtectedRoute>,
+  },
+  {
+    path: '/export/cities',
+    element: <ProtectedRoute><ErrorBoundary><ExportCities /></ErrorBoundary></ProtectedRoute>,
+  },
+  {
+    path: '/export/events',
+    element: <ProtectedRoute><ErrorBoundary><ExportEvents /></ErrorBoundary></ProtectedRoute>,
+  },
+  {
+    path: '/import/google-sheet',
+    element: <ProtectedRoute><ErrorBoundary><ImportGoogleSheet /></ErrorBoundary></ProtectedRoute>,
+  },
+  {
+    path: '*',
+    element: <NotFound />,
+  },
+];
+
+const router = createBrowserRouter(routes, {
+  future: {
+    v7_startTransition: true,
+    v7_relativeSplatPath: true,
+  },
+});
 
 function App() {
   return (
     <ErrorBoundary>
-    <LayoutActionsProvider>
-      <BrowserRouter>
-        <Routes>
-          {/* Страница ввода токена */}
-          <Route path="/token-auth" element={<ErrorBoundary><TokenAuth /></ErrorBoundary>} />
-
-          {/* Открытые маршруты */}
-          <Route path="/" element={<ErrorBoundary><Home /></ErrorBoundary>} />
-          {ENABLE_LOGIN && <Route path="/login" element={<ErrorBoundary><Login /></ErrorBoundary>} />}
-
-          {/* Защищённые маршруты - требуют токена */}
-
-          {/* Сессии */}
-          <Route path="/generation" element={<ProtectedRoute><ErrorBoundary><SessionsList /></ErrorBoundary></ProtectedRoute>} />
-          <Route path="/generation/list" element={<ProtectedRoute><ErrorBoundary><GenerationList /></ErrorBoundary></ProtectedRoute>} />
-          <Route path="/generation/upload" element={<ProtectedRoute><ErrorBoundary><UploadFile /></ErrorBoundary></ProtectedRoute>} />
-          <Route path="/generation/new" element={<ProtectedRoute><ErrorBoundary><NewSession /></ErrorBoundary></ProtectedRoute>} />
-          <Route path="/generation/:sessionId" element={<ProtectedRoute><SessionWizardErrorBoundary><SessionWizard /></SessionWizardErrorBoundary></ProtectedRoute>} />
-
-          {/* Работа с ИИ */}
-          <Route path="/ai/settings" element={<ProtectedRoute><ErrorBoundary><AISettings /></ErrorBoundary></ProtectedRoute>} />
-          <Route path="/ai/tts" element={<ProtectedRoute><ErrorBoundary><TTSSettings /></ErrorBoundary></ProtectedRoute>} />
-          <Route path="/ai/playground" element={<ProtectedRoute><ErrorBoundary><Playground /></ErrorBoundary></ProtectedRoute>} />
-          <Route path="/ai/images" element={<ProtectedRoute><ErrorBoundary><ImageGeneration /></ErrorBoundary></ProtectedRoute>} />
-          <Route path="/ai/cities" element={<ProtectedRoute><ErrorBoundary><CityGeneration /></ErrorBoundary></ProtectedRoute>} />
-          <Route path="/ai/events" element={<Navigate to="/generation" replace />} />
-
-          {/* Задачи генерации */}
-          <Route path="/tasks" element={<ProtectedRoute><ErrorBoundary><MyTasks /></ErrorBoundary></ProtectedRoute>} />
-
-          {/* Справочники */}
-          <Route path="/catalog" element={<ProtectedRoute><ErrorBoundary><CatalogHome /></ErrorBoundary></ProtectedRoute>} />
-          <Route path="/catalog/cities" element={<ProtectedRoute><ErrorBoundary><CitiesCatalog /></ErrorBoundary></ProtectedRoute>} />
-          <Route path="/catalog/events" element={<ProtectedRoute><ErrorBoundary><EventsCatalog /></ErrorBoundary></ProtectedRoute>} />
-          <Route path="/catalog/ticket-types" element={<ProtectedRoute><ErrorBoundary><TicketTypesCatalog /></ErrorBoundary></ProtectedRoute>} />
-          <Route path="/catalog/slot-availabilities" element={<ProtectedRoute><ErrorBoundary><SlotAvailabilitiesCatalog /></ErrorBoundary></ProtectedRoute>} />
-          <Route path="/catalog/ticket-prices" element={<ProtectedRoute><ErrorBoundary><TicketPricesCatalog /></ErrorBoundary></ProtectedRoute>} />
-          <Route path="/catalog/booking-setup" element={<ProtectedRoute><ErrorBoundary><BookingSetupWorkbench /></ErrorBoundary></ProtectedRoute>} />
-          <Route path="/catalog/reservations" element={<ProtectedRoute><ErrorBoundary><BookingReservationsCatalog /></ErrorBoundary></ProtectedRoute>} />
-          <Route path="/catalog/base-prices" element={<ProtectedRoute><ErrorBoundary><BasePricesCatalog /></ErrorBoundary></ProtectedRoute>} />
-          <Route path="/catalog/pricing-rules" element={<ProtectedRoute><ErrorBoundary><PricingRulesCatalog /></ErrorBoundary></ProtectedRoute>} />
-          <Route path="/catalog/analytics" element={<ProtectedRoute><ErrorBoundary><BookingAnalytics /></ErrorBoundary></ProtectedRoute>} />
-          <Route path="/catalog/audio-guides" element={<ProtectedRoute><ErrorBoundary><AudioGuidesCatalog /></ErrorBoundary></ProtectedRoute>} />
-          <Route path="/catalog/interactive-locations" element={<ProtectedRoute><ErrorBoundary><InteractiveLocationsCatalog /></ErrorBoundary></ProtectedRoute>} />
-          <Route path="/catalog/subscription-types" element={<ProtectedRoute><ErrorBoundary><SubscriptionTypesCatalog /></ErrorBoundary></ProtectedRoute>} />
-          <Route path="/catalog/activation-codes" element={<ProtectedRoute><ErrorBoundary><ActivationCodesCatalog /></ErrorBoundary></ProtectedRoute>} />
-          <Route path="/catalog/photos" element={<ProtectedRoute><ErrorBoundary><PhotosCatalog /></ErrorBoundary></ProtectedRoute>} />
-          <Route path="/catalog/tags" element={<ProtectedRoute><ErrorBoundary><TagsFilters /></ErrorBoundary></ProtectedRoute>} />
-
-          {/* Экспорт / Импорт */}
-          <Route path="/export/zip" element={<ProtectedRoute><ErrorBoundary><ExportZip /></ErrorBoundary></ProtectedRoute>} />
-          <Route path="/export/cities" element={<ProtectedRoute><ErrorBoundary><ExportCities /></ErrorBoundary></ProtectedRoute>} />
-          <Route path="/export/events" element={<ProtectedRoute><ErrorBoundary><ExportEvents /></ErrorBoundary></ProtectedRoute>} />
-          <Route path="/import/google-sheet" element={<ProtectedRoute><ErrorBoundary><ImportGoogleSheet /></ErrorBoundary></ProtectedRoute>} />
-
-          {/* 404 */}
-          <Route path="*" element={<NotFound />} />
-        </Routes>
-      </BrowserRouter>
-    </LayoutActionsProvider>
+      <LayoutActionsProvider>
+        <RouterProvider router={router} />
+      </LayoutActionsProvider>
     </ErrorBoundary>
   );
 }

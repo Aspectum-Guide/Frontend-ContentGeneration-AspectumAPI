@@ -96,43 +96,14 @@ function hydratePriceByType(types, basePrices, slotPrices, prev, editedIds, defa
   return next;
 }
 
-const DEFAULT_EVENT_TICKET_TYPES = [
-  { code: 'adult', name_ru: 'Взрослый', sort_order: 0 },
-  { code: 'child', name_ru: 'Детский', sort_order: 10 },
-];
-
-/** Все глобальные типы из каталога (event = null). */
-async function fetchGlobalTicketTypes() {
+/** Типы, применимые к событию: глобальные + событийные + привязанные к слотам (API ?event=). */
+async function fetchTicketTypesForEvent(evId) {
   const r = await ticketTypesAPI.list({
+    event: evId,
     page_size: 1000,
     ordering: 'sort_order',
-    is_active: 'true',
   });
-  return normalizeListResponse(r?.data, ['results', 'data']).filter(
-    (tt) => !resolveTicketTypeEventId(tt),
-  );
-}
-
-/** Создаёт adult/child в глобальном каталоге, если он пуст. */
-async function ensureGlobalTicketCatalog() {
-  const existing = await fetchGlobalTicketTypes();
-  if (existing.length) return existing;
-
-  for (const item of DEFAULT_EVENT_TICKET_TYPES) {
-    try {
-      await ticketTypesAPI.create({
-        code: item.code,
-        name: { ru: item.name_ru },
-        description: {},
-        sort_order: item.sort_order,
-        is_active: true,
-      });
-    } catch (err) {
-      const msg = parseApiError(err, '').toLowerCase();
-      if (!msg.includes('code') && !msg.includes('unique')) throw err;
-    }
-  }
-  return fetchGlobalTicketTypes();
+  return normalizeListResponse(r?.data, ['results', 'data']);
 }
 
 function extractCityMeta(eventItem) {
@@ -564,7 +535,6 @@ export default function BookingSetupWorkbenchPage() {
   const [syncSlotsSaving, setSyncSlotsSaving] = useState(false);
   const [syncSlotsError, setSyncSlotsError] = useState('');
   const [syncSlotsOk, setSyncSlotsOk] = useState('');
-  const autoForcePurgeRef = useRef(new Set());
 
   const [basePrices, setBasePrices] = useState([]);
   const [basePricesLoading, setBasePricesLoading] = useState(false);
@@ -576,10 +546,7 @@ export default function BookingSetupWorkbenchPage() {
     setTtLoading(true);
     setTtLoadError('');
     try {
-      let list = await fetchGlobalTicketTypes();
-      if (!list.length) {
-        list = await ensureGlobalTicketCatalog();
-      }
+      const list = await fetchTicketTypesForEvent(evId);
       setTicketTypes(list);
     } catch (err) {
       setTicketTypes([]);
@@ -719,16 +686,6 @@ export default function BookingSetupWorkbenchPage() {
 
   const loadAll = useCallback(async (evId) => {
     if (!evId) return;
-    const evKey = String(evId);
-    if (!autoForcePurgeRef.current.has(evKey)) {
-      autoForcePurgeRef.current.add(evKey);
-      try {
-        await ticketTypesForceAPI.purgeEventTicketTypes(evId);
-      } catch (e) {
-        autoForcePurgeRef.current.delete(evKey);
-        console.warn('[booking-setup] auto force purge failed', e);
-      }
-    }
     await Promise.all([
       loadTicketTypes(evId),
       loadSlots(evId),
@@ -1077,6 +1034,7 @@ export default function BookingSetupWorkbenchPage() {
     allActiveSlots,
   ]);
 
+
   const handleCreateTt = async (e) => {
     e.preventDefault();
     setTtError(''); setTtOk('');
@@ -1086,6 +1044,7 @@ export default function BookingSetupWorkbenchPage() {
     try {
       setTtSaving(true);
       const createRes = await ticketTypesAPI.create({
+        event: null,
         code,
         name: nameRu ? { ru: nameRu } : {},
         sort_order: Number(ttForm.sort_order || 0),
@@ -1591,7 +1550,7 @@ export default function BookingSetupWorkbenchPage() {
                   ))}
                   {!eventTicketTypes.length && (
                     <p className="text-sm text-gray-400">
-                      В глобальном каталоге нет типов — создайте вручную или обновите страницу (adult/child создаются автоматически).
+                      Типы не найдены для этого события. Если раньше был авто-purge — проверьте глобальный каталог в админке или создайте тип вручную.
                     </p>
                   )}
                 </div>

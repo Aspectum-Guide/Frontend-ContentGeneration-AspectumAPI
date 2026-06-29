@@ -69,7 +69,7 @@ export const eventSlotPricingAPI = {
 export const ticketTypesForceAPI = {
   /**
    * POST /api/v1/booking/force-purge-event-ticket-types/
-   * Radical: rebind reservations/slot ticket_types to global by `code`, then delete TicketType.event=<event>.
+   * Только вручную: rebind + удаление event-owned TicketType.
    */
   purgeEventTicketTypes: (eventId) =>
     apiClient.post('/booking/force-purge-event-ticket-types/', { event: eventId }),

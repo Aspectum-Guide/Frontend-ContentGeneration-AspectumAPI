@@ -118,6 +118,7 @@ export default function Layout({ children, pageHeader = null, pageHeaderMode = '
       title: 'Букинг',
       items: [
         { label: 'Настройка продаж', to: '/catalog/booking-setup' },
+        { label: 'Справочники', to: '/catalog/booking' },
         { label: 'Аналитика', to: '/catalog/analytics' },
         { label: 'Резервации', to: '/catalog/reservations' },
       ],
@@ -161,6 +162,8 @@ export default function Layout({ children, pageHeader = null, pageHeaderMode = '
     { startsWith: '/catalog/pricing-rules', title: 'Правила ценообразования' },
     { startsWith: '/catalog/analytics', title: 'Аналитика бронирований' },
     { startsWith: '/catalog/booking-setup', title: 'Booking Setup (мастер)' },
+    { startsWith: '/catalog/booking', title: 'Справочники букинга' },
+    { startsWith: '/catalog/reservations', title: 'Резервации' },
     { startsWith: '/catalog/subscription-types', title: 'Справочник типов подписки' },
     { startsWith: '/catalog/activation-codes', title: 'Справочник кодов активации' },
     { startsWith: '/catalog/audio-guides', title: 'Аудиогиды' },
