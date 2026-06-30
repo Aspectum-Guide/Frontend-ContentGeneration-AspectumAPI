@@ -502,6 +502,7 @@ export function useSessionWizardController({
       await attractionsStep.saveCurrentAttrIfDirty({ silent: true });
       await cityStep.saveCurrentCityInfoIfDirty?.({ silent: true });
       await attractionsStep.saveCurrentAttractionFeedItemIfDirty?.({ silent: true });
+      await attractionsStep.saveCurrentAttractionInfoIfDirty?.({ silent: true });
       await audioGuides.saveCurrentAttractionAudioGuideIfDirty?.({ silent: true });
     };
   }, [
@@ -509,6 +510,7 @@ export function useSessionWizardController({
     attractionsStep.saveCurrentAttrIfDirty,
     cityStep.saveCurrentCityInfoIfDirty,
     attractionsStep.saveCurrentAttractionFeedItemIfDirty,
+    attractionsStep.saveCurrentAttractionInfoIfDirty,
     audioGuides.saveCurrentAttractionAudioGuideIfDirty,
   ]);
 

@@ -1380,6 +1380,7 @@ export default function SessionWizard({ components = {} } = {}) {
             interactiveLocations={interactiveLocations}
             attractionInfos={attractionInfos}
             attractionFeedItems={attractionFeedItems}
+            attractionAudioGuides={attractionAudioGuides}
             cityTags={cityTags}
             translating={translating}
             publishing={publishing}

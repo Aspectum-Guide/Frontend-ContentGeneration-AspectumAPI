@@ -13,6 +13,7 @@ export default function SessionWizardPublishStep({
   interactiveLocations = [],
   attractionInfos = [],
   attractionFeedItems = [],
+  attractionAudioGuides = [],
   cityTags = [],
 
   translating,
@@ -32,6 +33,7 @@ export default function SessionWizardPublishStep({
   const hasInteractiveLocations = interactiveLocations.length > 0;
   const hasAttractionInfos = attractionInfos.length > 0;
   const hasAttractionFeedItems = attractionFeedItems.length > 0;
+  const hasAttractionAudioGuides = attractionAudioGuides.length > 0;
   const hasTags = cityTags.length > 0;
 
   const hasAnythingToPublish =
@@ -41,6 +43,7 @@ export default function SessionWizardPublishStep({
     hasInteractiveLocations ||
     hasAttractionInfos ||
     hasAttractionFeedItems ||
+    hasAttractionAudioGuides ||
     hasTags;
 
   const imageFeedItemsCount = attractionFeedItems.filter(

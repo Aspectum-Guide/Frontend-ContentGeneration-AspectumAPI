@@ -580,6 +580,29 @@ function buildAttractionFeedPersistSnapshot(item, attractionFeedLocaleData) {
   );
 }
 
+function collectAttractionInfoLocaleTexts(attractionInfoLocaleData) {
+  const name = {};
+  const description = {};
+
+  Object.values(attractionInfoLocaleData || {}).forEach((d) => {
+    if (!d?.lang) return;
+    name[d.lang] = d.name || '';
+    description[d.lang] = d.description || '';
+  });
+
+  return { name, description };
+}
+
+function buildAttractionInfoPersistSnapshot(info, attractionInfoLocaleData) {
+  if (!info?.id) return null;
+
+  const { name, description } = collectAttractionInfoLocaleTexts(attractionInfoLocaleData);
+
+  return JSON.stringify(
+    buildAttractionInfoPayload(normalizeAttractionInfo(info), name, description),
+  );
+}
+
 const getLocaleLang = (localeKey) => {
   const locale = DEFAULT_LOCALE_DEFS.find((item) => item.key === localeKey);
 
@@ -633,6 +656,9 @@ export function useAttractionsStep(ctx) {
   const [currentAttractionInfo, setCurrentAttractionInfo] = useState(null);
   const [attractionInfoActiveLocale, setAttractionInfoActiveLocale] = useState('ru-RU');
   const [attractionInfoSaving, setAttractionInfoSaving] = useState(false);
+  const attractionInfoSavedSnapshotRef = useRef(null);
+  const currentAttractionInfoIdRef = useRef(null);
+  const attractionInfoSavingRef = useRef(false);
 
   // ─── Attraction feed state ─────────────────────────────────────────────────
   const [attractionFeedItems, setAttractionFeedItems] = useState([]);
@@ -1512,6 +1538,24 @@ export function useAttractionsStep(ctx) {
     attractionInfoActiveLocale,
   ]);
 
+  useEffect(() => {
+    const id = normalizeId(currentAttractionInfo?.id);
+
+    if (!id) {
+      currentAttractionInfoIdRef.current = null;
+      attractionInfoSavedSnapshotRef.current = null;
+      return;
+    }
+
+    if (currentAttractionInfoIdRef.current !== id) {
+      currentAttractionInfoIdRef.current = id;
+      attractionInfoSavedSnapshotRef.current = buildAttractionInfoPersistSnapshot(
+        currentAttractionInfo,
+        attractionInfoLocaleData,
+      );
+    }
+  }, [currentAttractionInfo, attractionInfoLocaleData]);
+
   // ─── getAttractionInfoName ─────────────────────────────────────────────────
   const getAttractionInfoName = useCallback((info) => {
     const name = info?.name || {};
@@ -1642,8 +1686,8 @@ export function useAttractionsStep(ctx) {
   ]);
 
   // ─── saveCurrentAttractionInfo ─────────────────────────────────────────────
-  const saveCurrentAttractionInfo = useCallback(async () => {
-    if (!currentAttractionInfo) return;
+  const saveCurrentAttractionInfo = useCallback(async ({ silent = false } = {}) => {
+    if (!currentAttractionInfo) return null;
 
     const assignedType = currentAttractionInfo.assigned_attraction_type ?? 'none';
 
@@ -1660,27 +1704,26 @@ export function useAttractionsStep(ctx) {
       null;
 
     if (assignedType === 'database' && !eventId) {
-      showNote('Выберите достопримечательность из базы', 'error');
-      return;
+      const message = 'Выберите достопримечательность из базы';
+      if (!silent) {
+        showNote(message, 'error');
+      }
+      throw new Error(message);
     }
 
     if (assignedType === 'draft' && !sessionAttractionId) {
-      showNote('Выберите достопримечательность из сессии', 'error');
-      return;
+      const message = 'Выберите достопримечательность из сессии';
+      if (!silent) {
+        showNote(message, 'error');
+      }
+      throw new Error(message);
     }
 
+    attractionInfoSavingRef.current = true;
     setAttractionInfoSaving(true);
 
     try {
-      const name = {};
-      const description = {};
-
-      Object.values(attractionInfoLocaleData).forEach((d) => {
-        if (d.name || d.description) {
-          name[d.lang] = d.name || '';
-          description[d.lang] = d.description || '';
-        }
-      });
+      const { name, description } = collectAttractionInfoLocaleTexts(attractionInfoLocaleData);
 
       const res = await attractionInfosAPI.update(
         sessionId,
@@ -1708,13 +1751,26 @@ export function useAttractionsStep(ctx) {
 
       setCurrentAttractionInfo(updatedInfo);
 
-      showNote('Полезная информация о достопримечательности сохранена', 'success');
-    } catch (e) {
-      showNote(
-        'Ошибка при сохранении полезной информации: ' + parseApiError(e),
-        'error'
+      attractionInfoSavedSnapshotRef.current = buildAttractionInfoPersistSnapshot(
+        updatedInfo,
+        attractionInfoLocaleData,
       );
+
+      if (!silent) {
+        showNote('Полезная информация о достопримечательности сохранена', 'success');
+      }
+
+      return updatedInfo;
+    } catch (e) {
+      if (!silent) {
+        showNote(
+          'Ошибка при сохранении полезной информации: ' + parseApiError(e),
+          'error'
+        );
+      }
+      throw e;
     } finally {
+      attractionInfoSavingRef.current = false;
       setAttractionInfoSaving(false);
     }
   }, [
@@ -1723,6 +1779,29 @@ export function useAttractionsStep(ctx) {
     attractionInfoLocaleData,
     showNote,
   ]);
+
+  const isCurrentAttractionInfoDirty = useCallback(() => {
+    if (!currentAttractionInfo?.id) return false;
+
+    const snap = buildAttractionInfoPersistSnapshot(
+      currentAttractionInfo,
+      attractionInfoLocaleData,
+    );
+
+    return snap !== attractionInfoSavedSnapshotRef.current;
+  }, [currentAttractionInfo, attractionInfoLocaleData]);
+
+  const saveCurrentAttractionInfoIfDirty = useCallback(
+    async (options = {}) => {
+      if (!currentAttractionInfo?.id || !isCurrentAttractionInfoDirty()) {
+        return true;
+      }
+
+      await saveCurrentAttractionInfo(options);
+      return true;
+    },
+    [currentAttractionInfo, isCurrentAttractionInfoDirty, saveCurrentAttractionInfo],
+  );
 
   // ─── deleteCurrentAttractionInfo ───────────────────────────────────────────
   const deleteCurrentAttractionInfo = useCallback(async () => {
@@ -2964,6 +3043,8 @@ export function useAttractionsStep(ctx) {
     updateCurrentAttractionInfoPatch,
     updateAttractionInfoLocaleField,
     saveCurrentAttractionInfo,
+    saveCurrentAttractionInfoIfDirty,
+    isCurrentAttractionInfoDirty,
     getAttractionInfoName,
 
     addAttractionFeedItem,

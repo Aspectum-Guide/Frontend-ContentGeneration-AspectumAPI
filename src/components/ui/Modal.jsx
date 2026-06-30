@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import ModalPortal from './ModalPortal';
 
 /**
  * Универсальный модальный диалог.
@@ -8,7 +9,7 @@ import { useEffect, useState } from 'react';
  *   onClose   — () => void
  *   title     — string
  *   children  — ReactNode
- *   size      — 'sm' | 'md' | 'lg' | 'xl'  (default 'md')
+ *   size      — 'sm' | 'md' | 'ml' | 'lg' | 'xl'  (default 'md')
  *   footer    — ReactNode  (если задан — рендерится под children)
  */
 export default function Modal({ open, onClose, title, children, size = 'md', footer, priority = false }) {
@@ -24,23 +25,16 @@ export default function Modal({ open, onClose, title, children, size = 'md', foo
   const maxW = {
     sm: 'max-w-sm',
     md: 'max-w-lg',
+    ml: 'max-w-xl',
     lg: 'max-w-2xl',
     xl: 'max-w-4xl',
   }[size] || 'max-w-lg';
 
-  const overlayZ = priority ? 'z-[110]' : 'z-50';
+  const overlayZ = priority ? 110 : 100;
 
   return (
-    <div className={`fixed inset-0 ${overlayZ} flex items-center justify-center p-4`}>
-      {/* Overlay */}
-      <div
-        className="absolute inset-0 bg-black/40 backdrop-blur-sm"
-        onClick={onClose}
-      />
-
-      {/* Dialog */}
-      <div className={`relative w-full ${maxW} bg-white rounded-2xl shadow-2xl flex flex-col max-h-[90vh]`}>
-        {/* Header */}
+    <ModalPortal open={open} onClose={onClose} zIndex={overlayZ}>
+      <div className={`relative w-full ${maxW} mx-auto bg-white rounded-2xl shadow-2xl flex flex-col max-h-[min(90dvh,90vh)] min-w-0`}>
         {(title || onClose) && (
           <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 shrink-0">
             {title && (
@@ -59,33 +53,20 @@ export default function Modal({ open, onClose, title, children, size = 'md', foo
           </div>
         )}
 
-        {/* Body */}
-        <div className="flex-1 overflow-y-auto px-6 py-4">{children}</div>
+        <div className="flex-1 overflow-y-auto overflow-x-hidden px-6 py-4 min-w-0">{children}</div>
 
-        {/* Footer */}
         {footer && (
           <div className="shrink-0 px-6 py-4 border-t border-gray-100 bg-gray-50 rounded-b-2xl flex gap-3">
             {footer}
           </div>
         )}
       </div>
-    </div>
+    </ModalPortal>
   );
 }
 
 /**
  * Диалог подтверждения.
- *
- * Props:
- *   open      — boolean
- *   onClose   — () => void
- *   onConfirm — () => void | Promise<void>
- *   title     — string
- *   message   — string | ReactNode
- *   confirmLabel  — string  (default 'Подтвердить')
- *   cancelLabel   — string  (default 'Отмена')
- *   danger    — boolean  (красная кнопка подтверждения)
- *   loading   — boolean
  */
 export function ConfirmModal({
   open,

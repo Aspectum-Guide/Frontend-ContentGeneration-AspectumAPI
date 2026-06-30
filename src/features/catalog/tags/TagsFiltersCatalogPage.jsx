@@ -501,7 +501,7 @@ function FilterTab({
         open={!!editingFilter}
         onClose={closeEditModal}
         title="Редактировать фильтр"
-        size="md"
+        size="lg"
       >
         {editingFilter && (
           <form onSubmit={handleSave} className="space-y-4">

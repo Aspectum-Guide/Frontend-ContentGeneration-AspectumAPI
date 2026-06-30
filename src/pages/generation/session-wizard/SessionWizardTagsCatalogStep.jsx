@@ -1,4 +1,14 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { appLanguagesAPI } from '../../../api/generation';
+import MultiLangInput from '../../../components/forms/MultiLangInput';
+import ModalPortal from '../../../components/ui/ModalPortal';
+import {
+  DEFAULT_APP_LANGUAGES,
+  ensureAppLanguages,
+  mapAppLanguagesForMultiLangInput,
+  parseAppLanguagesResponse,
+} from '../../../features/catalog/shared/normalize';
+import { getMultiLangValue } from '../../../features/catalog/shared/i18n';
 import { normalizeId } from './sessionWizardShared.jsx';
 
 const transliterateRu = (value) => {
@@ -141,8 +151,16 @@ function resolveParentIdFromNode(node) {
 }
 
 function nodeToFormInitial(node, containingFolder = null) {
-  const title = node.title || {};
-  const desc = node.description || {};
+  const title =
+    node.title && typeof node.title === 'object' && !Array.isArray(node.title)
+      ? { ...node.title }
+      : typeof node.title === 'string'
+        ? { ru: node.title }
+        : {};
+  const desc =
+    node.description && typeof node.description === 'object' && !Array.isArray(node.description)
+      ? { ...node.description }
+      : {};
   const nameVal = node.name;
   const name =
     typeof nameVal === 'string'
@@ -158,10 +176,8 @@ function nodeToFormInitial(node, containingFolder = null) {
 
   return {
     name: name || node.slug || '',
-    titleRu: typeof title === 'object' ? title.ru || '' : '',
-    titleEn: typeof title === 'object' ? title.en || '' : '',
-    descriptionRu: typeof desc === 'object' ? desc.ru || '' : '',
-    descriptionEn: typeof desc === 'object' ? desc.en || '' : '',
+    title,
+    description: desc,
     index: node.index ?? 0,
     isShow: node.is_show !== false,
     picId: node.pic_id ?? node.picId ?? null,
@@ -180,6 +196,8 @@ function CityFilterForm({
   folderOptions = [],
   flatCatalog = false,
   pendingScope = 'filter-form',
+  appLanguages = DEFAULT_APP_LANGUAGES,
+  multiLangLanguages = [],
   onCreateCityFilterFolder,
   onCreateCityFilterTag,
   onCreateCityTag,
@@ -203,10 +221,8 @@ function CityFilterForm({
 
   const emptyForm = {
     name: '',
-    titleRu: '',
-    titleEn: '',
-    descriptionRu: '',
-    descriptionEn: '',
+    title: {},
+    description: {},
     index: 0,
     isShow: true,
     picId: null,
@@ -217,7 +233,7 @@ function CityFilterForm({
 
   const [quickTitle, setQuickTitle] = useState(() => {
     if (initialValue) {
-      return initialValue.titleRu || '';
+      return getMultiLangValue(initialValue.title) || '';
     }
     return '';
   });
@@ -229,10 +245,9 @@ function CityFilterForm({
       const i = initialValue;
       return {
         name: i.name ?? '',
-        titleRu: i.titleRu ?? '',
-        titleEn: i.titleEn ?? '',
-        descriptionRu: i.descriptionRu ?? '',
-        descriptionEn: i.descriptionEn ?? '',
+        title: i.title && typeof i.title === 'object' ? { ...i.title } : {},
+        description:
+          i.description && typeof i.description === 'object' ? { ...i.description } : {},
         index: i.index ?? 0,
         isShow: i.isShow !== false,
         picId: i.picId ?? null,
@@ -259,26 +274,43 @@ function CityFilterForm({
     setAdvancedOpen(true);
     setForm((prev) => ({
       ...prev,
-      titleRu: prev.titleRu.trim() || quickTitle.trim(),
+      title: {
+        ...(prev.title || {}),
+        ru: getMultiLangValue(prev.title) || quickTitle.trim(),
+      },
       name:
         prev.name.trim() ||
         makeUniqueName(quickTitle.trim(), prefix),
     }));
   };
 
+  const buildDescriptionPayload = useCallback((descriptionValue) => {
+    const raw = descriptionValue && typeof descriptionValue === 'object' ? { ...descriptionValue } : {};
+    const emoji = raw.emoji;
+    delete raw.emoji;
+    const text = appLanguages?.length
+      ? ensureAppLanguages(raw, appLanguages)
+      : raw;
+    if (emoji) {
+      text.emoji = emoji;
+    }
+    return text;
+  }, [appLanguages]);
+
   const buildFullPayload = useCallback(() => {
     const fType = form.filterType;
     const prefix = fType === 'folder' ? 'folder' : 'tag';
-    const ruTitle = form.titleRu.trim() || quickTitle.trim();
-    const enTitle = form.titleEn.trim();
-
-    const title = {};
-    if (ruTitle) title.ru = ruTitle;
-    if (enTitle) title.en = enTitle;
-
-    const description = {};
-    if (form.descriptionRu.trim()) description.ru = form.descriptionRu.trim();
-    if (form.descriptionEn.trim()) description.en = form.descriptionEn.trim();
+    const titleSource = {
+      ...(form.title || {}),
+    };
+    if (quickTitle.trim() && !getMultiLangValue(titleSource)) {
+      titleSource.ru = quickTitle.trim();
+    }
+    const title = appLanguages?.length
+      ? ensureAppLanguages(titleSource, appLanguages)
+      : titleSource;
+    const description = buildDescriptionPayload(form.description);
+    const ruTitle = getMultiLangValue(title) || quickTitle.trim();
 
     const name =
       form.name.trim() ||
@@ -305,7 +337,16 @@ function CityFilterForm({
       is_show: Boolean(form.isShow),
       pic_id: form.picId || null,
     };
-  }, [form, quickTitle, isEdit, folderId, initialValue?.parentId, flatCatalog]);
+  }, [
+    form,
+    quickTitle,
+    isEdit,
+    folderId,
+    initialValue?.parentId,
+    flatCatalog,
+    appLanguages,
+    buildDescriptionPayload,
+  ]);
 
   const handleSubmit = async (e) => {
     e?.preventDefault?.();
@@ -370,16 +411,15 @@ function CityFilterForm({
     }
 
     const fType = form.filterType;
-    const ruTitle = form.titleRu.trim() || quickTitle.trim();
-    const enTitle = form.titleEn.trim();
+    const titleText = getMultiLangValue(form.title) || quickTitle.trim();
 
-    if (fType === 'folder' && !ruTitle && !enTitle) {
-      setError('Для папки укажите название хотя бы на RU или EN.');
+    if (fType === 'folder' && !titleText) {
+      setError('Для папки укажите название хотя бы на одном языке.');
       return;
     }
 
-    if (fType === 'tag' && !ruTitle && !enTitle) {
-      setError('Укажите название хотя бы на RU или EN.');
+    if (fType === 'tag' && !titleText) {
+      setError('Укажите название хотя бы на одном языке.');
       return;
     }
 
@@ -474,7 +514,7 @@ function CityFilterForm({
     submitting ? 'Сохранение…' : isEdit ? 'Сохранить' : 'Создать';
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-3 max-h-[85vh] overflow-y-auto">
+    <form onSubmit={handleSubmit} className="space-y-3 max-h-[85vh] overflow-y-auto overflow-x-hidden min-w-0">
       <h3 className="text-base font-semibold text-gray-900">
         {mode === 'create-folder' && 'Новая папка'}
         {mode === 'create-tag' && (flatCatalog ? 'Новый тег города' : 'Новый тег')}
@@ -560,63 +600,30 @@ function CityFilterForm({
             />
           </div>
 
-          <div className="grid grid-cols-2 gap-2">
-            <div>
-              <label className="block text-xs font-medium text-gray-600 mb-0.5">
-                Название RU (title.ru)
-              </label>
-              <input
-                type="text"
-                value={form.titleRu}
-                onChange={(ev) =>
-                  setForm((p) => ({ ...p, titleRu: ev.target.value }))
-                }
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
-              />
-            </div>
-            <div>
-              <label className="block text-xs font-medium text-gray-600 mb-0.5">
-                Название EN (title.en)
-              </label>
-              <input
-                type="text"
-                value={form.titleEn}
-                onChange={(ev) =>
-                  setForm((p) => ({ ...p, titleEn: ev.target.value }))
-                }
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
-              />
-            </div>
-          </div>
+          <MultiLangInput
+            label="Название"
+            required
+            languages={multiLangLanguages}
+            value={form.title || {}}
+            onChange={(title) => setForm((prev) => ({ ...prev, title }))}
+          />
 
-          <div className="grid grid-cols-2 gap-2">
-            <div>
-              <label className="block text-xs font-medium text-gray-600 mb-0.5">
-                Описание RU
-              </label>
-              <textarea
-                value={form.descriptionRu}
-                onChange={(ev) =>
-                  setForm((p) => ({ ...p, descriptionRu: ev.target.value }))
-                }
-                rows={2}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm resize-none"
-              />
-            </div>
-            <div>
-              <label className="block text-xs font-medium text-gray-600 mb-0.5">
-                Описание EN
-              </label>
-              <textarea
-                value={form.descriptionEn}
-                onChange={(ev) =>
-                  setForm((p) => ({ ...p, descriptionEn: ev.target.value }))
-                }
-                rows={2}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm resize-none"
-              />
-            </div>
-          </div>
+          <MultiLangInput
+            label="Описание"
+            languages={multiLangLanguages}
+            value={Object.fromEntries(
+              Object.entries(form.description || {}).filter(([key]) => key !== 'emoji'),
+            )}
+            onChange={(description) =>
+              setForm((prev) => ({
+                ...prev,
+                description: {
+                  ...description,
+                  ...(prev.description?.emoji ? { emoji: prev.description.emoji } : {}),
+                },
+              }))
+            }
+          />
 
           <div className="grid grid-cols-2 gap-2 items-end">
             <div>
@@ -722,7 +729,7 @@ function CityFilterForm({
               <button
                 type="button"
                 onClick={() => {
-                  setQuickTitle(form.titleRu.trim() || quickTitle.trim());
+                  setQuickTitle(getMultiLangValue(form.title) || quickTitle.trim());
                   setAdvancedOpen(false);
                 }}
                 disabled={submitting}
@@ -775,6 +782,29 @@ export default function SessionWizardTagsCatalogStep({
   const [eventQuickTagByFolder, setEventQuickTagByFolder] = useState({});
   const [collapsedFolders, setCollapsedFolders] = useState({});
   const [eventModal, setEventModal] = useState(null);
+
+  const [appLanguages, setAppLanguages] = useState(DEFAULT_APP_LANGUAGES);
+  const multiLangLanguages = useMemo(
+    () => mapAppLanguagesForMultiLangInput(appLanguages),
+    [appLanguages],
+  );
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await appLanguagesAPI.list();
+        if (!cancelled) {
+          setAppLanguages(parseAppLanguagesResponse(res));
+        }
+      } catch (error) {
+        console.error('Failed to load app languages for filter editor', error);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const isCreatingInFolder = (folderId) =>
     creatingTagByFolderId.has(String(folderId));
@@ -1484,16 +1514,9 @@ export default function SessionWizardTagsCatalogStep({
         </button>
       </div>
 
-      {modal ? (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
-          <button
-            type="button"
-            className="absolute inset-0 bg-black/40"
-            aria-label="Закрыть"
-            onClick={closeModal}
-          />
-
-          <div className="relative bg-white rounded-xl shadow-xl border border-gray-200 w-full max-w-lg p-5 max-h-[90vh] overflow-hidden">
+      <ModalPortal open={Boolean(modal)} onClose={closeModal} zIndex={100}>
+        {modal ? (
+          <div className="relative bg-white rounded-xl shadow-xl border border-gray-200 w-full max-w-2xl p-5 max-h-[min(90dvh,90vh)] overflow-hidden min-w-0 mx-auto">
             <CityFilterForm
               key={`${modal.mode}-${modal.filterId}-${modal.flatCatalog ? 'flat' : 'tree'}-${modal.initial?.parentId ?? ''}`}
               mode={modal.mode}
@@ -1504,25 +1527,20 @@ export default function SessionWizardTagsCatalogStep({
               folderOptions={[]}
               flatCatalog={Boolean(modal.flatCatalog)}
               pendingScope="city-modal"
+              appLanguages={appLanguages}
+              multiLangLanguages={multiLangLanguages}
               onCreateCityTag={onCreateCityTag}
               onUpdateCityFilter={onUpdateCityFilter}
               onCancel={closeModal}
               onUploadCityFilterImage={onUploadCityFilterImage}
             />
           </div>
-        </div>
-      ) : null}
+        ) : null}
+      </ModalPortal>
 
-      {eventModal ? (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
-          <button
-            type="button"
-            className="absolute inset-0 bg-black/40"
-            aria-label="Закрыть"
-            onClick={closeEventModal}
-          />
-
-          <div className="relative bg-white rounded-xl shadow-xl border border-gray-200 w-full max-w-lg p-5 max-h-[90vh] overflow-hidden">
+      <ModalPortal open={Boolean(eventModal)} onClose={closeEventModal} zIndex={100}>
+        {eventModal ? (
+          <div className="relative bg-white rounded-xl shadow-xl border border-gray-200 w-full max-w-2xl p-5 max-h-[min(90dvh,90vh)] overflow-hidden min-w-0 mx-auto">
             <CityFilterForm
               key={`event-${eventModal.mode}-${eventModal.filterId}-${eventModal.initial?.parentId ?? ''}`}
               mode={eventModal.mode}
@@ -1532,6 +1550,8 @@ export default function SessionWizardTagsCatalogStep({
               initialValue={eventModal.initial}
               folderOptions={eventFolderOptions}
               flatCatalog={false}
+              appLanguages={appLanguages}
+              multiLangLanguages={multiLangLanguages}
               pendingScope={
                 eventModal.mode === 'create-folder'
                   ? 'event-modal-folder'
@@ -1544,8 +1564,8 @@ export default function SessionWizardTagsCatalogStep({
               onUploadFilterImage={onUploadEventFilterImage}
             />
           </div>
-        </div>
-      ) : null}
+        ) : null}
+      </ModalPortal>
     </div>
   );
 }

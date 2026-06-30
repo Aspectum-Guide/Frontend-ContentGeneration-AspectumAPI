@@ -33,6 +33,7 @@ export default function usePublishStep(ctx) {
     attractionInfos,
     attractionFeedItems,
     attractionAudioGuides,
+    flushDirtyDraftEditorsRef,
   } = ctx;
 
   const [closeOpen, setCloseOpen] = useState(false);
@@ -72,23 +73,8 @@ export default function usePublishStep(ctx) {
         await saveCityForStep1();
       }
 
-      if (currentCityInfo) {
-        await saveCurrentCityInfo();
-      }
-
-      await saveCurrentAttrIfDirty({ silent: true });
-      await saveCurrentIlIfDirty({ silent: true });
-
-      if (currentAttractionInfo) {
-        await saveCurrentAttractionInfo();
-      }
-
-      if (currentAttractionFeedItem) {
-        await saveCurrentAttractionFeedItem();
-      }
-
-      if (currentAttractionAudioGuide) {
-        await saveCurrentAttractionAudioGuide();
+      if (typeof flushDirtyDraftEditorsRef?.current === 'function') {
+        await flushDirtyDraftEditorsRef.current();
       }
 
       const res = await sessionsAPI.publish(sessionId);
@@ -150,16 +136,7 @@ export default function usePublishStep(ctx) {
     defaultLocale,
     localeData,
     saveCityForStep1,
-    currentCityInfo,
-    saveCurrentCityInfo,
-    saveCurrentAttrIfDirty,
-    saveCurrentIlIfDirty,
-    currentAttractionInfo,
-    saveCurrentAttractionInfo,
-    currentAttractionFeedItem,
-    saveCurrentAttractionFeedItem,
-    currentAttractionAudioGuide,
-    saveCurrentAttractionAudioGuide,
+    flushDirtyDraftEditorsRef,
     sessionId,
     loadSession,
     showNote,

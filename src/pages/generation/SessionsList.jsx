@@ -226,6 +226,52 @@ function isGroupFullySelected(group, selectedSet) {
   );
 }
 
+function pruneSelectionToSessions(selection, sessionsList) {
+  if (!selection?.size) return selection;
+
+  const validKeys = new Set();
+  sessionsList.forEach((session) => {
+    const group = { session, allCityRows: buildCityRows(session) };
+    validKeys.add(buildSessionSelectionKey(session.id));
+    getGroupDraftSelectionKeys(group).forEach((key) => validKeys.add(key));
+  });
+
+  const next = new Set();
+  let changed = false;
+
+  selection.forEach((key) => {
+    if (validKeys.has(key)) {
+      next.add(key);
+    } else {
+      changed = true;
+    }
+  });
+
+  return changed ? next : selection;
+}
+
+function removeDeletedItemsFromSelection(selection, { sessionId, cityDraftId, type }) {
+  if (!selection?.size) return selection;
+
+  const next = new Set(selection);
+  const normalizedSessionId = String(sessionId);
+
+  if (type === 'draft' && cityDraftId) {
+    next.delete(buildDraftSelectionKey(normalizedSessionId, cityDraftId));
+    next.delete(buildSessionSelectionKey(normalizedSessionId));
+    return next;
+  }
+
+  selection.forEach((key) => {
+    const parsed = parseSelectionKey(key);
+    if (parsed?.sessionId === normalizedSessionId) {
+      next.delete(key);
+    }
+  });
+
+  return next;
+}
+
 export default function SessionsList({ components = {} } = {}) {
   const StatusBadge = components.StatusBadge ?? DefaultStatusBadge;
   const ToastComp = components.Toast ?? DefaultToast;
@@ -270,6 +316,10 @@ export default function SessionsList({ components = {} } = {}) {
 
   const [selected, setSelected] = useState(new Set());
   const [bulkDeleting, setBulkDeleting] = useState(false);
+
+  useEffect(() => {
+    setSelected((prev) => pruneSelectionToSessions(prev, sessions));
+  }, [sessions]);
 
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [deleting, setDeleting] = useState(false);
@@ -371,6 +421,11 @@ export default function SessionsList({ components = {} } = {}) {
       }
 
       setDeleteTarget(null);
+      setSelected((prev) => removeDeletedItemsFromSelection(prev, {
+        sessionId: session.id,
+        cityDraftId: row?.cityDraftId,
+        type: isDraftDelete ? 'draft' : 'session',
+      }));
       await invalidateSessions();
     } catch (err) {
       showNote(
@@ -465,6 +520,7 @@ export default function SessionsList({ components = {} } = {}) {
     }
 
     setBulkDeleting(false);
+    setSelected(new Set());
 
     if (failed) {
       showNote(`Удалено с ошибками: ${failed} элементов не удалось`, 'error');
