@@ -1,6 +1,6 @@
 import 'leaflet/dist/leaflet.css';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { ilCatalogAPI } from '../../../api/generation';
+import { ilCatalogAPI, imagesAPI } from '../../../api/generation';
 import Layout from '../../../components/Layout';
 import DataTable from '../../../components/ui/DataTable';
 import { Field, TextInput } from '../../../components/ui/FormField';
@@ -19,10 +19,14 @@ function ILEditorModal({ open, onClose, location, onSaved, cityOptions }) {
   const isNew = !location?.id;
 
   const [activeLang, setActiveLang] = useState('ru');
-  const [form, setForm] = useState({ title: {}, description: {}, lat: '', lon: '', index: 0, is_show: true, city_id: '' });
+  const [form, setForm] = useState({ title: {}, description: {}, lat: '', lon: '', index: 0, is_show: true, city_id: '', image_id: null, image_url: null, icon_id: null, icon_url: null });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [activeTab, setActiveTab] = useState('content');
+  const [imageUploading, setImageUploading] = useState(false);
+  const [iconUploading, setIconUploading] = useState(false);
+  const imageInputRef = useRef(null);
+  const iconInputRef = useRef(null);
 
   const mapElRef = useRef(null);
   const mapRef = useRef(null);
@@ -32,7 +36,7 @@ function ILEditorModal({ open, onClose, location, onSaved, cityOptions }) {
   useEffect(() => {
     if (!open) return;
     if (isNew) {
-      setForm({ title: {}, description: {}, lat: '', lon: '', index: 0, is_show: true, city_id: '' });
+      setForm({ title: {}, description: {}, lat: '', lon: '', index: 0, is_show: true, city_id: '', image_id: null, image_url: null, icon_id: null, icon_url: null });
     } else {
       setForm({
         title: location.title || {},
@@ -42,6 +46,10 @@ function ILEditorModal({ open, onClose, location, onSaved, cityOptions }) {
         index: location.index ?? 0,
         is_show: location.is_show ?? true,
         city_id: location.city_id ? String(location.city_id) : '',
+        image_id: location.image_id || null,
+        image_url: location.image_url || null,
+        icon_id: location.icon_id || null,
+        icon_url: location.icon_url || null,
       });
     }
     setError('');
@@ -99,18 +107,44 @@ function ILEditorModal({ open, onClose, location, onSaved, cityOptions }) {
     map.setView([lat, lon], Math.max(map.getZoom(), 13));
   }, [form.lat, form.lon, activeTab]);
 
-  // Reset map on close
+  // Reset map and upload state on close
   useEffect(() => {
     if (!open) {
       mapRef.current?.remove();
       mapRef.current = null;
       markerRef.current = null;
+      setImageUploading(false);
+      setIconUploading(false);
     }
   }, [open]);
 
   const langOptions = buildLangOptions(Object.keys(form.title || {}).filter(Boolean).length
     ? Object.keys(form.title)
     : ALL_LANGS.slice(0, 2));
+
+  const handleImageUpload = async (e, kind) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    e.target.value = '';
+    kind === 'icon' ? setIconUploading(true) : setImageUploading(true);
+    try {
+      const fd = new FormData();
+      fd.append('file', file);
+      const r = await imagesAPI.upload(fd);
+      const { id, url } = r?.data || {};
+      if (id) {
+        if (kind === 'icon') {
+          setForm((p) => ({ ...p, icon_id: id, icon_url: url || null }));
+        } else {
+          setForm((p) => ({ ...p, image_id: id, image_url: url || null }));
+        }
+      }
+    } catch (err) {
+      setError('Ошибка загрузки: ' + parseApiError(err, 'Ошибка'));
+    } finally {
+      kind === 'icon' ? setIconUploading(false) : setImageUploading(false);
+    }
+  };
 
   const handleSave = async (e) => {
     e.preventDefault();
@@ -127,7 +161,9 @@ function ILEditorModal({ open, onClose, location, onSaved, cityOptions }) {
         lon: parseCoord(form.lon),
         index: Number(form.index || 0),
         is_show: form.is_show,
-        ...(form.city_id ? { city_id: form.city_id } : {}),
+        city_id: form.city_id || null,
+        image_id: form.image_id || null,
+        icon_id: form.icon_id || null,
       };
       if (isNew) {
         await ilCatalogAPI.create(payload);
@@ -146,6 +182,7 @@ function ILEditorModal({ open, onClose, location, onSaved, cityOptions }) {
     { key: 'content', label: 'Контент' },
     { key: 'map', label: 'Карта' },
     { key: 'settings', label: 'Настройки' },
+    { key: 'media', label: 'Медиа' },
   ];
 
   return (
@@ -253,6 +290,61 @@ function ILEditorModal({ open, onClose, location, onSaved, cityOptions }) {
               />
               <span className="text-sm text-gray-700">Показывать в приложении</span>
             </label>
+          </div>
+        )}
+
+        {activeTab === 'media' && (
+          <div className="space-y-5">
+            <div>
+              <p className="text-sm font-medium text-gray-700 mb-2">Иконка (маркер на карте)</p>
+              <div className="flex items-start gap-4">
+                <div className="w-16 h-16 rounded-xl border border-gray-200 bg-gray-50 flex items-center justify-center shrink-0 overflow-hidden">
+                  {form.icon_url
+                    ? <img src={form.icon_url} alt="" className="w-full h-full object-contain" />
+                    : <span className="text-2xl">📍</span>
+                  }
+                </div>
+                <div className="flex flex-col gap-2">
+                  <input ref={iconInputRef} type="file" accept="image/*" className="hidden" onChange={(e) => handleImageUpload(e, 'icon')} />
+                  <button type="button" onClick={() => iconInputRef.current?.click()} disabled={iconUploading}
+                    className="px-3 py-1.5 text-sm text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 disabled:opacity-50 transition-colors">
+                    {iconUploading ? 'Загрузка…' : 'Загрузить иконку'}
+                  </button>
+                  {form.icon_id && (
+                    <button type="button" onClick={() => setForm((p) => ({ ...p, icon_id: null, icon_url: null }))}
+                      className="px-3 py-1.5 text-sm text-red-600 bg-red-50 rounded-lg hover:bg-red-100 transition-colors">
+                      Удалить иконку
+                    </button>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            <div>
+              <p className="text-sm font-medium text-gray-700 mb-2">Изображение (обложка)</p>
+              <div className="space-y-2">
+                {form.image_url
+                  ? (
+                    <div className="relative w-full h-40 rounded-xl border border-gray-200 bg-gray-100 overflow-hidden">
+                      <img src={form.image_url} alt="" className="w-full h-full object-cover" />
+                      <button type="button" onClick={() => setForm((p) => ({ ...p, image_id: null, image_url: null }))}
+                        className="absolute top-2 right-2 w-7 h-7 bg-black/60 text-white rounded-full text-sm flex items-center justify-center hover:bg-black/80">
+                        ×
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="w-full h-40 rounded-xl border border-dashed border-gray-300 bg-gray-50 flex items-center justify-center text-sm text-gray-400">
+                      Изображение не выбрано
+                    </div>
+                  )
+                }
+                <input ref={imageInputRef} type="file" accept="image/*" className="hidden" onChange={(e) => handleImageUpload(e, 'image')} />
+                <button type="button" onClick={() => imageInputRef.current?.click()} disabled={imageUploading}
+                  className="px-3 py-1.5 text-sm text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 disabled:opacity-50 transition-colors">
+                  {imageUploading ? 'Загрузка…' : 'Загрузить изображение'}
+                </button>
+              </div>
+            </div>
           </div>
         )}
 
@@ -380,9 +472,11 @@ export default function InteractiveLocationsCatalogPage() {
       label: 'Название',
       render: (v, row) => (
         <div className="flex items-center gap-3">
-          {row.image_url
-            ? <img src={row.image_url} alt="" className="w-10 h-10 rounded-lg object-cover shrink-0" />
-            : <div className="w-10 h-10 rounded-lg bg-gray-100 flex items-center justify-center text-gray-300 shrink-0 text-lg">📍</div>
+          {row.icon_url
+            ? <img src={row.icon_url} alt="" className="w-10 h-10 rounded-lg object-contain shrink-0 bg-gray-50 border border-gray-100 p-1" />
+            : row.image_url
+              ? <img src={row.image_url} alt="" className="w-10 h-10 rounded-lg object-cover shrink-0" />
+              : <div className="w-10 h-10 rounded-lg bg-gray-100 flex items-center justify-center text-gray-300 shrink-0 text-lg">📍</div>
           }
           <div className="min-w-0">
             <p className="text-sm font-medium text-gray-900 truncate">{getMultiLangValue(v) || '—'}</p>

@@ -19,7 +19,7 @@ export default function LoginForm() {
       // Prefer the single source of truth (authAPI).
       const { resp: response, data: parsed } = await authAPI.loginJson(
         { email, password },
-        { baseUrl: '/api' },
+        { baseUrl: '/api/v1' },
       );
 
       if (!response.ok) {
