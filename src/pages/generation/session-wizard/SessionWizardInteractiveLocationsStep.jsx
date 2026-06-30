@@ -168,8 +168,11 @@ function IlPhotoPanel({
   currentIl,
   photoUploading,
   photoFileRef,
+  iconUploading,
+  iconFileRef,
   onOpenCommonsModal,
   onPhotoFileChange,
+  onIconFileChange,
   onUpdateIlPatch,
 }) {
   const preview = getSessionEntityImagePreview(currentIl);
@@ -255,6 +258,33 @@ function IlPhotoPanel({
             placeholder="© Автор / Источник"
             className="w-full px-2 py-1 text-xs border border-gray-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-blue-400"
           />
+        </div>
+      </div>
+
+      <div className="border-t border-gray-100 pt-3 space-y-2">
+        <p className="text-xs text-gray-500 font-medium">Иконка на карте</p>
+        <div className="flex items-center gap-2">
+          <div className="w-10 h-10 rounded-lg border border-gray-200 bg-gray-50 flex items-center justify-center shrink-0 overflow-hidden">
+            {currentIl?.icon_url
+              ? <img src={currentIl.icon_url} alt="" className="w-full h-full object-contain" />
+              : <span className="text-base">📍</span>
+            }
+            {iconUploading && (
+              <div className="absolute inset-0 bg-black/40 flex items-center justify-center rounded-lg">
+                <div className="animate-spin w-4 h-4 border-2 border-white border-t-transparent rounded-full" />
+              </div>
+            )}
+          </div>
+          <label className="flex-1 text-center text-xs text-blue-600 bg-blue-50 border border-blue-200 rounded-lg py-1.5 cursor-pointer hover:bg-blue-100 transition-colors">
+            {iconUploading ? 'Загрузка…' : '+ Иконка'}
+            <input
+              ref={iconFileRef}
+              type="file"
+              accept="image/*,.svg"
+              className="hidden"
+              onChange={(e) => onIconFileChange?.(e, currentIl)}
+            />
+          </label>
         </div>
       </div>
     </aside>
@@ -436,6 +466,9 @@ export default function SessionWizardInteractiveLocationsStep({
   eventFilterTreeError,
   photoUploading,
   photoFileRef,
+  iconUploading,
+  iconFileRef,
+  onIconFileChange,
   onOpenIlDetail,
   onAddInteractiveLocation,
   onDeleteCurrentIl,
@@ -875,8 +908,11 @@ export default function SessionWizardInteractiveLocationsStep({
           currentIl={currentIl}
           photoUploading={photoUploading}
           photoFileRef={photoFileRef}
+          iconUploading={iconUploading}
+          iconFileRef={iconFileRef}
           onOpenCommonsModal={onOpenCommonsModal}
           onPhotoFileChange={onPhotoFileChange}
+          onIconFileChange={onIconFileChange}
           onUpdateIlPatch={updateIlPatch}
         />
 

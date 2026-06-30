@@ -140,6 +140,8 @@ export default function SessionWizard({ components = {} } = {}) {
     ilAutoSaved,
     ilPhotoUploading,
     ilPhotoFileRef,
+    ilIconUploading,
+    ilIconFileRef,
     attrView,
     currentAttr,
     attrLocaleData,
@@ -301,6 +303,7 @@ export default function SessionWizard({ components = {} } = {}) {
     updateCurrentIlPatch,
     toggleCurrentIlTag,
     handleIlPhotoFile,
+    handleIlIconFile,
     ilGenerationOpen,
     ilGenerationPrompt,
     ilGenerating,
@@ -1326,6 +1329,9 @@ export default function SessionWizard({ components = {} } = {}) {
             eventFilterTreeError={eventFilterTreeError}
             photoUploading={ilPhotoUploading}
             photoFileRef={ilPhotoFileRef}
+            iconUploading={ilIconUploading}
+            iconFileRef={ilIconFileRef}
+            onIconFileChange={handleIlIconFile}
             onOpenIlDetail={openIlDetail}
             onAddInteractiveLocation={addInteractiveLocation}
             onDeleteCurrentIl={deleteCurrentIl}

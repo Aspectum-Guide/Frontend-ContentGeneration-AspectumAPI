@@ -60,6 +60,8 @@ export const normalizeInteractiveLocation = (loc = {}) => {
     image_copyright,
     imageCopyright: image_copyright,
     image: null,
+    icon_id: loc.icon_id ?? null,
+    icon_url: loc.icon_url ?? null,
     tags: normalizeTagIds(loc.tags ?? []),
     published_interactive_location_id:
       loc.published_interactive_location_id ?? null,
@@ -99,6 +101,7 @@ export const buildInteractiveLocationPayload = (loc, name, description) => {
     image_id: loc.image_id ?? null,
     image_original_url: loc.image_original_url ?? loc.imageOriginalUrl ?? '',
     image_copyright: loc.image_copyright ?? loc.imageCopyright ?? '',
+    icon_id: loc.icon_id ?? null,
     order: index,
     tags: normalizeTagIds(loc.tags ?? []),
   };

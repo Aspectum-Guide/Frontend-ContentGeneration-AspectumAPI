@@ -54,6 +54,8 @@ export default function useInteractiveLocationsStep({
   const [ilAutoSaved, setIlAutoSaved] = useState(false);
   const [ilPhotoUploading, setIlPhotoUploading] = useState(false);
   const ilPhotoFileRef = useRef(null);
+  const [ilIconUploading, setIlIconUploading] = useState(false);
+  const ilIconFileRef = useRef(null);
 
   const ilLocaleDataIlIdRef = useRef(null);
   const ilSavedSnapshotRef = useRef(null);
@@ -609,6 +611,39 @@ export default function useInteractiveLocationsStep({
     [sessionId, currentIl, ilLocaleData, showNote, imagesAPI],
   );
 
+  const handleIlIconFile = useCallback(
+    async (e, il) => {
+      const file = e.target.files?.[0];
+      if (!file || !il?.id) return;
+      setIlIconUploading(true);
+      try {
+        const formData = new FormData();
+        formData.append('file', file);
+        const res = await imagesAPI.upload(formData);
+        const iconId = res?.data?.id ?? res?.data?.image_id;
+        const iconUrl = res?.data?.url ?? res?.data?.image_url;
+        const patch = { icon_id: iconId, icon_url: iconUrl };
+        const merged = normalizeInteractiveLocation({ ...il, ...patch });
+        const localeDataForSave = currentIl?.id === il.id ? ilLocaleData : {};
+        const updatedIl = await persistInteractiveLocationRecord(sessionId, merged, localeDataForSave);
+        setInteractiveLocations((prev) =>
+          prev.map((item) => (item.id === il.id ? updatedIl : item)),
+        );
+        if (currentIl?.id === il.id) {
+          setCurrentIl(updatedIl);
+          ilSavedSnapshotRef.current = buildIlPersistSnapshot(updatedIl, ilLocaleData);
+        }
+        showNote('Иконка загружена', 'success');
+      } catch (err) {
+        showNote('Ошибка загрузки иконки: ' + parseApiError(err, err.message), 'error');
+      } finally {
+        setIlIconUploading(false);
+        if (ilIconFileRef.current) ilIconFileRef.current.value = '';
+      }
+    },
+    [sessionId, currentIl, ilLocaleData, showNote, imagesAPI],
+  );
+
   const openIlGenerationModal = useCallback(() => {
     ilGenPollCancelledRef.current = false;
     setIlGenerationError('');
@@ -820,6 +855,8 @@ export default function useInteractiveLocationsStep({
     ilAutoSaved,
     ilPhotoUploading,
     ilPhotoFileRef,
+    ilIconUploading,
+    ilIconFileRef,
 
     ilLocaleDataIlIdRef,
     ilSavedSnapshotRef,
@@ -860,6 +897,7 @@ export default function useInteractiveLocationsStep({
     persistInteractiveLocationImage,
     toggleCurrentIlTag,
     handleIlPhotoFile,
+    handleIlIconFile,
     leaveIlDetailView,
 
     openIlGenerationModal,
