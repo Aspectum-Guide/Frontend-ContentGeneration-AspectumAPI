@@ -65,6 +65,17 @@ export const BOOKING_CATALOG_SECTIONS = [
     items: BOOKING_REFERENCE_ITEMS,
   },
   {
+    id: 'llm-api-refs',
+    title: 'LLM API',
+    description: 'Ключи провайдеров и использование моделей',
+    badge: 'LLM',
+    badgeClass: 'bg-violet-100 text-violet-700',
+    items: [
+      { to: '/catalog/llm/keys', title: 'Ключи LLM API', description: 'Управление API keys и лимитами', icon: '🔑' },
+      { to: '/catalog/llm/usage', title: 'Использование моделей', description: 'Tokens, requests и стоимость по моделям', icon: '📈' },
+    ],
+  },
+  {
     id: 'booking-ops',
     title: 'Операции',
     description: 'Настройка продаж, отчёты и бронирования',

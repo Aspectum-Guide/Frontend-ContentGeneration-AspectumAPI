@@ -26,6 +26,8 @@ import PricingRulesCatalog from './pages/catalog/PricingRulesCatalog';
 import BookingAnalytics from './pages/catalog/BookingAnalytics';
 import AudioGuidesCatalog from './pages/catalog/AudioGuidesCatalog';
 import InteractiveLocationsCatalog from './pages/catalog/InteractiveLocationsCatalog';
+import LLMKeysCatalog from './pages/catalog/LLMKeysCatalog';
+import LLMUsageCatalog from './pages/catalog/LLMUsageCatalog';
 import ExportCities from './pages/export/ExportCities';
 import ExportEvents from './pages/export/ExportEvents';
 import ExportZip from './pages/export/ExportZip';
@@ -109,6 +111,14 @@ const routes = [
   {
     path: '/catalog/booking',
     element: <ProtectedRoute><ErrorBoundary><BookingCatalogHome /></ErrorBoundary></ProtectedRoute>,
+  },
+  {
+    path: '/catalog/llm/keys',
+    element: <ProtectedRoute><ErrorBoundary><LLMKeysCatalog /></ErrorBoundary></ProtectedRoute>,
+  },
+  {
+    path: '/catalog/llm/usage',
+    element: <ProtectedRoute><ErrorBoundary><LLMUsageCatalog /></ErrorBoundary></ProtectedRoute>,
   },
   {
     path: '/catalog/cities',

@@ -97,9 +97,8 @@ function hydratePriceByType(types, basePrices, slotPrices, prev, editedIds, defa
 }
 
 /** Типы, применимые к событию: глобальные + событийные + привязанные к слотам (API ?event=). */
-async function fetchTicketTypesForEvent(evId) {
+async function fetchTicketTypesForEvent(_evId) {
   const r = await ticketTypesAPI.list({
-    event: evId,
     page_size: 1000,
     ordering: 'sort_order',
   });

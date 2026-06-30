@@ -163,6 +163,8 @@ export default function Layout({ children, pageHeader = null, pageHeaderMode = '
     { startsWith: '/catalog/analytics', title: 'Аналитика бронирований' },
     { startsWith: '/catalog/booking-setup', title: 'Booking Setup (мастер)' },
     { startsWith: '/catalog/booking', title: 'Справочники букинга' },
+    { startsWith: '/catalog/llm/keys', title: 'Ключи LLM API' },
+    { startsWith: '/catalog/llm/usage', title: 'Использование моделей' },
     { startsWith: '/catalog/reservations', title: 'Резервации' },
     { startsWith: '/catalog/subscription-types', title: 'Справочник типов подписки' },
     { startsWith: '/catalog/activation-codes', title: 'Справочник кодов активации' },
