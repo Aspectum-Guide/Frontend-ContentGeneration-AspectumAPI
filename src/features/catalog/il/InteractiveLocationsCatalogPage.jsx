@@ -305,7 +305,7 @@ function ILEditorModal({ open, onClose, location, onSaved, cityOptions }) {
                   }
                 </div>
                 <div className="flex flex-col gap-2">
-                  <input ref={iconInputRef} type="file" accept="image/*" className="hidden" onChange={(e) => handleImageUpload(e, 'icon')} />
+                  <input ref={iconInputRef} type="file" accept="image/*,.svg" className="hidden" onChange={(e) => handleImageUpload(e, 'icon')} />
                   <button type="button" onClick={() => iconInputRef.current?.click()} disabled={iconUploading}
                     className="px-3 py-1.5 text-sm text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 disabled:opacity-50 transition-colors">
                     {iconUploading ? 'Загрузка…' : 'Загрузить иконку'}
