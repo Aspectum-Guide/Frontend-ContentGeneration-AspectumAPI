@@ -1,5 +1,5 @@
 import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from 'react';
-import { aiAPI, tasksAPI, cityInfosAPI, cityFiltersAPI, eventFiltersAPI, imagesAPI, sessionsAPI } from '../../../api/generation';
+import { aiAPI, tasksAPI, cityInfosAPI, cityFiltersAPI, eventFiltersAPI, imagesAPI, sessionsAPI, tagsAPI } from '../../../api/generation';
 import { trackEvent } from '../../../utils/analytics';
 import { isNotFoundError, parseApiError } from '../../../utils/apiError';
 import {
@@ -2417,6 +2417,191 @@ export default function useCityStep(ctx) {
     }
   }, [confirm, loadEventFilterTree, showNote, setDeletingEventFilterIds, setEventFilterTree]);
 
+  const bulkDeleteCityTags = useCallback(async (rawIds) => {
+    const ids = [...new Set((rawIds || []).map(normalizeId).filter(Boolean))];
+    if (!ids.length) return { deleted: 0, failed: 0 };
+
+    let deleted = 0;
+    let failed = 0;
+
+    for (const id of ids) {
+      const idStr = String(id);
+      if (deletingCityFilterPendingRef.current.has(idStr)) {
+        continue;
+      }
+
+      deletingCityFilterPendingRef.current.add(idStr);
+      setDeletingCityFilterIds((prev) => {
+        const next = new Set(prev);
+        next.add(idStr);
+        return next;
+      });
+
+      const applyLocalRemove = () => {
+        applyLocalFilterDeletion(
+          idStr,
+          locallyDeletedCityFilterIdsRef.current,
+          locallyCreatedCityFiltersRef.current,
+        );
+        setCityTagCatalog((prev) => prev.filter((item) => String(item.id) !== idStr));
+        setCityFilterTree((prev) =>
+          removeFilterIdsFromTree(prev, locallyDeletedCityFilterIdsRef.current),
+        );
+        setCityTags((prev) => {
+          const next = normalizeTagIds(prev).filter((tagId) => tagId !== id);
+          patchActiveDraftTags(next);
+          return next;
+        });
+      };
+
+      try {
+        await cityFiltersAPI.delete(id);
+        applyLocalRemove();
+        deleted += 1;
+      } catch (e) {
+        if (isNotFoundError(e)) {
+          applyLocalRemove();
+          deleted += 1;
+        } else {
+          failed += 1;
+        }
+      } finally {
+        deletingCityFilterPendingRef.current.delete(idStr);
+        setDeletingCityFilterIds((prev) => {
+          const next = new Set(prev);
+          next.delete(idStr);
+          return next;
+        });
+      }
+    }
+
+    void loadCityFilterTree().catch((err) => {
+      console.error('Catalog reload after bulk delete failed', err);
+    });
+    void loadCityTagCatalog().catch((err) => {
+      console.error('Catalog reload after bulk delete failed', err);
+    });
+
+    if (failed) {
+      showNote(`Удалено с ошибками: ${failed} из ${ids.length}`, 'error');
+    } else if (deleted) {
+      showNote(`Удалено тегов: ${deleted}`, 'success');
+    }
+
+    return { deleted, failed };
+  }, [
+    loadCityFilterTree,
+    loadCityTagCatalog,
+    patchActiveDraftTags,
+    setCityFilterTree,
+    setCityTagCatalog,
+    setCityTags,
+    setDeletingCityFilterIds,
+    showNote,
+  ]);
+
+  const bulkDeleteEventTags = useCallback(async (rawIds) => {
+    const ids = [...new Set((rawIds || []).map(normalizeId).filter(Boolean))];
+    if (!ids.length) return { deleted: 0, failed: 0 };
+
+    let deleted = 0;
+    let failed = 0;
+
+    for (const id of ids) {
+      const idStr = String(id);
+      if (deletingEventFilterPendingRef.current.has(idStr)) {
+        continue;
+      }
+
+      deletingEventFilterPendingRef.current.add(idStr);
+      setDeletingEventFilterIds((prev) => {
+        const next = new Set(prev);
+        next.add(idStr);
+        return next;
+      });
+
+      const applyLocalRemove = () => {
+        applyLocalFilterDeletion(
+          idStr,
+          locallyDeletedEventFilterIdsRef.current,
+          locallyCreatedEventFiltersRef.current,
+        );
+        setEventFilterTree((prev) =>
+          removeFilterIdsFromTree(prev, locallyDeletedEventFilterIdsRef.current),
+        );
+      };
+
+      try {
+        await eventFiltersAPI.delete(id);
+        applyLocalRemove();
+        deleted += 1;
+      } catch (e) {
+        if (isNotFoundError(e)) {
+          applyLocalRemove();
+          deleted += 1;
+        } else {
+          failed += 1;
+        }
+      } finally {
+        deletingEventFilterPendingRef.current.delete(idStr);
+        setDeletingEventFilterIds((prev) => {
+          const next = new Set(prev);
+          next.delete(idStr);
+          return next;
+        });
+      }
+    }
+
+    void loadEventFilterTree().catch((err) => {
+      console.error('Catalog reload after bulk delete failed', err);
+    });
+
+    if (failed) {
+      showNote(`Удалено с ошибками: ${failed} из ${ids.length}`, 'error');
+    } else if (deleted) {
+      showNote(`Удалено тегов: ${deleted}`, 'success');
+    }
+
+    return { deleted, failed };
+  }, [loadEventFilterTree, setDeletingEventFilterIds, setEventFilterTree, showNote]);
+
+  const translateSelectedTags = useCallback(async ({
+    filterType,
+    ids,
+    sourceLanguage = 'ru',
+    targetLanguages = [],
+  }) => {
+    const normalizedIds = [...new Set((ids || []).map(normalizeId).filter(Boolean))];
+    if (!normalizedIds.length) {
+      return null;
+    }
+
+    try {
+      const res = await tagsAPI.translateSelected({
+        filter_type: filterType,
+        ids: normalizedIds,
+        source_language: sourceLanguage,
+        target_languages: targetLanguages,
+        fields: ['title'],
+      });
+      const data = res?.data;
+      const translatedCount = Number(data?.translated_count ?? 0);
+
+      if (filterType === 'city') {
+        await loadCityTagCatalog();
+        await loadCityFilterTree();
+      } else {
+        await loadEventFilterTree();
+      }
+
+      showNote(`Переведено тегов: ${translatedCount}`, 'success');
+      return data;
+    } catch (e) {
+      showNote(parseApiError(e, 'Ошибка перевода тегов'), 'error');
+      throw e;
+    }
+  }, [loadCityFilterTree, loadCityTagCatalog, loadEventFilterTree, showNote]);
+
   const getSessionUuid = useCallback(() => session?.uuid || session?.session_uuid || '', [session]);
 
   return {
@@ -2498,6 +2683,7 @@ export default function useCityStep(ctx) {
 
     createCityFilterFolder, createCityFilterTag, createCityTag,
     updateCityFilter, deleteCityFilter,
+    bulkDeleteCityTags, bulkDeleteEventTags, translateSelectedTags,
 
     createEventFilterFolder, createEventFilterTag,
     updateEventFilter, deleteEventFilter, uploadEventFilterImage,

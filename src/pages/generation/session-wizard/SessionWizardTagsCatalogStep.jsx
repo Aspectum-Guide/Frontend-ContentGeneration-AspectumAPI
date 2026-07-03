@@ -2,6 +2,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { appLanguagesAPI } from '../../../api/generation';
 import MultiLangInput from '../../../components/forms/MultiLangInput';
 import ModalPortal from '../../../components/ui/ModalPortal';
+import { ConfirmModal as DefaultConfirmModal } from '../../../components/ui/Modal.jsx';
+import { useConfirmModal } from '../../../components/ui/useConfirmModal.jsx';
 import {
   DEFAULT_APP_LANGUAGES,
   ensureAppLanguages,
@@ -754,6 +756,9 @@ export default function SessionWizardTagsCatalogStep({
   onCreateCityTag,
   onUpdateCityFilter,
   onDeleteCityFilter,
+  onBulkDeleteCityTags,
+  onBulkDeleteEventTags,
+  onTranslateSelectedTags,
   onUploadCityFilterImage,
   deletingCityFilterIds = new Set(),
   eventFilterTree = [],
@@ -768,6 +773,7 @@ export default function SessionWizardTagsCatalogStep({
   deletingEventFilterIds = new Set(),
   onGoToStep,
 } = {}) {
+  const { confirm, confirmModal } = useConfirmModal(DefaultConfirmModal);
   const [catalogTab, setCatalogTab] = useState('city');
   const [searchQuery, setSearchQuery] = useState('');
   const [quickName, setQuickName] = useState('');
@@ -776,6 +782,11 @@ export default function SessionWizardTagsCatalogStep({
   const [creatingEventFolderQuick, setCreatingEventFolderQuick] = useState(false);
   const [creatingTagByFolderId, setCreatingTagByFolderId] = useState(() => new Set());
   const quickCreatePendingRef = useRef(new Set());
+
+  const [selectedCityTagIds, setSelectedCityTagIds] = useState(() => new Set());
+  const [selectedEventTagIds, setSelectedEventTagIds] = useState(() => new Set());
+  const [bulkDeleting, setBulkDeleting] = useState(false);
+  const [bulkTranslating, setBulkTranslating] = useState(false);
 
   const [eventSearchQuery, setEventSearchQuery] = useState('');
   const [eventQuickFolder, setEventQuickFolder] = useState('');
@@ -805,6 +816,152 @@ export default function SessionWizardTagsCatalogStep({
       cancelled = true;
     };
   }, []);
+
+  useEffect(() => {
+    setSelectedCityTagIds(new Set());
+    setSelectedEventTagIds(new Set());
+  }, [catalogTab]);
+
+  const targetLanguageCodes = useMemo(
+    () => multiLangLanguages.map((lang) => lang.code).filter(Boolean),
+    [multiLangLanguages],
+  );
+
+  const toggleCityTagSelected = useCallback((tagId) => {
+    const id = normalizeId(tagId);
+    if (!id) return;
+    setSelectedCityTagIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }, []);
+
+  const toggleEventTagSelected = useCallback((tagId) => {
+    const id = normalizeId(tagId);
+    if (!id) return;
+    setSelectedEventTagIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }, []);
+
+  const handleBulkDeleteCityTags = async () => {
+    const ids = [...selectedCityTagIds];
+    if (!ids.length || bulkDeleting) return;
+
+    if (!(await confirm({
+      title: 'Удаление',
+      message: `Удалить выбранные теги: ${ids.length}?`,
+      danger: true,
+      confirmLabel: 'Удалить',
+    }))) {
+      return;
+    }
+
+    setBulkDeleting(true);
+    try {
+      const result = await onBulkDeleteCityTags?.(ids);
+      const failed = Number(result?.failed ?? 0);
+      if (failed > 0) {
+        await onReloadCityTagCatalog?.();
+      }
+      setSelectedCityTagIds(new Set());
+    } finally {
+      setBulkDeleting(false);
+    }
+  };
+
+  const handleBulkDeleteEventTags = async () => {
+    const ids = [...selectedEventTagIds];
+    if (!ids.length || bulkDeleting) return;
+
+    if (!(await confirm({
+      title: 'Удаление',
+      message: `Удалить выбранные теги: ${ids.length}?`,
+      danger: true,
+      confirmLabel: 'Удалить',
+    }))) {
+      return;
+    }
+
+    setBulkDeleting(true);
+    try {
+      const result = await onBulkDeleteEventTags?.(ids);
+      const failed = Number(result?.failed ?? 0);
+      if (failed > 0) {
+        await onReloadEventFilters?.();
+      }
+      setSelectedEventTagIds(new Set());
+    } finally {
+      setBulkDeleting(false);
+    }
+  };
+
+  const handleBulkTranslateCityTags = async () => {
+    const ids = [...selectedCityTagIds];
+    if (!ids.length || bulkTranslating) return;
+
+    setBulkTranslating(true);
+    try {
+      await onTranslateSelectedTags?.({
+        filterType: 'city',
+        ids,
+        sourceLanguage: 'ru',
+        targetLanguages: targetLanguageCodes,
+      });
+      setSelectedCityTagIds(new Set());
+    } catch {
+      /* toast в контроллере */
+    } finally {
+      setBulkTranslating(false);
+    }
+  };
+
+  const handleBulkTranslateEventTags = async () => {
+    const ids = [...selectedEventTagIds];
+    if (!ids.length || bulkTranslating) return;
+
+    setBulkTranslating(true);
+    try {
+      await onTranslateSelectedTags?.({
+        filterType: 'event',
+        ids,
+        sourceLanguage: 'ru',
+        targetLanguages: targetLanguageCodes,
+      });
+      setSelectedEventTagIds(new Set());
+    } catch {
+      /* toast в контроллере */
+    } finally {
+      setBulkTranslating(false);
+    }
+  };
+
+  const activeSelectedCount =
+    catalogTab === 'city' ? selectedCityTagIds.size : selectedEventTagIds.size;
+
+  const handleTranslateActiveTags =
+    catalogTab === 'city'
+      ? handleBulkTranslateCityTags
+      : handleBulkTranslateEventTags;
+
+  const bulkActionsToolbar = (selectedCount, { onDelete }) => (
+    <div className="flex items-center justify-end gap-2 mb-2">
+      <span className="text-xs font-medium text-gray-600">Выбрано: {selectedCount}</span>
+      <button
+        type="button"
+        onClick={onDelete}
+        disabled={selectedCount === 0 || bulkDeleting || bulkTranslating}
+        className="px-3 py-1.5 text-xs font-medium text-red-600 bg-red-5в0 border border-red-200 rounded-lg hover:bg-red-100 disabled:opacity-50 disabled:pointer-events-none"
+      >
+        {bulkDeleting ? '...' : 'Удалить'}
+      </button>
+    </div>
+  );
 
   const isCreatingInFolder = (folderId) =>
     creatingTagByFolderId.has(String(folderId));
@@ -1207,6 +1364,10 @@ export default function SessionWizardTagsCatalogStep({
           )}
 
           {!cityTagCatalogLoading && !cityTagCatalogError && filteredCityTags.length > 0 && (
+            <>
+              {bulkActionsToolbar(selectedCityTagIds.size, {
+                onDelete: handleBulkDeleteCityTags,
+              })}
             <ul className="divide-y divide-gray-100 border border-gray-200 rounded-xl overflow-hidden bg-white">
               {filteredCityTags.map((tag) => {
                 const id = normalizeId(tag.id);
@@ -1217,6 +1378,14 @@ export default function SessionWizardTagsCatalogStep({
                     key={id}
                     className="flex items-center gap-3 px-3 py-2.5 hover:bg-gray-50"
                   >
+                    <input
+                      type="checkbox"
+                      checked={selectedCityTagIds.has(id)}
+                      onChange={() => toggleCityTagSelected(id)}
+                      onClick={(event) => event.stopPropagation()}
+                      className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500 shrink-0"
+                      aria-label={`Выбрать тег ${title}`}
+                    />
                     {imageUrl ? (
                       <img
                         src={imageUrl}
@@ -1251,6 +1420,7 @@ export default function SessionWizardTagsCatalogStep({
                 );
               })}
             </ul>
+            </>
           )}
         </div>
       ) : (
@@ -1341,6 +1511,10 @@ export default function SessionWizardTagsCatalogStep({
           {!eventFilterTreeLoading &&
             !eventFilterTreeError &&
             filteredEventFolders.length > 0 && (
+              <>
+              {bulkActionsToolbar(selectedEventTagIds.size, {
+                onDelete: handleBulkDeleteEventTags,
+              })}
               <ul className="space-y-3">
                 {filteredEventFolders.map((folder) => {
                   const fid = normalizeId(folder.id);
@@ -1450,6 +1624,14 @@ export default function SessionWizardTagsCatalogStep({
                                     key={tid}
                                     className="flex items-center gap-3 px-3 py-2 hover:bg-gray-50"
                                   >
+                                    <input
+                                      type="checkbox"
+                                      checked={selectedEventTagIds.has(tid)}
+                                      onChange={() => toggleEventTagSelected(tid)}
+                                      onClick={(event) => event.stopPropagation()}
+                                      className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500 shrink-0"
+                                      aria-label={`Выбрать тег ${ttitle}`}
+                                    />
                                     {imageUrl ? (
                                       <img
                                         src={imageUrl}
@@ -1491,11 +1673,12 @@ export default function SessionWizardTagsCatalogStep({
                   );
                 })}
               </ul>
+              </>
             )}
         </div>
       )}
 
-      <div className="flex justify-between pt-2">
+      <div className="flex justify-between items-center pt-2">
         <button
           type="button"
           onClick={() => onGoToStep?.(1)}
@@ -1504,14 +1687,25 @@ export default function SessionWizardTagsCatalogStep({
           ← Назад: Город
         </button>
 
-        <button
-          type="button"
-          onClick={() => onGoToStep?.(3)}
-          disabled={saving}
-          className="px-5 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors"
-        >
-          {saving ? 'Сохранение...' : 'Далее: Достопримечательности →'}
-        </button>
+        <div className="flex items-center gap-3">
+          <button
+            type="button"
+            onClick={handleTranslateActiveTags}
+            disabled={activeSelectedCount === 0 || bulkDeleting || bulkTranslating}
+            className="px-5 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:pointer-events-none transition-colors"
+          >
+            {bulkTranslating ? 'Перевод...' : 'Перевести'}
+          </button>
+
+          <button
+            type="button"
+            onClick={() => onGoToStep?.(3)}
+            disabled={saving}
+            className="px-5 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors"
+          >
+            {saving ? 'Сохранение...' : 'Далее: Достопримечательности →'}
+          </button>
+        </div>
       </div>
 
       <ModalPortal open={Boolean(modal)} onClose={closeModal} zIndex={100}>
@@ -1566,6 +1760,7 @@ export default function SessionWizardTagsCatalogStep({
           </div>
         ) : null}
       </ModalPortal>
+      {confirmModal}
     </div>
   );
 }

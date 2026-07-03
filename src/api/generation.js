@@ -7,6 +7,12 @@ export const appLanguagesAPI = {
   list: () => apiClient.get(`${BASE}/app-languages/`),
 };
 
+// ─── Tags (catalog bulk actions) ─────────────────────────────────────────────
+export const tagsAPI = {
+  translateSelected: (payload) =>
+    apiClient.post(`${BASE}/tags/translate-selected/`, payload),
+};
+
 // ─── Sessions ────────────────────────────────────────────────────────────────
 export const sessionsAPI = {
   list: () => apiClient.get(`${BASE}/sessions/`),

@@ -235,6 +235,9 @@ export default function SessionWizard({ components = {} } = {}) {
     createCityTag,
     updateCityFilter,
     deleteCityFilter,
+    bulkDeleteCityTags,
+    bulkDeleteEventTags,
+    translateSelectedTags,
     uploadEventFilterImage,
     createEventFilterFolder,
     createEventFilterTag,
@@ -1064,6 +1067,9 @@ export default function SessionWizard({ components = {} } = {}) {
             onCreateCityTag={createCityTag}
             onUpdateCityFilter={updateCityFilter}
             onDeleteCityFilter={deleteCityFilter}
+            onBulkDeleteCityTags={bulkDeleteCityTags}
+            onBulkDeleteEventTags={bulkDeleteEventTags}
+            onTranslateSelectedTags={translateSelectedTags}
             onUploadCityFilterImage={uploadCityFilterImage}
             deletingCityFilterIds={deletingCityFilterIds}
             eventFilterTree={eventFilterTree}
