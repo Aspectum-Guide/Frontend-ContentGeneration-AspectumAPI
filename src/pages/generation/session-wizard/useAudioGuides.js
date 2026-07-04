@@ -238,16 +238,6 @@ const normalizeAudioGuidePlanItemsForLang = (items) => {
   return result;
 };
 
-const langHasNonEmptyAudioGuideTexts = (guide, lang) => {
-  const key = String(lang || '').trim();
-  if (!key) return false;
-
-  const m = guide?.content_texts?.[key];
-  if (!m || typeof m !== 'object') return false;
-
-  return Object.values(m).some((t) => String(t || '').trim() !== '');
-};
-
 const audioGuideAllPlanItemsHaveText = (guide, lang) => {
   const langKey = String(lang || '').trim();
   if (!langKey) return false;
