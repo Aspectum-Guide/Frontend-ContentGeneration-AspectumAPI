@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react';
 import { getCityDraftName, getFlag } from './sessionWizardShared.jsx';
+import { createCoordinatePasteHandler } from '../../../utils/coordinates';
 
 // ─── helpers ──────────────────────────────────────────────────────────────────
 
@@ -98,6 +99,12 @@ function LocalePills({ localeData, activeLocale, defaultLocale, onSwitch, onSetD
 }
 
 function CoordinatesPanel({ lat, lon, savedLat, savedLon, setMapContainerRef, onLatChange, onLonChange, onRestoreSavedCoords }) {
+  // Вставка пары "55.7558, 37.6173" в любое из полей заполняет оба
+  const handleCoordPaste = createCoordinatePasteHandler(({ lat: pLat, lon: pLon }) => {
+    onLatChange(String(pLat));
+    onLonChange(String(pLon));
+  });
+
   return (
     <div className="w-56 shrink-0 space-y-2">
       <div className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Координаты</div>
@@ -106,12 +113,14 @@ function CoordinatesPanel({ lat, lon, savedLat, savedLon, setMapContainerRef, on
         <input
           type="number" step="0.000001" value={lat}
           onChange={(e) => onLatChange(e.target.value)}
+          onPaste={handleCoordPaste}
           placeholder="Широта"
           className="w-full px-2 py-1.5 border border-gray-200 rounded-lg text-xs focus:outline-none focus:ring-1 focus:ring-blue-400"
         />
         <input
           type="number" step="0.000001" value={lon}
           onChange={(e) => onLonChange(e.target.value)}
+          onPaste={handleCoordPaste}
           placeholder="Долгота"
           className="w-full px-2 py-1.5 border border-gray-200 rounded-lg text-xs focus:outline-none focus:ring-1 focus:ring-blue-400"
         />

@@ -24,8 +24,9 @@ export const sessionsAPI = {
   delete: (sessionId) => apiClient.delete(`${BASE}/sessions/${sessionId}/delete/`),
   publish: (sessionId) => apiClient.post(`${BASE}/sessions/${sessionId}/publish/`, {}),
   translate: (sessionId, data = {}) => apiClient.post(`${BASE}/sessions/${sessionId}/translate/`, data),
-  checkConflicts: (sessionId) =>
-    apiClient.get(`${BASE}/sessions/${sessionId}/publish/check-conflicts/`),
+  // Бэкенд принимает только POST (тело: {close_batch?: boolean})
+  checkConflicts: (sessionId, data = {}) =>
+    apiClient.post(`${BASE}/sessions/${sessionId}/publish/check-conflicts/`, data),
   updateCity: (sessionId, data) =>
     apiClient.patch(`${BASE}/sessions/${sessionId}/city/`, data),
   createCityDraft: (sessionId, data = {}) =>

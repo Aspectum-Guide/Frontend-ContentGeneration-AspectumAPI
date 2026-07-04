@@ -6,6 +6,7 @@ import AiGenerationDedupeToggle from '../../../components/generation/AiGeneratio
 import AiGenerationCountField from '../../../components/generation/AiGenerationCountField.jsx';
 import { getAttrName, getFlag, getSessionEntityImagePreview, resolveSessionEntityImageOriginalUrl, resolveSessionEntityImageCopyright, normalizeId } from './sessionWizardShared.jsx';
 import SessionWizardAttractionTagsPicker from './SessionWizardAttractionTagsPicker.jsx';
+import { createCoordinatePasteHandler } from '../../../utils/coordinates';
 
 const getCityDisplayName = (city) => {
   if (!city) return 'Без названия';
@@ -291,7 +292,17 @@ function IlPhotoPanel({
   );
 }
 
-function IlMapPanel({ lat, lon, onLatChange, onLonChange }) {
+function IlMapPanel({ lat, lon, onLatChange, onLonChange, onCoordsChange }) {
+  // Вставка пары "55.7558, 37.6173" в любое из полей заполняет оба
+  const handleCoordPaste = createCoordinatePasteHandler(({ lat: pLat, lon: pLon }) => {
+    if (onCoordsChange) {
+      onCoordsChange({ lat: String(pLat), lon: String(pLon) });
+    } else {
+      onLatChange(String(pLat));
+      onLonChange(String(pLon));
+    }
+  });
+
   const mapInstanceRef = useRef(null);
   const markerRef = useRef(null);
   const [mapNode, setMapNode] = useState(null);
@@ -432,6 +443,7 @@ function IlMapPanel({ lat, lon, onLatChange, onLonChange }) {
           step="0.000001"
           value={lat ?? ''}
           onChange={(e) => onLatChange(e.target.value)}
+          onPaste={handleCoordPaste}
           placeholder="Широта"
           className="px-3 py-1.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
         />
@@ -441,6 +453,7 @@ function IlMapPanel({ lat, lon, onLatChange, onLonChange }) {
           step="0.000001"
           value={lon ?? ''}
           onChange={(e) => onLonChange(e.target.value)}
+          onPaste={handleCoordPaste}
           placeholder="Долгота"
           className="px-3 py-1.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
         />
@@ -1094,6 +1107,9 @@ export default function SessionWizardInteractiveLocationsStep({
               }}
               onLonChange={(value) => {
                 updateIlPatch({ lon: value });
+              }}
+              onCoordsChange={({ lat, lon }) => {
+                updateIlPatch({ lat, lon });
               }}
             />
           </div>

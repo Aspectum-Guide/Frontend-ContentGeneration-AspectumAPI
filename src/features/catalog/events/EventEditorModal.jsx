@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from 'react';
 import CommonsImagePicker from '../../../components/generation/CommonsImagePicker';
 import { Field, FormActions, TextInput } from '../../../components/ui/FormField';
 import Modal from '../../../components/ui/Modal';
+import { createCoordinatePasteHandler } from '../../../utils/coordinates';
 import { buildLangOptions, getMultiLangValue } from '../shared/i18n';
 import { LangBlock, LangTabs } from '../shared/LangFields';
 
@@ -360,6 +361,7 @@ export default function EventEditorModal({
                       max="90"
                       value={event?.lat ?? ''}
                       onChange={(e) => setEvent((p) => ({ ...p, lat: parseFloat(e.target.value) }))}
+                      onPaste={createCoordinatePasteHandler(({ lat, lon }) => setEvent((p) => ({ ...p, lat, lon })))}
                       placeholder="41.902782"
                     />
                   </Field>
@@ -371,6 +373,7 @@ export default function EventEditorModal({
                       max="180"
                       value={event?.lon ?? ''}
                       onChange={(e) => setEvent((p) => ({ ...p, lon: parseFloat(e.target.value) }))}
+                      onPaste={createCoordinatePasteHandler(({ lat, lon }) => setEvent((p) => ({ ...p, lat, lon })))}
                       placeholder="12.496366"
                     />
                   </Field>

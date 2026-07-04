@@ -103,7 +103,7 @@ export function ConfirmModal({
   return (
     <Modal open={open} onClose={busy ? undefined : onClose} title={title} size="sm" priority>
       {message && (
-        <p className="text-sm text-gray-600">{message}</p>
+        <p className="text-sm text-gray-600 whitespace-pre-line">{message}</p>
       )}
       {internalError && (
         <p className="mt-2 text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">{internalError}</p>

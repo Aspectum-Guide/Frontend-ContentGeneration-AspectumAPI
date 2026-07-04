@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
 import { sessionsAPI } from '../../../api/generation';
 import { trackEvent } from '../../../utils/analytics';
 import { parseApiError } from '../../../utils/apiError';
@@ -18,16 +18,6 @@ export default function usePublishStep(ctx) {
     firstCitySaveAtRef,
     loadSession,
     saveCityForStep1,
-    currentCityInfo,
-    saveCurrentCityInfo,
-    saveCurrentAttrIfDirty,
-    saveCurrentIlIfDirty,
-    currentAttractionInfo,
-    saveCurrentAttractionInfo,
-    currentAttractionFeedItem,
-    saveCurrentAttractionFeedItem,
-    currentAttractionAudioGuide,
-    saveCurrentAttractionAudioGuide,
     cityDrafts,
     cityInfos,
     attractionInfos,
@@ -43,7 +33,14 @@ export default function usePublishStep(ctx) {
   const [translating, setTranslating] = useState(false);
   const [preparingPublishStep, setPreparingPublishStep] = useState(false);
 
+  // Синхронные guard'ы от double-click: state обновляется асинхронно,
+  // и второй быстрый клик успевает запустить параллельный запрос.
+  const publishInFlightRef = useRef(false);
+  const closeInFlightRef = useRef(false);
+
   const handleClose = useCallback(async () => {
+    if (closeInFlightRef.current) return;
+    closeInFlightRef.current = true;
     setClosing(true);
     try {
       await sessionsAPI.close(sessionId, closeMode);
@@ -54,21 +51,44 @@ export default function usePublishStep(ctx) {
       trackEvent('close_session_mode', { sessionId: String(sessionId), mode: closeMode, result: 'fail', reason: parseApiError(err, 'Ошибка закрытия') });
       showNote(parseApiError(err, 'Ошибка закрытия сессии'), 'error');
     } finally {
+      closeInFlightRef.current = false;
       setClosing(false);
     }
   }, [sessionId, closeMode, navigate, showNote]);
 
   const handlePublish = useCallback(async () => {
-    if (!(await confirm({
-      title: 'Публикация сессии',
-      message: 'Опубликовать всю сессию? Данные будут записаны в основную базу.',
-    }))) {
-      return;
-    }
-
+    if (publishInFlightRef.current) return;
+    publishInFlightRef.current = true;
+    // Блокируем кнопку сразу (в т.ч. пока открыт confirm),
+    // иначе второй клик запускает параллельную публикацию.
     setPublishing(true);
 
     try {
+      // Предварительная проверка конфликтов: город с таким названием уже
+      // существует — публикация обновит/объединит его данные.
+      let conflictLines = [];
+      try {
+        const chk = await sessionsAPI.checkConflicts(sessionId);
+        const conflicts = chk?.data?.conflicts || [];
+        conflictLines = conflicts.map((c) => {
+          const label = c?.city_name_en || c?.existing_city_id || 'город';
+          return `• «${label}» уже существует — данные будут объединены с существующим городом`;
+        });
+      } catch {
+        // Проверка недоступна — публикацию не блокируем.
+      }
+
+      const baseMessage = 'Опубликовать всю сессию? Данные будут записаны в основную базу.';
+      const message = conflictLines.length
+        ? `${baseMessage}\n\nВнимание, найдены пересечения:\n${conflictLines.join('\n')}`
+        : baseMessage;
+
+      if (!(await confirm({
+        title: 'Публикация сессии',
+        message,
+      }))) {
+        return;
+      }
       if (defaultLocale && localeData[defaultLocale]) {
         await saveCityForStep1();
       }
@@ -128,11 +148,11 @@ export default function usePublishStep(ctx) {
 
       showNote(parseApiError(err, 'Ошибка публикации'), 'error');
     } finally {
+      publishInFlightRef.current = false;
       setPublishing(false);
     }
   }, [
     confirm,
-    session,
     defaultLocale,
     localeData,
     saveCityForStep1,

@@ -36,6 +36,7 @@ export const authAPI = {
   },
 
   // Refresh via apiClient base (TokenManager owns the refresh orchestration).
-  refresh: (data: unknown) => apiClient.post('/auth/token/refresh/', data),
+  // Без trailing slash: auth-роуты бэкенда зарегистрированы без слэша.
+  refresh: (data: unknown) => apiClient.post('/auth/token/refresh', data),
 };
 

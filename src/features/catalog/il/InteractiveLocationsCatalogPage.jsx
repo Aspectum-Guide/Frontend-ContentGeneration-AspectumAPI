@@ -7,6 +7,7 @@ import { Field, TextInput } from '../../../components/ui/FormField';
 import Modal, { ConfirmModal } from '../../../components/ui/Modal';
 import { useLayoutActions } from '../../../context/useLayoutActions';
 import { parseApiError } from '../../../utils/apiError';
+import { createCoordinatePasteHandler } from '../../../utils/coordinates';
 import { buildLangOptions, getMultiLangValue } from '../shared/i18n';
 import { LangBlock, LangTabs } from '../shared/LangFields';
 
@@ -239,6 +240,7 @@ function ILEditorModal({ open, onClose, location, onSaved, cityOptions }) {
                   step="any"
                   value={form.lat}
                   onChange={(e) => setForm((p) => ({ ...p, lat: e.target.value }))}
+                  onPaste={createCoordinatePasteHandler(({ lat, lon }) => setForm((p) => ({ ...p, lat: String(lat), lon: String(lon) })))}
                   placeholder="41.902800"
                 />
               </Field>
@@ -248,6 +250,7 @@ function ILEditorModal({ open, onClose, location, onSaved, cityOptions }) {
                   step="any"
                   value={form.lon}
                   onChange={(e) => setForm((p) => ({ ...p, lon: e.target.value }))}
+                  onPaste={createCoordinatePasteHandler(({ lat, lon }) => setForm((p) => ({ ...p, lat: String(lat), lon: String(lon) })))}
                   placeholder="12.496400"
                 />
               </Field>

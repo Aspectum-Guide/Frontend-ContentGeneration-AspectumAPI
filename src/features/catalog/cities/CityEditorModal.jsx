@@ -3,6 +3,7 @@ import { useEffect, useRef } from 'react';
 import CommonsImagePicker from '../../../components/generation/CommonsImagePicker';
 import { Field, FormActions, TextInput } from '../../../components/ui/FormField';
 import Modal from '../../../components/ui/Modal';
+import { createCoordinatePasteHandler } from '../../../utils/coordinates';
 import { buildLangOptions, getMultiLangValue } from '../shared/i18n';
 import { LangBlock, LangTabs } from '../shared/LangFields';
 
@@ -306,6 +307,7 @@ export default function CityEditorModal({
                       max="90"
                       value={city?.lat ?? ''}
                       onChange={(e) => setCity((p) => ({ ...p, lat: parseFloat(e.target.value) }))}
+                      onPaste={createCoordinatePasteHandler(({ lat, lon }) => setCity((p) => ({ ...p, lat, lon })))}
                       placeholder="55.7558"
                     />
                   </Field>
@@ -317,6 +319,7 @@ export default function CityEditorModal({
                       max="180"
                       value={city?.lon ?? ''}
                       onChange={(e) => setCity((p) => ({ ...p, lon: parseFloat(e.target.value) }))}
+                      onPaste={createCoordinatePasteHandler(({ lat, lon }) => setCity((p) => ({ ...p, lat, lon })))}
                       placeholder="37.6173"
                     />
                   </Field>

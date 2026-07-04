@@ -227,9 +227,12 @@ class TokenManager {
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), this.REFRESH_TIMEOUT_MS);
 
-      // Call refresh endpoint
+      // Call refresh endpoint.
+      // Канонический путь БЕЗ trailing slash: бэкенд регистрирует auth-роуты
+      // без слэша при APPEND_SLASH=False — вариант со слэшем всегда давал 404
+      // (fallback его маскировал, но 404 засорял network/console каждые ~15 мин).
       const { fetchWithSlashFallback } = await import('./fetchWithSlashFallback');
-      const response = await fetchWithSlashFallback(`${apiUrl}/auth/token/refresh/`, {
+      const response = await fetchWithSlashFallback(`${apiUrl}/auth/token/refresh`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
