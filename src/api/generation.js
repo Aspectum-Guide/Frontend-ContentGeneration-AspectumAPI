@@ -158,6 +158,12 @@ export const attractionAudioGuidesAPI = {
       `${BASE}/sessions/${sessionId}/attraction-audio-guides/${guideId}/tracks/${trackId}/generate-audio/`,
       payload,
     ),
+
+  generateChapteredTrackAudio: (sessionId, guideId, trackId, payload = {}) =>
+    apiClient.post(
+      `${BASE}/sessions/${sessionId}/attraction-audio-guides/${guideId}/tracks/${trackId}/generate-chaptered-audio/`,
+      payload,
+    ),
 };
 
 export const ttsAPI = {
@@ -183,6 +189,7 @@ export const audioAPI = {
     apiClient.get(generationAudioFilePath(audioId), {
       responseType: 'blob',
       skipApiGetCache: true,
+      params: { _: Date.now() },
     }),
 
   /**
@@ -199,12 +206,14 @@ export const audioAPI = {
       return apiClient.get(generationAudioFilePath(fromPath[1]), {
         responseType: 'blob',
         skipApiGetCache: true,
+        params: { _: Date.now() },
       });
     }
     if (/^[0-9a-f-]{36}$/i.test(raw)) {
       return apiClient.get(generationAudioFilePath(raw), {
         responseType: 'blob',
         skipApiGetCache: true,
+        params: { _: Date.now() },
       });
     }
     return Promise.reject(new Error('Unsupported audio reference for authenticated fetch'));

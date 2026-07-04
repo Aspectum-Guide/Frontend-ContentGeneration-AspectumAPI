@@ -142,11 +142,36 @@ const getAudioGuideBindingLabel = (
   return 'Без достопримечательности';
 };
 
-function AttractionAudioTrackPreview({ trackAudioId, trackAudioUrl }) {
+function AttractionAudioTrackPreview({
+  trackAudioId,
+  trackAudioUrl,
+  chapters = [],
+  durationSeconds = null,
+}) {
+  const audioRef = useRef(null);
   const blobUrlRef = useRef(null);
   const [previewUrl, setPreviewUrl] = useState(null);
   const [loading, setLoading] = useState(false);
   const [loadError, setLoadError] = useState(false);
+
+  const normalizedChapters = Array.isArray(chapters)
+    ? chapters.filter((chapter) => Number.isFinite(Number(chapter?.start_seconds)))
+    : [];
+  const durationLabel = formatAudioDuration(durationSeconds);
+
+  const seekToChapter = (chapter) => {
+    const startSeconds = Number(chapter?.start_seconds);
+    const audio = audioRef.current;
+
+    if (!audio || !Number.isFinite(startSeconds)) return;
+
+    const wasPaused = audio.paused;
+    audio.currentTime = Math.max(0, startSeconds);
+
+    if (!wasPaused) {
+      audio.play().catch(() => {});
+    }
+  };
 
   useEffect(() => {
     let cancelled = false;
@@ -215,6 +240,44 @@ function AttractionAudioTrackPreview({ trackAudioId, trackAudioUrl }) {
 
   return (
     <div className="space-y-2">
+      {durationLabel ? (
+        <p className="text-xs font-medium text-gray-600">
+          Итоговый аудиофайл: {durationLabel}
+        </p>
+      ) : null}
+
+      {normalizedChapters.length > 0 ? (
+        <div className="space-y-1 rounded-lg border border-gray-200 bg-gray-50 p-2">
+          <p className="text-xs font-medium text-gray-600">Главы и тайм-коды</p>
+          <div className="flex flex-wrap gap-2">
+            {normalizedChapters.map((chapter, index) => {
+              const startLabel = formatAudioDuration(chapter.start_seconds);
+              const endLabel = formatAudioDuration(chapter.end_seconds);
+              const title = chapter.title || `Глава ${index + 1}`;
+
+              return (
+                <button
+                  key={`${chapter.plan_item_id || index}-${chapter.start_seconds}`}
+                  type="button"
+                  onClick={() => seekToChapter(chapter)}
+                  className="rounded-md border border-blue-100 bg-white px-2 py-1 text-left text-xs text-blue-700 shadow-sm transition hover:border-blue-300 hover:bg-blue-50"
+                  title={`Перейти к главе: ${title}`}
+                >
+                  <span className="font-semibold">{startLabel}</span>
+                  {endLabel ? <span className="text-blue-400">-{endLabel}</span> : null}
+                  <span className="ml-1 text-gray-700">{title}</span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      ) : (
+        <p className="text-xs text-gray-500">
+          Тайминги глав пока не сохранены. После перегенерации аудио здесь
+          появятся кликабельные переходы по главам.
+        </p>
+      )}
+
       {loading ? (
         <p className="text-xs text-gray-600">Загрузка аудио...</p>
       ) : null}
@@ -226,7 +289,14 @@ function AttractionAudioTrackPreview({ trackAudioId, trackAudioUrl }) {
       ) : null}
 
       {!loading && !loadError && previewUrl ? (
-        <audio key={previewUrl} controls src={previewUrl} className="w-full" />
+        <audio
+          key={previewUrl}
+          ref={audioRef}
+          controls
+          preload="metadata"
+          src={previewUrl}
+          className="w-full"
+        />
       ) : null}
     </div>
   );
@@ -339,6 +409,23 @@ const buildElevenLabsVoiceLabel = (voice) => {
   }
 
   return parts.join(' · ');
+};
+
+const formatAudioDuration = (seconds) => {
+  const value = Number(seconds);
+  if (!Number.isFinite(value) || value < 0) return '';
+
+  const total = Math.max(0, Math.round(value));
+  const minutes = Math.floor(total / 60);
+  const restSeconds = total % 60;
+
+  return `${minutes}:${String(restSeconds).padStart(2, '0')}`;
+};
+
+const getTrackChapters = (track) => {
+  if (Array.isArray(track?.chapters)) return track.chapters;
+  if (Array.isArray(track?.chapter_timings)) return track.chapter_timings;
+  return [];
 };
 
 function ElevenLabsSettingsPanel({
@@ -647,6 +734,7 @@ export default function SessionWizardAttractionAudioGuidesBlock({
   const trackAudioId = currentLocale.track?.audio_id || null;
   const trackAudioUrl = currentLocale.track?.audio_url || '';
   const hasTrackAudio = Boolean(trackAudioId || trackAudioUrl);
+  const trackChapters = getTrackChapters(currentLocale.track);
   const planLang = currentLocale.lang || 'ru';
 
   const hasTextForEveryPlanItem =
@@ -1331,6 +1419,8 @@ export default function SessionWizardAttractionAudioGuidesBlock({
               <AttractionAudioTrackPreview
                 trackAudioId={trackAudioId}
                 trackAudioUrl={trackAudioUrl}
+                chapters={trackChapters}
+                durationSeconds={currentLocale.track?.duration_seconds}
               />
             ) : null}
 

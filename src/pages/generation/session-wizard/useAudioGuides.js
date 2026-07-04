@@ -110,6 +110,21 @@ const normalizeAudioGuideTracks = (tracks) => {
         track.audio?.copyright ??
         '',
       language: lang,
+      duration_seconds:
+        track.duration_seconds ??
+        track.durationSeconds ??
+        track.audio?.duration_seconds ??
+        null,
+      chapters: Array.isArray(track.chapters)
+        ? track.chapters
+        : Array.isArray(track.chapter_timings)
+          ? track.chapter_timings
+          : [],
+      chapter_timings: Array.isArray(track.chapter_timings)
+        ? track.chapter_timings
+        : Array.isArray(track.chapters)
+          ? track.chapters
+          : [],
     };
   });
 
@@ -282,6 +297,18 @@ const mergeAudioGuideTrackFromTtsResponse = (guide, lang, data) => {
   const audioId = audio.id ?? track.audio ?? null;
   const audioUrl = audio.url ?? '';
   const copyright = audio.copyright ?? 'Generated with ElevenLabs';
+  const chapters = Array.isArray(data?.chapters)
+    ? data.chapters
+    : Array.isArray(track?.chapters)
+      ? track.chapters
+      : Array.isArray(track?.chapter_timings)
+        ? track.chapter_timings
+        : [];
+  const durationSeconds =
+    data?.duration_seconds ??
+    track?.duration_seconds ??
+    guide.tracks?.[lang]?.duration_seconds ??
+    null;
 
   return normalizeAttractionAudioGuide({
     ...guide,
@@ -294,6 +321,9 @@ const mergeAudioGuideTrackFromTtsResponse = (guide, lang, data) => {
         audio_url: audioUrl,
         copyright,
         language: lang,
+        duration_seconds: durationSeconds,
+        chapters,
+        chapter_timings: chapters,
       },
     },
   });
@@ -620,6 +650,11 @@ function readElevenLabsSettingsFromFrontendCache() {
       return null;
     }
 
+    if (parsed.data?.configured === false) {
+      sessionStorage.removeItem(ELEVENLABS_SETTINGS_FRONTEND_CACHE_KEY);
+      return null;
+    }
+
     return parsed.data;
   } catch {
     return null;
@@ -627,6 +662,15 @@ function readElevenLabsSettingsFromFrontendCache() {
 }
 
 function writeElevenLabsSettingsToFrontendCache(data) {
+  if (data?.configured === false) {
+    try {
+      sessionStorage.removeItem(ELEVENLABS_SETTINGS_FRONTEND_CACHE_KEY);
+    } catch {
+      // ignore quota / private mode
+    }
+    return;
+  }
+
   try {
     sessionStorage.setItem(
       ELEVENLABS_SETTINGS_FRONTEND_CACHE_KEY,
@@ -1038,6 +1082,17 @@ export function useAudioGuides({
           audio_id: trackRaw.audio_id ?? null,
           audio_url: trackRaw.audio_url ?? '',
           copyright: trackRaw.copyright ?? '',
+          duration_seconds: trackRaw.duration_seconds ?? null,
+          chapters: Array.isArray(trackRaw.chapters)
+            ? trackRaw.chapters
+            : Array.isArray(trackRaw.chapter_timings)
+              ? trackRaw.chapter_timings
+              : [],
+          chapter_timings: Array.isArray(trackRaw.chapter_timings)
+            ? trackRaw.chapter_timings
+            : Array.isArray(trackRaw.chapters)
+              ? trackRaw.chapters
+              : [],
         },
       };
 
@@ -2000,7 +2055,7 @@ export function useAudioGuides({
           console.debug('ElevenLabs generate audio payload', payload);
         }
 
-        const res = await attractionAudioGuidesAPI.generateTrackAudio(
+        const res = await attractionAudioGuidesAPI.generateChapteredTrackAudio(
           sessionId,
           guide.id,
           trackId,
@@ -2024,9 +2079,7 @@ export function useAudioGuides({
             localeSnapshot,
           );
         showNote(
-          data.reused
-            ? 'Аудиофайл уже актуален — повторная генерация не потребовалась'
-            : 'Аудиофайл аудиогида сгенерирован',
+          'Аудиофайл аудиогида сгенерирован с таймингами глав',
           'success',
         );
       } catch (error) {
