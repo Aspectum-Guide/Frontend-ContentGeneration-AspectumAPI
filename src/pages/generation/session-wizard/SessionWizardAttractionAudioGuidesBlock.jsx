@@ -553,6 +553,8 @@ export default function SessionWizardAttractionAudioGuidesBlock({
   onAddAttractionAudioGuidePlanPoint,
   onRemoveAttractionAudioGuidePlanPoint,
   onUpdateAttractionAudioGuidePlanItemText,
+  onImportAttractionAudioGuidePlanFromText,
+  onShowNote,
   onSaveCurrentAttractionAudioGuide,
   onDeleteCurrentAttractionAudioGuide,
   onUploadAttractionAudioGuideTrack,
@@ -585,6 +587,7 @@ export default function SessionWizardAttractionAudioGuidesBlock({
   onGoToStep,
 }) {
   const audioFileRef = useRef(null);
+  const [planImportText, setPlanImportText] = useState('');
 
   const itemTextModalGenerating = Boolean(
     audioGuideItemTextGenerateItemId &&
@@ -754,6 +757,35 @@ export default function SessionWizardAttractionAudioGuidesBlock({
     !audioGuideGeneratingAllMainText &&
     !attractionAudioGuideSaving &&
     !attractionAudioUploading;
+
+  const handleImportPlanFromText = () => {
+    const raw = planImportText.trim();
+    if (!raw) return;
+
+    if (planPoints.length > 0) {
+      const confirmed = window.confirm(
+        `Текущий план (${planPoints.length} пункт(ов)) и тексты пунктов для этого языка ` +
+          'будут заменены содержимым из вставленного текста. Продолжить?',
+      );
+      if (!confirmed) return;
+    }
+
+    const created = onImportAttractionAudioGuidePlanFromText?.(
+      currentLocale.lang,
+      raw,
+    );
+
+    if (!created) {
+      onShowNote?.(
+        'Не удалось распознать пункты. Заголовки глав должны начинаться с «# ».',
+        'error',
+      );
+      return;
+    }
+
+    setPlanImportText('');
+    onShowNote?.(`Импортировано пунктов плана: ${created}`, 'success');
+  };
 
   return (
     <section className="space-y-4">
@@ -976,6 +1008,43 @@ export default function SessionWizardAttractionAudioGuidesBlock({
                 disabled={planGenerationControlsDisabled}
                 className="block w-24 px-3 py-1.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
               />
+            </div>
+
+            <div className="rounded-lg border border-gray-200 bg-white p-3 space-y-2">
+              <div>
+                <label
+                  htmlFor="audio-guide-plan-import"
+                  className="block text-xs font-medium text-gray-700"
+                >
+                  Вставить готовый план и тексты
+                </label>
+                <p className="mt-0.5 text-[11px] leading-snug text-gray-500">
+                  Строки с «# Заголовок» станут пунктами плана, а текст под каждым
+                  заголовком — основным текстом соответствующего пункта. Заполнит план
+                  для текущего языка ({currentLocale.lang?.toUpperCase() || 'RU'}).
+                </p>
+              </div>
+
+              <textarea
+                id="audio-guide-plan-import"
+                rows={5}
+                value={planImportText}
+                onChange={(e) => setPlanImportText(e.target.value)}
+                disabled={planGenerationControlsDisabled}
+                placeholder={
+                  '# Красный песчаник фасада\n\nТекст первого пункта…\n\n# От выставки к коллекции\n\nТекст второго пункта…'
+                }
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 resize-y"
+              />
+
+              <button
+                type="button"
+                onClick={handleImportPlanFromText}
+                disabled={planGenerationControlsDisabled || !planImportText.trim()}
+                className="w-fit px-3 py-1.5 text-xs font-medium text-blue-700 bg-blue-100 border border-blue-200 rounded-lg hover:bg-blue-200 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Заполнить план из текста
+              </button>
             </div>
 
             <button

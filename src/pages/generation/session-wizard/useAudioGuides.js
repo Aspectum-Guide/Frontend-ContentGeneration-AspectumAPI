@@ -180,6 +180,38 @@ const generateAudioGuidePlanItemId = () => {
   return `plan-${Date.now()}-${Math.random().toString(16).slice(2)}`;
 };
 
+// Разбор вставленного размеченного текста плана.
+// Строки вида `# Заголовок` (1–6 решёток) — пункты плана, текст под ними
+// до следующего заголовка — основной текст соответствующего пункта.
+// Текст до первого заголовка игнорируется.
+const parseAudioGuidePlanImport = (rawText) => {
+  if (!rawText || typeof rawText !== 'string') return [];
+
+  const headingRe = /^\s{0,3}#{1,6}\s+(.*\S)\s*$/;
+  const lines = rawText.replace(/\r\n?/g, '\n').split('\n');
+
+  const items = [];
+  let current = null;
+
+  lines.forEach((line) => {
+    const match = line.match(headingRe);
+
+    if (match) {
+      current = { title: match[1].trim(), bodyLines: [] };
+      items.push(current);
+    } else if (current) {
+      current.bodyLines.push(line);
+    }
+  });
+
+  return items
+    .map((item) => ({
+      title: item.title,
+      text: item.bodyLines.join('\n').trim(),
+    }))
+    .filter((item) => item.title);
+};
+
 const isAudioGuidePlanUuid = (value) => {
   if (!value || typeof value !== 'string') return false;
 
@@ -1486,6 +1518,56 @@ export function useAudioGuides({
     [attractionAudioGuideActiveLocale, attractionAudioGuideLocaleData],
   );
 
+  const importAttractionAudioGuidePlanFromText = useCallback(
+    (lang, rawText) => {
+      const targetLang =
+        lang ||
+        attractionAudioGuideLocaleData?.[attractionAudioGuideActiveLocale]?.lang ||
+        getLocaleLang(attractionAudioGuideActiveLocale);
+
+      if (!targetLang) return 0;
+
+      const parsed = parseAudioGuidePlanImport(rawText);
+      if (parsed.length === 0) return 0;
+
+      setCurrentAttractionAudioGuide((prev) => {
+        if (!prev) return prev;
+
+        const nextPlan = [];
+        const langMap = {};
+
+        parsed.forEach((item) => {
+          const id = generateAudioGuidePlanItemId();
+          nextPlan.push({ id, title: item.title });
+          langMap[id] = item.text;
+        });
+
+        const updated = {
+          ...prev,
+          content_plan: {
+            ...(prev.content_plan || {}),
+            [targetLang]: nextPlan,
+          },
+          content_texts: {
+            ...(prev.content_texts || {}),
+            [targetLang]: langMap,
+          },
+        };
+
+        setAttractionAudioGuides((items) =>
+          items.map((item) =>
+            normalizeId(item.id) === normalizeId(updated.id) ? updated : item,
+          ),
+        );
+
+        return updated;
+      });
+
+      return parsed.length;
+    },
+    [attractionAudioGuideActiveLocale, attractionAudioGuideLocaleData],
+  );
+
   const saveCurrentAttractionAudioGuide = useCallback(
     async ({ silent = false } = {}) => {
       if (!currentAttractionAudioGuide) return null;
@@ -2764,6 +2846,7 @@ export function useAudioGuides({
     addAttractionAudioGuidePlanPoint,
     removeAttractionAudioGuidePlanPoint,
     updateAttractionAudioGuidePlanItemText,
+    importAttractionAudioGuidePlanFromText,
     saveCurrentAttractionAudioGuide,
     saveCurrentAttractionAudioGuideIfDirty,
     isCurrentAttractionAudioGuideDirty,

@@ -366,6 +366,7 @@ export default function SessionWizard({ components = {} } = {}) {
     addAttractionAudioGuidePlanPoint,
     removeAttractionAudioGuidePlanPoint,
     updateAttractionAudioGuidePlanItemText,
+    importAttractionAudioGuidePlanFromText,
     saveCurrentAttractionAudioGuide,
     deleteCurrentAttractionAudioGuide,
     uploadAttractionAudioGuideTrack,
@@ -1265,6 +1266,7 @@ export default function SessionWizard({ components = {} } = {}) {
                 onAddAttractionAudioGuidePlanPoint={addAttractionAudioGuidePlanPoint}
                 onRemoveAttractionAudioGuidePlanPoint={removeAttractionAudioGuidePlanPoint}
                 onUpdateAttractionAudioGuidePlanItemText={updateAttractionAudioGuidePlanItemText}
+                onImportAttractionAudioGuidePlanFromText={importAttractionAudioGuidePlanFromText}
                 onShowNote={showNote}
                 onSaveCurrentAttractionAudioGuide={saveCurrentAttractionAudioGuide}
                 onDeleteCurrentAttractionAudioGuide={deleteCurrentAttractionAudioGuide}
