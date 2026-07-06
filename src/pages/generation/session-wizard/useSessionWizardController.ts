@@ -83,12 +83,24 @@ export function useSessionWizardController({
   const activeCityDraftIdRef = useRef<UUID | null>(null);
   const requestedCityDraftIdRef = useRef<UUID | null>(null);
 
-  const [currentStep, setCurrentStep] = useState(1);
+  // Восстановление позиции после перезагрузки: шаг и открытая
+  // достопримечательность живут в URL (?step=N&attraction=<id>)
+  const [currentStep, setCurrentStep] = useState(() => {
+    if (typeof window === 'undefined') return 1;
+    const raw = Number(new URLSearchParams(window.location.search).get('step'));
+    return Number.isInteger(raw) && raw >= 1 && raw <= TOTAL_STEPS ? raw : 1;
+  });
   const [localeData, setLocaleData] = useState<LocaleData>(makeLocaleData);
   const [activeLocale, setActiveLocale] = useState('ru-RU');
   const [defaultLocale, setDefaultLocale] = useState('ru-RU');
 
-  const currentStepRef = useRef(1);
+  const requestedAttractionIdRef = useRef<string>(
+    typeof window === 'undefined'
+      ? ''
+      : new URLSearchParams(window.location.search).get('attraction') || ''
+  );
+
+  const currentStepRef = useRef(currentStep);
   const hasUnsavedChangesRef = useRef(false);
   const sessionOpenedAtRef = useRef<number | null>(null);
   const firstCitySaveAtRef = useRef<number | null>(null);
@@ -429,6 +441,69 @@ export function useSessionWizardController({
     const state = location.state as WizardLocationState | null;
     requestedCityDraftIdRef.current = normalizeDraftId(routeDraftId || state?.cityDraftId);
   }, [location.search, location.state]);
+
+  // ─── Позиция визарда в URL: перезагрузка страницы возвращает на место ─────
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const prevStep = params.get('step') || '';
+    const prevAttraction = params.get('attraction') || '';
+
+    const nextStep = currentStep > 1 ? String(currentStep) : '';
+    const nextAttraction =
+      currentStep === 3 &&
+      attractionsStep.attrView === 'detail' &&
+      attractionsStep.currentAttr?.id
+        ? String(attractionsStep.currentAttr.id)
+        : '';
+
+    if (prevStep === nextStep && prevAttraction === nextAttraction) return;
+
+    if (nextStep) params.set('step', nextStep);
+    else params.delete('step');
+    if (nextAttraction) params.set('attraction', nextAttraction);
+    else params.delete('attraction');
+
+    navigate(
+      {
+        pathname: location.pathname,
+        search: params.toString() ? `?${params.toString()}` : '',
+      },
+      { replace: true, state: location.state },
+    );
+  }, [
+    currentStep,
+    attractionsStep.attrView,
+    attractionsStep.currentAttr?.id,
+    navigate,
+    location.pathname,
+    location.search,
+    location.state,
+  ]);
+
+  // После перезагрузки: как только достопримечательности загрузились,
+  // открываем ту, что была открыта (?attraction=<id>)
+  useEffect(() => {
+    const wanted = requestedAttractionIdRef.current;
+    if (!wanted) return;
+
+    if (currentStep !== 3 || attractionsStep.attrView === 'detail') {
+      requestedAttractionIdRef.current = '';
+      return;
+    }
+
+    const attractions = attractionsStep.attractions || [];
+    if (!attractions.length) return; // ждём загрузку списка
+
+    requestedAttractionIdRef.current = '';
+    if (attractions.some((a: { id: unknown }) => String(a.id) === wanted)) {
+      attractionsStep.openAttrDetail(wanted);
+    }
+  }, [
+    currentStep,
+    attractionsStep.attractions,
+    attractionsStep.attrView,
+    attractionsStep.openAttrDetail,
+  ]);
 
   const navigateToStep = useCallback(
     async (target: number): Promise<boolean> => {
