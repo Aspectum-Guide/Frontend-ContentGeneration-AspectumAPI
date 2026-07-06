@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { attractionAudioGuidesAPI, audioAPI, ttsAPI } from '../../../api/generation';
+import { attractionAudioGuidesAPI, audioAPI, tasksAPI, ttsAPI } from '../../../api/generation';
 import { parseApiError } from '../../../utils/apiError';
+import { pollGenerationTask } from '../../../utils/generationTaskPoll';
 import {
   normalizeId,
   DEFAULT_LOCALE_DEFS,
@@ -2115,6 +2116,7 @@ export function useAudioGuides({
         const payload = {
           language_code: lang,
           replace_existing: Boolean(replaceExisting),
+          async: true,
         };
         if (voiceId) payload.voice_id = voiceId;
 
@@ -2134,7 +2136,30 @@ export function useAudioGuides({
           payload,
         );
 
-        const data = res?.data || {};
+        let data = res?.data || {};
+        if (data?.async && data?.task_id) {
+          setAudioGuideTrackGenerationError(
+            data.current_step || 'Генерация аудио запущена...',
+          );
+          const task = await pollGenerationTask(data.task_id, {
+            tasksAPI,
+            intervalMs: 3000,
+            maxWaitMs: 30 * 60 * 1000,
+            onProgress: (progressTask) => {
+              const step = progressTask?.current_step;
+              const progress = Number(progressTask?.progress);
+              if (step) {
+                setAudioGuideTrackGenerationError(
+                  Number.isFinite(progress) && progress > 0 && progress < 100
+                    ? `${step} (${progress}%)`
+                    : step,
+                );
+              }
+            },
+          });
+          data = task?.result_data || {};
+        }
+
         if (!data.ok) {
           throw new Error(data.error || 'Не удалось сгенерировать аудио');
         }
