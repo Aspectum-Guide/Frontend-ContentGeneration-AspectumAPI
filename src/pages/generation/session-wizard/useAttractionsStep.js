@@ -2018,12 +2018,46 @@ export function useAttractionsStep(ctx) {
   }, []);
 
   // ─── addAttractionFeedItem ─────────────────────────────────────────────────
-  const addAttractionFeedItem = useCallback(async (itemType = 'text') => {
+  // options.insertAt — вставить на позицию, сдвинув элементы с index >= insertAt
+  // (достройка недостающей половины блока «фото+текст» рядом с парной);
+  // options.bindingFromItem — скопировать привязку соседа.
+  const addAttractionFeedItem = useCallback(async (itemType = 'text', options = {}) => {
     try {
       const emptyItem = createEmptyAttractionFeedItem(itemType);
 
-      emptyItem.index = attractionFeedItems.length;
+      const insertAt = Number.isInteger(options.insertAt) ? options.insertAt : null;
 
+      if (insertAt !== null) {
+        // Сдвигаем соседей ДО создания: новый элемент займёт insertAt
+        const toShift = attractionFeedItems.filter(
+          (item) => Number(item.index) >= insertAt
+        );
+        await Promise.all(
+          toShift.map((item) =>
+            attractionFeedAPI.update(
+              sessionId,
+              item.id,
+              buildAttractionFeedPayload({ ...item, index: Number(item.index) + 1 })
+            )
+          )
+        );
+      }
+
+      emptyItem.index = insertAt !== null
+        ? insertAt
+        : attractionFeedItems.length;
+
+      const bindingSource = options.bindingFromItem;
+      if (bindingSource) {
+        emptyItem.assigned_attraction_type = bindingSource.assigned_attraction_type || 'none';
+        emptyItem.event = bindingSource.event_id ?? bindingSource.event ?? null;
+        emptyItem.event_id = emptyItem.event;
+        emptyItem.attraction = null;
+        emptyItem.attraction_id = null;
+        emptyItem.session_attraction =
+          bindingSource.session_attraction_id ?? bindingSource.session_attraction ?? null;
+        emptyItem.session_attraction_id = emptyItem.session_attraction;
+      } else {
       const sessionAttrId = normalizeId(currentAttr?.id);
       if (sessionAttrId) {
         emptyItem.assigned_attraction_type = 'draft';
@@ -2042,6 +2076,7 @@ export function useAttractionsStep(ctx) {
         emptyItem.attraction = null;
         emptyItem.attraction_id = null;
       }
+      }
 
       const res = await attractionFeedAPI.create(
         sessionId,
@@ -2057,18 +2092,165 @@ export function useAttractionsStep(ctx) {
           attractionFeedLocaleDataItemIdRef.current = null;
         }
 
-        setAttractionFeedItems((prev) => [...prev, item]);
+        setAttractionFeedItems((prev) => {
+          const base = insertAt !== null
+            ? prev.map((existing) =>
+                Number(existing.index) >= insertAt
+                  ? { ...existing, index: Number(existing.index) + 1 }
+                  : existing
+              )
+            : prev;
+          return [...base, item];
+        });
         setCurrentAttractionFeedItem(item);
 
         showNote('Элемент ленты добавлен', 'success');
       }
+      return item;
     } catch (e) {
       showNote(
         'Ошибка при добавлении элемента ленты: ' + parseApiError(e),
         'error'
       );
+      return null;
     }
-  }, [sessionId, attractionFeedItems.length, showNote, currentAttr]);
+  }, [sessionId, attractionFeedItems, showNote, currentAttr]);
+
+  // ─── addAttractionFeedBlock ────────────────────────────────────────────────
+  // Блок = пара «изображение + текст». В API это по-прежнему ДВА отдельных
+  // feed-item'а (item_type=image и item_type=text) с соседними индексами —
+  // контракт бэкенда и мобильного приложения не меняется.
+  const addAttractionFeedBlock = useCallback(async () => {
+    const applyBinding = (emptyItem) => {
+      const sessionAttrId = normalizeId(currentAttr?.id);
+      emptyItem.event = null;
+      emptyItem.event_id = null;
+      emptyItem.attraction = null;
+      emptyItem.attraction_id = null;
+      if (sessionAttrId) {
+        emptyItem.assigned_attraction_type = 'draft';
+        emptyItem.session_attraction = sessionAttrId;
+        emptyItem.session_attraction_id = sessionAttrId;
+      } else {
+        emptyItem.assigned_attraction_type = 'none';
+        emptyItem.session_attraction = null;
+        emptyItem.session_attraction_id = null;
+      }
+      return emptyItem;
+    };
+
+    try {
+      // max(index)+1 устойчивее к дырам/дубликатам индексов, чем length
+      const baseIndex = attractionFeedItems.reduce(
+        (acc, item) => Math.max(acc, Number(item.index ?? 0) + 1),
+        attractionFeedItems.length,
+      );
+      const created = [];
+
+      for (const [offset, itemType] of [[0, 'image'], [1, 'text']]) {
+        const emptyItem = applyBinding(createEmptyAttractionFeedItem(itemType));
+        emptyItem.index = baseIndex + offset;
+
+        const res = await attractionFeedAPI.create(
+          sessionId,
+          buildAttractionFeedPayload(emptyItem)
+        );
+        const rawItem = res?.data?.attraction_feed_item || res?.data;
+        const item = rawItem?.id != null ? normalizeAttractionFeedItem(rawItem) : null;
+        if (item?.id) created.push(item);
+      }
+
+      if (created.length) {
+        setAttractionFeedItems((prev) => [...prev, ...created]);
+        showNote('Блок ленты (фото + текст) добавлен', 'success');
+      }
+      return created;
+    } catch (e) {
+      showNote('Ошибка при добавлении блока ленты: ' + parseApiError(e), 'error');
+      return [];
+    }
+  }, [sessionId, attractionFeedItems, showNote, currentAttr]);
+
+  // ─── reorderAttractionFeedItems ────────────────────────────────────────────
+  // Принимает id в новом визуальном порядке, переиндексирует 0..N-1 и
+  // сохраняет изменившиеся индексы через существующий update-эндпоинт.
+  const reorderAttractionFeedItems = useCallback(async (orderedIds, { silent = false } = {}) => {
+    const orderMap = new Map(
+      orderedIds.map((id, position) => [normalizeId(id), position])
+    );
+
+    // Считаем новый порядок ЧИСТО (не внутри setState-updater'а: его
+    // side-effect'ы выполняются позже и PATCH'и не успели бы собраться)
+    const next = [...attractionFeedItems]
+      .sort((a, b) => {
+        const pa = orderMap.get(normalizeId(a.id)) ?? Number.MAX_SAFE_INTEGER;
+        const pb = orderMap.get(normalizeId(b.id)) ?? Number.MAX_SAFE_INTEGER;
+        return pa - pb;
+      })
+      .map((item, position) =>
+        Number(item.index) !== position ? { ...item, index: position } : item
+      );
+
+    const prevIndexById = new Map(
+      attractionFeedItems.map((item) => [normalizeId(item.id), Number(item.index)])
+    );
+    const changed = next.filter(
+      (item) => prevIndexById.get(normalizeId(item.id)) !== Number(item.index)
+    );
+
+    setAttractionFeedItems(next);
+
+    // Текущий открытый элемент тоже мог сменить индекс
+    setCurrentAttractionFeedItem((prev) => {
+      if (!prev) return prev;
+      const position = orderMap.get(normalizeId(prev.id));
+      if (position === undefined || Number(prev.index) === position) return prev;
+      return { ...prev, index: position };
+    });
+
+    try {
+      await Promise.all(
+        changed.map((item) =>
+          attractionFeedAPI.update(
+            sessionId,
+            item.id,
+            buildAttractionFeedPayload(item)
+          )
+        )
+      );
+      if (changed.length && !silent) {
+        showNote('Порядок ленты обновлён', 'success');
+      }
+    } catch (e) {
+      showNote('Ошибка при сохранении порядка: ' + parseApiError(e), 'error');
+    }
+  }, [sessionId, attractionFeedItems, showNote]);
+
+  // ─── deleteAttractionFeedItemsByIds ────────────────────────────────────────
+  // Удаление блока целиком (обе половины) из списка, без открытия detail.
+  const deleteAttractionFeedItemsByIds = useCallback(async (ids, { label = 'блок' } = {}) => {
+    const targetIds = (ids || []).map(normalizeId).filter(Boolean);
+    if (!targetIds.length) return;
+
+    if (!(await confirm({ message: `Удалить ${label}?`, danger: true }))) {
+      return;
+    }
+
+    try {
+      for (const id of targetIds) {
+        await attractionFeedAPI.delete(sessionId, id);
+      }
+      setAttractionFeedItems((items) =>
+        items.filter((item) => !targetIds.includes(normalizeId(item.id)))
+      );
+      setCurrentAttractionFeedItem((prev) =>
+        prev && targetIds.includes(normalizeId(prev.id)) ? null : prev
+      );
+      showNote('Удалено', 'success');
+    } catch (e) {
+      showNote('Ошибка при удалении: ' + parseApiError(e), 'error');
+    }
+  }, [sessionId, confirm, showNote]);
 
   // ─── updateAttractionFeedLocaleField ───────────────────────────────────────
   const updateAttractionFeedLocaleField = useCallback((field, value) => {
@@ -3048,6 +3230,9 @@ export function useAttractionsStep(ctx) {
     getAttractionInfoName,
 
     addAttractionFeedItem,
+    addAttractionFeedBlock,
+    reorderAttractionFeedItems,
+    deleteAttractionFeedItemsByIds,
     openAttractionFeedItemDetail,
     deleteCurrentAttractionFeedItem,
     saveCurrentAttractionFeedItem,

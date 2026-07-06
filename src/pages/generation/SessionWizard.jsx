@@ -347,6 +347,9 @@ export default function SessionWizard({ components = {} } = {}) {
 
     openAttractionFeedItemDetail,
     addAttractionFeedItem,
+    addAttractionFeedBlock,
+    reorderAttractionFeedItems,
+    deleteAttractionFeedItemsByIds,
     updateCurrentAttractionFeedItemPatch,
     updateAttractionFeedLocaleField,
     saveCurrentAttractionFeedItem,
@@ -1212,6 +1215,9 @@ export default function SessionWizard({ components = {} } = {}) {
                 onOpenAttractionFeedItemDetail={openAttractionFeedItemDetail}
                 onOpenAttractionFeedCommonsModal={openAttractionFeedCommonsModal}
                 onAddAttractionFeedItem={addAttractionFeedItem}
+                onAddAttractionFeedBlock={addAttractionFeedBlock}
+                onReorderAttractionFeedItems={reorderAttractionFeedItems}
+                onDeleteAttractionFeedItemsByIds={deleteAttractionFeedItemsByIds}
                 onSetCurrentAttractionFeedItem={setCurrentAttractionFeedItem}
                 onSetAttractionFeedActiveLocale={setAttractionFeedActiveLocale}
                 onUpdateAttractionFeedLocaleField={updateAttractionFeedLocaleField}

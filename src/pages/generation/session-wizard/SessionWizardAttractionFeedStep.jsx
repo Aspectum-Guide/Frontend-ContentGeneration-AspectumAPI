@@ -1,3 +1,5 @@
+import { useMemo, useRef, useState } from 'react';
+
 import { getFlag, normalizeId } from './sessionWizardShared.jsx';
 
 const getMultilangDisplay = (value, fallback = '') => {
@@ -84,11 +86,6 @@ const getFeedItemName = (item) => {
   }
 
   return preview;
-};
-
-const getFeedItemTypeLabel = (item) => {
-  if (item?.item_type === 'image') return 'Изображение';
-  return 'Текст';
 };
 
 const isFeedItemBindingIncomplete = (item) => {
@@ -223,7 +220,7 @@ function AttractionFeedItemsPanel({
   attractionFeedItems = [],
   currentAttractionFeedItem,
   onSelectFeedItem,
-  onAddFeedItem,
+  onAddFeedBlock,
 }) {
   const currentId = normalizeId(currentAttractionFeedItem?.id);
 
@@ -231,26 +228,16 @@ function AttractionFeedItemsPanel({
     <div className="p-3 border border-gray-200 rounded-xl bg-gray-50">
       <div className="flex items-center justify-between mb-2 gap-3">
         <p className="text-sm font-medium text-gray-800">
-          Черновики элементов ленты
+          Элементы ленты
         </p>
 
-        <div className="flex items-center gap-1.5">
-          <button
-            type="button"
-            onClick={() => onAddFeedItem?.('text')}
-            className="px-2.5 py-1 text-xs font-medium text-blue-700 bg-blue-100 rounded-md hover:bg-blue-200 transition-colors"
-          >
-            + Текст
-          </button>
-
-          <button
-            type="button"
-            onClick={() => onAddFeedItem?.('image')}
-            className="px-2.5 py-1 text-xs font-medium text-purple-700 bg-purple-100 rounded-md hover:bg-purple-200 transition-colors"
-          >
-            + Изображение
-          </button>
-        </div>
+        <button
+          type="button"
+          onClick={() => onAddFeedBlock?.()}
+          className="px-2.5 py-1 text-xs font-medium text-blue-700 bg-blue-100 rounded-md hover:bg-blue-200 transition-colors"
+        >
+          + Блок (фото + текст)
+        </button>
       </div>
 
       <div className="flex flex-wrap gap-2">
@@ -403,6 +390,176 @@ function FeedImagePanel({
   );
 }
 
+// ─── Блочная модель ленты ────────────────────────────────────────────────────
+// UI группирует элементы в блоки «фото + текст», но в API это по-прежнему
+// отдельные feed-item'ы (item_type=image / text) с индексами — контракт
+// бэкенда и мобильного приложения не меняется.
+
+const getFeedItemBindingKey = (item) =>
+  getDatabaseAttractionId(item) || getSessionAttractionId(item) || 'none';
+
+function buildFeedBlocks(items = []) {
+  const sorted = [...items].sort((a, b) => {
+    const ai = Number(a.index ?? 0);
+    const bi = Number(b.index ?? 0);
+    if (ai !== bi) return ai - bi;
+    return String(a.id).localeCompare(String(b.id));
+  });
+
+  const blocks = [];
+  let cursor = 0;
+  while (cursor < sorted.length) {
+    const item = sorted[cursor];
+    const next = sorted[cursor + 1];
+
+    if (
+      item.item_type === 'image' &&
+      next?.item_type === 'text' &&
+      getFeedItemBindingKey(item) === getFeedItemBindingKey(next)
+    ) {
+      blocks.push({ key: `${item.id}:${next.id}`, image: item, text: next });
+      cursor += 2;
+      continue;
+    }
+
+    if (item.item_type === 'image') {
+      blocks.push({ key: String(item.id), image: item, text: null });
+    } else {
+      blocks.push({ key: String(item.id), image: null, text: item });
+    }
+    cursor += 1;
+  }
+
+  return blocks;
+}
+
+const flattenBlocksToIds = (blocks) =>
+  blocks.flatMap((block) => [block.image?.id, block.text?.id].filter(Boolean));
+
+function FeedBlockCard({
+  block,
+  position,
+  referenceAttractions,
+  attractions,
+  isDragging,
+  isDropTarget,
+  onDragStart,
+  onDragOver,
+  onDragLeave,
+  onDrop,
+  onDragEnd,
+  onOpenItem,
+  onAddMissingHalf,
+  onDeleteBlock,
+}) {
+  const anchorItem = block.image || block.text;
+  const textPreview = block.text ? getFeedItemTextPreview(block.text) : '';
+  const imagePreview = block.image ? getFeedImagePreview(block.image) : null;
+  const bindingIncomplete = isFeedItemBindingIncomplete(anchorItem);
+
+  return (
+    <div
+      draggable
+      onDragStart={onDragStart}
+      onDragOver={onDragOver}
+      onDragLeave={onDragLeave}
+      onDrop={onDrop}
+      onDragEnd={onDragEnd}
+      className={`relative flex gap-3 p-3 bg-white border rounded-xl transition-all select-none ${
+        isDragging
+          ? 'opacity-40 border-blue-400'
+          : isDropTarget
+            ? 'border-blue-500 ring-2 ring-blue-200'
+            : 'border-gray-200 hover:border-blue-300'
+      }`}
+    >
+      {/* Ручка + номер блока */}
+      <div className="flex flex-col items-center gap-1 shrink-0 pt-1 cursor-grab active:cursor-grabbing text-gray-400">
+        <span className="text-base leading-none" title="Перетащите, чтобы изменить порядок">⠿</span>
+        <span className="w-6 h-6 flex items-center justify-center rounded-full bg-gray-100 text-xs font-medium text-gray-600">
+          {position + 1}
+        </span>
+      </div>
+
+      {/* Фото-половина */}
+      <div className="w-32 shrink-0">
+        {block.image ? (
+          <button
+            type="button"
+            onClick={() => onOpenItem?.(block.image.id)}
+            className="relative block w-full aspect-[4/3] bg-gray-100 rounded-lg overflow-hidden border border-gray-200 hover:ring-2 hover:ring-blue-300 transition-shadow"
+            title="Открыть фото"
+          >
+            {imagePreview ? (
+              <img src={imagePreview} alt="" className="w-full h-full object-cover" />
+            ) : (
+              <span className="absolute inset-0 flex items-center justify-center text-[11px] text-gray-400 px-1 text-center">
+                Фото не выбрано — нажмите, чтобы добавить
+              </span>
+            )}
+          </button>
+        ) : (
+          <button
+            type="button"
+            onClick={() => onAddMissingHalf?.(block, 'image')}
+            className="w-full aspect-[4/3] rounded-lg border-2 border-dashed border-gray-300 text-gray-400 text-xs hover:border-blue-400 hover:text-blue-500 transition-colors"
+          >
+            + фото
+          </button>
+        )}
+      </div>
+
+      {/* Текст-половина */}
+      <div className="flex-1 min-w-0 flex flex-col">
+        {block.text ? (
+          <button
+            type="button"
+            onClick={() => onOpenItem?.(block.text.id)}
+            className="flex-1 text-left text-sm text-gray-700 leading-snug rounded-lg px-2 py-1.5 -mx-1 hover:bg-blue-50 transition-colors"
+            title="Открыть текст"
+          >
+            {textPreview ? (
+              <span className="line-clamp-4">{textPreview}</span>
+            ) : (
+              <span className="text-gray-400 italic">
+                Текст не заполнен — нажмите, чтобы написать
+              </span>
+            )}
+          </button>
+        ) : (
+          <button
+            type="button"
+            onClick={() => onAddMissingHalf?.(block, 'text')}
+            className="flex-1 rounded-lg border-2 border-dashed border-gray-300 text-gray-400 text-xs hover:border-blue-400 hover:text-blue-500 transition-colors"
+          >
+            + текст к этому фото
+          </button>
+        )}
+
+        <div className="flex items-center gap-1.5 text-[11px] text-gray-500 mt-1.5 min-w-0">
+          <span className="truncate">
+            {getFeedItemBindingLabel(anchorItem, referenceAttractions, attractions)}
+          </span>
+          {bindingIncomplete && (
+            <span className="px-1.5 py-0.5 rounded bg-amber-100 text-amber-700 font-medium shrink-0">
+              ⚠ не выбрана
+            </span>
+          )}
+        </div>
+      </div>
+
+      <button
+        type="button"
+        onClick={() => onDeleteBlock?.(block)}
+        className="absolute top-2 right-2 w-6 h-6 flex items-center justify-center rounded-md text-gray-300 hover:text-red-600 hover:bg-red-50 transition-colors"
+        title="Удалить блок"
+      >
+        ✕
+      </button>
+    </div>
+  );
+}
+
 export default function SessionWizardAttractionFeedStep({
   embedded = false,
   scopedToAttractionId = '',
@@ -422,6 +579,9 @@ export default function SessionWizardAttractionFeedStep({
 
   onOpenAttractionFeedItemDetail,
   onAddAttractionFeedItem,
+  onAddAttractionFeedBlock,
+  onReorderAttractionFeedItems,
+  onDeleteAttractionFeedItemsByIds,
   onSetCurrentAttractionFeedItem,
   onSetAttractionFeedActiveLocale,
   onUpdateAttractionFeedLocaleField,
@@ -454,6 +614,55 @@ export default function SessionWizardAttractionFeedStep({
     }
   };
 
+  // ─── Блочный режим списка: карточки «фото + текст» с drag&drop ────────────
+  const feedBlocks = useMemo(
+    () => buildFeedBlocks(attractionFeedItems),
+    [attractionFeedItems],
+  );
+
+  const [dragBlockKey, setDragBlockKey] = useState(null);
+  const [dropBlockKey, setDropBlockKey] = useState(null);
+  // ref — источник истины для drop: state может не успеть обновиться
+  // между dragstart и drop (быстрый жест), стейт нужен только для подсветки
+  const dragBlockKeyRef = useRef(null);
+
+  const handleBlockDrop = (targetKey) => {
+    const sourceKey = dragBlockKeyRef.current;
+    setDropBlockKey(null);
+    if (!sourceKey || sourceKey === targetKey) return;
+
+    const fromIdx = feedBlocks.findIndex((b) => b.key === sourceKey);
+    const toIdx = feedBlocks.findIndex((b) => b.key === targetKey);
+    if (fromIdx < 0 || toIdx < 0) return;
+
+    const next = [...feedBlocks];
+    const [moved] = next.splice(fromIdx, 1);
+    next.splice(toIdx, 0, moved);
+
+    onReorderAttractionFeedItems?.(flattenBlocksToIds(next));
+  };
+
+  const handleAddMissingHalf = (block, type) => {
+    const sibling = block.image || block.text;
+    if (!sibling) return;
+
+    // Фото встаёт ПЕРЕД текстом пары, текст — ПОСЛЕ фото пары
+    const insertAt = type === 'image'
+      ? Number(sibling.index ?? 0)
+      : Number(sibling.index ?? 0) + 1;
+
+    onAddAttractionFeedItem?.(type, {
+      bindingFromItem: sibling,
+      insertAt,
+    });
+  };
+
+  const handleDeleteBlock = (block) => {
+    const ids = [block.image?.id, block.text?.id].filter(Boolean);
+    const label = ids.length > 1 ? 'блок (фото и текст)' : 'элемент ленты';
+    onDeleteAttractionFeedItemsByIds?.(ids, { label });
+  };
+
   if (!currentAttractionFeedItem) {
     return (
       <section className="space-y-4">
@@ -464,85 +673,71 @@ export default function SessionWizardAttractionFeedStep({
             </h2>
 
             <p className="text-sm text-gray-500">
-              Добавьте отдельные текстовые комментарии и изображения для ленты.
-              Текст и картинки не привязаны друг к другу.
+              Блок ленты — это фотография и подпись к ней. Перетаскивайте
+              карточки за ⠿, чтобы изменить порядок показа в приложении.
             </p>
           </div>
 
-          <div className="flex items-center gap-2 shrink-0">
-            <button
-              type="button"
-              onClick={() => onAddAttractionFeedItem?.('text')}
-              className="px-3 py-1.5 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors"
-            >
-              + Текст
-            </button>
-
-            <button
-              type="button"
-              onClick={() => onAddAttractionFeedItem?.('image')}
-              className="px-3 py-1.5 text-sm font-medium text-white bg-purple-600 rounded-lg hover:bg-purple-700 transition-colors"
-            >
-              + Изображение
-            </button>
-          </div>
+          <button
+            type="button"
+            onClick={() => onAddAttractionFeedBlock?.()}
+            className="px-3 py-1.5 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors shrink-0"
+          >
+            + Добавить блок
+          </button>
         </div>
 
-        {attractionFeedItems.length === 0 ? (
+        {feedBlocks.length === 0 ? (
           <div className="text-center py-10 text-gray-400 border border-dashed border-gray-200 rounded-xl bg-gray-50">
             <div className="text-3xl mb-2">🖼️</div>
 
             <p className="text-sm">
               {scopedToAttractionId
-                ? 'Для этой достопримечательности пока нет элементов ленты.'
-                : 'Нет элементов ленты. Добавьте текст или изображение.'}
+                ? 'Для этой достопримечательности пока нет ленты.'
+                : 'Лента пуста. Добавьте первый блок «фото + текст».'}
             </p>
           </div>
         ) : (
-          <div className="space-y-2">
-            {attractionFeedItems.map((item, index) => (
-              <div
-                key={item.id}
-                onClick={() => onOpenAttractionFeedItemDetail?.(item.id)}
-                className="flex items-center justify-between p-3 bg-white border border-gray-200 rounded-lg hover:border-blue-300 hover:bg-blue-50 cursor-pointer transition-colors"
-              >
-                <div className="flex items-center gap-3 min-w-0">
-                  <span className="w-6 h-6 flex items-center justify-center rounded-full bg-gray-100 text-xs font-medium text-gray-600 shrink-0">
-                    {index + 1}
-                  </span>
-
-                  <div className="min-w-0">
-                    <div className="flex items-center gap-2">
-                      <span
-                        className={`px-1.5 py-0.5 rounded text-[11px] font-medium ${
-                          item.item_type === 'image'
-                            ? 'bg-purple-100 text-purple-700'
-                            : 'bg-blue-100 text-blue-700'
-                        }`}
-                      >
-                        {getFeedItemTypeLabel(item)}
-                      </span>
-
-                      <div className="text-sm font-medium text-gray-900 truncate">
-                        {getFeedItemName(item)}
-                      </div>
-                    </div>
-
-                    <div className="flex items-center gap-1.5 text-xs text-gray-500 mt-0.5">
-                      {getFeedItemBindingLabel(item, referenceAttractions, attractions)}
-                      {isFeedItemBindingIncomplete(item) && (
-                        <span className="px-1.5 py-0.5 rounded bg-amber-100 text-amber-700 font-medium shrink-0">
-                          ⚠ не выбрана
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                </div>
-
-                <span className="text-xs text-blue-600 font-medium shrink-0">
-                  Открыть →
-                </span>
-              </div>
+          <div className="grid gap-2.5 sm:grid-cols-1 lg:grid-cols-2">
+            {feedBlocks.map((block, position) => (
+              <FeedBlockCard
+                key={block.key}
+                block={block}
+                position={position}
+                referenceAttractions={referenceAttractions}
+                attractions={attractions}
+                isDragging={dragBlockKey === block.key}
+                isDropTarget={dropBlockKey === block.key && dragBlockKey !== block.key}
+                onDragStart={(event) => {
+                  if (event.dataTransfer) {
+                    event.dataTransfer.effectAllowed = 'move';
+                  }
+                  dragBlockKeyRef.current = block.key;
+                  setDragBlockKey(block.key);
+                }}
+                onDragOver={(event) => {
+                  event.preventDefault();
+                  if (event.dataTransfer) {
+                    event.dataTransfer.dropEffect = 'move';
+                  }
+                  setDropBlockKey(block.key);
+                }}
+                onDragLeave={() => {
+                  setDropBlockKey((prev) => (prev === block.key ? null : prev));
+                }}
+                onDrop={(event) => {
+                  event.preventDefault();
+                  handleBlockDrop(block.key);
+                }}
+                onDragEnd={() => {
+                  dragBlockKeyRef.current = null;
+                  setDragBlockKey(null);
+                  setDropBlockKey(null);
+                }}
+                onOpenItem={onOpenAttractionFeedItemDetail}
+                onAddMissingHalf={handleAddMissingHalf}
+                onDeleteBlock={handleDeleteBlock}
+              />
             ))}
           </div>
         )}
@@ -598,7 +793,7 @@ export default function SessionWizardAttractionFeedStep({
         attractionFeedItems={attractionFeedItems}
         currentAttractionFeedItem={currentAttractionFeedItem}
         onSelectFeedItem={onOpenAttractionFeedItemDetail}
-        onAddFeedItem={onAddAttractionFeedItem}
+        onAddFeedBlock={onAddAttractionFeedBlock}
       />
 
       {itemType === 'text' && (
