@@ -341,6 +341,7 @@ export default function SessionWizard({ components = {} } = {}) {
     updateAttractionInfoLocaleField,
     saveCurrentAttractionInfo,
     deleteCurrentAttractionInfo,
+    deleteAttractionInfosByIds,
 
     setCurrentAttractionFeedItem,
     setAttractionFeedActiveLocale,
@@ -1173,6 +1174,7 @@ export default function SessionWizard({ components = {} } = {}) {
                 onUpdateCurrentAttractionInfoPatch={updateCurrentAttractionInfoPatch}
                 onSaveCurrentAttractionInfo={saveCurrentAttractionInfo}
                 onDeleteCurrentAttractionInfo={deleteCurrentAttractionInfo}
+                onDeleteAttractionInfosByIds={deleteAttractionInfosByIds}
                 onGoToStep={goToStep}
                 attractionInfoGenerateModalOpen={attractionInfoGenerateModalOpen}
                 attractionInfoGeneratePrompt={attractionInfoGeneratePrompt}

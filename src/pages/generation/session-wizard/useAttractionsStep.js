@@ -1839,6 +1839,64 @@ export function useAttractionsStep(ctx) {
     showNote,
   ]);
 
+  // ─── deleteAttractionInfosByIds (пакетное удаление) ────────────────────────
+  const deleteAttractionInfosByIds = useCallback(
+    async (ids = []) => {
+      const targetIds = Array.from(
+        new Set((ids || []).map((id) => normalizeId(id)).filter(Boolean)),
+      );
+
+      if (targetIds.length === 0) return { deleted: 0, failed: 0 };
+
+      if (
+        !(await confirm({
+          message: `Удалить выбранную полезную информацию (${targetIds.length})?`,
+          danger: true,
+        }))
+      ) {
+        return { deleted: 0, failed: 0, cancelled: true };
+      }
+
+      const results = await Promise.allSettled(
+        targetIds.map((id) => attractionInfosAPI.delete(sessionId, id)),
+      );
+
+      const deletedIds = new Set();
+      let failed = 0;
+
+      results.forEach((res, idx) => {
+        if (res.status === 'fulfilled') {
+          deletedIds.add(targetIds[idx]);
+        } else {
+          failed += 1;
+        }
+      });
+
+      if (deletedIds.size > 0) {
+        setAttractionInfos((items) =>
+          items.filter((item) => !deletedIds.has(normalizeId(item.id))),
+        );
+        setCurrentAttractionInfo((prev) =>
+          prev && deletedIds.has(normalizeId(prev.id)) ? null : prev,
+        );
+      }
+
+      if (failed === 0) {
+        showNote(`Удалено блоков: ${deletedIds.size}`, 'success');
+      } else if (deletedIds.size > 0) {
+        showNote(
+          `Удалено: ${deletedIds.size}, не удалось: ${failed}`,
+          'warning',
+        );
+      } else {
+        showNote('Не удалось удалить выбранные блоки', 'error');
+      }
+
+      return { deleted: deletedIds.size, failed };
+    },
+    [sessionId, confirm, showNote],
+  );
+
   // ─── buildAttractionFeedLocaleData ─────────────────────────────────────────
   const buildAttractionFeedLocaleData = useCallback(
     (item, previousData = null) => {
@@ -3222,6 +3280,7 @@ export function useAttractionsStep(ctx) {
     addAttractionInfo,
     openAttractionInfoDetail,
     deleteCurrentAttractionInfo,
+    deleteAttractionInfosByIds,
     updateCurrentAttractionInfoPatch,
     updateAttractionInfoLocaleField,
     saveCurrentAttractionInfo,

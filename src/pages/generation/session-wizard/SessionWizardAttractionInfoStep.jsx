@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import AiGenerationModal, { WizardGenerationActionFooter } from '../../../components/generation/AiGenerationModal.jsx';
 import AiGenerationQualitySettings from '../../../components/generation/AiGenerationQualitySettings.jsx';
 import AiGenerationDedupeToggle from '../../../components/generation/AiGenerationDedupeToggle.jsx';
@@ -239,6 +239,7 @@ export default function SessionWizardAttractionInfoStep({
   onUpdateCurrentAttractionInfoPatch,
   onSaveCurrentAttractionInfo,
   onDeleteCurrentAttractionInfo,
+  onDeleteAttractionInfosByIds,
   onGoToStep,
 
   attractionInfoGenerateModalOpen = false,
@@ -265,6 +266,39 @@ export default function SessionWizardAttractionInfoStep({
 }) {
   const currentLocale =
     attractionInfoLocaleData[attractionInfoActiveLocale] || {};
+
+  const [selectMode, setSelectMode] = useState(false);
+  const [selectedIds, setSelectedIds] = useState(() => new Set());
+
+  const exitSelectMode = () => {
+    setSelectMode(false);
+    setSelectedIds(new Set());
+  };
+
+  const toggleSelected = (id) => {
+    const key = normalizeId(id);
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  };
+
+  const allInfoIds = attractionInfos.map((info) => normalizeId(info.id));
+  const allSelected =
+    allInfoIds.length > 0 && allInfoIds.every((id) => selectedIds.has(id));
+
+  const toggleSelectAll = () => {
+    setSelectedIds(allSelected ? new Set() : new Set(allInfoIds));
+  };
+
+  const handleBulkDelete = async () => {
+    const ids = Array.from(selectedIds);
+    if (ids.length === 0) return;
+    const res = await onDeleteAttractionInfosByIds?.(ids);
+    if (!res?.cancelled) exitSelectMode();
+  };
 
   const savedAttractions = useMemo(
     () => filterPersistedSessionAttractions(attractions),
@@ -467,19 +501,60 @@ export default function SessionWizardAttractionInfoStep({
       <section className="space-y-4">
         {attractionInfoGenerationModal}
 
-        <div className="flex items-center justify-between gap-3">
-          <div>
-            <h2 className="text-lg font-semibold text-gray-900">
-              Полезная информация о достопримечательности
-            </h2>
+        <div className="flex items-start justify-between gap-3">
+          <div className="flex flex-wrap items-center gap-3">
+            <div>
+              <h2 className="text-lg font-semibold text-gray-900">
+                Полезная информация о достопримечательности
+              </h2>
 
-            <p className="text-sm text-gray-500">
-              Добавьте полезные блоки: часы работы, билеты, правила посещения,
-              советы
-            </p>
+              <p className="text-sm text-gray-500">
+                Добавьте полезные блоки: часы работы, билеты, правила посещения,
+                советы
+              </p>
+            </div>
+
+            {!selectMode && attractionInfoHeaderActions}
           </div>
 
-          {attractionInfoHeaderActions}
+          {attractionInfos.length > 0 && (
+            <div className="flex items-center gap-2 shrink-0">
+              {selectMode ? (
+                <>
+                  <button
+                    type="button"
+                    onClick={toggleSelectAll}
+                    className="px-3 py-1.5 text-sm font-medium text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+                  >
+                    {allSelected ? 'Снять все' : 'Выбрать все'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleBulkDelete}
+                    disabled={selectedIds.size === 0}
+                    className="px-3 py-1.5 text-sm font-medium text-white bg-red-600 rounded-lg hover:bg-red-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    Удалить ({selectedIds.size})
+                  </button>
+                  <button
+                    type="button"
+                    onClick={exitSelectMode}
+                    className="px-3 py-1.5 text-sm font-medium text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+                  >
+                    Отмена
+                  </button>
+                </>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => setSelectMode(true)}
+                  className="px-3 py-1.5 text-sm font-medium text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+                >
+                  Выбрать
+                </button>
+              )}
+            </div>
+          )}
         </div>
 
         {attractionInfos.length === 0 ? (
@@ -494,38 +569,67 @@ export default function SessionWizardAttractionInfoStep({
           </div>
         ) : (
           <div className="space-y-2">
-            {attractionInfos.map((info, idx) => (
-              <div
-                key={info.id}
-                onClick={() => onOpenAttractionInfoDetail?.(info.id)}
-                className="flex items-center justify-between p-3 bg-white border border-gray-200 rounded-lg hover:border-blue-300 hover:bg-blue-50 cursor-pointer transition-colors"
-              >
-                <div className="flex items-center gap-3 min-w-0">
-                  <span className="w-6 h-6 flex items-center justify-center rounded-full bg-gray-100 text-xs font-medium text-gray-600 shrink-0">
-                    {idx + 1}
-                  </span>
+            {attractionInfos.map((info, idx) => {
+              const infoKey = normalizeId(info.id);
+              const isSelected = selectedIds.has(infoKey);
 
-                  <div className="min-w-0">
-                    <div className="text-sm font-medium text-gray-900 truncate">
-                      {getAttractionInfoName(info)}
-                    </div>
+              return (
+                <div
+                  key={info.id}
+                  onClick={() =>
+                    selectMode
+                      ? toggleSelected(info.id)
+                      : onOpenAttractionInfoDetail?.(info.id)
+                  }
+                  className={`flex items-center justify-between p-3 bg-white border rounded-lg cursor-pointer transition-colors ${
+                    selectMode && isSelected
+                      ? 'border-blue-400 bg-blue-50'
+                      : 'border-gray-200 hover:border-blue-300 hover:bg-blue-50'
+                  }`}
+                >
+                  <div className="flex items-center gap-3 min-w-0">
+                    {selectMode && (
+                      <input
+                        type="checkbox"
+                        checked={isSelected}
+                        onChange={() => toggleSelected(info.id)}
+                        onClick={(e) => e.stopPropagation()}
+                        className="w-4 h-4 accent-blue-600 shrink-0 cursor-pointer"
+                      />
+                    )}
 
-                    <div className="flex items-center gap-1.5 text-xs text-gray-500">
-                      {getAttractionInfoBindingLabel(info, referenceAttractions, attractions)}
-                      {isAttractionInfoBindingIncomplete(info) && (
-                        <span className="px-1.5 py-0.5 rounded bg-amber-100 text-amber-700 font-medium shrink-0">
-                          ⚠ не выбрана
-                        </span>
-                      )}
+                    <span className="w-6 h-6 flex items-center justify-center rounded-full bg-gray-100 text-xs font-medium text-gray-600 shrink-0">
+                      {idx + 1}
+                    </span>
+
+                    <div className="min-w-0">
+                      <div className="text-sm font-medium text-gray-900 truncate">
+                        {getAttractionInfoName(info)}
+                      </div>
+
+                      <div className="flex items-center gap-1.5 text-xs text-gray-500">
+                        {getAttractionInfoBindingLabel(info, referenceAttractions, attractions)}
+                        {isAttractionInfoBindingIncomplete(info) && (
+                          <span className="px-1.5 py-0.5 rounded bg-amber-100 text-amber-700 font-medium shrink-0">
+                            ⚠ не выбрана
+                          </span>
+                        )}
+                      </div>
                     </div>
                   </div>
-                </div>
 
-                <span className="text-xs text-blue-600 font-medium shrink-0">
-                  Открыть →
-                </span>
-              </div>
-            ))}
+                  {selectMode ? (
+                    <span className="text-xs text-gray-400 font-medium shrink-0">
+                      {isSelected ? 'Выбрано' : 'Выбрать'}
+                    </span>
+                  ) : (
+                    <span className="text-xs text-blue-600 font-medium shrink-0">
+                      Открыть →
+                    </span>
+                  )}
+                </div>
+              );
+            })}
           </div>
         )}
 
