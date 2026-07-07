@@ -4,6 +4,7 @@ import AiGenerationQualitySettings from '../../../components/generation/AiGenera
 import AiGenerationDedupeToggle from '../../../components/generation/AiGenerationDedupeToggle.jsx';
 import AiGenerationCountField from '../../../components/generation/AiGenerationCountField.jsx';
 import { getFlag, normalizeId } from './sessionWizardShared.jsx';
+import UsefulInfoTextImportBox from './UsefulInfoTextImportBox.jsx';
 
 const AI_GENERATION_LANG_OPTIONS = [
   { value: 'ru', label: 'Русский (ru)' },
@@ -212,6 +213,7 @@ export default function SessionWizardCityInfoStep({
   onUpdateCurrentCityInfoPatch,
   onSaveCurrentCityInfo,
   onDeleteCurrentCityInfo,
+  onImportCityInfoFromText,
   onGoToStep,
 
   cityInfoGenerateModalOpen = false,
@@ -427,6 +429,15 @@ export default function SessionWizardCityInfoStep({
               </button>
             </div>
           </div>
+
+          <UsefulInfoTextImportBox
+            title="Вставить готовую полезную информацию о городе"
+            description="Строки с «# Заголовок» станут отдельными блоками полезной информации, а текст под каждым заголовком — описанием блока."
+            buttonLabel="Создать блоки о городе"
+            defaultLanguage={cityInfoGenerationLang || 'ru'}
+            disabled={cityInfoSaving || cityInfoGenerating}
+            onImport={onImportCityInfoFromText}
+          />
 
           {cityInfos.length === 0 ? (
             <div className="text-center py-10 text-gray-400 border border-dashed border-gray-200 rounded-xl bg-gray-50">

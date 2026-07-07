@@ -37,6 +37,33 @@ const STEP_LABELS = [
   'Публикация',
 ];
 
+function normalizeCommonsQuery(value) {
+  if (value == null) return '';
+
+  const normalizeText = (text) => {
+    const normalized = String(text || '').trim();
+
+    return normalized && normalized !== '(без названия)' && normalized !== 'без названия'
+      ? normalized
+      : '';
+  };
+
+  if (typeof value === 'string') {
+    return normalizeText(value);
+  }
+
+  if (typeof value === 'object') {
+    return normalizeText(
+      value.ru ||
+      value.en ||
+      value.it ||
+      Object.values(value).find((item) => item != null && String(item).trim())
+    );
+  }
+
+  return normalizeText(value);
+}
+
 export default function SessionWizard({ components = {} } = {}) {
   const StatusBadge = components.StatusBadge ?? DefaultStatusBadge;
   const ToastComp = components.Toast ?? DefaultToast;
@@ -252,6 +279,7 @@ export default function SessionWizard({ components = {} } = {}) {
     updateCityInfoLocaleField,
     saveCurrentCityInfo,
     deleteCurrentCityInfo,
+    importCityInfoFromText,
     openCityInfoGenerateModal,
     closeCityInfoGenerateModal,
     setCityInfoGeneratePrompt,
@@ -261,6 +289,7 @@ export default function SessionWizard({ components = {} } = {}) {
 
     openAttrDetail,
     addAttraction,
+    importAttractionsFromText,
     openAttractionGenerationModal,
     closeAttractionGenerationModal,
     setAttractionGenerationPrompt,
@@ -287,6 +316,7 @@ export default function SessionWizard({ components = {} } = {}) {
     setAttractionInfoGenerateCount,
     generateAttractionInfoFromPrompt,
     deleteCurrentAttr,
+    deleteAttractionsByIds,
     saveCurrentAttr,
     saveCurrentAttrIfDirty,
     saveCityForStep1,
@@ -342,6 +372,7 @@ export default function SessionWizard({ components = {} } = {}) {
     saveCurrentAttractionInfo,
     deleteCurrentAttractionInfo,
     deleteAttractionInfosByIds,
+    importAttractionInfoFromText,
 
     setCurrentAttractionFeedItem,
     setAttractionFeedActiveLocale,
@@ -548,16 +579,53 @@ export default function SessionWizard({ components = {} } = {}) {
     feedItemId: null,
   });
   const commonsAttraction =
-    commonsTarget.type === 'attraction'
+    commonsTarget.type === 'attraction' || commonsTarget.type === 'attraction_feed'
       ? attractions.find((attr) => String(attr.id) === String(commonsTarget.attractionId)) ||
         currentAttr
       : null;
+  const commonsInteractiveLocation =
+    commonsTarget.type === 'interactive_location'
+      ? interactiveLocations.find(
+          (item) => String(item.id) === String(commonsTarget.interactiveLocationId),
+        ) || currentIl
+      : null;
+
+  const cityCommonsQuery = normalizeCommonsQuery(localeData[activeLocale]?.name);
+  const commonsDefaultQuery = useMemo(() => {
+    if (commonsTarget.type === 'attraction' || commonsTarget.type === 'attraction_feed') {
+      return normalizeCommonsQuery(getAttrName(commonsAttraction)) || cityCommonsQuery;
+    }
+
+    if (commonsTarget.type === 'interactive_location') {
+      return normalizeCommonsQuery(getAttrName(commonsInteractiveLocation)) || cityCommonsQuery;
+    }
+
+    return cityCommonsQuery;
+  }, [
+    commonsTarget.type,
+    commonsAttraction,
+    commonsInteractiveLocation,
+    cityCommonsQuery,
+  ]);
+
+  const commonsDescription = useMemo(() => {
+    if (commonsTarget.type === 'attraction' || commonsTarget.type === 'attraction_feed') {
+      return 'Выберите изображение соответствующего события с указанием лицензии и автора';
+    }
+
+    if (commonsTarget.type === 'interactive_location') {
+      return 'Выберите изображение интерактивной локации с указанием лицензии и автора';
+    }
+
+    return 'Выберите изображение города с указанием лицензии и автора';
+  }, [commonsTarget.type]);
 
   const openCityCommonsModal = () => {
     setCommonsTarget({
       type: 'city',
       attractionId: null,
       feedItemId: null,
+      interactiveLocationId: null,
     });
 
     setCommonsModalOpen(true);
@@ -568,6 +636,7 @@ export default function SessionWizard({ components = {} } = {}) {
       type: 'attraction',
       attractionId: attr?.id ?? currentAttr?.id ?? null,
       feedItemId: null,
+      interactiveLocationId: null,
     });
 
     setCommonsModalOpen(true);
@@ -576,6 +645,7 @@ export default function SessionWizard({ components = {} } = {}) {
   const openInteractiveLocationCommonsModal = (il) => {
     setCommonsTarget({
       type: 'interactive_location',
+      attractionId: null,
       interactiveLocationId: il?.id ?? currentIl?.id ?? null,
       feedItemId: null,
     });
@@ -586,8 +656,9 @@ export default function SessionWizard({ components = {} } = {}) {
   const openAttractionFeedCommonsModal = (item) => {
     setCommonsTarget({
       type: 'attraction_feed',
-      attractionId: null,
+      attractionId: currentAttr?.id ?? null,
       feedItemId: item?.id ?? currentAttractionFeedItem?.id ?? null,
+      interactiveLocationId: null,
     });
 
     setCommonsModalOpen(true);
@@ -1036,6 +1107,7 @@ export default function SessionWizard({ components = {} } = {}) {
                 onUpdateCurrentCityInfoPatch={updateCurrentCityInfoPatch}
                 onSaveCurrentCityInfo={saveCurrentCityInfo}
                 onDeleteCurrentCityInfo={deleteCurrentCityInfo}
+                onImportCityInfoFromText={importCityInfoFromText}
                 onGoToStep={goToStep}
                 cityInfoGenerateModalOpen={cityInfoGenerateModalOpen}
                 cityInfoGeneratePrompt={cityInfoGeneratePrompt}
@@ -1111,6 +1183,7 @@ export default function SessionWizard({ components = {} } = {}) {
               onOpenAttrDetail={openAttrDetail}
               onOpenAttractionCommonsModal={openAttractionCommonsModal}
               onAddAttraction={addAttraction}
+              onImportAttractionsFromText={importAttractionsFromText}
               attractionGenerationOpen={attractionGenerationOpen}
               attractionGenerationProgress={attractionGenerationProgress}
               attractionGenerationPrompt={attractionGenerationPrompt}
@@ -1142,6 +1215,7 @@ export default function SessionWizard({ components = {} } = {}) {
               onAiGenerationModeChange={setAiGenerationMode}
               onAiUseWebSearchChange={setAiUseWebSearch}
               onDeleteCurrentAttr={deleteCurrentAttr}
+              onDeleteAttractionsByIds={deleteAttractionsByIds}
               onSetAttrView={setAttrView}
               onSetCurrentAttr={setCurrentAttr}
               onSetAttrActiveLocale={setAttrActiveLocale}
@@ -1175,6 +1249,7 @@ export default function SessionWizard({ components = {} } = {}) {
                 onSaveCurrentAttractionInfo={saveCurrentAttractionInfo}
                 onDeleteCurrentAttractionInfo={deleteCurrentAttractionInfo}
                 onDeleteAttractionInfosByIds={deleteAttractionInfosByIds}
+                onImportAttractionInfoFromText={importAttractionInfoFromText}
                 onGoToStep={goToStep}
                 attractionInfoGenerateModalOpen={attractionInfoGenerateModalOpen}
                 attractionInfoGeneratePrompt={attractionInfoGeneratePrompt}
@@ -1490,11 +1565,8 @@ export default function SessionWizard({ components = {} } = {}) {
         onClose={() => setCommonsModalOpen(false)}
         onImageSelected={handleCommonsImageSelected}
         getSessionUuid={getSessionUuid}
-        defaultQuery={
-          commonsTarget.type === 'attraction'
-            ? getAttrName(commonsAttraction) || ''
-            : localeData[activeLocale]?.name || ''
-        }
+        defaultQuery={commonsDefaultQuery}
+        description={commonsDescription}
       />
     </Layout>
   );

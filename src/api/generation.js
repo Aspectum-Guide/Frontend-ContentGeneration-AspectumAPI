@@ -261,11 +261,11 @@ export const imagesAPI = {
   delete: (imageId) => apiClient.delete(`${BASE}/images/${imageId}/delete/`),
   // Wikimedia Commons integration
   searchCommons: (query, limit = 10, page = 1) =>
-    apiClient.get(`/media/commons/search/`, {
+    apiClient.get('media/commons/search/', {
       params: { q: query, limit, page },
     }),
   importCommons: (data) =>
-    apiClient.post(`/media/commons/import/`, data),
+    apiClient.post('media/commons/import/', data),
 };
 
 // ─── Generation Tasks ─────────────────────────────────────────────────────────

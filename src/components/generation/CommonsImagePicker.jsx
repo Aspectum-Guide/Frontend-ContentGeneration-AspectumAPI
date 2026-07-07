@@ -11,6 +11,7 @@ export default function CommonsImagePicker({
   onImageSelected,
   getSessionUuid,
   defaultQuery = '',
+  description = 'Выберите изображение с указанием лицензии и автора',
 }) {
   const [query, setQuery] = useState(defaultQuery || '');
   const [page, setPage] = useState(1);
@@ -253,7 +254,7 @@ export default function CommonsImagePicker({
             </h3>
 
             <p className="text-sm text-gray-500">
-              Выберите изображение города с указанием лицензии и автора
+              {description}
             </p>
           </div>
 

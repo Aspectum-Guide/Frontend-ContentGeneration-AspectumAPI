@@ -5,6 +5,7 @@ import AiGenerationDedupeToggle from '../../../components/generation/AiGeneratio
 import AiGenerationCountField from '../../../components/generation/AiGenerationCountField.jsx';
 import { getAttrName, getFlag, getSessionEntityImagePreview, resolveSessionEntityImageOriginalUrl, resolveSessionEntityImageCopyright, normalizeId } from './sessionWizardShared.jsx';
 import SessionWizardAttractionTagsPicker from './SessionWizardAttractionTagsPicker.jsx';
+import UsefulInfoTextImportBox from './UsefulInfoTextImportBox.jsx';
 import { createCoordinatePasteHandler } from '../../../utils/coordinates';
 
 const getCityDisplayName = (city) => {
@@ -473,7 +474,9 @@ export default function SessionWizardAttractionsStep({
 
   onOpenAttrDetail,
   onAddAttraction,
+  onImportAttractionsFromText,
   onDeleteCurrentAttr,
+  onDeleteAttractionsByIds,
   onSetAttrView,
   onSetCurrentAttr,
   onSetAttrActiveLocale,
@@ -515,6 +518,8 @@ export default function SessionWizardAttractionsStep({
   onAiUseWebSearchChange,
 }) {
   const attrCurrentLocale = attrLocaleData[attrActiveLocale] || {};
+  const [selectMode, setSelectMode] = useState(false);
+  const [selectedAttractionIds, setSelectedAttractionIds] = useState(() => new Set());
 
   const assignedCityType = currentAttr?.assigned_city_type || 'none';
   const selectedDatabaseCityId = normalizeId(currentAttr?.city_id ?? currentAttr?.city);
@@ -530,6 +535,40 @@ export default function SessionWizardAttractionsStep({
     if (typeof onUpdateCurrentAttrPatch === 'function') {
       onUpdateCurrentAttrPatch(patch);
     }
+  };
+
+  const exitSelectMode = () => {
+    setSelectMode(false);
+    setSelectedAttractionIds(new Set());
+  };
+
+  const attractionIds = attractions.map((attr) => normalizeId(attr.id)).filter(Boolean);
+  const allSelected =
+    attractionIds.length > 0 &&
+    attractionIds.every((id) => selectedAttractionIds.has(id));
+
+  const toggleSelectedAttraction = (id) => {
+    const key = normalizeId(id);
+    if (!key) return;
+
+    setSelectedAttractionIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  };
+
+  const toggleSelectAllAttractions = () => {
+    setSelectedAttractionIds(allSelected ? new Set() : new Set(attractionIds));
+  };
+
+  const handleBulkDeleteAttractions = async () => {
+    const ids = Array.from(selectedAttractionIds);
+    if (ids.length === 0) return;
+
+    const res = await onDeleteAttractionsByIds?.(ids);
+    if (!res?.cancelled) exitSelectMode();
   };
 
   const sessionDraftsForAi = useMemo(
@@ -759,34 +798,102 @@ export default function SessionWizardAttractionsStep({
 
       {attrView === 'list' ? (
         <div className="space-y-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <h2 className="text-lg font-semibold text-gray-900">
-                Достопримечательности
-              </h2>
+          <div className="flex items-start justify-between gap-3">
+            <div className="flex flex-wrap items-center gap-3">
+              <div>
+                <h2 className="text-lg font-semibold text-gray-900">
+                  Достопримечательности
+                </h2>
 
-              <p className="text-sm text-gray-500">
-                Добавьте объекты и при необходимости привяжите их к городу
-              </p>
+                <p className="text-sm text-gray-500">
+                  Добавьте объекты. Новые объекты из вставки будут привязаны к текущему городу сессии.
+                </p>
+              </div>
+
+              {!selectMode && (
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => onOpenAttractionGenerationModal?.()}
+                    className="px-3 py-1.5 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors"
+                  >
+                    Сгенерировать
+                  </button>
+                  <button
+                    type="button"
+                    onClick={onAddAttraction}
+                    className="px-3 py-1.5 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors"
+                  >
+                    + Добавить
+                  </button>
+                </div>
+              )}
             </div>
 
-            <div className="flex items-center gap-2">
-              <button
-                type="button"
-                onClick={() => onOpenAttractionGenerationModal?.()}
-                className="px-3 py-1.5 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors"
-              >
-                Сгенерировать
-              </button>
-              <button
-                type="button"
-                onClick={onAddAttraction}
-                className="px-3 py-1.5 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors"
-              >
-                + Добавить
-              </button>
-            </div>
+            {attractions.length > 0 && (
+              <div className="flex items-center gap-2 shrink-0">
+                {selectMode ? (
+                  <>
+                    <button
+                      type="button"
+                      onClick={toggleSelectAllAttractions}
+                      className="px-3 py-1.5 text-sm font-medium text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+                    >
+                      {allSelected ? 'Снять все' : 'Выбрать все'}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleBulkDeleteAttractions}
+                      disabled={selectedAttractionIds.size === 0}
+                      className="px-3 py-1.5 text-sm font-medium text-white bg-red-600 rounded-lg hover:bg-red-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      Удалить ({selectedAttractionIds.size})
+                    </button>
+                    <button
+                      type="button"
+                      onClick={exitSelectMode}
+                      className="px-3 py-1.5 text-sm font-medium text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+                    >
+                      Отмена
+                    </button>
+                  </>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => setSelectMode(true)}
+                    className="px-3 py-1.5 text-sm font-medium text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+                  >
+                    Выбрать
+                  </button>
+                )}
+              </div>
+            )}
           </div>
+
+          <UsefulInfoTextImportBox
+            title="Вставить готовые достопримечательности"
+            description="Каждая достопримечательность начинается с «# Название». Поля: координаты, индекс, ранг, описание. Привязка к городу берётся из текущего города сессии."
+            buttonLabel="Создать достопримечательности"
+            defaultLanguage={attractionGenerationLang || 'ru'}
+            disabled={attractionGenerating}
+            emptyError="Не удалось распознать достопримечательности. Каждый объект должен начинаться с «# Название»."
+            errorFallback="Не удалось создать достопримечательности"
+            placeholder={
+              '# Колизей\n' +
+              'координаты: 41.890210, 12.492231\n' +
+              'индекс: 1\n' +
+              'ранг: 10\n' +
+              'описание:\n' +
+              'Крупнейший амфитеатр Древнего Рима и один из главных символов города.\n\n' +
+              '# Пантеон\n' +
+              'координаты: 41.898610, 12.476873\n' +
+              'индекс: 1\n' +
+              'ранг: 9\n' +
+              'описание:\n' +
+              'Античный храм с куполом и окулюсом, позже превращённый в церковь.'
+            }
+            onImport={onImportAttractionsFromText}
+          />
 
           {attractions.length === 0 ? (
             <div className="text-center py-12 text-gray-400">
@@ -798,19 +905,41 @@ export default function SessionWizardAttractionsStep({
             </div>
           ) : (
             <div className="space-y-2">
-              {attractions.map((attr, idx) => (
-                <div
-                  key={attr.id}
-                  onClick={() => onOpenAttrDetail(attr.id)}
-                  className="flex items-center justify-between p-3 bg-white border border-gray-200 rounded-lg hover:border-blue-300 hover:bg-blue-50 cursor-pointer transition-colors"
-                >
-                  <div className="flex items-center gap-3">
+              {attractions.map((attr, idx) => {
+                const attrId = normalizeId(attr.id);
+                const isSelected = selectedAttractionIds.has(attrId);
+
+                return (
+                  <div
+                    key={attr.id}
+                    onClick={() =>
+                      selectMode
+                        ? toggleSelectedAttraction(attr.id)
+                        : onOpenAttrDetail(attr.id)
+                    }
+                    className={`flex items-center justify-between p-3 bg-white border rounded-lg cursor-pointer transition-colors ${
+                      selectMode && isSelected
+                        ? 'border-blue-400 bg-blue-50'
+                        : 'border-gray-200 hover:border-blue-300 hover:bg-blue-50'
+                    }`}
+                  >
+                  <div className="flex items-center gap-3 min-w-0">
+                    {selectMode && (
+                      <input
+                        type="checkbox"
+                        checked={isSelected}
+                        onChange={() => toggleSelectedAttraction(attr.id)}
+                        onClick={(e) => e.stopPropagation()}
+                        className="w-4 h-4 accent-blue-600 shrink-0 cursor-pointer"
+                      />
+                    )}
+
                     <span className="w-6 h-6 flex items-center justify-center rounded-full bg-gray-100 text-xs font-medium text-gray-600">
                       {idx + 1}
                     </span>
 
-                    <div>
-                      <div className="text-sm font-medium text-gray-900">
+                    <div className="min-w-0">
+                      <div className="text-sm font-medium text-gray-900 truncate">
                         {getAttrName(attr)}
                       </div>
 
@@ -830,11 +959,18 @@ export default function SessionWizardAttractionsStep({
                     </div>
                   </div>
 
-                  <span className="text-xs text-blue-600 font-medium">
-                    Открыть →
-                  </span>
+                  {selectMode ? (
+                    <span className="text-xs text-gray-400 font-medium shrink-0">
+                      {isSelected ? 'Выбрано' : 'Выбрать'}
+                    </span>
+                  ) : (
+                    <span className="text-xs text-blue-600 font-medium shrink-0">
+                      Открыть →
+                    </span>
+                  )}
                 </div>
-              ))}
+                );
+              })}
             </div>
           )}
 

@@ -34,6 +34,8 @@ import {
   mergeServerCollection,
   waitForPersistenceIdle,
 } from './useSessionWizardHelpers.js';
+import { parseUsefulInfoTextImport } from './usefulInfoTextImport';
+import { parseAttractionsTextImport } from './attractionsTextImport';
 
 function sortLocaleSourceEntries(entries) {
   if (!Array.isArray(entries) || entries.length <= 1) return entries;
@@ -955,6 +957,17 @@ export function useAttractionsStep(ctx) {
     }
   }, [sessionId, attractions, buildAttrLocaleData, showNote, currentAttr?.id]);
 
+  const resolveActiveAttractionCityDraftId = useCallback(() => {
+    const activeDraftId = normalizeDraftId(activeCityDraftIdRef.current);
+    if (activeDraftId && activeDraftId !== 'legacy') return activeDraftId;
+
+    const usableDrafts = (cityDrafts || [])
+      .map((draft) => normalizeDraftId(draft?.id))
+      .filter((id) => id && id !== 'legacy');
+
+    return usableDrafts[0] || '';
+  }, [activeCityDraftIdRef, cityDrafts]);
+
   // ─── addAttraction ─────────────────────────────────────────────────────────
   const addAttraction = useCallback(async () => {
     try {
@@ -1034,6 +1047,120 @@ export function useAttractionsStep(ctx) {
     setSession,
   ]);
 
+  const importAttractionsFromText = useCallback(async (langRaw = 'ru', rawText = '') => {
+    const lang = String(langRaw || 'ru').split('-')[0].trim().toLowerCase() || 'ru';
+    const parsed = parseAttractionsTextImport(rawText);
+
+    if (parsed.length === 0) {
+      showNote('Не удалось распознать достопримечательности. Каждый объект должен начинаться с «# Название».', 'error');
+      return 0;
+    }
+
+    const activeDraftId = resolveActiveAttractionCityDraftId();
+    if (!activeDraftId) {
+      showNote(
+        'Сначала откройте или сохраните город сессии: импорт достопримечательностей должен быть привязан к городу.',
+        'error',
+      );
+      return 0;
+    }
+
+    const created = [];
+
+    try {
+      for (const item of parsed) {
+        const index = Number.isFinite(Number(item.index)) ? Number(item.index) : 1;
+        const rank = Number.isFinite(Number(item.rank)) ? Number(item.rank) : 5;
+        const name = { [lang]: item.name };
+        const description = { [lang]: item.description || '' };
+        const contents = { [lang]: item.description || '' };
+
+        const res = await attractionsAPI.create(sessionId, {
+          name,
+          description,
+          lat: item.lat,
+          lon: item.lon,
+          index,
+          rank,
+          assigned_city_type: 'draft',
+          city: null,
+          city_id: null,
+          session_city: activeDraftId,
+          session_city_id: activeDraftId,
+          image_id: null,
+          order: index,
+        });
+
+        const rawAttr = res?.data?.attraction || res?.data;
+        const createdId = normalizeId(rawAttr?.id);
+
+        if (createdId) {
+          await attractionsAPI.saveContent(sessionId, createdId, {
+            language: lang,
+            text: item.description || '',
+          });
+        }
+
+        const attr = normalizeAttraction({
+          ...(rawAttr || {}),
+          name: rawAttr?.name ?? name,
+          description: rawAttr?.description ?? description,
+          contents: {
+            ...(rawAttr?.contents || {}),
+            ...contents,
+          },
+          assigned_city_type: rawAttr?.assigned_city_type ?? 'draft',
+          session_city: rawAttr?.session_city ?? activeDraftId,
+          session_city_id: rawAttr?.session_city_id ?? activeDraftId,
+          index: rawAttr?.index ?? index,
+          order: rawAttr?.order ?? index,
+          rank: rawAttr?.rank ?? rank,
+          lat: rawAttr?.lat ?? item.lat,
+          lon: rawAttr?.lon ?? item.lon,
+        });
+
+        if (attr?.id) {
+          created.push(attr);
+        }
+      }
+
+      if (created.length > 0) {
+        setAttractions((prev) => {
+          let next = prev;
+          created.forEach((attr) => {
+            next = upsertById(next, attr);
+          });
+          return next;
+        });
+
+        if (setSession) {
+          setSession((prev) => {
+            if (!prev) return prev;
+            let nextAttractions = prev.attractions || [];
+            created.forEach((attr) => {
+              nextAttractions = upsertById(nextAttractions, attr);
+            });
+            return { ...prev, attractions: nextAttractions };
+          });
+        }
+      }
+
+      showNote(`Создано достопримечательностей: ${created.length}`, 'success');
+      return created.length;
+    } catch (e) {
+      showNote(
+        'Ошибка при импорте достопримечательностей: ' + parseApiError(e, 'Ошибка создания'),
+        'error',
+      );
+      throw e;
+    }
+  }, [
+    sessionId,
+    resolveActiveAttractionCityDraftId,
+    showNote,
+    setSession,
+  ]);
+
   // ─── deleteCurrentAttr ─────────────────────────────────────────────────────
   const deleteCurrentAttr = useCallback(async () => {
     if (!currentAttr) return;
@@ -1041,14 +1168,94 @@ export function useAttractionsStep(ctx) {
     if (!(await confirm({ message: `Удалить «${name}»?`, danger: true }))) return;
     try {
       await attractionsAPI.delete(sessionId, currentAttr.id);
-      setAttractions(prev => prev.filter((item) => item.id !== currentAttr.id));
+      const deletedId = normalizeId(currentAttr.id);
+      setAttractions(prev => prev.filter((item) => normalizeId(item.id) !== deletedId));
       setAttrView('list');
       setCurrentAttr(null);
+      if (setSession) {
+        setSession((prev) =>
+          prev
+            ? {
+                ...prev,
+                attractions: (prev.attractions || []).filter(
+                  (item) => normalizeId(item.id) !== deletedId,
+                ),
+              }
+            : prev,
+        );
+      }
       showNote('Удалено', 'success');
     } catch (e) {
       showNote('Ошибка при удалении: ' + e.message, 'error');
     }
-  }, [sessionId, currentAttr, showNote, confirm]);
+  }, [sessionId, currentAttr, showNote, confirm, setSession]);
+
+  const deleteAttractionsByIds = useCallback(async (ids = []) => {
+    const targetIds = Array.from(
+      new Set((ids || []).map((id) => normalizeId(id)).filter(Boolean)),
+    );
+
+    if (targetIds.length === 0) return { deleted: 0, failed: 0 };
+
+    if (
+      !(await confirm({
+        message: `Удалить выбранные достопримечательности (${targetIds.length})?`,
+        danger: true,
+      }))
+    ) {
+      return { deleted: 0, failed: 0, cancelled: true };
+    }
+
+    const results = await Promise.allSettled(
+      targetIds.map((id) => attractionsAPI.delete(sessionId, id)),
+    );
+
+    const deletedIds = new Set();
+    let failed = 0;
+
+    results.forEach((res, idx) => {
+      if (res.status === 'fulfilled') {
+        deletedIds.add(targetIds[idx]);
+      } else {
+        failed += 1;
+      }
+    });
+
+    if (deletedIds.size > 0) {
+      setAttractions((items) =>
+        items.filter((item) => !deletedIds.has(normalizeId(item.id))),
+      );
+      setCurrentAttr((prev) =>
+        prev && deletedIds.has(normalizeId(prev.id)) ? null : prev,
+      );
+      setAttrView((prev) =>
+        currentAttr && deletedIds.has(normalizeId(currentAttr.id)) ? 'list' : prev,
+      );
+
+      if (setSession) {
+        setSession((prev) =>
+          prev
+            ? {
+                ...prev,
+                attractions: (prev.attractions || []).filter(
+                  (item) => !deletedIds.has(normalizeId(item.id)),
+                ),
+              }
+            : prev,
+        );
+      }
+    }
+
+    if (failed === 0) {
+      showNote(`Удалено достопримечательностей: ${deletedIds.size}`, 'success');
+    } else if (deletedIds.size > 0) {
+      showNote(`Удалено: ${deletedIds.size}, не удалось: ${failed}`, 'warning');
+    } else {
+      showNote('Не удалось удалить выбранные достопримечательности', 'error');
+    }
+
+    return { deleted: deletedIds.size, failed };
+  }, [sessionId, confirm, showNote, setSession, currentAttr]);
 
   // ─── isCurrentAttrDirty ────────────────────────────────────────────────────
   const isCurrentAttrDirty = useCallback(() => {
@@ -1621,6 +1828,101 @@ export function useAttractionsStep(ctx) {
     attrLocaleData,
     attrActiveLocale,
     showNote,
+  ]);
+
+  const importAttractionInfoFromText = useCallback(async (langRaw = 'ru', rawText = '') => {
+    const lang = String(langRaw || 'ru').split('-')[0].trim().toLowerCase() || 'ru';
+    const parsed = parseUsefulInfoTextImport(rawText);
+
+    if (parsed.length === 0) {
+      showNote('Не удалось распознать блоки. Заголовки должны начинаться с «#».', 'error');
+      return 0;
+    }
+
+    let activeAttractionId = normalizeId(currentAttr?.id);
+    if (!currentAttr || !activeAttractionId || !isPersistedSessionAttractionId(activeAttractionId)) {
+      showNote(
+        'Откройте сохранённую достопримечательность перед импортом полезной информации.',
+        'error',
+      );
+      return 0;
+    }
+
+    await saveCurrentAttrIfDirty({ silent: true });
+    activeAttractionId = normalizeId(currentAttr.id);
+
+    const created = [];
+
+    try {
+      for (const item of parsed) {
+        const emptyInfo = createEmptyAttractionInfo({
+          activeAttractionId,
+          sourceLocaleData: attrLocaleData,
+        });
+
+        const name = {
+          ...(emptyInfo.name || {}),
+          [lang]: item.title,
+        };
+        const description = {
+          ...(emptyInfo.description || {}),
+          [lang]: item.text,
+        };
+
+        const res = await attractionInfosAPI.create(
+          sessionId,
+          buildAttractionInfoPayload(
+            {
+              ...emptyInfo,
+              name,
+              description,
+            },
+            name,
+            description,
+          ),
+        );
+
+        const rawInfo = res?.data?.attraction_info || res?.data;
+        const info = rawInfo?.id != null ? normalizeAttractionInfo(rawInfo) : null;
+        if (info?.id) {
+          created.push(info);
+        }
+      }
+
+      if (created.length > 0) {
+        setAttractionInfos((prev) => {
+          const existingIds = new Set(prev.map((item) => String(item.id)));
+          const toAdd = created.filter((item) => item.id && !existingIds.has(String(item.id)));
+          return [...prev, ...toAdd];
+        });
+
+        if (setSession) {
+          setSession((prev) => {
+            if (!prev) return prev;
+            const existing = Array.isArray(prev.attraction_infos) ? prev.attraction_infos : [];
+            const existingIds = new Set(existing.map((item) => String(item.id)));
+            const toAdd = created.filter((item) => item.id && !existingIds.has(String(item.id)));
+            return { ...prev, attraction_infos: [...existing, ...toAdd] };
+          });
+        }
+      }
+
+      showNote(`Создано блоков полезной информации: ${created.length}`, 'success');
+      return created.length;
+    } catch (e) {
+      showNote(
+        'Ошибка при создании полезной информации: ' + parseApiError(e, 'Ошибка создания'),
+        'error',
+      );
+      throw e;
+    }
+  }, [
+    sessionId,
+    currentAttr,
+    attrLocaleData,
+    saveCurrentAttrIfDirty,
+    showNote,
+    setSession,
   ]);
 
   // ─── openAttractionInfoDetail ──────────────────────────────────────────────
@@ -3267,7 +3569,9 @@ export function useAttractionsStep(ctx) {
     buildAttrLocaleData,
     openAttrDetail,
     addAttraction,
+    importAttractionsFromText,
     deleteCurrentAttr,
+    deleteAttractionsByIds,
     saveCurrentAttr,
     saveCurrentAttrIfDirty,
     isCurrentAttrDirty,
@@ -3278,6 +3582,7 @@ export function useAttractionsStep(ctx) {
     openAttractionCommonsModal,
 
     addAttractionInfo,
+    importAttractionInfoFromText,
     openAttractionInfoDetail,
     deleteCurrentAttractionInfo,
     deleteAttractionInfosByIds,

@@ -4,6 +4,7 @@ import AiGenerationQualitySettings from '../../../components/generation/AiGenera
 import AiGenerationDedupeToggle from '../../../components/generation/AiGenerationDedupeToggle.jsx';
 import AiGenerationCountField from '../../../components/generation/AiGenerationCountField.jsx';
 import { getAttrName, getFlag, normalizeId, filterPersistedSessionAttractions } from './sessionWizardShared.jsx';
+import UsefulInfoTextImportBox from './UsefulInfoTextImportBox.jsx';
 
 const AI_GENERATION_LANG_OPTIONS = [
   { value: 'ru', label: 'Русский (ru)' },
@@ -240,6 +241,7 @@ export default function SessionWizardAttractionInfoStep({
   onSaveCurrentAttractionInfo,
   onDeleteCurrentAttractionInfo,
   onDeleteAttractionInfosByIds,
+  onImportAttractionInfoFromText,
   onGoToStep,
 
   attractionInfoGenerateModalOpen = false,
@@ -556,6 +558,17 @@ export default function SessionWizardAttractionInfoStep({
             </div>
           )}
         </div>
+
+        {scopedToAttractionId ? (
+          <UsefulInfoTextImportBox
+            title="Вставить готовую полезную информацию о достопримечательности"
+            description="Строки с «# Заголовок» станут отдельными блоками полезной информации и будут привязаны к открытой достопримечательности."
+            buttonLabel="Создать блоки о достопримечательности"
+            defaultLanguage={attractionInfoGenerationLang || 'ru'}
+            disabled={attractionInfoSaving || attractionInfoGenerating}
+            onImport={onImportAttractionInfoFromText}
+          />
+        ) : null}
 
         {attractionInfos.length === 0 ? (
           <div className="text-center py-10 text-gray-400 border border-dashed border-gray-200 rounded-xl bg-gray-50">

@@ -36,6 +36,7 @@ import {
   isPollCancelledError,
   TASK_NOT_FOUND_MESSAGE,
 } from '../../../utils/generationTaskPoll';
+import { parseUsefulInfoTextImport } from './usefulInfoTextImport';
 
 export const makeLocaleData = () => {
   return Object.fromEntries(
@@ -1738,6 +1739,83 @@ export default function useCityStep(ctx) {
     }
   }, [sessionId, showNote, localeData, defaultLocale, setCityInfos, setCurrentCityInfo, setCityInfoActiveLocale]);
 
+  const importCityInfoFromText = useCallback(async (langRaw = 'ru', rawText = '') => {
+    const lang = String(langRaw || 'ru').split('-')[0].trim().toLowerCase() || 'ru';
+    const parsed = parseUsefulInfoTextImport(rawText);
+
+    if (parsed.length === 0) {
+      showNote('Не удалось распознать блоки. Заголовки должны начинаться с «#».', 'error');
+      return 0;
+    }
+
+    const activeDraftId = normalizeDraftId(activeCityDraftIdRef.current);
+    const created = [];
+
+    try {
+      for (const item of parsed) {
+        const emptyInfo = createEmptyCityInfo({
+          activeDraftId,
+          sourceLocaleData: localeData,
+        });
+
+        const name = {
+          ...(emptyInfo.name || {}),
+          [lang]: item.title,
+        };
+        const description = {
+          ...(emptyInfo.description || {}),
+          [lang]: item.text,
+        };
+
+        const res = await cityInfosAPI.create(
+          sessionId,
+          buildCityInfoPayload(
+            {
+              ...emptyInfo,
+              name,
+              description,
+            },
+            name,
+            description,
+          ),
+        );
+
+        const rawInfo = res?.data?.city_info || res?.data;
+        const info = rawInfo?.id != null ? normalizeCityInfo(rawInfo) : null;
+        if (info?.id) {
+          created.push(info);
+        }
+      }
+
+      if (created.length > 0) {
+        setCityInfos((prev) => {
+          const existingIds = new Set(prev.map((item) => String(item.id)));
+          const toAdd = created.filter((item) => item.id && !existingIds.has(String(item.id)));
+          return [...prev, ...toAdd];
+        });
+
+        if (setSession) {
+          setSession((prev) => {
+            if (!prev) return prev;
+            const existing = Array.isArray(prev.city_infos) ? prev.city_infos : [];
+            const existingIds = new Set(existing.map((item) => String(item.id)));
+            const toAdd = created.filter((item) => item.id && !existingIds.has(String(item.id)));
+            return { ...prev, city_infos: [...existing, ...toAdd] };
+          });
+        }
+      }
+
+      showNote(`Создано блоков полезной информации: ${created.length}`, 'success');
+      return created.length;
+    } catch (e) {
+      showNote(
+        'Ошибка при создании полезной информации: ' + parseApiError(e, 'Ошибка создания'),
+        'error',
+      );
+      throw e;
+    }
+  }, [sessionId, showNote, localeData, setSession]);
+
   const updateCurrentCityInfoPatch = useCallback((patch) => {
     setCurrentCityInfo((prev) => {
       if (!prev) return prev;
@@ -2671,7 +2749,7 @@ export default function useCityStep(ctx) {
 
     uploadCityFilterImage,
 
-    addCityInfo, openCityInfoDetail, deleteCurrentCityInfo,
+    addCityInfo, importCityInfoFromText, openCityInfoDetail, deleteCurrentCityInfo,
     updateCurrentCityInfoPatch, updateCityInfoLocaleField,
     saveCurrentCityInfo, saveCurrentCityInfoIfDirty, isCurrentCityInfoDirty,
     getCityInfoName,

@@ -38,6 +38,7 @@ export default function useInteractiveLocationsStep({
   loadSession,
   aiGenerationMode,
   aiUseWebSearch,
+  getSessionUuid,
   imagesAPI: imagesApiOverride,
   collectWizardLanguageCodes,
   session,
@@ -571,7 +572,19 @@ export default function useInteractiveLocationsStep({
       setIlPhotoUploading(true);
       try {
         const formData = new FormData();
-        formData.append('image', file);
+        formData.append('file', file);
+        formData.append('session_uuid', getSessionUuid() || '');
+        formData.append('temp', '1');
+
+        const copyright =
+          il.image_copyright ||
+          il.imageCopyright ||
+          '';
+
+        if (copyright) {
+          formData.append('copyright', copyright);
+        }
+
         const res = await imagesAPI.upload(formData);
         const imageId = res?.data?.image_id ?? res?.data?.id;
         const imageUrl = res?.data?.url ?? res?.data?.image_url;
@@ -608,7 +621,7 @@ export default function useInteractiveLocationsStep({
         }
       }
     },
-    [sessionId, currentIl, ilLocaleData, showNote, imagesAPI],
+    [sessionId, currentIl, ilLocaleData, getSessionUuid, showNote, imagesAPI],
   );
 
   const handleIlIconFile = useCallback(
