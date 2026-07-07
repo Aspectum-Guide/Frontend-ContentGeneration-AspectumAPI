@@ -164,6 +164,12 @@ export const attractionAudioGuidesAPI = {
       `${BASE}/sessions/${sessionId}/attraction-audio-guides/${guideId}/tracks/${trackId}/generate-chaptered-audio/`,
       payload,
     ),
+
+  regenerateChapterAudio: (sessionId, guideId, trackId, payload = {}) =>
+    apiClient.post(
+      `${BASE}/sessions/${sessionId}/attraction-audio-guides/${guideId}/tracks/${trackId}/regenerate-chapter-audio/`,
+      payload,
+    ),
 };
 
 export const ttsAPI = {

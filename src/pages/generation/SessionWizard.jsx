@@ -426,6 +426,8 @@ export default function SessionWizard({ components = {} } = {}) {
     audioGuideItemTextGeneratePrompt,
     audioGuideItemTextGenerationError,
     generateAttractionAudioGuideTrackAudio,
+    regenerateAttractionAudioGuideChapter,
+    audioGuideRegeneratingChapterId,
     elevenLabsSettingsLoading,
     elevenLabsSettingsError,
     elevenLabsSettings,
@@ -1391,6 +1393,10 @@ export default function SessionWizard({ components = {} } = {}) {
                 onGenerateAttractionAudioGuideTrackAudio={
                   generateAttractionAudioGuideTrackAudio
                 }
+                onRegenerateAttractionAudioGuideChapter={
+                  regenerateAttractionAudioGuideChapter
+                }
+                audioGuideRegeneratingChapterId={audioGuideRegeneratingChapterId}
                 elevenLabsSettingsLoading={elevenLabsSettingsLoading}
                 elevenLabsSettingsError={elevenLabsSettingsError}
                 elevenLabsSettings={elevenLabsSettings}

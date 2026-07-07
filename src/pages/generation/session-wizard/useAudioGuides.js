@@ -811,6 +811,7 @@ export function useAudioGuides({
     useState('');
   const [generatingAudioGuideTrack, setGeneratingAudioGuideTrack] = useState(false);
   const [audioGuideTrackGenerationError, setAudioGuideTrackGenerationError] = useState(null);
+  const [audioGuideRegeneratingChapterId, setAudioGuideRegeneratingChapterId] = useState(null);
   const [audioGuidePlanGenerationState, setAudioGuidePlanGenerationState] = useState({});
   const audioGuidePlanGenerationStateRef = useRef({});
   const [elevenLabsSettingsLoading, setElevenLabsSettingsLoading] = useState(false);
@@ -2190,6 +2191,78 @@ export function useAudioGuides({
     [sessionId, showNote, audioGuideTtsVoiceId, audioGuideTtsModelId],
   );
 
+  const regenerateAttractionAudioGuideChapter = useCallback(
+    async (guide, languageCode, planItemId) => {
+      if (!guide || !planItemId) return;
+      const lang = (languageCode || '').trim();
+      if (!lang) {
+        showNote('Не удалось определить язык трека', 'error');
+        return;
+      }
+
+      const workingGuide = normalizeAttractionAudioGuide(guide);
+      const trackId = workingGuide.tracks?.[lang]?.id;
+      if (!trackId) {
+        showNote('Сначала сгенерируйте аудиофайл целиком', 'error');
+        return;
+      }
+
+      const applyGuidePatch = (nextGuide) => {
+        setCurrentAttractionAudioGuide((prev) =>
+          prev && normalizeId(prev.id) === normalizeId(guide.id) ? nextGuide : prev,
+        );
+        setAttractionAudioGuides((prev) =>
+          prev.map((item) =>
+            normalizeId(item.id) === normalizeId(guide.id) ? nextGuide : item,
+          ),
+        );
+      };
+
+      setAudioGuideRegeneratingChapterId(planItemId);
+      setAudioGuideTrackGenerationError(null);
+      try {
+        const res = await attractionAudioGuidesAPI.regenerateChapterAudio(
+          sessionId,
+          guide.id,
+          trackId,
+          { language_code: lang, plan_item_id: planItemId, async: true },
+        );
+
+        let data = res?.data || {};
+        if (data?.async && data?.task_id) {
+          setAudioGuideTrackGenerationError(
+            data.current_step || 'Перегенерация главы запущена...',
+          );
+          const task = await pollGenerationTask(data.task_id, {
+            tasksAPI,
+            intervalMs: 3000,
+            maxWaitMs: 30 * 60 * 1000,
+            onProgress: (progressTask) => {
+              const step = progressTask?.current_step;
+              if (step) setAudioGuideTrackGenerationError(step);
+            },
+          });
+          data = task?.result_data || {};
+        }
+
+        if (!data.ok) {
+          throw new Error(data.error || 'Не удалось перегенерировать главу');
+        }
+
+        const merged = mergeAudioGuideTrackFromTtsResponse(workingGuide, lang, data);
+        applyGuidePatch(merged);
+        showNote('Глава перегенерирована', 'success');
+      } catch (error) {
+        const message = mapAudioGuideTrackTtsError(error);
+        setAudioGuideTrackGenerationError(message);
+        showNote(message, 'error');
+      } finally {
+        setAudioGuideRegeneratingChapterId(null);
+      }
+    },
+    [sessionId, showNote],
+  );
+
   const pendingPlanGenerationRef = useRef(null);
 
   const runAttractionAudioGuidePlanGeneration = useCallback(
@@ -2878,6 +2951,8 @@ export function useAudioGuides({
     removeAttractionAudioGuideTrack,
     uploadAttractionAudioGuideTrack,
     generateAttractionAudioGuideTrackAudio,
+    regenerateAttractionAudioGuideChapter,
+    audioGuideRegeneratingChapterId,
     generateAttractionAudioGuidePlan,
     openAttractionAudioGuidePlanGenerateModal,
     closeAttractionAudioGuidePlanGenerateModal,

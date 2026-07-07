@@ -147,6 +147,8 @@ function AttractionAudioTrackPreview({
   trackAudioUrl,
   chapters = [],
   durationSeconds = null,
+  onRegenerateChapter = null,
+  regeneratingChapterId = null,
 }) {
   const audioRef = useRef(null);
   const blobUrlRef = useRef(null);
@@ -254,19 +256,39 @@ function AttractionAudioTrackPreview({
               const startLabel = formatAudioDuration(chapter.start_seconds);
               const endLabel = formatAudioDuration(chapter.end_seconds);
               const title = chapter.title || `Глава ${index + 1}`;
+              const planItemId = chapter.plan_item_id;
+              const isRegenerating =
+                planItemId && regeneratingChapterId === planItemId;
+              const regenBusy = Boolean(regeneratingChapterId);
 
               return (
-                <button
-                  key={`${chapter.plan_item_id || index}-${chapter.start_seconds}`}
-                  type="button"
-                  onClick={() => seekToChapter(chapter)}
-                  className="rounded-md border border-blue-100 bg-white px-2 py-1 text-left text-xs text-blue-700 shadow-sm transition hover:border-blue-300 hover:bg-blue-50"
-                  title={`Перейти к главе: ${title}`}
+                <div
+                  key={`${planItemId || index}-${chapter.start_seconds}`}
+                  className="flex items-stretch overflow-hidden rounded-md border border-blue-100 bg-white shadow-sm"
                 >
-                  <span className="font-semibold">{startLabel}</span>
-                  {endLabel ? <span className="text-blue-400">-{endLabel}</span> : null}
-                  <span className="ml-1 text-gray-700">{title}</span>
-                </button>
+                  <button
+                    type="button"
+                    onClick={() => seekToChapter(chapter)}
+                    className="px-2 py-1 text-left text-xs text-blue-700 transition hover:bg-blue-50"
+                    title={`Перейти к главе: ${title}`}
+                  >
+                    <span className="font-semibold">{startLabel}</span>
+                    {endLabel ? <span className="text-blue-400">-{endLabel}</span> : null}
+                    <span className="ml-1 text-gray-700">{title}</span>
+                  </button>
+
+                  {onRegenerateChapter && planItemId ? (
+                    <button
+                      type="button"
+                      onClick={() => onRegenerateChapter(planItemId)}
+                      disabled={regenBusy}
+                      title="Перегенерировать эту главу"
+                      className="border-l border-blue-100 px-2 text-xs text-gray-500 transition hover:bg-blue-50 hover:text-blue-700 disabled:opacity-40 disabled:cursor-not-allowed"
+                    >
+                      {isRegenerating ? '…' : '↻'}
+                    </button>
+                  ) : null}
+                </div>
               );
             })}
           </div>
@@ -578,6 +600,8 @@ export default function SessionWizardAttractionAudioGuidesBlock({
   onAiGenerationModeChange,
   onAiUseWebSearchChange,
   onGenerateAttractionAudioGuideTrackAudio,
+  onRegenerateAttractionAudioGuideChapter,
+  audioGuideRegeneratingChapterId = null,
   elevenLabsSettingsLoading = false,
   elevenLabsSettingsError = '',
   elevenLabsSettings = null,
@@ -1490,6 +1514,17 @@ export default function SessionWizardAttractionAudioGuidesBlock({
                 trackAudioUrl={trackAudioUrl}
                 chapters={trackChapters}
                 durationSeconds={currentLocale.track?.duration_seconds}
+                regeneratingChapterId={audioGuideRegeneratingChapterId}
+                onRegenerateChapter={
+                  onRegenerateAttractionAudioGuideChapter
+                    ? (planItemId) =>
+                        onRegenerateAttractionAudioGuideChapter(
+                          currentAttractionAudioGuide,
+                          currentLocale.lang,
+                          planItemId,
+                        )
+                    : null
+                }
               />
             ) : null}
 
