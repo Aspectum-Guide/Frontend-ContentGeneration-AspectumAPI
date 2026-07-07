@@ -4,6 +4,7 @@ import AiGenerationQualitySettings from '../../../components/generation/AiGenera
 import AiGenerationDedupeToggle from '../../../components/generation/AiGenerationDedupeToggle.jsx';
 import AiGenerationCountField from '../../../components/generation/AiGenerationCountField.jsx';
 import { getAttrName, getFlag, getSessionEntityImagePreview, resolveSessionEntityImageOriginalUrl, resolveSessionEntityImageCopyright, normalizeId } from './sessionWizardShared.jsx';
+import { usePasteImageOnHover } from '../../../hooks/usePasteImageOnHover';
 import SessionWizardAttractionTagsPicker from './SessionWizardAttractionTagsPicker.jsx';
 import UsefulInfoTextImportBox from './UsefulInfoTextImportBox.jsx';
 import { createCoordinatePasteHandler } from '../../../utils/coordinates';
@@ -190,9 +191,16 @@ function AttractionPhotoPanel({
   const imageOriginalUrl = resolveSessionEntityImageOriginalUrl(currentAttr);
   const imageCopyright = resolveSessionEntityImageCopyright(currentAttr);
 
+  const photoPaste = usePasteImageOnHover((file) =>
+    onPhotoFileChange?.({ target: { files: [file], value: '' } }, currentAttr),
+  );
+
   return (
     <aside className="w-52 shrink-0 space-y-3">
-      <div className="relative aspect-[3/4] bg-gray-100 rounded-xl overflow-hidden border border-gray-200 flex items-center justify-center">
+      <div
+        {...photoPaste}
+        title="Наведите и нажмите Ctrl+V, чтобы вставить фото из буфера"
+        className="relative aspect-[3/4] bg-gray-100 rounded-xl overflow-hidden border border-gray-200 flex items-center justify-center">
         {preview ? (
           <img
             src={preview}

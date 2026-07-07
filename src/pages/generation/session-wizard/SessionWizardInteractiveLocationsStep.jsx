@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import 'leaflet/dist/leaflet.css';
+import { usePasteImageOnHover } from '../../../hooks/usePasteImageOnHover';
 import AiGenerationModal, { WizardGenerationActionFooter } from '../../../components/generation/AiGenerationModal.jsx';
 import AiGenerationQualitySettings from '../../../components/generation/AiGenerationQualitySettings.jsx';
 import AiGenerationDedupeToggle from '../../../components/generation/AiGenerationDedupeToggle.jsx';
@@ -180,9 +181,16 @@ function IlPhotoPanel({
   const imageOriginalUrl = resolveSessionEntityImageOriginalUrl(currentIl);
   const imageCopyright = resolveSessionEntityImageCopyright(currentIl);
 
+  const photoPaste = usePasteImageOnHover((file) =>
+    onPhotoFileChange?.({ target: { files: [file], value: '' } }, currentIl),
+  );
+
   return (
     <aside className="w-52 shrink-0 space-y-3">
-      <div className="relative aspect-[3/4] bg-gray-100 rounded-xl overflow-hidden border border-gray-200 flex items-center justify-center">
+      <div
+        {...photoPaste}
+        title="Наведите и нажмите Ctrl+V, чтобы вставить фото из буфера"
+        className="relative aspect-[3/4] bg-gray-100 rounded-xl overflow-hidden border border-gray-200 flex items-center justify-center">
         {preview ? (
           <img
             src={preview}

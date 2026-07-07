@@ -1,6 +1,7 @@
 import { useMemo, useRef, useState } from 'react';
 
 import { getFlag, normalizeId } from './sessionWizardShared.jsx';
+import { usePasteImageOnHover } from '../../../hooks/usePasteImageOnHover';
 
 const getMultilangDisplay = (value, fallback = '') => {
   if (!value) return fallback;
@@ -300,9 +301,16 @@ function FeedImagePanel({
   const imageOriginalUrl = getFeedImageOriginalUrl(currentItem);
   const imageCopyright = getFeedImageCopyright(currentItem);
 
+  const photoPaste = usePasteImageOnHover((file) =>
+    onPhotoFileChange?.({ target: { files: [file], value: '' } }, currentItem),
+  );
+
   return (
     <aside className="w-52 shrink-0 space-y-3">
-      <div className="relative aspect-[3/4] bg-gray-100 rounded-xl overflow-hidden border border-gray-200 flex items-center justify-center">
+      <div
+        {...photoPaste}
+        title="Наведите и нажмите Ctrl+V, чтобы вставить фото из буфера"
+        className="relative aspect-[3/4] bg-gray-100 rounded-xl overflow-hidden border border-gray-200 flex items-center justify-center">
         {imagePreview ? (
           <img
             src={imagePreview}

@@ -3002,6 +3002,67 @@ export function useAttractionsStep(ctx) {
     showNote,
   ]);
 
+  // ─── handleAttractionPhotoFile ─────────────────────────────────────────────
+  // Загрузка главного фото достопримечательности из файла (кнопка «+ Добавить фото»
+  // и вставка из буфера по Ctrl+V при наведении на рамку).
+  const handleAttractionPhotoFile = useCallback(async (event, attrArg = null) => {
+    const file = event.target.files?.[0];
+
+    if (!file || !file.type.startsWith('image/')) return;
+
+    event.target.value = '';
+
+    const targetAttr = attrArg || currentAttr;
+
+    if (!targetAttr?.id) return;
+
+    try {
+      const fd = new FormData();
+
+      fd.append('file', file);
+      fd.append('session_uuid', getSessionUuid() || '');
+      fd.append('temp', '1');
+
+      const existingCopyright =
+        targetAttr.image_copyright || targetAttr.imageCopyright || '';
+
+      if (existingCopyright) {
+        fd.append('copyright', existingCopyright);
+      }
+
+      const res = await imagesAPI.upload(fd);
+      const { id, url, copyright: uploadedCopyright } = res?.data || {};
+
+      if (id && url) {
+        const copyright =
+          uploadedCopyright != null ? uploadedCopyright || '' : existingCopyright;
+
+        await persistAttractionImage(
+          {
+            image_id: id,
+            image: id,
+
+            image_url: url,
+            imageUrl: url,
+            imagePreview: url,
+
+            image_original_url: '',
+            imageOriginalUrl: '',
+
+            image_copyright: copyright,
+            imageCopyright: copyright,
+          },
+          { silent: false },
+        );
+      }
+    } catch (err) {
+      showNote(
+        'Ошибка загрузки изображения: ' + parseApiError(err, 'Ошибка загрузки'),
+        'error',
+      );
+    }
+  }, [getSessionUuid, currentAttr, persistAttractionImage, showNote]);
+
   // ─── openAttractionFeedCommonsModal ────────────────────────────────────────
   const openAttractionFeedCommonsModal = useCallback((item) => {
     setCommonsTarget({
@@ -3574,6 +3635,7 @@ export function useAttractionsStep(ctx) {
     updateAttrLocaleField,
     updateCurrentAttrPatch,
     persistAttractionImage,
+    handleAttractionPhotoFile,
     toggleCurrentAttractionTag,
     openAttractionCommonsModal,
 

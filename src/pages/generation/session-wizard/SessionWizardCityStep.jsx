@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import { getCityDraftName, getFlag } from './sessionWizardShared.jsx';
 import { createCoordinatePasteHandler } from '../../../utils/coordinates';
+import { usePasteImageOnHover } from '../../../hooks/usePasteImageOnHover';
 
 // ─── helpers ──────────────────────────────────────────────────────────────────
 
@@ -143,9 +144,15 @@ function PhotoPanel({
   photoFileRef, onOpenCommonsModal, onPhotoFileChange, onPhotoDelete,
   onImageOriginalUrlChange, onImageCopyrightChange,
 }) {
+  const photoPaste = usePasteImageOnHover((file) =>
+    onPhotoFileChange?.({ target: { files: [file], value: '' } }),
+  );
   return (
     <div className="w-48 shrink-0 space-y-2">
-      <div className="relative aspect-[3/4] bg-gray-100 rounded-xl overflow-hidden border border-gray-200 flex items-center justify-center">
+      <div
+        {...photoPaste}
+        title="Наведите и нажмите Ctrl+V, чтобы вставить фото из буфера"
+        className="relative aspect-[3/4] bg-gray-100 rounded-xl overflow-hidden border border-gray-200 flex items-center justify-center">
         {imagePreview
           ? <img src={imagePreview} alt="Фото" className="w-full h-full object-cover" />
           : <span className="text-gray-400 text-xs">Нет фото</span>

@@ -331,6 +331,7 @@ export default function SessionWizard({ components = {} } = {}) {
     saveCurrentIlIfDirty,
     persistInteractiveLocationImage,
     persistAttractionImage,
+    handleAttractionPhotoFile,
     leaveIlDetailView,
     updateIlLocaleField,
     updateCurrentIlPatch,
@@ -1184,6 +1185,7 @@ export default function SessionWizard({ components = {} } = {}) {
               onUpdateCurrentAttrPatch={updateCurrentAttrPatch}
               onOpenAttrDetail={openAttrDetail}
               onOpenAttractionCommonsModal={openAttractionCommonsModal}
+              onAttractionPhotoFileChange={handleAttractionPhotoFile}
               onAddAttraction={addAttraction}
               onImportAttractionsFromText={importAttractionsFromText}
               attractionGenerationOpen={attractionGenerationOpen}
