@@ -1349,14 +1349,10 @@ export function useAttractionsStep(ctx) {
           );
         }
 
-        await Promise.all(
-          Object.values(attrLocaleData).map((d) =>
-            attractionsAPI.saveContent(sessionId, currentAttr.id, {
-              language: d.lang,
-              text: d.contentText || '',
-            }),
-          ),
-        );
+        // Единое поле описания (Variant B): текст достопримечательности
+        // хранится в description (его показывает приложение и заполняет ИИ)
+        // и сохраняется выше через update_attraction. Осиротевший
+        // AttractionContent («Текст») из формы больше не пишем.
 
         attrSavedSnapshotRef.current = buildAttrPersistSnapshot(
           updatedAttr,

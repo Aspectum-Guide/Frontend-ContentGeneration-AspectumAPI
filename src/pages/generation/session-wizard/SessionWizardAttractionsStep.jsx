@@ -1257,7 +1257,7 @@ export default function SessionWizardAttractionsStep({
                 <div className="flex items-center justify-between gap-3 mb-1">
                   <div className="flex items-center gap-2">
                     <label className="text-sm font-medium text-gray-700">
-                      Текст
+                      Описание
                     </label>
                     <span className="px-1.5 py-0.5 bg-blue-100 text-blue-700 text-xs rounded font-mono">
                       {localeLabel}
@@ -1274,12 +1274,12 @@ export default function SessionWizardAttractionsStep({
                 </div>
 
                 <textarea
-                  value={attrCurrentLocale.contentText || ''}
+                  value={attrCurrentLocale.description || ''}
                   onChange={(e) =>
-                    onUpdateAttrLocaleField('contentText', e.target.value)
+                    onUpdateAttrLocaleField('description', e.target.value)
                   }
                   rows={7}
-                  placeholder="Подробный текст-описание, история, интересные факты..."
+                  placeholder="Описание достопримечательности: история, интересные факты — то, что увидит пользователь в приложении."
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
                 />
               </div>
