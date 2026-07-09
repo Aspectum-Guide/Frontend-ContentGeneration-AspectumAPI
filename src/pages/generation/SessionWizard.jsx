@@ -6,6 +6,7 @@ import CommonsImagePicker from '../../components/generation/CommonsImagePicker';
 import SessionWizardAttractionsStep from './session-wizard/SessionWizardAttractionsStep';
 import SessionWizardInteractiveLocationsStep from './session-wizard/SessionWizardInteractiveLocationsStep';
 import SessionWizardCityStep from './session-wizard/SessionWizardCityStep';
+import SessionWizardGenerateCityFull from './session-wizard/SessionWizardGenerateCityFull';
 import SessionWizardPublishStep from './session-wizard/SessionWizardPublishStep';
 import SessionWizardTagsCatalogStep from './session-wizard/SessionWizardTagsCatalogStep';
 import SessionWizardCityTagsPicker from './session-wizard/SessionWizardCityTagsPicker';
@@ -429,6 +430,11 @@ export default function SessionWizard({ components = {} } = {}) {
     generateAttractionAudioGuideTrackAudio,
     regenerateAttractionAudioGuideChapter,
     audioGuideRegeneratingChapterId,
+    generateAttractionAudioGuideTtsStress,
+    setAttractionAudioGuideStressText,
+    audioGuideStressBusyId,
+    buildSessionStressDictionary,
+    buildingStressDictionary,
     elevenLabsSettingsLoading,
     elevenLabsSettingsError,
     elevenLabsSettings,
@@ -1032,6 +1038,12 @@ export default function SessionWizard({ components = {} } = {}) {
 
         {currentStep === 1 && (
           <div className="space-y-6">
+            <SessionWizardGenerateCityFull
+              sessionId={sessionId}
+              defaultLang={defaultLocale || 'ru'}
+              onDone={() => controller.loadSession(activeCityDraftId)}
+            />
+
             <SessionWizardCityStep
               cityDrafts={cityDrafts}
               activeCityDraftId={activeCityDraftId}
@@ -1399,6 +1411,15 @@ export default function SessionWizard({ components = {} } = {}) {
                   regenerateAttractionAudioGuideChapter
                 }
                 audioGuideRegeneratingChapterId={audioGuideRegeneratingChapterId}
+                onGenerateAttractionAudioGuideTtsStress={
+                  generateAttractionAudioGuideTtsStress
+                }
+                onSetAttractionAudioGuideStressText={
+                  setAttractionAudioGuideStressText
+                }
+                audioGuideStressBusyId={audioGuideStressBusyId}
+                onBuildSessionStressDictionary={buildSessionStressDictionary}
+                buildingStressDictionary={buildingStressDictionary}
                 elevenLabsSettingsLoading={elevenLabsSettingsLoading}
                 elevenLabsSettingsError={elevenLabsSettingsError}
                 elevenLabsSettings={elevenLabsSettings}

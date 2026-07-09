@@ -170,6 +170,18 @@ export const attractionAudioGuidesAPI = {
       `${BASE}/sessions/${sessionId}/attraction-audio-guides/${guideId}/tracks/${trackId}/regenerate-chapter-audio/`,
       payload,
     ),
+
+  generateTtsStress: (sessionId, guideId, payload = {}) =>
+    apiClient.post(
+      `${BASE}/sessions/${sessionId}/attraction-audio-guides/${guideId}/generate-tts-stress/`,
+      payload,
+    ),
+
+  buildStressDictionary: (sessionId, payload = {}) =>
+    apiClient.post(
+      `${BASE}/sessions/${sessionId}/build-stress-dictionary/`,
+      payload,
+    ),
 };
 
 export const ttsAPI = {
@@ -342,6 +354,15 @@ export const aiAPI = {
       `${BASE}/ai/attraction-info-json/tasks/${taskId}/create-attraction-info/`,
       payload,
     ),
+  /**
+   * Оркестратор «Сгенерировать город целиком» — одно действие.
+   * Возвращает { task_id } родительской задачи; поллить как обычную задачу
+   * (result_data.summary = { children_total, children_done, children_failed }).
+   * payload: { prompt, lang?, attractions_count?, city_info_count?,
+   *            attraction_info_count?, provider?, generation_mode?, use_web_search? }
+   */
+  generateCityFull: (sessionId, payload = {}) =>
+    apiClient.post(`${BASE}/sessions/${sessionId}/generate-city-full/`, payload),
 };
 
 // ─── Events (reference) ───────────────────────────────────────────────────────
