@@ -363,6 +363,12 @@ export const aiAPI = {
    */
   generateCityFull: (sessionId, payload = {}) =>
     apiClient.post(`${BASE}/sessions/${sessionId}/generate-city-full/`, payload),
+  /** Ф2: перегенерация описания одной достопримечательности. */
+  regenerateAttractionDetail: (sessionId, attrId, payload = {}) =>
+    apiClient.post(
+      `${BASE}/sessions/${sessionId}/attractions/${attrId}/regenerate-detail/`,
+      payload,
+    ),
 };
 
 // ─── Events (reference) ───────────────────────────────────────────────────────

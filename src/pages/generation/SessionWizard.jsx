@@ -24,6 +24,7 @@ import {
   normalizeId,
 } from './session-wizard/sessionWizardShared.jsx';
 import { useSessionWizardController } from './session-wizard/useSessionWizardController.ts';
+import { aiAPI } from '../../api/generation';
 import DefaultToast from '../../components/ui/Toast.jsx';
 import DefaultInlineProgressBanner from '../../components/ui/InlineProgressBanner.jsx';
 import { ConfirmModal as DefaultConfirmModal } from '../../components/ui/Modal.jsx';
@@ -1195,6 +1196,12 @@ export default function SessionWizard({ components = {} } = {}) {
               referenceCities={referenceCities || []}
               cityDrafts={cityDrafts || []}
               onUpdateCurrentAttrPatch={updateCurrentAttrPatch}
+              onRegenerateAttractionDetail={async (attrId, locale) => {
+                await aiAPI.regenerateAttractionDetail(sessionId, attrId, {
+                  lang: locale || activeLocale || 'ru',
+                });
+                await controller.loadSession(activeCityDraftId);
+              }}
               onOpenAttrDetail={openAttrDetail}
               onOpenAttractionCommonsModal={openAttractionCommonsModal}
               onAttractionPhotoFileChange={handleAttractionPhotoFile}

@@ -490,6 +490,7 @@ export default function SessionWizardAttractionsStep({
   onSetAttrActiveLocale,
   onUpdateAttrLocaleField,
   onSaveCurrentAttr,
+  onRegenerateAttractionDetail,
   onGoToStep,
 
   eventFilterTree = [],
@@ -528,6 +529,7 @@ export default function SessionWizardAttractionsStep({
   const attrCurrentLocale = attrLocaleData[attrActiveLocale] || {};
   const [selectMode, setSelectMode] = useState(false);
   const [selectedAttractionIds, setSelectedAttractionIds] = useState(() => new Set());
+  const [regenDetailLoading, setRegenDetailLoading] = useState(false);
 
   const assignedCityType = currentAttr?.assigned_city_type || 'none';
   const selectedDatabaseCityId = normalizeId(currentAttr?.city_id ?? currentAttr?.city);
@@ -1281,6 +1283,26 @@ export default function SessionWizardAttractionsStep({
                   </button>
                 </div>
 
+                {typeof onRegenerateAttractionDetail === 'function' && currentAttr?.id && (
+                  <div className="flex justify-end mb-1">
+                    <button
+                      type="button"
+                      disabled={regenDetailLoading}
+                      onClick={async () => {
+                        setRegenDetailLoading(true);
+                        try {
+                          await onRegenerateAttractionDetail(currentAttr.id, attrActiveLocale);
+                        } finally {
+                          setRegenDetailLoading(false);
+                        }
+                      }}
+                      title="Перегенерировать описание этой достопримечательности через ИИ"
+                      className="px-3 py-1 text-xs font-medium text-indigo-700 bg-indigo-50 border border-indigo-200 rounded-lg hover:bg-indigo-100 disabled:opacity-50 transition-colors"
+                    >
+                      {regenDetailLoading ? '↻ Генерирую…' : '↻ Перегенерировать ИИ'}
+                    </button>
+                  </div>
+                )}
                 <textarea
                   value={attrCurrentLocale.description || ''}
                   onChange={(e) =>
