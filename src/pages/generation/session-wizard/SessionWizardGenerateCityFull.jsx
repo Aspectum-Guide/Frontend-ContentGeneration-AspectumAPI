@@ -19,9 +19,6 @@ import { pollGenerationTask } from '../../../utils/generationTaskPoll';
 export default function SessionWizardGenerateCityFull({ sessionId, defaultLang = 'ru', onDone }) {
   const [prompt, setPrompt] = useState('');
   const [attractionsCount, setAttractionsCount] = useState(10);
-  const [cityInfoCount, setCityInfoCount] = useState(5);
-  const [attractionInfoCount, setAttractionInfoCount] = useState(5);
-  const [useWebSearch, setUseWebSearch] = useState(false);
 
   const [running, setRunning] = useState(false);
   const [task, setTask] = useState(null);
@@ -45,9 +42,8 @@ export default function SessionWizardGenerateCityFull({ sessionId, defaultLang =
         prompt: trimmed,
         lang: defaultLang,
         attractions_count: clampCount(attractionsCount),
-        city_info_count: clampCount(cityInfoCount),
-        attraction_info_count: clampCount(attractionInfoCount),
-        use_web_search: useWebSearch,
+        // Полезную инфу (город/достопр.) оркестратор определяет по найденным данным
+        // сам (может быть 0), с cap-ами на бэке. Веб-поиск автономный (research).
       });
       const taskId = data?.task_id;
       if (!taskId) throw new Error('Бэкенд не вернул task_id');
@@ -72,10 +68,7 @@ export default function SessionWizardGenerateCityFull({ sessionId, defaultLang =
     } finally {
       setRunning(false);
     }
-  }, [
-    prompt, running, sessionId, defaultLang,
-    attractionsCount, cityInfoCount, attractionInfoCount, useWebSearch, onDone,
-  ]);
+  }, [prompt, running, sessionId, defaultLang, attractionsCount, onDone]);
 
   const progress = Math.max(0, Math.min(100, Number(task?.progress) || 0));
   const summary = task?.result_data?.summary || {};
@@ -107,16 +100,9 @@ export default function SessionWizardGenerateCityFull({ sessionId, defaultLang =
         <div className="flex flex-wrap items-end gap-3">
           <NumField label="Достопримечательности" value={attractionsCount}
             onChange={setAttractionsCount} disabled={running} />
-          <NumField label="Полезная инфа (город)" value={cityInfoCount}
-            onChange={setCityInfoCount} disabled={running} />
-          <NumField label="Инфа на достопр." value={attractionInfoCount}
-            onChange={setAttractionInfoCount} disabled={running} />
-
-          <label className="flex items-center gap-1.5 text-xs text-gray-700">
-            <input type="checkbox" checked={useWebSearch} disabled={running}
-              onChange={(e) => setUseWebSearch(e.target.checked)} />
-            Веб-поиск
-          </label>
+          <span className="text-[11px] text-gray-400 self-center max-w-[220px]">
+            Полезную инфу и объём подбирает система по найденным данным.
+          </span>
 
           <button
             type="button"
