@@ -18,6 +18,7 @@ import { pollGenerationTask } from '../../../utils/generationTaskPoll';
  */
 export default function SessionWizardGenerateCityFull({ sessionId, defaultLang = 'ru', onDone }) {
   const [prompt, setPrompt] = useState('');
+  const [bigCity, setBigCity] = useState(false);
 
   const [running, setRunning] = useState(false);
   const [task, setTask] = useState(null);
@@ -38,8 +39,8 @@ export default function SessionWizardGenerateCityFull({ sessionId, defaultLang =
       const { data } = await aiAPI.generateCityFull(sessionId, {
         prompt: trimmed,
         lang: defaultLang,
-        // Объём (достопр., инфа) полностью решает система по найденным данным
-        // (до 70 основных для обычного города; больше — если промт указывает).
+        allow_large: bigCity,   // многораундовый discovery: до 150 достопр. / 300 ИЛ
+        // Объём (достопр., инфа, ИЛ) решает система по найденным данным.
         // Веб-поиск автономный (research через Brave).
       });
       const taskId = data?.task_id;
@@ -65,7 +66,7 @@ export default function SessionWizardGenerateCityFull({ sessionId, defaultLang =
     } finally {
       setRunning(false);
     }
-  }, [prompt, running, sessionId, defaultLang, onDone]);
+  }, [prompt, running, sessionId, defaultLang, bigCity, onDone]);
 
   const progress = Math.max(0, Math.min(100, Number(task?.progress) || 0));
   const summary = task?.result_data?.summary || {};
@@ -94,10 +95,16 @@ export default function SessionWizardGenerateCityFull({ sessionId, defaultLang =
           className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-indigo-400 focus:outline-none focus:ring-1 focus:ring-indigo-400 disabled:bg-gray-100"
         />
 
-        <div className="flex flex-wrap items-end gap-3">
-          <span className="text-[11px] text-gray-400 self-center max-w-[340px]">
-            Объём (достопримечательности, полезная инфа) система подбирает сама по
-            найденным данным. Для большого города укажи это в запросе.
+        <div className="flex flex-wrap items-center gap-3">
+          <label className="flex items-center gap-1.5 text-xs text-gray-700"
+            title="Многораундовый поиск: до ~150 достопримечательностей и 300 интерактивных локаций (дольше и дороже)">
+            <input type="checkbox" checked={bigCity} disabled={running}
+              onChange={(e) => setBigCity(e.target.checked)} />
+            Большой город
+          </label>
+          <span className="text-[11px] text-gray-400 self-center max-w-[300px]">
+            Объём система подбирает по данным. «Большой город» — многораундовый поиск
+            (до ~150 достопр. / 300 ИЛ, дольше).
           </span>
 
           <button
