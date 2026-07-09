@@ -17,7 +17,8 @@ import { buildGenerationPayloadFields } from '../../../components/generation/AiG
 
 const DEFAULT_AUDIO_GUIDE_PLAN_ITEMS_COUNT = 6;
 const PREFERRED_DEFAULT_ELEVENLABS_VOICE_ID = 'ogi2DyUAKJb7CEdqqvlU';
-const ELEVENLABS_SETTINGS_FRONTEND_CACHE_KEY = 'aspectum:elevenlabs:settings:v1';
+// v2: инвалидируем старый кэш (в нём было только 10 голосов из-за пагинации /v2/voices).
+const ELEVENLABS_SETTINGS_FRONTEND_CACHE_KEY = 'aspectum:elevenlabs:settings:v2';
 const ELEVENLABS_SETTINGS_FRONTEND_CACHE_TTL_MS = 6 * 60 * 60 * 1000;
 
 const emptyAudioGuidePlanGenerationLocaleState = () => ({
@@ -62,6 +63,9 @@ const normalizeAttractionAudioGuide = (guide = {}) => {
     content_plan: normalizeContentPlan(guide.content_plan ?? guide.contentPlan ?? {}),
     content_texts: normalizeContentTexts(
       guide.content_texts ?? guide.contentTexts ?? {},
+    ),
+    content_texts_tts: normalizeContentTexts(
+      guide.content_texts_tts ?? guide.contentTextsTts ?? {},
     ),
 
     index: Number(guide.index ?? 0),
@@ -358,6 +362,7 @@ const buildAttractionAudioGuidePayload = (
     title = null,
     contentPlan = null,
     contentTexts = null,
+    contentTextsTts = null,
     includeTracks = false,
     trackLanguages = null,
   } = {},
@@ -386,6 +391,9 @@ const buildAttractionAudioGuidePayload = (
     content_plan: contentPlan ?? guide.content_plan ?? {},
     content_texts: normalizeContentTexts(
       contentTexts ?? guide.content_texts ?? {},
+    ),
+    content_texts_tts: normalizeContentTexts(
+      contentTextsTts ?? guide.content_texts_tts ?? {},
     ),
 
     index: Number(guide.index ?? 0),
@@ -495,6 +503,9 @@ function buildAttractionAudioGuideSavePayload(guide, localeData) {
     contentPlan,
     contentTexts: normalizeContentTexts(
       normalizedGuide.content_texts ?? {},
+    ),
+    contentTextsTts: normalizeContentTexts(
+      normalizedGuide.content_texts_tts ?? {},
     ),
     includeTracks: true,
     trackLanguages,
@@ -812,6 +823,10 @@ export function useAudioGuides({
   const [generatingAudioGuideTrack, setGeneratingAudioGuideTrack] = useState(false);
   const [audioGuideTrackGenerationError, setAudioGuideTrackGenerationError] = useState(null);
   const [audioGuideRegeneratingChapterId, setAudioGuideRegeneratingChapterId] = useState(null);
+  // Идёт расстановка ударений: null | 'all' | planItemId
+  const [audioGuideStressBusyId, setAudioGuideStressBusyId] = useState(null);
+  // Идёт фоновый сбор словаря ударений города
+  const [buildingStressDictionary, setBuildingStressDictionary] = useState(false);
   const [audioGuidePlanGenerationState, setAudioGuidePlanGenerationState] = useState({});
   const audioGuidePlanGenerationStateRef = useRef({});
   const [elevenLabsSettingsLoading, setElevenLabsSettingsLoading] = useState(false);
@@ -1632,6 +1647,12 @@ export function useAudioGuides({
               currentAttractionAudioGuide.content_texts ??
               {},
           ),
+          content_texts_tts: normalizeContentTexts(
+            responseGuide.content_texts_tts ??
+              payload.content_texts_tts ??
+              currentAttractionAudioGuide.content_texts_tts ??
+              {},
+          ),
 
           tracks:
             responseGuide.tracks ??
@@ -2024,7 +2045,7 @@ export function useAudioGuides({
   );
 
   const generateAttractionAudioGuideTrackAudio = useCallback(
-    async ({ languageCode = null, replaceExisting = false } = {}) => {
+    async ({ languageCode = null, replaceExisting = false, force = false } = {}) => {
       const guide = currentAttractionAudioGuideRef.current;
       if (!guide?.id) {
         showNote('Сначала откройте аудиогид', 'error');
@@ -2116,9 +2137,10 @@ export function useAudioGuides({
         const voiceId = (audioGuideTtsVoiceId || audioGuideTtsVoiceIdRef.current || '').trim();
         const payload = {
           language_code: lang,
-          replace_existing: Boolean(replaceExisting),
+          replace_existing: Boolean(replaceExisting) || Boolean(force),
           async: true,
         };
+        if (force) payload.force = true;
         if (voiceId) payload.voice_id = voiceId;
 
         if (audioGuideTtsModelTouchedRef.current) {
@@ -2258,6 +2280,136 @@ export function useAudioGuides({
         showNote(message, 'error');
       } finally {
         setAudioGuideRegeneratingChapterId(null);
+      }
+    },
+    [sessionId, showNote],
+  );
+
+  // Расстановка ударений (U+0301) для озвучки: пишет вторую версию текста в
+  // content_texts_tts. planItemId=null → весь текст языка; иначе одна глава.
+  const generateAttractionAudioGuideTtsStress = useCallback(
+    async (guide, languageCode, planItemId = null, provider = null) => {
+      if (!guide) return;
+      const lang = (languageCode || '').trim();
+      if (!lang) {
+        showNote('Не удалось определить язык', 'error');
+        return;
+      }
+
+      const workingGuide = normalizeAttractionAudioGuide(guide);
+
+      const applyGuidePatch = (nextGuide) => {
+        setCurrentAttractionAudioGuide((prev) =>
+          prev && normalizeId(prev.id) === normalizeId(guide.id) ? nextGuide : prev,
+        );
+        setAttractionAudioGuides((prev) =>
+          prev.map((item) =>
+            normalizeId(item.id) === normalizeId(guide.id) ? nextGuide : item,
+          ),
+        );
+      };
+
+      setAudioGuideStressBusyId(planItemId || 'all');
+      setAudioGuideTrackGenerationError(null);
+      try {
+        const res = await attractionAudioGuidesAPI.generateTtsStress(
+          sessionId,
+          guide.id,
+          {
+            language_code: lang,
+            plan_item_id: planItemId || undefined,
+            provider: provider || undefined,
+            async: true,
+          },
+        );
+
+        let data = res?.data || {};
+        if (data?.async && data?.task_id) {
+          setAudioGuideTrackGenerationError(
+            data.current_step || 'Расстановка ударений запущена...',
+          );
+          const task = await pollGenerationTask(data.task_id, {
+            tasksAPI,
+            intervalMs: 3000,
+            maxWaitMs: 30 * 60 * 1000,
+            onProgress: (progressTask) => {
+              const step = progressTask?.current_step;
+              if (step) setAudioGuideTrackGenerationError(step);
+            },
+          });
+          data = task?.result_data || {};
+        }
+
+        if (!data.ok) {
+          throw new Error(data.error || 'Не удалось расставить ударения');
+        }
+
+        // Бэкенд возвращает актуальный словарь языка целиком — им и заменяем.
+        const langMap = data.content_texts_tts || {};
+        const merged = normalizeAttractionAudioGuide({
+          ...workingGuide,
+          content_texts_tts: {
+            ...(workingGuide.content_texts_tts || {}),
+            [lang]: langMap,
+          },
+        });
+        applyGuidePatch(merged);
+        setAudioGuideTrackGenerationError(null);
+        showNote(
+          planItemId ? 'Ударения главы обновлены' : 'Ударения расставлены',
+          'success',
+        );
+      } catch (error) {
+        const message = mapAudioGuideTrackTtsError(error);
+        setAudioGuideTrackGenerationError(message);
+        showNote(message, 'error');
+      } finally {
+        setAudioGuideStressBusyId(null);
+      }
+    },
+    [sessionId, showNote],
+  );
+
+  // Ручная правка текста с ударениями: перекрывает ИИ и держит state актуальным.
+  const setAttractionAudioGuideStressText = useCallback(
+    (guide, languageCode, planItemId, value) => {
+      if (!guide || !planItemId) return;
+      const lang = (languageCode || '').trim();
+      if (!lang) return;
+
+      const apply = (prev) => {
+        if (!prev || normalizeId(prev.id) !== normalizeId(guide.id)) return prev;
+        const tts = { ...(prev.content_texts_tts || {}) };
+        const langMap = { ...(tts[lang] || {}) };
+        langMap[String(planItemId)] = value ?? '';
+        tts[lang] = langMap;
+        return { ...prev, content_texts_tts: tts };
+      };
+
+      setCurrentAttractionAudioGuide((prev) => apply(prev) || prev);
+      setAttractionAudioGuides((prev) =>
+        prev.map((item) => apply(item) || item),
+      );
+    },
+    [],
+  );
+
+  // Ручной запуск фонового сбора словаря ударений (топонимы/названия города).
+  const buildSessionStressDictionary = useCallback(
+    async (languageCode = 'ru') => {
+      setBuildingStressDictionary(true);
+      try {
+        await attractionAudioGuidesAPI.buildStressDictionary(sessionId, {
+          language_code: (languageCode || 'ru').trim() || 'ru',
+        });
+        showNote(
+          'Сбор ударений для города запущен в фоне — словарь пополнится автоматически',
+          'success',
+        );
+      } catch (error) {
+        showNote(mapAudioGuideTrackTtsError(error), 'error');
+      } finally {
+        setBuildingStressDictionary(false);
       }
     },
     [sessionId, showNote],
@@ -2953,6 +3105,11 @@ export function useAudioGuides({
     generateAttractionAudioGuideTrackAudio,
     regenerateAttractionAudioGuideChapter,
     audioGuideRegeneratingChapterId,
+    generateAttractionAudioGuideTtsStress,
+    setAttractionAudioGuideStressText,
+    audioGuideStressBusyId,
+    buildSessionStressDictionary,
+    buildingStressDictionary,
     generateAttractionAudioGuidePlan,
     openAttractionAudioGuidePlanGenerateModal,
     closeAttractionAudioGuidePlanGenerateModal,

@@ -602,6 +602,11 @@ export default function SessionWizardAttractionAudioGuidesBlock({
   onGenerateAttractionAudioGuideTrackAudio,
   onRegenerateAttractionAudioGuideChapter,
   audioGuideRegeneratingChapterId = null,
+  onGenerateAttractionAudioGuideTtsStress,
+  onSetAttractionAudioGuideStressText,
+  audioGuideStressBusyId = null,
+  onBuildSessionStressDictionary,
+  buildingStressDictionary = false,
   elevenLabsSettingsLoading = false,
   elevenLabsSettingsError = '',
   elevenLabsSettings = null,
@@ -612,6 +617,8 @@ export default function SessionWizardAttractionAudioGuidesBlock({
 }) {
   const audioFileRef = useRef(null);
   const [planImportText, setPlanImportText] = useState('');
+  // Провайдер для расстановки ударений: '' = по настройке AI_PROVIDER
+  const [stressProvider, setStressProvider] = useState('');
 
   const itemTextModalGenerating = Boolean(
     audioGuideItemTextGenerateItemId &&
@@ -1323,6 +1330,61 @@ export default function SessionWizardAttractionAudioGuidesBlock({
             </div>
           </AiGenerationModal>
 
+          {planPoints.length > 0 && onGenerateAttractionAudioGuideTtsStress ? (
+            <div className="flex flex-wrap items-center justify-between gap-2 p-2.5 bg-purple-50/60 border border-purple-200 rounded-lg">
+              <span className="text-xs text-purple-800">
+                Ударения для озвучки ElevenLabs — вторая версия текста (U+0301).
+              </span>
+              <div className="flex items-center gap-2">
+                {onBuildSessionStressDictionary ? (
+                  <button
+                    type="button"
+                    onClick={() =>
+                      onBuildSessionStressDictionary(currentLocale.lang)
+                    }
+                    disabled={buildingStressDictionary}
+                    title="Найти правильные ударения в названиях города и достопримечательностей (Викисловарь + веб) и пополнить словарь"
+                    className="shrink-0 px-3 py-1.5 text-xs font-medium text-purple-700 bg-white border border-purple-300 rounded-lg hover:bg-purple-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {buildingStressDictionary
+                      ? 'Сбор...'
+                      : '📖 Собрать ударения города'}
+                  </button>
+                ) : null}
+                <select
+                  value={stressProvider}
+                  onChange={(e) => setStressProvider(e.target.value)}
+                  disabled={audioGuideStressBusyId != null}
+                  title="Провайдер ИИ для расстановки ударений"
+                  className="px-2 py-1.5 text-xs border border-purple-200 rounded-lg bg-white text-purple-800 focus:outline-none focus:ring-2 focus:ring-purple-500 disabled:opacity-50"
+                >
+                  <option value="">Провайдер: по умолчанию</option>
+                  <option value="deepseek">DeepSeek (дёшево)</option>
+                  <option value="openai">OpenAI</option>
+                </select>
+                <button
+                  type="button"
+                  onClick={() =>
+                    onGenerateAttractionAudioGuideTtsStress(
+                      currentAttractionAudioGuide,
+                      currentLocale.lang,
+                      null,
+                      stressProvider || null,
+                    )
+                  }
+                  disabled={
+                    audioGuideStressBusyId != null || attractionAudioGuideSaving
+                  }
+                  className="shrink-0 px-3 py-1.5 text-xs font-medium text-white bg-purple-600 rounded-lg hover:bg-purple-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {audioGuideStressBusyId === 'all'
+                    ? 'Расстановка...'
+                    : '↻ Расставить ударения во всех пунктах'}
+                </button>
+              </div>
+            </div>
+          ) : null}
+
           {planPoints.length === 0 ? (
             <p className="text-xs text-gray-500">
               Сначала добавьте или сгенерируйте план аудиогида.
@@ -1346,6 +1408,18 @@ export default function SessionWizardAttractionAudioGuidesBlock({
                 const itemGenerating = Boolean(
                   itemId && audioGuideGeneratingItemTextById?.[itemId],
                 );
+                const rawStress =
+                  planLang &&
+                  currentAttractionAudioGuide?.content_texts_tts?.[planLang]?.[
+                    itemId
+                  ];
+                const stressValue =
+                  rawStress != null && rawStress !== undefined
+                    ? String(rawStress)
+                    : '';
+                const stressBusy =
+                  audioGuideStressBusyId === itemId ||
+                  audioGuideStressBusyId === 'all';
                 return (
                   <div
                     key={`ag-main-text-${point.id}`}
@@ -1388,6 +1462,50 @@ export default function SessionWizardAttractionAudioGuidesBlock({
                     >
                       {itemGenerating ? 'Генерация...' : 'Сгенерировать этот пункт'}
                     </button>
+
+                    {onGenerateAttractionAudioGuideTtsStress ? (
+                      <div className="mt-2 pt-2 border-t border-dashed border-gray-200 space-y-1.5">
+                        <div className="flex items-center justify-between gap-2">
+                          <label className="block text-xs font-medium text-purple-700">
+                            Текст с ударениями (для ElevenLabs)
+                          </label>
+                          <button
+                            type="button"
+                            onClick={() =>
+                              onGenerateAttractionAudioGuideTtsStress(
+                                currentAttractionAudioGuide,
+                                planLang,
+                                itemId,
+                                stressProvider || null,
+                              )
+                            }
+                            disabled={
+                              stressBusy ||
+                              !spokenText.trim() ||
+                              attractionAudioGuideSaving
+                            }
+                            title="Расставить ударения на основе основного текста"
+                            className="shrink-0 px-2 py-1 text-xs font-medium text-purple-700 bg-purple-50 border border-purple-200 rounded-md hover:bg-purple-100 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                          >
+                            {stressBusy ? 'Расстановка...' : '↻ Расставить ударения'}
+                          </button>
+                        </div>
+                        <textarea
+                          value={stressValue}
+                          onChange={(e) =>
+                            onSetAttractionAudioGuideStressText?.(
+                              currentAttractionAudioGuide,
+                              planLang,
+                              itemId,
+                              e.target.value,
+                            )
+                          }
+                          rows={3}
+                          placeholder="Версия с ударениями (U+0301). Если пусто — озвучка возьмёт основной текст."
+                          className="w-full px-3 py-2 border border-purple-200 rounded-lg text-sm bg-purple-50/40 focus:outline-none focus:ring-2 focus:ring-purple-500 resize-y min-h-[72px]"
+                        />
+                      </div>
+                    ) : null}
                   </div>
                 );
               })}
@@ -1504,7 +1622,7 @@ export default function SessionWizardAttractionAudioGuidesBlock({
               error={elevenLabsSettingsError}
               voiceId={audioGuideTtsVoiceId}
               onVoiceChange={onSetAudioGuideTtsVoiceId}
-              onLoadSettings={() => onLoadElevenLabsSettings?.()}
+              onLoadSettings={() => onLoadElevenLabsSettings?.({ refresh: true })}
               voiceSelectDisabled={generatingAudioGuideTrack}
             />
 
@@ -1546,6 +1664,24 @@ export default function SessionWizardAttractionAudioGuidesBlock({
                     ? 'Перегенерировать аудиофайл'
                     : 'Сгенерировать аудиофайл'}
               </button>
+
+              {hasTrackAudio ? (
+                <button
+                  type="button"
+                  onClick={() =>
+                    onGenerateAttractionAudioGuideTrackAudio?.({
+                      languageCode: planLang,
+                      replaceExisting: true,
+                      force: true,
+                    })
+                  }
+                  disabled={!canGenerateFullAudio}
+                  title="Переозвучить все главы заново, даже если текст не менялся (при глюках ElevenLabs)"
+                  className="px-3 py-1.5 text-xs font-medium text-blue-700 bg-white border border-blue-300 rounded-lg hover:bg-blue-50 disabled:opacity-50 transition-colors"
+                >
+                  ↻ Заново, без кэша
+                </button>
+              ) : null}
             </div>
           </div>
         </div>
