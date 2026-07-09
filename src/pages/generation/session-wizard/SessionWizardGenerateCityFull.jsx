@@ -18,15 +18,12 @@ import { pollGenerationTask } from '../../../utils/generationTaskPoll';
  */
 export default function SessionWizardGenerateCityFull({ sessionId, defaultLang = 'ru', onDone }) {
   const [prompt, setPrompt] = useState('');
-  const [attractionsCount, setAttractionsCount] = useState(10);
 
   const [running, setRunning] = useState(false);
   const [task, setTask] = useState(null);
   const [error, setError] = useState('');
   const [doneSummary, setDoneSummary] = useState(null);
   const cancelledRef = useRef(false);
-
-  const clampCount = (v) => Math.max(1, Math.min(50, Number(v) || 1));
 
   const start = useCallback(async () => {
     const trimmed = prompt.trim();
@@ -41,9 +38,9 @@ export default function SessionWizardGenerateCityFull({ sessionId, defaultLang =
       const { data } = await aiAPI.generateCityFull(sessionId, {
         prompt: trimmed,
         lang: defaultLang,
-        attractions_count: clampCount(attractionsCount),
-        // Полезную инфу (город/достопр.) оркестратор определяет по найденным данным
-        // сам (может быть 0), с cap-ами на бэке. Веб-поиск автономный (research).
+        // Объём (достопр., инфа) полностью решает система по найденным данным
+        // (до 70 основных для обычного города; больше — если промт указывает).
+        // Веб-поиск автономный (research через Brave).
       });
       const taskId = data?.task_id;
       if (!taskId) throw new Error('Бэкенд не вернул task_id');
@@ -68,7 +65,7 @@ export default function SessionWizardGenerateCityFull({ sessionId, defaultLang =
     } finally {
       setRunning(false);
     }
-  }, [prompt, running, sessionId, defaultLang, attractionsCount, onDone]);
+  }, [prompt, running, sessionId, defaultLang, onDone]);
 
   const progress = Math.max(0, Math.min(100, Number(task?.progress) || 0));
   const summary = task?.result_data?.summary || {};
@@ -98,10 +95,9 @@ export default function SessionWizardGenerateCityFull({ sessionId, defaultLang =
         />
 
         <div className="flex flex-wrap items-end gap-3">
-          <NumField label="Достопримечательности" value={attractionsCount}
-            onChange={setAttractionsCount} disabled={running} />
-          <span className="text-[11px] text-gray-400 self-center max-w-[220px]">
-            Полезную инфу и объём подбирает система по найденным данным.
+          <span className="text-[11px] text-gray-400 self-center max-w-[340px]">
+            Объём (достопримечательности, полезная инфа) система подбирает сама по
+            найденным данным. Для большого города укажи это в запросе.
           </span>
 
           <button
