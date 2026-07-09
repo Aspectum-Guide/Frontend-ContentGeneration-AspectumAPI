@@ -60,7 +60,10 @@ export default function SessionWizardGenerateCityFull({ sessionId, defaultLang =
         onProgress: (t) => setTask(t),
       });
 
-      setDoneSummary(finalTask?.result_data?.summary || {});
+      setDoneSummary({
+        ...(finalTask?.result_data?.summary || {}),
+        cost: finalTask?.result_data?.cost_summary || null,
+      });
       if (typeof onDone === 'function') {
         await onDone();
       }
@@ -147,7 +150,13 @@ export default function SessionWizardGenerateCityFull({ sessionId, defaultLang =
           <div className="rounded-md border border-green-200 bg-green-50 px-3 py-2 text-xs text-green-800">
             Готово. Шагов: {doneSummary.children_done ?? '—'}/{doneSummary.children_total ?? '—'}
             {doneSummary.children_failed ? `, с ошибками: ${doneSummary.children_failed}` : ''}.
-            Данные обновлены ниже.
+            {doneSummary.cost && doneSummary.cost.total_usd != null && (
+              <> Стоимость: <b>${Number(doneSummary.cost.total_usd).toFixed(4)}</b>
+                {doneSummary.cost.total_tokens
+                  ? ` (${doneSummary.cost.total_tokens.toLocaleString()} токенов)`
+                  : ''}.</>
+            )}
+            {' '}Данные обновлены ниже.
           </div>
         )}
 
