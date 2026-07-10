@@ -114,6 +114,7 @@ const buildCityStepPayload = ({
   imageId,
   imageOriginalUrl,
   activeCityDraftId,
+  baseUpdatedAt,
 }) => {
   const name = {};
   const description = {};
@@ -139,6 +140,9 @@ const buildCityStepPayload = ({
     image_id: imageId,
     image_original_url: imageOriginalUrl || '',
     ...(draftId && draftId !== 'legacy' ? { draft_id: draftId } : {}),
+    // optimistic concurrency: версия драфта на момент загрузки формы —
+    // сейв поверх более свежих данных (их пишет генерация) бэкенд отклонит 409.
+    ...(baseUpdatedAt ? { base_updated_at: baseUpdatedAt } : {}),
   };
 };
 
@@ -543,6 +547,12 @@ export default function useCityStep(ctx) {
   const autoSavingRef = useRef(false);
   const [autoSaved, setAutoSaved] = useState(false);
   const autoSaveTimerRef = useRef(null);
+  // Optimistic concurrency: версия (updated_at) драфта, которую держит форма.
+  // Сейв со stale-версией бэкенд отклоняет 409 — форма перезагружается свежим,
+  // вместо того чтобы затирать работу генерации «город целиком».
+  const cityBaseUpdatedAtRef = useRef(null);
+  // Пауза автосейва после конфликта с активной генерацией (не долбим 409 каждые 2.5с).
+  const autoSavePausedUntilRef = useRef(0);
 
   const localCreatedCityDraftsRef = useRef(new Map());
   const localDeletedCityDraftIdsRef = useRef(new Set());
@@ -908,12 +918,18 @@ export default function useCityStep(ctx) {
 
     setDefaultLocale(defaultLocaleKey);
     setActiveLocale(defaultLocaleKey);
+
+    // запоминаем версию загруженных данных для optimistic concurrency
+    cityBaseUpdatedAtRef.current = city.updated_at || null;
   }, [setLocaleData, setDefaultLocale, setActiveLocale]);
 
   const mergeCitySaveResponseIntoState = useCallback((data) => {
     if (!data || typeof data !== 'object') return;
 
     const savedDraft = data.draft || null;
+    if (savedDraft?.updated_at) {
+      cityBaseUpdatedAtRef.current = savedDraft.updated_at;
+    }
     const savedDraftId = normalizeDraftId(
       data.draft_id || savedDraft?.id || activeCityDraftIdRef.current,
     );
@@ -970,6 +986,7 @@ export default function useCityStep(ctx) {
       imageId,
       imageOriginalUrl,
       activeCityDraftId: activeCityDraftIdRef.current,
+      baseUpdatedAt: cityBaseUpdatedAtRef.current,
     });
 
     setSaving(true);
@@ -1008,13 +1025,31 @@ export default function useCityStep(ctx) {
 
       return data;
     } catch (err) {
+      const conflictData = err?.response?.status === 409 && err?.response?.data?.conflict
+        ? err.response.data : null;
+      if (conflictData) {
+        // Данные на сервере новее формы (их писала генерация): не затираем —
+        // перезагружаем форму свежим драфтом и сообщаем без «ошибки».
+        if (conflictData.draft) {
+          loadCityIntoForm(conflictData.draft);
+          mergeCitySaveResponseIntoState(conflictData);
+        }
+        hasUnsavedChangesRef.current = false;
+        showNote(
+          conflictData.generation_active
+            ? 'Идёт генерация города — форма обновлена свежими данными с сервера'
+            : 'Данные города были обновлены — форма перезагружена свежими данными',
+          'info',
+        );
+        return conflictData;
+      }
       trackEvent('save_city_fail', { sessionId: String(sessionId), reason: parseApiError(err, 'Ошибка сохранения') });
       showNote('Ошибка при сохранении города: ' + parseApiError(err, 'Ошибка сохранения'), 'error');
       throw err;
     } finally {
       setSaving(false);
     }
-  }, [sessionId, localeData, defaultLocale, lat, lon, cityTags, imageId, imageOriginalUrl, showNote, loadSession, syncActiveDraftRoute, mergeCitySaveResponseIntoState, setActiveCityDraftId, sessionOpenedAtRef, firstCitySaveAtRef]);
+  }, [sessionId, localeData, defaultLocale, lat, lon, cityTags, imageId, imageOriginalUrl, showNote, loadSession, syncActiveDraftRoute, mergeCitySaveResponseIntoState, loadCityIntoForm, setActiveCityDraftId, sessionOpenedAtRef, firstCitySaveAtRef]);
 
   const waitForCityPersistenceIdle = useCallback(async () => {
     const deadline = Date.now() + 15000;
@@ -1040,10 +1075,18 @@ export default function useCityStep(ctx) {
       imageId,
       imageOriginalUrl,
       activeCityDraftId: activeCityDraftIdRef.current,
+      baseUpdatedAt: cityBaseUpdatedAtRef.current,
     });
 
-    const res = await sessionsAPI.updateCity(sessionId, payload);
-    mergeCitySaveResponseIntoState(res?.data);
+    try {
+      const res = await sessionsAPI.updateCity(sessionId, payload);
+      mergeCitySaveResponseIntoState(res?.data);
+    } catch (e) {
+      // Конфликт версий (сервер новее — писала генерация): тихий сейв просто
+      // не нужен, данные уже лучше наших. Прочие ошибки — наверх, как раньше.
+      if (!(e?.response?.status === 409 && e?.response?.data?.conflict)) throw e;
+      mergeCitySaveResponseIntoState(e.response.data);
+    }
   }, [
     sessionId,
     session,
@@ -1066,6 +1109,8 @@ export default function useCityStep(ctx) {
     clearTimeout(autoSaveTimerRef.current);
     autoSaveTimerRef.current = setTimeout(async () => {
       if (savingRef.current) return;
+      // после конфликта с активной генерацией автосейв берёт паузу
+      if (Date.now() < autoSavePausedUntilRef.current) return;
 
       setAutoSaving(true);
       try {
@@ -1078,6 +1123,7 @@ export default function useCityStep(ctx) {
           imageId,
           imageOriginalUrl,
           activeCityDraftId: activeCityDraftIdRef.current,
+          baseUpdatedAt: cityBaseUpdatedAtRef.current,
         });
         const res = await sessionsAPI.updateCity(sessionId, payload);
         mergeCitySaveResponseIntoState(res?.data);
@@ -1085,7 +1131,26 @@ export default function useCityStep(ctx) {
         hasUnsavedChangesRef.current = false;
         setTimeout(() => setAutoSaved(false), 2500);
       } catch (e) {
-        showNote('Ошибка автосохранения города: ' + parseApiError(e, 'Неизвестная ошибка'), 'error');
+        const conflictData = e?.response?.status === 409 && e?.response?.data?.conflict
+          ? e.response.data : null;
+        if (conflictData) {
+          // Сервер новее (город дозаполняет генерация): перезагружаем форму
+          // свежим драфтом вместо затирания; при активной генерации — пауза,
+          // чтобы не конфликтить каждые 2.5 секунды.
+          if (conflictData.draft) {
+            loadCityIntoForm(conflictData.draft);
+            mergeCitySaveResponseIntoState(conflictData);
+          }
+          hasUnsavedChangesRef.current = false;
+          if (conflictData.generation_active) {
+            autoSavePausedUntilRef.current = Date.now() + 60_000;
+            showNote('Идёт генерация города — форма обновлена, автосохранение приостановлено на минуту', 'info');
+          } else {
+            showNote('Данные города были обновлены — форма перезагружена свежими данными', 'info');
+          }
+        } else {
+          showNote('Ошибка автосохранения города: ' + parseApiError(e, 'Неизвестная ошибка'), 'error');
+        }
       } finally {
         setAutoSaving(false);
       }
@@ -1104,6 +1169,7 @@ export default function useCityStep(ctx) {
     sessionId,
     session,
     mergeCitySaveResponseIntoState,
+    loadCityIntoForm,
   ]);
 
   useEffect(() => {
