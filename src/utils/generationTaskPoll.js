@@ -50,7 +50,9 @@ export async function pollGenerationTask(
         throw new Error(TASK_NOT_FOUND_MESSAGE);
       }
       const status = err?.response?.status;
-      if (status && status >= 500) {
+      // 5xx ИЛИ сетевой сбой (нет response: обрыв сети, рестарт dev-сервера,
+      // ноутбук проснулся) — задача на бэке живёт, поллинг не сдаётся.
+      if (!err?.response || (status && status >= 500)) {
         await sleep(intervalMs);
         continue;
       }

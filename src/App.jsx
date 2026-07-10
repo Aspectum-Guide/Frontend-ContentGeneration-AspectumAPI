@@ -4,6 +4,7 @@ import ProtectedRoute from './components/ProtectedRoute';
 import { LayoutActionsProvider } from './context/LayoutActionsContext';
 import NotFound from './pages/NotFound';
 import AISettings from './pages/ai/AISettings';
+import PromptSettings from './pages/ai/PromptSettings';
 import TTSSettings from './pages/ai/TTSSettings';
 import CityGeneration from './pages/ai/CityGeneration';
 import ImageGeneration from './pages/ai/ImageGeneration';
@@ -79,6 +80,10 @@ const routes = [
   {
     path: '/ai/settings',
     element: <ProtectedRoute><ErrorBoundary><AISettings /></ErrorBoundary></ProtectedRoute>,
+  },
+  {
+    path: '/ai/prompts',
+    element: <ProtectedRoute><ErrorBoundary><PromptSettings /></ErrorBoundary></ProtectedRoute>,
   },
   {
     path: '/ai/tts',

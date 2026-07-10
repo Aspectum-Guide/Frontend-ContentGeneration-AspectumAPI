@@ -363,12 +363,24 @@ export const aiAPI = {
    */
   generateCityFull: (sessionId, payload = {}) =>
     apiClient.post(`${BASE}/sessions/${sessionId}/generate-city-full/`, payload),
+  /** Последняя задача «город целиком» (для resume после обновления страницы). */
+  cityFullActive: (sessionId) =>
+    apiClient.get(`${BASE}/sessions/${sessionId}/generate-city-full/active/`),
+  /** Кнопка «Стоп»: останавливает активную генерацию города. */
+  cityFullCancel: (sessionId) =>
+    apiClient.post(`${BASE}/sessions/${sessionId}/generate-city-full/cancel/`),
   /** Ф2: перегенерация описания одной достопримечательности. */
   regenerateAttractionDetail: (sessionId, attrId, payload = {}) =>
     apiClient.post(
       `${BASE}/sessions/${sessionId}/attractions/${attrId}/regenerate-detail/`,
       payload,
     ),
+  /** Совокупная стоимость AI-генерации в рамках сессии (город + перегенерации). */
+  sessionGenerationCost: (sessionId) =>
+    apiClient.get(`${BASE}/sessions/${sessionId}/generation-cost/`),
+  /** Вкладка «Промпты»: базовые промпты/правила генерации. */
+  listPrompts: () => apiClient.get(`${BASE}/ai/prompts/`),
+  savePrompt: (key, text) => apiClient.post(`${BASE}/ai/prompts/${key}/`, { text }),
 };
 
 // ─── Events (reference) ───────────────────────────────────────────────────────
