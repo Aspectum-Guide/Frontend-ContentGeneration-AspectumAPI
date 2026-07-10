@@ -1,5 +1,7 @@
 import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from 'react';
 import { aiAPI, tasksAPI, cityInfosAPI, cityFiltersAPI, eventFiltersAPI, imagesAPI, sessionsAPI, tagsAPI } from '../../../api/generation';
+import apiClient from '../../../api/client';
+import TokenManager from '../../../utils/TokenManager';
 import { trackEvent } from '../../../utils/analytics';
 import { isNotFoundError, parseApiError } from '../../../utils/apiError';
 import {
@@ -553,6 +555,14 @@ export default function useCityStep(ctx) {
   const cityBaseUpdatedAtRef = useRef(null);
   // Пауза автосейва после конфликта с активной генерацией (не долбим 409 каждые 2.5с).
   const autoSavePausedUntilRef = useRef(0);
+  // Программная загрузка данных в форму (loadCityIntoForm) меняет тот же стейт,
+  // что и пользовательский ввод — раньше это рождало «пустые» автосейвы после
+  // каждого открытия формы (и именно они затирали работу генерации). Окно
+  // подавления: изменения внутри него — не правки, автосейв не заводится.
+  const suppressAutosaveUntilRef = useRef(0);
+  // Актуальный слепок формы для немедленного flush при уходе со страницы
+  // (debounce-таймер при unmount раньше просто отменялся — правки терялись).
+  const autosaveSnapshotRef = useRef(null);
 
   const localCreatedCityDraftsRef = useRef(new Map());
   const localDeletedCityDraftIdsRef = useRef(new Set());
@@ -921,6 +931,8 @@ export default function useCityStep(ctx) {
 
     // запоминаем версию загруженных данных для optimistic concurrency
     cityBaseUpdatedAtRef.current = city.updated_at || null;
+    // это программная загрузка, не правка пользователя — автосейв не нужен
+    suppressAutosaveUntilRef.current = Date.now() + 800;
   }, [setLocaleData, setDefaultLocale, setActiveLocale]);
 
   const mergeCitySaveResponseIntoState = useCallback((data) => {
@@ -1105,6 +1117,19 @@ export default function useCityStep(ctx) {
     if (currentStepRef.current !== 1 || !sessionId || !session || !defaultLocale) return;
     if (!localeData[defaultLocale]) return;
 
+    // Программная загрузка формы (loadCityIntoForm) — не правка: без этого
+    // каждое открытие формы рождало «пустой» автосейв, который и затирал
+    // данные, дописанные генерацией.
+    if (Date.now() < suppressAutosaveUntilRef.current) {
+      hasUnsavedChangesRef.current = false;
+      return;
+    }
+
+    // Свежий слепок формы — для немедленного flush при уходе со страницы.
+    autosaveSnapshotRef.current = {
+      localeData, defaultLocale, lat, lon, cityTags, imageId, imageOriginalUrl,
+    };
+
     hasUnsavedChangesRef.current = true;
     clearTimeout(autoSaveTimerRef.current);
     autoSaveTimerRef.current = setTimeout(async () => {
@@ -1171,6 +1196,59 @@ export default function useCityStep(ctx) {
     mergeCitySaveResponseIntoState,
     loadCityIntoForm,
   ]);
+
+  // Немедленный сейв несохранённых правок при уходе: debounce-таймер при
+  // unmount раньше просто отменялся («вставил → переключился → пропало»).
+  // useKeepalive=true — страница скрывается/закрывается: обычный XHR может
+  // не дожить, keepalive-fetch браузер дошлёт сам.
+  const flushPendingCityAutosave = useCallback((useKeepalive = false) => {
+    if (!hasUnsavedChangesRef.current || savingRef.current) return;
+    if (Date.now() < autoSavePausedUntilRef.current) return;
+    const snap = autosaveSnapshotRef.current;
+    if (!sessionId || !snap?.defaultLocale || !snap.localeData?.[snap.defaultLocale]) return;
+
+    const payload = buildCityStepPayload({
+      ...snap,
+      activeCityDraftId: activeCityDraftIdRef.current,
+      baseUpdatedAt: cityBaseUpdatedAtRef.current,
+    });
+    hasUnsavedChangesRef.current = false;
+    clearTimeout(autoSaveTimerRef.current);
+
+    if (useKeepalive) {
+      try {
+        const tokens = TokenManager.getTokens?.();
+        fetch(`${apiClient.defaults.baseURL}/generation/sessions/${sessionId}/city/`, {
+          method: 'PATCH',
+          keepalive: true,
+          headers: {
+            'Content-Type': 'application/json',
+            ...(tokens?.access ? { Authorization: `Bearer ${tokens.access}` } : {}),
+          },
+          body: JSON.stringify(payload),
+        }).catch(() => {});
+      } catch { /* уход со страницы — best effort */ }
+    } else {
+      sessionsAPI.updateCity(sessionId, payload)
+        .then((res) => mergeCitySaveResponseIntoState(res?.data))
+        .catch(() => { /* 409 = на сервере новее; сеть — правка уже в форме при возврате */ });
+    }
+  }, [sessionId, mergeCitySaveResponseIntoState]);
+
+  useEffect(() => {
+    if (!sessionId) return undefined;
+    const onVisibility = () => {
+      if (document.visibilityState === 'hidden') flushPendingCityAutosave(true);
+    };
+    const onPageHide = () => flushPendingCityAutosave(true);
+    document.addEventListener('visibilitychange', onVisibility);
+    window.addEventListener('pagehide', onPageHide);
+    return () => {
+      document.removeEventListener('visibilitychange', onVisibility);
+      window.removeEventListener('pagehide', onPageHide);
+      flushPendingCityAutosave(false);   // SPA-переход на другую страницу админки
+    };
+  }, [sessionId, flushPendingCityAutosave]);
 
   useEffect(() => {
     if (!mapNode) return;
