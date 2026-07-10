@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import useFlushOnLeave from './useFlushOnLeave';
 import { interactiveLocationsAPI, imagesAPI as defaultImagesAPI, aiAPI, tasksAPI, sessionsAPI } from '../../../api/generation';
 import {
   pollGenerationTask,
@@ -232,6 +233,8 @@ export default function useInteractiveLocationsStep({
     },
     [currentIl, isCurrentIlDirty, saveCurrentIl],
   );
+  // Уход со страницы отменяет debounce-таймер — правки дожимаются немедленно.
+  useFlushOnLeave(() => saveCurrentIlIfDirty({ silent: true }));
 
   useEffect(() => {
     clearTimeout(ilAutoSaveTimerRef.current);

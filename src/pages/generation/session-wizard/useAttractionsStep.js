@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import useFlushOnLeave from './useFlushOnLeave';
 import { attractionsAPI, attractionInfosAPI, attractionFeedAPI, aiAPI, tasksAPI, imagesAPI as defaultImagesAPI, sessionsAPI } from '../../../api/generation';
 import {
   pollGenerationTask,
@@ -1396,6 +1397,8 @@ export function useAttractionsStep(ctx) {
     },
     [currentAttr, isCurrentAttrDirty, saveCurrentAttr],
   );
+  // Уход со страницы отменяет debounce-таймер — правки дожимаются немедленно.
+  useFlushOnLeave(() => saveCurrentAttrIfDirty({ silent: true }));
 
   // ─── Auto-save for attraction ──────────────────────────────────────────────
   useEffect(() => {
@@ -2100,6 +2103,7 @@ export function useAttractionsStep(ctx) {
     },
     [currentAttractionInfo, isCurrentAttractionInfoDirty, saveCurrentAttractionInfo],
   );
+  useFlushOnLeave(() => saveCurrentAttractionInfoIfDirty({ silent: true }));
 
   // ─── deleteCurrentAttractionInfo ───────────────────────────────────────────
   const deleteCurrentAttractionInfo = useCallback(async () => {
@@ -2808,6 +2812,7 @@ export function useAttractionsStep(ctx) {
       attractionFeedAutoSaving,
     ],
   );
+  useFlushOnLeave(() => saveCurrentAttractionFeedItemIfDirty({ silent: true }));
 
   // ─── Auto-save for feed item ───────────────────────────────────────────────
   useEffect(() => {

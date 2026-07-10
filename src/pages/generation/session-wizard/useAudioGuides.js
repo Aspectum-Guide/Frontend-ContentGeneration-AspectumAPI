@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import useFlushOnLeave from './useFlushOnLeave';
 import { attractionAudioGuidesAPI, audioAPI, tasksAPI, ttsAPI } from '../../../api/generation';
 import { parseApiError } from '../../../utils/apiError';
 import { pollGenerationTask } from '../../../utils/generationTaskPoll';
@@ -1746,6 +1747,8 @@ export function useAudioGuides({
       saveCurrentAttractionAudioGuide,
     ],
   );
+  // Уход со страницы отменяет debounce-таймер — правки дожимаются немедленно.
+  useFlushOnLeave(() => saveCurrentAttractionAudioGuideIfDirty({ silent: true }));
 
   useEffect(() => {
     clearTimeout(attractionAudioGuideAutoSaveTimerRef.current);
