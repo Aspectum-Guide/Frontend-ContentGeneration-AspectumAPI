@@ -19,8 +19,13 @@ import { pollGenerationTask } from '../../../utils/generationTaskPoll';
  */
 export default function SessionWizardGenerateCityFull({ sessionId, defaultLang = 'ru', onDone }) {
   const [prompt, setPrompt] = useState('');
-  const [bigCity, setBigCity] = useState(false);
   const [testMode, setTestMode] = useState(false);
+  // Максимальные пороги (не план!): система собирает полный пул и выбирает
+  // лучшее сверху вниз по значимости; меньше порога — норма (достоверность важнее).
+  const [attractionsMax, setAttractionsMax] = useState('');
+  const [ilMax, setIlMax] = useState('');
+  // Иконки новых фильтров через gpt-image-2 — дорого, поэтому явная галочка.
+  const [genIcons, setGenIcons] = useState(false);
 
   const [running, setRunning] = useState(false);
   const [stopping, setStopping] = useState(false);
@@ -112,8 +117,10 @@ export default function SessionWizardGenerateCityFull({ sessionId, defaultLang =
         const t = data?.task;
         if (!alive || !t) return;
         if (t.request?.prompt) setPrompt((p) => p || t.request.prompt);
-        if (t.request?.allow_large) setBigCity(true);
         if (t.request?.test_mode) setTestMode(true);
+        if (t.request?.attractions_max) setAttractionsMax(String(t.request.attractions_max));
+        if (t.request?.il_max) setIlMax(String(t.request.il_max));
+        if (t.request?.generate_icons) setGenIcons(true);
         if (t.status === 'pending' || t.status === 'processing') {
           setTask(t);
           attach(t.id);
@@ -145,13 +152,19 @@ export default function SessionWizardGenerateCityFull({ sessionId, defaultLang =
     setTask(null);
 
     try {
+      const aMax = parseInt(attractionsMax, 10);
+      const iMax = parseInt(ilMax, 10);
       const { data } = await aiAPI.generateCityFull(sessionId, {
         prompt: trimmed,
         lang: defaultLang,
-        allow_large: bigCity,   // многораундовый discovery: до 150 достопр. / 300 ИЛ
         test_mode: testMode,    // отладка: ≤15 основных, ≤30 ИЛ — дёшево
-        // Объём (достопр., инфа, ИЛ) решает система по найденным данным.
-        // Веб-поиск автономный (research через Brave).
+        // Максимальные пороги: собирается ВСЁ, в итог идут лучшие по значимости
+        // до порога (может быть меньше — система не выдумывает ради количества).
+        attractions_max: Number.isFinite(aMax) && aMax > 0 ? aMax : undefined,
+        il_max: Number.isFinite(iMax) && iMax > 0 ? iMax : undefined,
+        // Большие пороги (>70 ОЛ) автоматически включают многораундовый поиск.
+        allow_large: Number.isFinite(aMax) && aMax > 70,
+        generate_icons: genIcons, // gpt-image-2, ~$0.1+/иконка — только осознанно
       });
       const taskId = data?.task_id;
       if (!taskId) throw new Error('Бэкенд не вернул task_id');
@@ -166,7 +179,7 @@ export default function SessionWizardGenerateCityFull({ sessionId, defaultLang =
       }
       setError(err?.response?.data?.error || err?.message || 'Ошибка генерации');
     }
-  }, [prompt, running, sessionId, defaultLang, bigCity, testMode, attach]);
+  }, [prompt, running, sessionId, defaultLang, testMode, attractionsMax, ilMax, genIcons, attach]);
 
   const stop = useCallback(async () => {
     if (!running || stopping) return;
@@ -212,10 +225,20 @@ export default function SessionWizardGenerateCityFull({ sessionId, defaultLang =
 
         <div className="flex flex-wrap items-center gap-3">
           <label className="flex items-center gap-1.5 text-xs text-gray-700"
-            title="Многораундовый поиск: до ~150 достопримечательностей и 300 интерактивных локаций (дольше и дороже)">
-            <input type="checkbox" checked={bigCity} disabled={running}
-              onChange={(e) => setBigCity(e.target.checked)} />
-            Большой город
+            title="Максимум основных локаций в итоге. Система собирает полный пул и берёт лучшие по значимости — может выдать меньше, если значимого мало. Пусто — авто (до 70; больше 70 включает многораундовый поиск)">
+            Макс. ОЛ
+            <input type="number" min="1" max="150" value={attractionsMax} disabled={running}
+              onChange={(e) => setAttractionsMax(e.target.value)}
+              placeholder="авто"
+              className="w-16 rounded border border-gray-300 px-1.5 py-0.5 text-xs disabled:bg-gray-100" />
+          </label>
+          <label className="flex items-center gap-1.5 text-xs text-gray-700"
+            title="Максимум интерактивных локаций (точек на карте). Пусто — авто">
+            Макс. ИЛ
+            <input type="number" min="1" max="300" value={ilMax} disabled={running}
+              onChange={(e) => setIlMax(e.target.value)}
+              placeholder="авто"
+              className="w-16 rounded border border-gray-300 px-1.5 py-0.5 text-xs disabled:bg-gray-100" />
           </label>
           <label className="flex items-center gap-1.5 text-xs text-gray-700"
             title="Отладка: не больше 15 основных локаций и 30 ИЛ — быстро и дёшево">
@@ -223,10 +246,12 @@ export default function SessionWizardGenerateCityFull({ sessionId, defaultLang =
               onChange={(e) => setTestMode(e.target.checked)} />
             Тест-режим (15/30)
           </label>
-          <span className="text-[11px] text-gray-400 self-center max-w-[300px]">
-            Объём система подбирает по данным. «Большой город» — многораундовый поиск
-            (до ~150 достопр. / 300 ИЛ, дольше).
-          </span>
+          <label className="flex items-center gap-1.5 text-xs text-gray-700"
+            title="Генерировать иконки для НОВЫХ фильтров через gpt-image-2. Дорого (~$0.1+ за иконку) — включайте в случае крайней лени; иначе иконки ставятся руками">
+            <input type="checkbox" checked={genIcons} disabled={running}
+              onChange={(e) => setGenIcons(e.target.checked)} />
+            Иконки фильтров <span className="text-amber-600">($)</span>
+          </label>
 
           {running ? (
             <button
