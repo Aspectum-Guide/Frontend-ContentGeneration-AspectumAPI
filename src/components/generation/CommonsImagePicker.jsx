@@ -35,6 +35,10 @@ export default function CommonsImagePicker({
   const [tab, setTab] = useState('best');
   const [library, setLibrary] = useState(null);   // ответ photo-library
   const [libLoading, setLibLoading] = useState(false);
+  // Инфинит-скролл табов-источников: страница и «есть ещё» по каждому табу.
+  const [libPages, setLibPages] = useState({});
+  const [libHasMore, setLibHasMore] = useState({});
+  const libParamsRef = useRef(null);   // параметры последней загрузки библиотеки
 
   const loadLibrary = useCallback(async (searchQuery) => {
     const q = String(searchQuery || '').trim();
@@ -53,7 +57,17 @@ export default function CommonsImagePicker({
         params.lon = coords.lon;
       }
       const { data } = await imagesAPI.photoLibrary(params);
+      libParamsRef.current = params;
       setLibrary(data || null);
+      // первая страница загружена; «есть ещё», если источник отдал полный лист
+      const pages = {};
+      const more = {};
+      for (const [k, v] of Object.entries(data?.sources || {})) {
+        pages[k] = 1;
+        more[k] = (v || []).length >= 10;
+      }
+      setLibPages(pages);
+      setLibHasMore(more);
     } catch (err) {
       console.error('Photo library error:', err);
       setLibrary(null);
@@ -61,6 +75,40 @@ export default function CommonsImagePicker({
       setLibLoading(false);
     }
   }, [coords, cityName, countryName, defaultQuery]);
+
+  // Догрузка следующей страницы активного таба-источника (кроме best/commons).
+  const [libPageLoading, setLibPageLoading] = useState(false);
+  const loadMoreForTab = useCallback(async (tabKey) => {
+    if (!libParamsRef.current || libPageLoading) return;
+    if (!libHasMore[tabKey]) return;
+    const nextPage = (libPages[tabKey] || 1) + 1;
+    setLibPageLoading(true);
+    try {
+      const { data } = await imagesAPI.photoLibrary({
+        ...libParamsRef.current, source: tabKey, page: nextPage,
+      });
+      const incoming = data?.items || [];
+      setLibrary((prev) => {
+        if (!prev) return prev;
+        const seen = new Set((prev.sources?.[tabKey] || []).map((i) => i.image_url));
+        const fresh = incoming.filter((i) => !seen.has(i.image_url));
+        return {
+          ...prev,
+          sources: {
+            ...prev.sources,
+            [tabKey]: [...(prev.sources?.[tabKey] || []), ...fresh],
+          },
+        };
+      });
+      setLibPages((p) => ({ ...p, [tabKey]: nextPage }));
+      setLibHasMore((m) => ({ ...m, [tabKey]: !!data?.has_more }));
+    } catch (err) {
+      console.error('Photo library page error:', err);
+      setLibHasMore((m) => ({ ...m, [tabKey]: false }));
+    } finally {
+      setLibPageLoading(false);
+    }
+  }, [libPages, libHasMore, libPageLoading]);
 
   const modalRef = useRef(null);
   const dialogRef = useRef(null);
@@ -250,20 +298,25 @@ export default function CommonsImagePicker({
 
   const handleScroll = useCallback(() => {
     const scrollHost = dialogRef.current || modalRef.current;
-    const normalizedQuery = query.trim();
-
-    if (!scrollHost || loading || !hasMore || normalizedQuery.length < 2) return;
+    if (!scrollHost) return;
 
     const scrollBottom = scrollHost.scrollTop + scrollHost.clientHeight;
     const threshold = scrollHost.scrollHeight - 180;
+    if (scrollBottom < threshold) return;
 
-    if (scrollBottom >= threshold) {
+    if (tab === 'commons') {
+      const normalizedQuery = query.trim();
+      if (loading || !hasMore || normalizedQuery.length < 2) return;
       const nextPage = page + 1;
-
       setPage(nextPage);
       runSearch(normalizedQuery, nextPage);
+      return;
     }
-  }, [loading, hasMore, query, page, runSearch]);
+    // табы-источники: догрузка своей страницы («как в WC»)
+    if (tab !== 'best') {
+      loadMoreForTab(tab);
+    }
+  }, [tab, loading, hasMore, query, page, runSearch, loadMoreForTab]);
 
   useEffect(() => {
     const scrollHost = dialogRef.current || modalRef.current;
@@ -412,17 +465,38 @@ export default function CommonsImagePicker({
                 : 'Введите запрос и нажмите «Найти»'}
             </div>
           ) : (
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-              {libItems.map((item, idx) => (
-                <ImageCard
-                  key={`${item.image_url || item.thumb_url || 'lib'}:${idx}`}
-                  item={item}
-                  onSelect={() => handleImageSelect(item)}
-                  disabled={loading || libLoading}
-                  sourceBadge={tab === 'best' ? item.source : ''}
-                />
-              ))}
-            </div>
+            <>
+              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                {libItems.map((item, idx) => (
+                  <ImageCard
+                    key={`${item.image_url || item.thumb_url || 'lib'}:${idx}`}
+                    item={item}
+                    onSelect={() => handleImageSelect(item)}
+                    disabled={loading || libLoading}
+                    sourceBadge={tab === 'best' ? item.source : ''}
+                  />
+                ))}
+              </div>
+              {libPageLoading && (
+                <div className="text-center py-4 text-gray-500 text-sm">Загрузка...</div>
+              )}
+              {tab !== 'best' && libHasMore[tab] && !libPageLoading && libItems.length > 0 && (
+                <div className="text-center py-4">
+                  <button
+                    type="button"
+                    onClick={() => loadMoreForTab(tab)}
+                    className="px-4 py-1.5 text-sm text-blue-600 border border-blue-200 rounded-lg hover:bg-blue-50"
+                  >
+                    Показать ещё
+                  </button>
+                </div>
+              )}
+              {tab !== 'best' && !libHasMore[tab] && libItems.length > 0 && (
+                <div className="text-center py-4 text-gray-400 text-xs">
+                  Больше результатов нет
+                </div>
+              )}
+            </>
           )}
         </div>
       </div>
