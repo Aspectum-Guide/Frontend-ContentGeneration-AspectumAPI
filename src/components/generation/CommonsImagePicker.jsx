@@ -42,8 +42,12 @@ export default function CommonsImagePicker({
     setLibLoading(true);
     try {
       const params = { q };
-      if (cityName) params.city = cityName;
-      if (countryName) params.country = countryName;
+      // Ручной запрос (оператор изменил текст) — глобальный поиск БЕЗ привязки
+      // к городу объекта: «кремль» должен находить кремли, а не пустой
+      // «кремль в Гусь-Хрустальном». Дефолтный запрос объекта — с городом.
+      const isManual = q && q !== String(defaultQuery || '').trim();
+      if (!isManual && cityName) params.city = cityName;
+      if (!isManual && countryName) params.country = countryName;
       if (coords?.lat != null && coords?.lon != null) {
         params.lat = coords.lat;
         params.lon = coords.lon;
@@ -56,7 +60,7 @@ export default function CommonsImagePicker({
     } finally {
       setLibLoading(false);
     }
-  }, [coords, cityName, countryName]);
+  }, [coords, cityName, countryName, defaultQuery]);
 
   const modalRef = useRef(null);
   const dialogRef = useRef(null);
