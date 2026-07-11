@@ -1,6 +1,136 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { aiAPI, tasksAPI } from '../../../api/generation';
+import apiClient from '../../../api/client';
 import { pollGenerationTask } from '../../../utils/generationTaskPoll';
+
+const SOURCE_GROUP_TITLES = { photo: '📷 Фото', facts: '📚 Фактура', discovery: '🔎 Поиск мест' };
+const SOURCE_REGION_LABELS = { RU: 'RU', 'RU-SPB': 'СПб' };
+
+/**
+ * Кнопка «Источники ▾» с выпадающим скролл-списком галочек источников
+ * конвейера (реестр SourceToggle). Переключатели ГЛОБАЛЬНЫЕ — те же, что в
+ * «Настройки ИИ → Источники данных»: выключил citywalls здесь — он выключен
+ * для всех генераций, пока не включишь обратно.
+ */
+function SourcesDropdown({ disabled }) {
+  const [open, setOpen] = useState(false);
+  const [sources, setSources] = useState(null);
+  const [busyKey, setBusyKey] = useState('');
+  const boxRef = useRef(null);
+
+  const load = useCallback(async () => {
+    try {
+      const { data } = await apiClient.get('/generation/sources/');
+      setSources(data?.sources || []);
+    } catch {
+      setSources([]);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (open && sources === null) load();
+  }, [open, sources, load]);
+
+  // клик мимо панели — закрыть
+  useEffect(() => {
+    if (!open) return undefined;
+    const onDown = (e) => {
+      if (boxRef.current && !boxRef.current.contains(e.target)) setOpen(false);
+    };
+    document.addEventListener('mousedown', onDown);
+    return () => document.removeEventListener('mousedown', onDown);
+  }, [open]);
+
+  const setToggle = async (key, enabled) => {
+    setBusyKey(key);
+    try {
+      const { data } = await apiClient.post(`/generation/sources/${key}/`, { enabled });
+      setSources(data?.sources || []);
+    } catch {
+      /* оставляем прежнее состояние */
+    } finally {
+      setBusyKey('');
+    }
+  };
+
+  const offCount = (sources || []).filter(
+    (s) => (s.operator_toggle ?? s.default_on) === false || !s.env_ok,
+  ).length;
+
+  return (
+    <div className="relative" ref={boxRef}>
+      <button
+        type="button"
+        disabled={disabled}
+        onClick={() => setOpen((v) => !v)}
+        className="rounded border border-gray-300 bg-white px-2 py-0.5 text-xs text-gray-700 hover:border-indigo-400 disabled:cursor-not-allowed disabled:opacity-60"
+        title="Какие источники конвейер использует для фото, фактов и поиска мест. Глобальные переключатели (те же, что в «Настройки ИИ»)"
+      >
+        Источники{offCount ? ` (выкл: ${offCount})` : ''} ▾
+      </button>
+      {open && (
+        <div className="absolute left-0 top-full z-20 mt-1 max-h-72 w-80 overflow-y-auto rounded-md border border-gray-200 bg-white p-2 shadow-lg">
+          <p className="mb-1.5 text-[10px] leading-snug text-gray-400">
+            Глобальные переключатели — действуют на все генерации, региональные
+            источники сами включаются только в своих городах.
+          </p>
+          {sources === null && <p className="text-xs text-gray-500">Загрузка…</p>}
+          {['photo', 'facts', 'discovery'].map((g) => {
+            const items = (sources || []).filter((s) => s.group === g);
+            if (!items.length) return null;
+            return (
+              <div key={g} className="mb-2 last:mb-0">
+                <div className="mb-0.5 text-[10px] font-semibold uppercase tracking-wide text-gray-400">
+                  {SOURCE_GROUP_TITLES[g] || g}
+                </div>
+                {items.map((s) => {
+                  const checked = s.operator_toggle ?? s.default_on;
+                  const rowDisabled = !s.env_ok || busyKey === s.key;
+                  return (
+                    <label
+                      key={s.key}
+                      title={s.description + (s.env_ok ? '' : ` — нужен ключ: ${(s.requires_env || []).join(', ')}`)}
+                      className={`flex items-center gap-1.5 rounded px-1 py-0.5 text-xs ${
+                        rowDisabled ? 'text-gray-400' : 'cursor-pointer text-gray-800 hover:bg-indigo-50'
+                      }`}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={checked && s.env_ok}
+                        disabled={rowDisabled}
+                        onChange={(e) => setToggle(s.key, e.target.checked)}
+                      />
+                      <span className="min-w-0 flex-1 truncate">{s.title}</span>
+                      {s.regions.map((r) => (
+                        <span key={r} className="rounded bg-amber-50 px-1 text-[10px] text-amber-700">
+                          {SOURCE_REGION_LABELS[r] || r}
+                        </span>
+                      ))}
+                      {!s.env_ok && <span className="text-[10px] text-red-400">нет ключа</span>}
+                      {s.operator_toggle != null && s.env_ok && (
+                        <button
+                          type="button"
+                          className="rounded bg-gray-100 px-1 text-[10px] text-gray-500 hover:bg-gray-200"
+                          title="Сбросить к состоянию по умолчанию"
+                          onClick={(e) => {
+                            e.preventDefault();
+                            setToggle(s.key, null);
+                          }}
+                        >
+                          сброс
+                        </button>
+                      )}
+                    </label>
+                  );
+                })}
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
 
 /**
  * Панель «Сгенерировать город целиком» — одно действие вместо ручной беготни
@@ -252,6 +382,7 @@ export default function SessionWizardGenerateCityFull({ sessionId, defaultLang =
               onChange={(e) => setGenIcons(e.target.checked)} />
             Иконки фильтров <span className="text-amber-600">($)</span>
           </label>
+          <SourcesDropdown disabled={running} />
 
           {running ? (
             <button
