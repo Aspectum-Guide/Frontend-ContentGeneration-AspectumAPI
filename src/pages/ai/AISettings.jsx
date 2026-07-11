@@ -290,6 +290,134 @@ export default function AISettings() {
         </div>
       </form>
     </div>
+
+    <SourceToggles />
     </Layout>
+  );
+}
+
+const SOURCE_GROUPS = [
+  { key: 'photo', title: '📷 Фото' },
+  { key: 'facts', title: '📚 Фактура (гиды и описания)' },
+  { key: 'discovery', title: '🔎 Поиск достопримечательностей' },
+];
+
+const REGION_LABELS = { RU: 'Россия', 'RU-SPB': 'Санкт-Петербург' };
+
+// Источники данных конвейера: включение/отключение без деплоя.
+function SourceToggles() {
+  const [sources, setSources] = useState(null);
+  const [busyKey, setBusyKey] = useState('');
+  const [error, setError] = useState('');
+
+  const load = async () => {
+    try {
+      const response = await apiClient.get('/generation/sources/');
+      setSources(response.data?.sources || []);
+    } catch (err) {
+      console.error('Error loading sources:', err);
+      setSources([]);
+      setError('Не удалось загрузить список источников');
+    }
+  };
+
+  useEffect(() => {
+    load();
+  }, []);
+
+  const setToggle = async (key, enabled) => {
+    setBusyKey(key);
+    setError('');
+    try {
+      const response = await apiClient.post(`/generation/sources/${key}/`, { enabled });
+      setSources(response.data?.sources || []);
+    } catch (err) {
+      console.error('Error toggling source:', err);
+      setError('Не удалось сохранить переключатель');
+    } finally {
+      setBusyKey('');
+    }
+  };
+
+  if (!sources) return null;
+
+  return (
+    <div className="bg-white rounded-lg shadow-sm p-6 mt-6">
+      <h2 className="text-xl font-bold mb-1">Источники данных</h2>
+      <p className="text-sm text-gray-500 mb-4">
+        Откуда конвейер берёт фото, факты и кандидатов достопримечательностей.
+        Региональные источники срабатывают только для своих городов; серые —
+        на сервере нет нужного API-ключа.
+      </p>
+
+      {error && (
+        <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-2 rounded-lg mb-4 text-sm">
+          {error}
+        </div>
+      )}
+
+      {SOURCE_GROUPS.map((group) => (
+        <div key={group.key} className="mb-5 last:mb-0">
+          <h3 className="text-sm font-semibold text-gray-700 mb-2">{group.title}</h3>
+          <div className="grid md:grid-cols-2 gap-2">
+            {sources
+              .filter((s) => s.group === group.key)
+              .map((s) => {
+                const checked = s.operator_toggle ?? s.default_on;
+                const disabled = !s.env_ok || busyKey === s.key;
+                return (
+                  <label
+                    key={s.key}
+                    className={`flex items-start gap-2 p-2.5 rounded-lg border cursor-pointer ${
+                      disabled
+                        ? 'border-gray-100 bg-gray-50 opacity-60 cursor-not-allowed'
+                        : 'border-gray-200 hover:border-blue-300'
+                    }`}
+                  >
+                    <input
+                      type="checkbox"
+                      className="mt-1"
+                      checked={checked}
+                      disabled={disabled}
+                      onChange={(e) => setToggle(s.key, e.target.checked)}
+                    />
+                    <span className="min-w-0 flex-1">
+                      <span className="text-sm font-medium text-gray-900">{s.title}</span>
+                      <span className="block text-xs text-gray-500">{s.description}</span>
+                      <span className="flex gap-1 mt-1 flex-wrap items-center">
+                        {s.regions.map((r) => (
+                          <span
+                            key={r}
+                            className="px-1.5 py-0.5 rounded bg-amber-50 text-amber-700 text-[10px]"
+                          >
+                            {REGION_LABELS[r] || r}
+                          </span>
+                        ))}
+                        {!s.env_ok && (
+                          <span className="px-1.5 py-0.5 rounded bg-red-50 text-red-600 text-[10px]">
+                            нужен ключ: {(s.requires_env || []).join(', ')}
+                          </span>
+                        )}
+                        {s.operator_toggle != null && (
+                          <button
+                            type="button"
+                            className="px-1.5 py-0.5 rounded bg-gray-100 text-gray-500 text-[10px] hover:bg-gray-200"
+                            onClick={(e) => {
+                              e.preventDefault();
+                              setToggle(s.key, null);
+                            }}
+                          >
+                            {s.operator_toggle ? 'включён вручную' : 'выключен вручную'} — сбросить
+                          </button>
+                        )}
+                      </span>
+                    </span>
+                  </label>
+                );
+              })}
+          </div>
+        </div>
+      ))}
+    </div>
   );
 }
