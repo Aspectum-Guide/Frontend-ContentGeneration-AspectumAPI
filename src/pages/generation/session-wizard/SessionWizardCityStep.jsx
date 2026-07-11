@@ -174,7 +174,7 @@ function PhotoPanel({
           type="button" onClick={onOpenCommonsModal}
           className="absolute top-2 right-2 px-1.5 py-0.5 text-[10px] bg-purple-600 text-white rounded hover:bg-purple-700 shadow transition-colors"
         >
-          ✦ Commons
+          ⊞ Библиотека
         </button>
       </div>
 

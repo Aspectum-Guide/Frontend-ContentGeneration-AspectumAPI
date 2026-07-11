@@ -223,9 +223,9 @@ function AttractionPhotoPanel({
           type="button"
           onClick={() => onOpenCommonsModal?.(currentAttr)}
           className="absolute top-2 right-2 px-2 py-1 text-xs bg-purple-600 text-white rounded-md hover:bg-purple-700 transition-colors shadow-lg"
-          title="Подобрать в Wikimedia Commons"
+          title="Библиотека изображений: Commons, Минкульт, Openverse, Pastvu, Mapillary"
         >
-          ✦ Commons
+          ⊞ Библиотека
         </button>
       </div>
 

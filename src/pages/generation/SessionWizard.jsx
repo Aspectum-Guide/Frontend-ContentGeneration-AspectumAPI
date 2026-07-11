@@ -618,6 +618,19 @@ export default function SessionWizard({ components = {} } = {}) {
     cityCommonsQuery,
   ]);
 
+  // Контекст для «Библиотеки»: координаты объекта включают гео-источники
+  // (pastvu/mapillary/commons-geo), город — Минкульт и точность поиска.
+  const commonsCoords = useMemo(() => {
+    const src = (commonsTarget.type === 'attraction' || commonsTarget.type === 'attraction_feed')
+      ? commonsAttraction
+      : commonsTarget.type === 'interactive_location'
+        ? commonsInteractiveLocation
+        : { lat, lon };
+    const la = parseFloat(src?.lat);
+    const lo = parseFloat(src?.lon);
+    return Number.isFinite(la) && Number.isFinite(lo) ? { lat: la, lon: lo } : null;
+  }, [commonsTarget.type, commonsAttraction, commonsInteractiveLocation, lat, lon]);
+
   const commonsDescription = useMemo(() => {
     if (commonsTarget.type === 'attraction' || commonsTarget.type === 'attraction_feed') {
       return 'Выберите изображение соответствующего события с указанием лицензии и автора';
@@ -1603,6 +1616,9 @@ export default function SessionWizard({ components = {} } = {}) {
         getSessionUuid={getSessionUuid}
         defaultQuery={commonsDefaultQuery}
         description={commonsDescription}
+        coords={commonsCoords}
+        cityName={cityCommonsQuery || ''}
+        countryName={localeData[activeLocale]?.country || ''}
       />
     </Layout>
   );

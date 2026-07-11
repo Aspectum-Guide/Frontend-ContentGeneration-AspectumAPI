@@ -284,6 +284,9 @@ export const imagesAPI = {
     }),
   importCommons: (data) =>
     apiClient.post('media/commons/import/', data),
+  // «Библиотека»: все источники конвейера одним запросом (best + по источникам)
+  photoLibrary: (params) =>
+    apiClient.get(`${BASE}/photo-library/`, { params }),
 };
 
 // ─── Generation Tasks ─────────────────────────────────────────────────────────
