@@ -146,6 +146,7 @@ function AttractionAudioTrackPreview({
   trackAudioId,
   trackAudioUrl,
   chapters = [],
+  downloadName = 'audio-guide.mp3',
   durationSeconds = null,
   onRegenerateChapter = null,
   regeneratingChapterId = null,
@@ -311,14 +312,24 @@ function AttractionAudioTrackPreview({
       ) : null}
 
       {!loading && !loadError && previewUrl ? (
-        <audio
-          key={previewUrl}
-          ref={audioRef}
-          controls
-          preload="metadata"
-          src={previewUrl}
-          className="w-full"
-        />
+        <>
+          <audio
+            key={previewUrl}
+            ref={audioRef}
+            controls
+            preload="metadata"
+            src={previewUrl}
+            className="w-full"
+          />
+          {/* blob-URL прячет встроенное «Скачать» в плеере Chrome — даём явную кнопку */}
+          <a
+            href={previewUrl}
+            download={downloadName}
+            className="inline-flex items-center gap-1 text-xs font-medium text-blue-700 hover:text-blue-900"
+          >
+            ⬇ Скачать MP3
+          </a>
+        </>
       ) : null}
     </div>
   );
@@ -1631,6 +1642,7 @@ export default function SessionWizardAttractionAudioGuidesBlock({
                 trackAudioId={trackAudioId}
                 trackAudioUrl={trackAudioUrl}
                 chapters={trackChapters}
+                downloadName={`audio-guide-${currentLocale.lang || 'ru'}.mp3`}
                 durationSeconds={currentLocale.track?.duration_seconds}
                 regeneratingChapterId={audioGuideRegeneratingChapterId}
                 onRegenerateChapter={
