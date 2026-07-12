@@ -104,7 +104,11 @@ export default function SlotAvailabilitiesCatalog() {
   const { eventOptions, eventsLoading } = useEventOptions();
   const [eventFilter, setEventFilter] = useState('');
 
-  const { ticketTypeOptions, ticketTypesLoading } = useTicketTypeOptions(eventFilter);
+  // Slots only ever accept global ticket types (event-owned ones are invisible
+  // to customers on the public API — backend also rejects them, see #9).
+  const { ticketTypeOptions, ticketTypesLoading } = useTicketTypeOptions(eventFilter, 500, {
+    globalOnly: true,
+  });
   const [ticketTypeFilter, setTicketTypeFilter] = useState('');
 
   const crud = useCatalogCrud({
@@ -388,7 +392,10 @@ export default function SlotAvailabilitiesCatalog() {
             </Field>
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-              <Field label="Доступно мест">
+              <Field
+                label="Доступно мест"
+                hint="Один общий пул на весь слот — делится между всеми выбранными типами билетов, а не считается отдельно для каждого."
+              >
                 <TextInput
                   type="number"
                   min={0}
@@ -412,7 +419,7 @@ export default function SlotAvailabilitiesCatalog() {
             </div>
 
             <FormHint>
-              Можно выбирать любые глобальные типы билетов; событие задает контекст только для слота и цен.
+              Можно выбирать только глобальные типы билетов; событие задает контекст только для слота и цен.
             </FormHint>
 
             <FormActions
@@ -623,7 +630,10 @@ export default function SlotAvailabilitiesCatalog() {
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-              <Field label="Мест">
+              <Field
+                label="Мест"
+                hint="Общий пул на каждый создаваемый слот — делится между всеми выбранными типами билетов."
+              >
                 <TextInput
                   type="number"
                   min={0}
@@ -910,6 +920,21 @@ export default function SlotAvailabilitiesCatalog() {
               {Array.isArray(result.errors) && result.errors.length ? (
                 <div className="mt-2 text-xs text-red-700">
                   Ошибки: {result.errors.length} (первые показаны в ответе API)
+                </div>
+              ) : null}
+              {Array.isArray(result.overlap_warnings) && result.overlap_warnings.length ? (
+                <div className="mt-2 text-xs text-amber-700 bg-amber-50 rounded px-2 py-1.5">
+                  <div className="font-medium">
+                    ⚠️ Слоты слишком близко друг к другу ({result.overlap_warnings.length}):
+                  </div>
+                  <div className="mt-1 space-y-0.5">
+                    {result.overlap_warnings.slice(0, 5).map((w) => (
+                      <div key={w.slot_datetime}>
+                        {new Date(w.slot_datetime).toLocaleString()} — рядом:{' '}
+                        {(w.close_to || []).map((c) => new Date(c).toLocaleString()).join(', ')}
+                      </div>
+                    ))}
+                  </div>
                 </div>
               ) : null}
             </div>

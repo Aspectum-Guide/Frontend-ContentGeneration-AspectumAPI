@@ -38,5 +38,12 @@ export const authAPI = {
   // Refresh via apiClient base (TokenManager owns the refresh orchestration).
   // Без trailing slash: auth-роуты бэкенда зарегистрированы без слэша.
   refresh: (data: unknown) => apiClient.post('/auth/token/refresh', data),
+
+  /**
+   * Current user profile (includes `is_staff`), used to gate access to this
+   * admin — the backend booking-setup endpoints require IsAdminUser, so the
+   * UI should not let non-staff users in either.
+   */
+  me: () => apiClient.get('/auth/me'),
 };
 

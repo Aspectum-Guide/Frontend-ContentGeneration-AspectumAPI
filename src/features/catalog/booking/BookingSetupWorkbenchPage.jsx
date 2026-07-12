@@ -697,6 +697,14 @@ export default function BookingSetupWorkbenchPage() {
     [ticketTypes, eventId],
   );
 
+  // Slots only accept global types (event-owned ones are invisible to
+  // customers on the public API, and the backend now rejects attaching
+  // them) — used for the slot-creation picker below, not for pricing.
+  const globalEventTicketTypes = useMemo(
+    () => eventTicketTypes.filter((tt) => !resolveTicketTypeEventId(tt)),
+    [eventTicketTypes],
+  );
+
   const basePriceByType = useMemo(
     () => Object.fromEntries(basePrices.map((bp) => [String(bp.ticket_type), bp])),
     [basePrices],
@@ -814,14 +822,14 @@ export default function BookingSetupWorkbenchPage() {
   }, [eventId]);
 
   useEffect(() => {
-    const ids = eventTicketTypes.map((tt) => String(tt.id));
+    const ids = globalEventTicketTypes.map((tt) => String(tt.id));
     setSlotForm((prev) => ({
       ...prev,
       ticket_type_ids: prev.ticket_type_ids?.length
         ? prev.ticket_type_ids.filter((id) => ids.includes(String(id)))
         : ids,
     }));
-  }, [eventTicketTypes]);
+  }, [globalEventTicketTypes]);
   useEffect(() => {
     if (!eventId) return;
     const stillVisible = filteredEventOptions.some((ev) => String(ev.id) === String(eventId));
@@ -1148,7 +1156,11 @@ export default function BookingSetupWorkbenchPage() {
         is_active: true,
       });
       const res = r?.data;
-      setSlotOk(`Создано: ${res?.created_count ?? 0}, пропущено: ${res?.skipped_existing ?? 0}`);
+      const overlapCount = Array.isArray(res?.overlap_warnings) ? res.overlap_warnings.length : 0;
+      setSlotOk(
+        `Создано: ${res?.created_count ?? 0}, пропущено: ${res?.skipped_existing ?? 0}`
+        + (overlapCount ? ` · ⚠️ ${overlapCount} слот(ов) близко друг к другу (<30 мин)` : ''),
+      );
       await loadSlots(eventId);
       await loadPricePreview(eventId, null, eventTicketTypes, { refetchSlots: true });
       if (slotForm.also_create_prices) {
@@ -1892,19 +1904,23 @@ export default function BookingSetupWorkbenchPage() {
                   )}
 
                   <div className="grid grid-cols-2 gap-3">
-                    <Field label="Кол-во мест"><TextInput type="number" min={0} value={slotForm.available_seats} onChange={(e) => setSlotForm((p) => ({ ...p, available_seats: +e.target.value || 0 }))} /></Field>
+                    <Field label="Кол-во мест" hint="Общий пул на слот — делится между всеми выбранными типами билетов ниже."><TextInput type="number" min={0} value={slotForm.available_seats} onChange={(e) => setSlotForm((p) => ({ ...p, available_seats: +e.target.value || 0 }))} /></Field>
                     <Field label="Закрытие брони (мин до)"><TextInput type="number" min={0} value={slotForm.booking_closes_minutes_before} onChange={(e) => setSlotForm((p) => ({ ...p, booking_closes_minutes_before: +e.target.value || 0 }))} /></Field>
                   </div>
 
-                  <Field label="Типы билетов для слотов" required>
-                    {!eventTicketTypes.length ? (
-                      <p className="text-sm text-gray-400">Сначала добавьте типы билетов для события</p>
+                  <Field
+                    label="Типы билетов для слотов"
+                    required
+                    hint="Только глобальные типы — событийные (устаревшие) недоступны для слотов, так как их не видят покупатели."
+                  >
+                    {!globalEventTicketTypes.length ? (
+                      <p className="text-sm text-gray-400">Сначала добавьте глобальный тип билета для события</p>
                     ) : (
                       <div className="space-y-2">
                         <div className="flex flex-wrap gap-2">
                           <button
                             type="button"
-                            onClick={() => setSlotForm((p) => ({ ...p, ticket_type_ids: eventTicketTypes.map((tt) => String(tt.id)) }))}
+                            onClick={() => setSlotForm((p) => ({ ...p, ticket_type_ids: globalEventTicketTypes.map((tt) => String(tt.id)) }))}
                             className="px-2 py-1 text-xs rounded border border-gray-200 bg-gray-50 hover:bg-gray-100"
                           >
                             Выбрать все
@@ -1917,11 +1933,11 @@ export default function BookingSetupWorkbenchPage() {
                             Снять выбор
                           </button>
                           <span className="text-xs text-gray-500 self-center">
-                            Выбрано: {slotForm.ticket_type_ids?.length || 0} из {eventTicketTypes.length}
+                            Выбрано: {slotForm.ticket_type_ids?.length || 0} из {globalEventTicketTypes.length}
                           </span>
                         </div>
                         <div className="flex flex-wrap gap-2">
-                          {eventTicketTypes.map((tt) => {
+                          {globalEventTicketTypes.map((tt) => {
                             const id = String(tt.id);
                             const checked = (slotForm.ticket_type_ids || []).includes(id);
                             return (

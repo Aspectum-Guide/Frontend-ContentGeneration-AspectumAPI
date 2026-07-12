@@ -14,6 +14,7 @@ import CatalogPageHeader from '../shared/components/CatalogPageHeader';
 import EventSelect from '../shared/components/EventSelect';
 import FormErrorAlert from '../shared/components/FormErrorAlert';
 import FormHint from '../shared/components/FormHint';
+import PricePrecedenceHint from '../shared/components/PricePrecedenceHint';
 import StatusBadge from '../shared/components/StatusBadge';
 import TableRowActions from '../shared/components/TableRowActions';
 import TicketTypeSelect from '../shared/components/TicketTypeSelect';
@@ -308,6 +309,8 @@ export default function TicketPricesCatalog() {
           setEditingPrice(createEmptyTicketPrice());
         }}
       />
+
+      <PricePrecedenceHint />
 
       <DataTable
         columns={columns}

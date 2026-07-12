@@ -6,6 +6,8 @@ import { normalizeListResponse } from '../shared/normalize';
 import { getEventLabel, getTicketTypeLabel } from '../shared/labels';
 
 export default function AssignTicketTypeModal({ open, ticketType, onClose, onDone }) {
+  const isGlobal = !ticketType?.event;
+
   const [events, setEvents] = useState([]);
   const [existingByEvent, setExistingByEvent] = useState({}); // eventId → { id, is_active }
   const [selected, setSelected] = useState(new Set());
@@ -14,7 +16,9 @@ export default function AssignTicketTypeModal({ open, ticketType, onClose, onDon
   const [error, setError] = useState(null);
 
   useEffect(() => {
-    if (!open || !ticketType) return;
+    // Глобальный тип уже доступен всем событиям — грузить список событий
+    // и существующие event-owned копии для него незачем.
+    if (!open || !ticketType || isGlobal) return;
     setError(null);
     setLoading(true);
 
@@ -48,6 +52,8 @@ export default function AssignTicketTypeModal({ open, ticketType, onClose, onDon
       })
       .catch((e) => setError(parseApiError(e, 'Ошибка загрузки ивентов')))
       .finally(() => setLoading(false));
+    // isGlobal derives synchronously from ticketType, already covered by that dep.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, ticketType]);
 
   const toggle = (eventId) => {
@@ -111,6 +117,32 @@ export default function AssignTicketTypeModal({ open, ticketType, onClose, onDon
 
   const typeName = getTicketTypeLabel(ticketType) || '—';
 
+  if (isGlobal) {
+    return (
+      <Modal open={open} onClose={onClose} title={`«${typeName}» — глобальный тип`} size="md">
+        <div className="space-y-4">
+          <p className="text-sm text-gray-700">
+            Этот тип билета глобальный (не привязан к событию) — он уже
+            автоматически доступен на всех событиях по коду «{ticketType?.code || '—'}».
+            Отдельное назначение по событиям не требуется.
+          </p>
+          <p className="text-xs text-gray-500">
+            Если нужен тип билета именно для одного события, создайте новый
+            в «Справочнике типов билетов» и укажите для него событие.
+          </p>
+          <div className="flex justify-end pt-1">
+            <button
+              onClick={onClose}
+              className="px-4 py-2 text-sm text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors"
+            >
+              Понятно
+            </button>
+          </div>
+        </div>
+      </Modal>
+    );
+  }
+
   return (
     <Modal
       open={open}
@@ -125,6 +157,14 @@ export default function AssignTicketTypeModal({ open, ticketType, onClose, onDon
           {error && (
             <div className="text-sm text-red-600 bg-red-50 rounded-lg px-3 py-2">{error}</div>
           )}
+
+          <p className="text-xs text-amber-700 bg-amber-50 rounded-lg px-3 py-2">
+            Это событийный тип билета (устаревшая модель) — назначение
+            создаёт отдельные копии по каждому событию вместо переиспользования
+            одного типа. Для новых типов рекомендуется оставлять поле
+            «Событие» пустым в «Справочнике типов билетов» — тогда тип станет
+            глобальным и будет виден всем событиям без клонирования.
+          </p>
 
           {events.length === 0 ? (
             <div className="py-6 text-center text-sm text-gray-400">

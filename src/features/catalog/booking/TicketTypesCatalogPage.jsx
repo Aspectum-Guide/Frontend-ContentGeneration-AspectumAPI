@@ -55,7 +55,8 @@ function mapRowToEdit(row) {
 function mapEditToPayload(item) {
   const code = (item.code || '').trim().toLowerCase();
   return {
-    event: item.event,
+    // Пусто = глобальный тип, переиспользуемый на всех событиях по `code`.
+    event: item.event || null,
     code,
     name: item.name || {},
     description: item.description || {},
@@ -290,12 +291,15 @@ export default function TicketTypesCatalog() {
             <FormErrorAlert message={saveError} />
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-              <Field label="Событие" required>
+              <Field
+                label="Событие"
+                hint="Пусто — глобальный тип, переиспользуемый на всех событиях по коду. Выберите событие только если тип нужен именно для него."
+              >
                 <EventSelect
                   value={editingType.event}
                   onChange={(v) => setEditingType((prev) => ({ ...prev, event: v }))}
                   options={eventOptions}
-                  required
+                  placeholder="Глобальный (все события)"
                 />
               </Field>
 

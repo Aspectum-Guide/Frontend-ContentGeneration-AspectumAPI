@@ -96,7 +96,18 @@ export function useBookableEventOptions(pageSize = 500) {
   return { bookableEvents, bookableLoading };
 }
 
-export function useTicketTypeOptions(eventId, pageSize = 500) {
+/**
+ * @param {string} eventId
+ * @param {number} [pageSize]
+ * @param {{ globalOnly?: boolean }} [opts] `globalOnly` — only global
+ *   (event=NULL) types. Use this for pickers that attach types to a *slot*:
+ *   the public event API only ever shows global types to customers, so an
+ *   event-owned type attached to a slot is silently invisible on booking —
+ *   the backend also rejects this, but filtering it out of the picker avoids
+ *   the round-trip error entirely.
+ */
+export function useTicketTypeOptions(eventId, pageSize = 500, opts = {}) {
+  const { globalOnly = false } = opts;
   const [ticketTypeOptions, setTicketTypeOptions] = useState([]);
   const [ticketTypesLoading, setTicketTypesLoading] = useState(false);
 
@@ -112,6 +123,7 @@ export function useTicketTypeOptions(eventId, pageSize = 500) {
         page_size: pageSize,
         ordering: 'sort_order',
         is_active: 'true',
+        ...(globalOnly ? { global: '1' } : {}),
       });
       const data = response?.data;
       const list = filterTicketTypesForEvent(
@@ -124,7 +136,7 @@ export function useTicketTypeOptions(eventId, pageSize = 500) {
     } finally {
       setTicketTypesLoading(false);
     }
-  }, [eventId, pageSize]);
+  }, [eventId, pageSize, globalOnly]);
 
   useEffect(() => {
     loadTicketTypes();

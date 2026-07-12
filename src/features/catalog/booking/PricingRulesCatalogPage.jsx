@@ -13,6 +13,7 @@ import ActiveCheckboxField from '../shared/components/ActiveCheckboxField';
 import CatalogPageHeader from '../shared/components/CatalogPageHeader';
 import EventSelect from '../shared/components/EventSelect';
 import FormErrorAlert from '../shared/components/FormErrorAlert';
+import PricePrecedenceHint from '../shared/components/PricePrecedenceHint';
 import StatusBadge from '../shared/components/StatusBadge';
 import TableRowActions from '../shared/components/TableRowActions';
 import TicketTypeSelect from '../shared/components/TicketTypeSelect';
@@ -205,6 +206,8 @@ export default function PricingRulesCatalogPage() {
         createLabel="Создать правило"
         onCreate={() => { setSaveError(null); setEditing(createEmpty()); }}
       />
+
+      <PricePrecedenceHint />
 
       <DataTable
         columns={columns}
