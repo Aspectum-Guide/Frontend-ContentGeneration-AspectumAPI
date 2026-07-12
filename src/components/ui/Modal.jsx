@@ -74,6 +74,7 @@ export function ConfirmModal({
   onConfirm,
   title = 'Подтвердите действие',
   message,
+  children,
   confirmLabel = 'Подтвердить',
   cancelLabel = 'Отмена',
   danger = false,
@@ -108,6 +109,7 @@ export function ConfirmModal({
       {internalError && (
         <p className="mt-2 text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">{internalError}</p>
       )}
+      {children}
       <div className="flex gap-3 mt-4">
         <button
           onClick={handleConfirm}

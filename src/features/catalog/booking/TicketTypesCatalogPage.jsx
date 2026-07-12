@@ -12,6 +12,7 @@ import { useCatalogFilters } from '../core/useCatalogFilters';
 import { useCatalogResource } from '../core/useCatalogResource';
 import { useEventOptions } from '../shared/bookingOptions';
 import ActiveCheckboxField from '../shared/components/ActiveCheckboxField';
+import BlockingReservationsList from '../shared/components/BlockingReservationsList';
 import CatalogPageHeader from '../shared/components/CatalogPageHeader';
 import EventSelect from '../shared/components/EventSelect';
 import FormErrorAlert from '../shared/components/FormErrorAlert';
@@ -84,6 +85,8 @@ export default function TicketTypesCatalog() {
 
   const [activeLang, setActiveLang] = useState('');
   const [assignTarget, setAssignTarget] = useState(null);
+  const [forceDeleteTarget, setForceDeleteTarget] = useState(null);
+  const [forceDeleteError, setForceDeleteError] = useState('');
 
   const reload = useCallback(async (pageNum) => {
     const isActiveParam =
@@ -120,7 +123,16 @@ export default function TicketTypesCatalog() {
     updateErrorMessage: 'Ошибка сохранения типа билета',
     deleteErrorMessage: 'Ошибка удаления типа билета',
   });
-  const { editingItem: editingType, setEditingItem: setEditingType, saving, saveError, deleteTarget, deleting, deleteError } = crud;
+  const {
+    editingItem: editingType,
+    setEditingItem: setEditingType,
+    saving,
+    saveError,
+    deleteTarget,
+    deleting,
+    deleteError,
+    deleteErrorDetails,
+  } = crud;
 
   const openCreate = useCallback(() => {
     setActiveLang('');
@@ -407,6 +419,44 @@ export default function TicketTypesCatalog() {
         confirmLabel="Удалить"
         danger
         loading={deleting}
+      >
+        <BlockingReservationsList details={deleteErrorDetails} />
+        {deleteErrorDetails?.blocking_count ? (
+          <button
+            type="button"
+            onClick={() => {
+              setForceDeleteError('');
+              setForceDeleteTarget(deleteTarget);
+            }}
+            className="mt-2 text-xs text-red-700 underline hover:no-underline"
+          >
+            Удалить принудительно вместе с этими бронированиями
+          </button>
+        ) : null}
+      </ConfirmModal>
+
+      <ConfirmModal
+        open={!!forceDeleteTarget}
+        onClose={() => setForceDeleteTarget(null)}
+        onConfirm={async () => {
+          try {
+            await ticketTypesAPI.forceDelete(forceDeleteTarget.id);
+            setForceDeleteTarget(null);
+            crud.cancelDelete();
+            await reload(page);
+          } catch (err) {
+            const msg = parseApiError(err, 'Ошибка принудительного удаления');
+            setForceDeleteError(msg);
+            throw new Error(msg);
+          }
+        }}
+        title="Удалить принудительно?"
+        message={
+          forceDeleteError
+          || `Это безвозвратно удалит тип «${getTicketTypeLabel(forceDeleteTarget) || forceDeleteTarget?.id || ''}» И все связанные с ним бронирования (историю заказов). Отменить нельзя.`
+        }
+        confirmLabel="Удалить всё"
+        danger
       />
 
       <AssignTicketTypeModal

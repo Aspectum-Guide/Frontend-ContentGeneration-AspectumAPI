@@ -15,6 +15,10 @@ export const ticketTypesAPI = {
   create: (data) => apiClient.post('/booking/ticket-types/', data),
   update: (ticketTypeId, data) => apiClient.patch(`/booking/ticket-types/${ticketTypeId}/`, data),
   delete: (ticketTypeId) => apiClient.delete(`/booking/ticket-types/${ticketTypeId}/`),
+  // Deletes the ticket type AND every BookingReservation referencing it.
+  // Irreversible — only use after showing the user what will be destroyed.
+  forceDelete: (ticketTypeId) =>
+    apiClient.post(`/booking/ticket-types/${ticketTypeId}/force-delete/`, { confirm: true }),
 };
 
 export const bookingReferenceAPI = {
@@ -28,6 +32,10 @@ export const eventSlotAvailabilitiesAPI = {
   create: (data) => apiClient.post('/booking/slot-availabilities/', data),
   update: (id, data) => apiClient.patch(`/booking/slot-availabilities/${id}/`, data),
   delete: (id) => apiClient.delete(`/booking/slot-availabilities/${id}/`),
+  // Deletes the slot AND every BookingReservation referencing it.
+  // Irreversible — only use after showing the user what will be destroyed.
+  forceDelete: (id) =>
+    apiClient.post(`/booking/slot-availabilities/${id}/force-delete/`, { confirm: true }),
   bulkCreate: (data) => apiClient.post('/booking/slot-availabilities/bulk-create/', data),
 };
 

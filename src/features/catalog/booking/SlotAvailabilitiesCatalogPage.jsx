@@ -12,6 +12,7 @@ import { useCatalogResource } from '../core/useCatalogResource';
 import BulkActionModal from '../../../components/bulk/BulkActionModal';
 import { useEventOptions, useTicketTypeMapForEvents, useTicketTypeOptions } from '../shared/bookingOptions';
 import ActiveCheckboxField from '../shared/components/ActiveCheckboxField';
+import BlockingReservationsList from '../shared/components/BlockingReservationsList';
 import CatalogPageHeader from '../shared/components/CatalogPageHeader';
 import EventSelect from '../shared/components/EventSelect';
 import FormErrorAlert from '../shared/components/FormErrorAlert';
@@ -102,6 +103,8 @@ export default function SlotAvailabilitiesCatalog() {
   });
 
   const { eventOptions, eventsLoading } = useEventOptions();
+  const [forceDeleteTarget, setForceDeleteTarget] = useState(null);
+  const [forceDeleteError, setForceDeleteError] = useState('');
   const [eventFilter, setEventFilter] = useState('');
 
   // Slots only ever accept global ticket types (event-owned ones are invisible
@@ -446,6 +449,44 @@ export default function SlotAvailabilitiesCatalog() {
         confirmLabel="Удалить"
         danger
         loading={crud.deleting}
+      >
+        <BlockingReservationsList details={crud.deleteErrorDetails} />
+        {crud.deleteErrorDetails?.blocking_count ? (
+          <button
+            type="button"
+            onClick={() => {
+              setForceDeleteError('');
+              setForceDeleteTarget(crud.deleteTarget);
+            }}
+            className="mt-2 text-xs text-red-700 underline hover:no-underline"
+          >
+            Удалить принудительно вместе с этими бронированиями
+          </button>
+        ) : null}
+      </ConfirmModal>
+
+      <ConfirmModal
+        open={!!forceDeleteTarget}
+        onClose={() => setForceDeleteTarget(null)}
+        onConfirm={async () => {
+          try {
+            await eventSlotAvailabilitiesAPI.forceDelete(forceDeleteTarget.id);
+            setForceDeleteTarget(null);
+            crud.cancelDelete();
+            await reload(page);
+          } catch (err) {
+            const msg = parseApiError(err, 'Ошибка принудительного удаления');
+            setForceDeleteError(msg);
+            throw new Error(msg);
+          }
+        }}
+        title="Удалить принудительно?"
+        message={
+          forceDeleteError
+          || `Это безвозвратно удалит слот «${forceDeleteTarget?.id || ''}» И все связанные с ним бронирования (историю заказов). Отменить нельзя.`
+        }
+        confirmLabel="Удалить всё"
+        danger
       />
 
       <BulkActionModal

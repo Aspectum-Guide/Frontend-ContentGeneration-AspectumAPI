@@ -30,6 +30,9 @@ export function useCatalogCrud({
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [deleting, setDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState(null);
+  // Raw response body of the last failed delete (e.g. `{ blocking_objects, blocking_count }`
+  // from a 409 ProtectedError) — `deleteError` is just the human-readable string.
+  const [deleteErrorDetails, setDeleteErrorDetails] = useState(null);
 
   const openCreate = useCallback(() => {
     setSaveError(null);
@@ -48,6 +51,7 @@ export function useCatalogCrud({
 
   const askDelete = useCallback((row) => {
     setDeleteError(null);
+    setDeleteErrorDetails(null);
     setDeleteTarget(row || null);
   }, []);
 
@@ -101,6 +105,7 @@ export function useCatalogCrud({
     try {
       setDeleting(true);
       setDeleteError(null);
+      setDeleteErrorDetails(null);
       if (!deleteRequest) throw new Error('deleteRequest is not provided');
       await deleteRequest(deleteTarget.id);
       setDeleteTarget(null);
@@ -108,6 +113,7 @@ export function useCatalogCrud({
     } catch (err) {
       const msg = parseError(err, deleteErrorMessage);
       setDeleteError(msg);
+      setDeleteErrorDetails(err?.response?.data ?? null);
       throw err;
     } finally {
       setDeleting(false);
@@ -125,6 +131,7 @@ export function useCatalogCrud({
       deleteTarget,
       deleting,
       deleteError,
+      deleteErrorDetails,
       askDelete,
       cancelDelete,
       confirmDelete,
@@ -141,6 +148,7 @@ export function useCatalogCrud({
       deleteTarget,
       deleting,
       deleteError,
+      deleteErrorDetails,
       askDelete,
       cancelDelete,
       confirmDelete,
