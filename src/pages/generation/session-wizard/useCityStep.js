@@ -1130,58 +1130,12 @@ export default function useCityStep(ctx) {
       localeData, defaultLocale, lat, lon, cityTags, imageId, imageOriginalUrl,
     };
 
+    // Таймерного автосейва больше НЕТ (сейвы каждые 2.5с дёргали сервер и
+    // сбрасывали курсор в конец при правке текста). Правки копятся локально,
+    // сохранение — при уходе фокуса из формы (onCityFormBlur), при переключении
+    // шага/страницы и при скрытии вкладки (flushPendingCityAutosave ниже).
     hasUnsavedChangesRef.current = true;
-    clearTimeout(autoSaveTimerRef.current);
-    autoSaveTimerRef.current = setTimeout(async () => {
-      if (savingRef.current) return;
-      // после конфликта с активной генерацией автосейв берёт паузу
-      if (Date.now() < autoSavePausedUntilRef.current) return;
-
-      setAutoSaving(true);
-      try {
-        const payload = buildCityStepPayload({
-          localeData,
-          defaultLocale,
-          lat,
-          lon,
-          cityTags,
-          imageId,
-          imageOriginalUrl,
-          activeCityDraftId: activeCityDraftIdRef.current,
-          baseUpdatedAt: cityBaseUpdatedAtRef.current,
-        });
-        const res = await sessionsAPI.updateCity(sessionId, payload);
-        mergeCitySaveResponseIntoState(res?.data);
-        setAutoSaved(true);
-        hasUnsavedChangesRef.current = false;
-        setTimeout(() => setAutoSaved(false), 2500);
-      } catch (e) {
-        const conflictData = e?.response?.status === 409 && e?.response?.data?.conflict
-          ? e.response.data : null;
-        if (conflictData) {
-          // Сервер новее (город дозаполняет генерация): перезагружаем форму
-          // свежим драфтом вместо затирания; при активной генерации — пауза,
-          // чтобы не конфликтить каждые 2.5 секунды.
-          if (conflictData.draft) {
-            loadCityIntoForm(conflictData.draft);
-            mergeCitySaveResponseIntoState(conflictData);
-          }
-          hasUnsavedChangesRef.current = false;
-          if (conflictData.generation_active) {
-            autoSavePausedUntilRef.current = Date.now() + 60_000;
-            showNote('Идёт генерация города — форма обновлена, автосохранение приостановлено на минуту', 'info');
-          } else {
-            showNote('Данные города были обновлены — форма перезагружена свежими данными', 'info');
-          }
-        } else {
-          showNote('Ошибка автосохранения города: ' + parseApiError(e, 'Неизвестная ошибка'), 'error');
-        }
-      } finally {
-        setAutoSaving(false);
-      }
-    }, 2500);
-
-    return () => clearTimeout(autoSaveTimerRef.current);
+    return undefined;
   }, [
     deferredLocaleData,
     deferredLat,
@@ -1229,11 +1183,25 @@ export default function useCityStep(ctx) {
         }).catch(() => {});
       } catch { /* уход со страницы — best effort */ }
     } else {
+      setAutoSaving(true);
       sessionsAPI.updateCity(sessionId, payload)
-        .then((res) => mergeCitySaveResponseIntoState(res?.data))
-        .catch(() => { /* 409 = на сервере новее; сеть — правка уже в форме при возврате */ });
+        .then((res) => {
+          mergeCitySaveResponseIntoState(res?.data);
+          setAutoSaved(true);
+          setTimeout(() => setAutoSaved(false), 2500);
+        })
+        .catch(() => { /* 409 = на сервере новее; сеть — правка уже в форме при возврате */ })
+        .finally(() => setAutoSaving(false));
     }
   }, [sessionId, mergeCitySaveResponseIntoState]);
+
+  // onBlur контейнера формы города: сохраняем, только когда фокус ушёл ЗА
+  // пределы формы (перескок поле→поле сейв не дёргает).
+  const onCityFormBlur = useCallback((e) => {
+    const next = e?.relatedTarget;
+    if (next && e?.currentTarget?.contains?.(next)) return;
+    flushPendingCityAutosave(false);
+  }, [flushPendingCityAutosave]);
 
   useEffect(() => {
     if (!sessionId) return undefined;
@@ -2863,6 +2831,7 @@ export default function useCityStep(ctx) {
     mapNode, setMapContainerRef,
 
     saving, savingRef, autoSaving, autoSavingRef, autoSaved, autoSaveTimerRef,
+    onCityFormBlur, flushPendingCityAutosave,
 
     localCreatedCityDraftsRef, localDeletedCityDraftIdsRef,
     loadSessionSeqRef,

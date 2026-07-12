@@ -230,6 +230,7 @@ export default function SessionWizard({ components = {} } = {}) {
     saving,
     autoSaving,
     autoSaved,
+    onCityFormBlur,
     hasUnsavedChangesRef,
     preparingPublishStep,
     closeOpen,
@@ -1051,7 +1052,9 @@ export default function SessionWizard({ components = {} } = {}) {
         </div>
 
         {currentStep === 1 && (
-          <div className="space-y-6">
+          /* onBlur: сейв города при уходе фокуса из формы — вместо таймера
+             2.5с, который дёргал сервер и сбрасывал курсор при наборе */
+          <div className="space-y-6" onBlur={onCityFormBlur}>
             <SessionWizardGenerateCityFull
               sessionId={sessionId}
               defaultLang={defaultLocale || 'ru'}
