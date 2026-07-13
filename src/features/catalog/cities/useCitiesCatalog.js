@@ -39,6 +39,10 @@ export function useCitiesCatalog() {
   const [deleting, setDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState(null);
 
+  // IAP sync (editor)
+  const [syncingIap, setSyncingIap] = useState(false);
+  const [syncIapNote, setSyncIapNote] = useState(null);
+
   const loadCities = useCallback(async () => {
     try {
       setLoading(true);
@@ -94,6 +98,7 @@ export function useCitiesCatalog() {
     if (preparingEdit) return;
     setSaveError(null);
     setDeleteError(null);
+    setSyncIapNote(null);
     setActiveLang(pickPrimaryLangCode([row?.name, row?.description, row?.country]));
     setActiveEditTab('content');
     setPreparingEdit(true);
@@ -172,6 +177,35 @@ export function useCitiesCatalog() {
       setSaving(false);
     }
   }, [editingCity, loadCities]);
+
+  const [togglingIds, setTogglingIds] = useState(new Set());
+
+  const toggleFlag = useCallback(async (cityId, field, value) => {
+    const key = `${cityId}-${field}`;
+    setTogglingIds((prev) => new Set(prev).add(key));
+    setAllCities((prev) => prev.map((c) => c.id === cityId ? { ...c, [field]: value } : c));
+    try {
+      await citiesCatalogAPI.update(cityId, { [field]: value });
+    } catch {
+      setAllCities((prev) => prev.map((c) => c.id === cityId ? { ...c, [field]: !value } : c));
+    } finally {
+      setTogglingIds((prev) => { const s = new Set(prev); s.delete(key); return s; });
+    }
+  }, []);
+
+  const syncIap = useCallback(async () => {
+    if (!editingCity?.id) return;
+    setSyncingIap(true);
+    setSyncIapNote(null);
+    try {
+      await citiesCatalogAPI.syncIap(editingCity.id);
+      setSyncIapNote({ type: 'success', text: 'Синк запущен — статусы обновятся через несколько секунд.' });
+    } catch (err) {
+      setSyncIapNote({ type: 'error', text: parseApiError(err, 'Ошибка запуска синка') });
+    } finally {
+      setSyncingIap(false);
+    }
+  }, [editingCity]);
 
   const requestDelete = useCallback((row) => {
     setDeleteError(null);
@@ -264,6 +298,15 @@ export function useCitiesCatalog() {
     setDeleteTarget,
     confirmDelete,
     toastNote,
+
+    // list toggle (is_show)
+    toggleFlag,
+    togglingIds,
+
+    // IAP sync
+    syncIap,
+    syncingIap,
+    syncIapNote,
   };
 }
 

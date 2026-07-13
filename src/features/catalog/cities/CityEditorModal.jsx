@@ -11,7 +11,28 @@ const CITY_EDIT_TABS = [
   { key: 'content', label: 'Контент' },
   { key: 'media', label: 'Обложка' },
   { key: 'geo', label: 'Карта и теги' },
+  { key: 'iap', label: 'IAP' },
 ];
+
+const IAP_STATUS_LABELS = {
+  not_created: 'Не создан',
+  pending_review: 'На модерации',
+  approved: 'Одобрен',
+  active: 'Активен',
+  error: 'Ошибка',
+};
+
+function IapStatusBadge({ status }) {
+  const color = status === 'error' ? 'bg-red-50 text-red-700 border-red-200'
+    : (status === 'approved' || status === 'active') ? 'bg-green-50 text-green-700 border-green-200'
+    : status === 'pending_review' ? 'bg-yellow-50 text-yellow-700 border-yellow-200'
+    : 'bg-gray-50 text-gray-600 border-gray-200';
+  return (
+    <span className={`inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium border ${color}`}>
+      {IAP_STATUS_LABELS[status] || status || '—'}
+    </span>
+  );
+}
 
 export default function CityEditorModal({
   open,
@@ -34,6 +55,9 @@ export default function CityEditorModal({
   onCommonsSelect,
   allFilters,
   toggleFilter,
+  syncIap,
+  syncingIap,
+  syncIapNote,
 }) {
   const cityMapElRef = useRef(null);
   const cityMapRef = useRef(null);
@@ -360,6 +384,98 @@ export default function CityEditorModal({
                     </p>
                   </Field>
                 )}
+              </div>
+            )}
+
+            {activeTab === 'iap' && (
+              <div className="space-y-4">
+                <Field label="Видимость">
+                  <div className="flex items-center h-full pt-1">
+                    <label className="flex items-center gap-2 cursor-pointer select-none">
+                      <button
+                        type="button"
+                        role="switch"
+                        aria-checked={!!city?.is_show}
+                        aria-label="Видимость города"
+                        onClick={() => setCity((p) => ({ ...p, is_show: !p.is_show }))}
+                        className={`relative w-10 h-5 rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-offset-1 focus:ring-blue-500 ${city?.is_show ? 'bg-blue-600' : 'bg-gray-300'}`}
+                      >
+                        <span className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-all ${city?.is_show ? 'left-5' : 'left-0.5'}`} />
+                      </button>
+                      <span className="text-sm text-gray-700">
+                        {city?.is_show ? 'Показывается в приложении' : 'Скрыт'}
+                      </span>
+                    </label>
+                  </div>
+                </Field>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  <Field label="IAP SKU">
+                    <TextInput
+                      value={city?.iap_sku || ''}
+                      onChange={(e) => setCity((p) => ({ ...p, iap_sku: e.target.value }))}
+                      placeholder="city_rome"
+                    />
+                  </Field>
+                  <Field label="Цена (USD)">
+                    <TextInput
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      value={city?.iap_price_usd ?? ''}
+                      onChange={(e) => setCity((p) => ({ ...p, iap_price_usd: e.target.value }))}
+                      placeholder="2.99"
+                    />
+                  </Field>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-3 p-3 bg-gray-50 rounded-xl border border-gray-200">
+                  <div>
+                    <p className="text-xs text-gray-500 mb-1">Apple</p>
+                    <IapStatusBadge status={city?.iap_apple_status} />
+                  </div>
+                  <div>
+                    <p className="text-xs text-gray-500 mb-1">Google</p>
+                    <IapStatusBadge status={city?.iap_google_status} />
+                  </div>
+                  <div>
+                    <p className="text-xs text-gray-500 mb-1">Синк</p>
+                    <p className="text-sm text-gray-700">
+                      {city?.iap_synced_at ? new Date(city.iap_synced_at).toLocaleString('ru-RU') : 'Ещё не синкался'}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-3">
+                  <button
+                    type="button"
+                    onClick={syncIap}
+                    disabled={syncingIap}
+                    className="px-3 py-2 text-sm font-medium text-blue-700 bg-blue-50 rounded-lg hover:bg-blue-100 disabled:opacity-50 transition-colors"
+                  >
+                    {syncingIap ? (
+                      <span className="flex items-center gap-1.5">
+                        <span className="animate-spin w-3 h-3 border border-blue-500 border-t-transparent rounded-full inline-block" />
+                        Синкаем...
+                      </span>
+                    ) : '🔄 Синхронизировать с App Store / Google Play'}
+                  </button>
+                </div>
+
+                {syncIapNote && (
+                  <div className={`p-3 rounded-lg text-sm border ${
+                    syncIapNote.type === 'error'
+                      ? 'bg-red-50 border-red-200 text-red-700'
+                      : 'bg-green-50 border-green-200 text-green-700'
+                  }`}>
+                    {syncIapNote.text}
+                  </div>
+                )}
+
+                <p className="text-xs text-gray-400">
+                  Изменение цены и SKU применится после сохранения города. Синхронизация с App Store / Google Play
+                  запускается отдельно — статусы выше могут не обновиться сразу после нажатия.
+                </p>
               </div>
             )}
 

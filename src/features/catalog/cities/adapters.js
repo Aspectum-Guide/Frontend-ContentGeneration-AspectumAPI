@@ -12,6 +12,12 @@ export function fromApiCity(row) {
     image_id: row.image_id ?? null,
     image_url: row.image_url ?? null,
     image_copyright: row.image_copyright ?? '',
+    is_show: row.is_show ?? true,
+    iap_sku: row.iap_sku ?? '',
+    iap_price_usd: row.iap_price_usd ?? '',
+    iap_apple_status: row.iap_apple_status ?? 'not_created',
+    iap_google_status: row.iap_google_status ?? 'not_created',
+    iap_synced_at: row.iap_synced_at ?? null,
   };
 }
 
@@ -30,6 +36,12 @@ export function mergeCityRowWithApiDetail(row, detail) {
     image_url: d.image_url ?? base.image_url ?? null,
     image_copyright: d.image_copyright ?? base.image_copyright ?? '',
     city_filter_ids: (d.city_filter_ids || base.city_filter_ids || []).map(String),
+    is_show: d.is_show ?? base.is_show ?? true,
+    iap_sku: d.iap_sku ?? base.iap_sku ?? '',
+    iap_price_usd: d.iap_price_usd ?? base.iap_price_usd ?? '',
+    iap_apple_status: d.iap_apple_status ?? base.iap_apple_status ?? 'not_created',
+    iap_google_status: d.iap_google_status ?? base.iap_google_status ?? 'not_created',
+    iap_synced_at: d.iap_synced_at ?? base.iap_synced_at ?? null,
   };
 }
 
@@ -39,6 +51,7 @@ export function toApiCityUpdatePayload(city) {
     description: city?.description || {},
     country: city?.country || {},
     city_filter_ids: (city?.city_filter_ids || []).map(String),
+    is_show: !!city?.is_show,
   };
 
   const latVal = city?.lat;
@@ -47,6 +60,8 @@ export function toApiCityUpdatePayload(city) {
   if (lonVal !== '' && lonVal != null) payload.lon = parseFloat(lonVal);
   if (city?.image_id !== undefined) payload.image_id = city.image_id;
   if (city?.image_copyright !== undefined) payload.image_copyright = city.image_copyright;
+  if (city?.iap_sku !== undefined) payload.iap_sku = city.iap_sku;
+  if (city?.iap_price_usd !== '' && city?.iap_price_usd != null) payload.iap_price_usd = city.iap_price_usd;
 
   return payload;
 }

@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import Layout from '../../../components/Layout';
 import DataTable from '../../../components/ui/DataTable';
 import { ConfirmModal } from '../../../components/ui/Modal';
@@ -11,6 +11,16 @@ import { useCitiesCatalog } from './useCitiesCatalog';
 export default function CitiesCatalogPage() {
   const { setMobileActions } = useLayoutActions();
   const c = useCitiesCatalog();
+  const [toggleConfirm, setToggleConfirm] = useState(null); // { id, field, value, label }
+
+  const requestToggle = (id, field, value, label) => {
+    if (!value) {
+      // отключение — спрашиваем подтверждение
+      setToggleConfirm({ id, field, value, label });
+    } else {
+      c.toggleFlag(id, field, value);
+    }
+  };
 
   const columns = [
     {
@@ -42,6 +52,36 @@ export default function CitiesCatalogPage() {
           {lat != null ? `${parseFloat(lat).toFixed(3)}, ${parseFloat(row.lon).toFixed(3)}` : '—'}
         </span>
       ),
+    },
+    {
+      key: 'iap_price_usd',
+      label: 'Цена',
+      render: (price) => (
+        <span className="text-sm text-gray-600">{price ? `$${price}` : '—'}</span>
+      ),
+    },
+    {
+      key: 'is_show',
+      label: 'Виден',
+      render: (v, row) => {
+        const loading = c.togglingIds.has(`${row.id}-is_show`);
+        return (
+          <button
+            type="button"
+            role="switch"
+            aria-checked={v}
+            aria-label={v ? 'Скрыть город' : 'Показать город'}
+            onClick={() => !loading && requestToggle(row.id, 'is_show', !v, `Скрыть «${getMultiLangValue(row.name) || row.id}»?`)}
+            disabled={loading}
+            className={`relative w-9 h-5 rounded-full transition-colors focus:outline-none disabled:opacity-50 ${v ? 'bg-blue-500' : 'bg-gray-300'}`}
+          >
+            {loading
+              ? <span className="absolute inset-0 flex items-center justify-center"><span className="w-3 h-3 border border-white border-t-transparent rounded-full animate-spin" /></span>
+              : <span className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-all ${v ? 'left-4' : 'left-0.5'}`} />
+            }
+          </button>
+        );
+      },
     },
     {
       key: 'id',
@@ -151,6 +191,22 @@ export default function CitiesCatalogPage() {
         onCommonsSelect={c.handleCommonsImageSelect}
         allFilters={c.allFilters}
         toggleFilter={c.toggleFilter}
+        syncIap={c.syncIap}
+        syncingIap={c.syncingIap}
+        syncIapNote={c.syncIapNote}
+      />
+
+      <ConfirmModal
+        open={!!toggleConfirm}
+        onClose={() => setToggleConfirm(null)}
+        onConfirm={() => {
+          c.toggleFlag(toggleConfirm.id, toggleConfirm.field, toggleConfirm.value);
+          setToggleConfirm(null);
+        }}
+        title={toggleConfirm?.label || 'Подтвердите действие'}
+        message="Город исчезнет из мобильного приложения и поиска."
+        confirmLabel="Да, скрыть"
+        danger
       />
 
       <ConfirmModal

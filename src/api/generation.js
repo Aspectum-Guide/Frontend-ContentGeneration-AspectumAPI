@@ -267,6 +267,11 @@ export const citiesAPI = {
   list: (params) => apiClient.get('/city/list', { params }),
 };
 
+// ─── IAP admin (city product sync) ─────────────────────────────────────────────
+export const iapAdminAPI = {
+  syncCity: (cityId) => apiClient.post(`/iap/admin/cities/${cityId}/sync`),
+};
+
 // ─── Images ──────────────────────────────────────────────────────────────────
 export const imagesAPI = {
   upload: (formData) =>

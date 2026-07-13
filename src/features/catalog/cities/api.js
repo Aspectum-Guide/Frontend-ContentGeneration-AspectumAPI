@@ -1,4 +1,4 @@
-import { citiesAPI, cityFiltersAPI, imagesAPI } from '../../../api/generation';
+import { citiesAPI, cityFiltersAPI, iapAdminAPI, imagesAPI } from '../../../api/generation';
 import { unwrapEnvelope } from '../shared/normalize';
 import { mapCityTagForCityEditor } from '../shared/tagCatalog';
 
@@ -14,5 +14,6 @@ export const citiesCatalogAPI = {
     return { data: arr.map(mapCityTagForCityEditor) };
   },
   uploadImage: (formData) => imagesAPI.upload(formData),
+  syncIap: (id) => iapAdminAPI.syncCity(id),
 };
 
