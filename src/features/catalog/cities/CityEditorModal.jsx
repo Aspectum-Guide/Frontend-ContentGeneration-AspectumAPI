@@ -410,11 +410,14 @@ export default function CityEditorModal({
                 </Field>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                  <Field label="IAP SKU">
+                  <Field
+                    label="IAP SKU"
+                    hint={!city?.iap_sku ? 'Пусто — SKU ещё не сгенерирован для этого города' : undefined}
+                  >
                     <TextInput
                       value={city?.iap_sku || ''}
                       onChange={(e) => setCity((p) => ({ ...p, iap_sku: e.target.value }))}
-                      placeholder="city_rome"
+                      placeholder="напр. city_rome"
                     />
                   </Field>
                   <Field label="Цена (USD)">
