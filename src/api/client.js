@@ -1,5 +1,6 @@
 import axios from 'axios';
 import TokenManager from '../utils/TokenManager';
+import { redirectToAuth } from '../utils/authRedirect';
 
 // Определяем базовый URL для API
 // В Vite переменные окружения доступны через import.meta.env
@@ -30,6 +31,12 @@ const CACHE_TTL = 2000; // ms
 const MAX_429_RETRIES = 3;
 
 const sleep = (ms) => new Promise((res) => setTimeout(res, ms));
+
+/** Сброс GET-кэша после мутаций (create/update/delete). */
+export function clearApiGetCache() {
+  responseCache.clear();
+  inFlightRequests.clear();
+}
 
 // Wrap GET to add dedupe/cache/retry behaviour
 const originalGet = apiClient.get.bind(apiClient);
@@ -116,11 +123,16 @@ apiClient.interceptors.request.use(
 // Интерсептор для обработки ошибок и автоматического обновления токена
 apiClient.interceptors.response.use(
   (response) => {
+    const method = String(response.config?.method || 'get').toLowerCase();
+    if (method !== 'get') {
+      clearApiGetCache();
+    }
+
     if (IS_DEV) {
       console.log('📥 API Response:', {
         status: response.status,
         url: response.config.baseURL + response.config.url,
-        data: response.data,
+        method: response.config.method?.toUpperCase(),
       });
     }
     return response;
@@ -152,8 +164,7 @@ apiClient.interceptors.response.use(
           }
         } catch { /* ignore */ }
       }
-      TokenManager.clearTokens();
-      window.location.replace('/token-auth');
+      redirectToAuth();
       return Promise.reject(error);
     }
 
@@ -191,8 +202,7 @@ apiClient.interceptors.response.use(
           // Разлогиниваем только при аутентификационной ошибке refresh токена.
           if (refreshResult.isAuthError || refreshResult.isExpired) {
             console.log('🔥 [APIClient] Clearing tokens due to expired refresh');
-            TokenManager.clearTokens();
-            window.location.replace('/token-auth');
+            redirectToAuth();
             return Promise.reject(error);
           }
 
@@ -208,8 +218,7 @@ apiClient.interceptors.response.use(
         console.error('❌ [APIClient] Token refresh error:', refreshError);
         // Сбрасываем сессию только если refresh действительно невалиден/просрочен.
         if (refreshError?.isAuthError || refreshError?.isExpired) {
-          TokenManager.clearTokens();
-          window.location.replace('/token-auth');
+          redirectToAuth();
         }
         return Promise.reject(refreshError);
       }
@@ -218,8 +227,7 @@ apiClient.interceptors.response.use(
     // Если это 401 из самого endpoint refresh, то токены некорректны
     if (error.response?.status === 401 && config?.url?.includes('/auth/token/refresh')) {
       console.log('🚨 [APIClient] 401 from refresh endpoint - forcing logout');
-      TokenManager.clearTokens();
-      window.location.replace('/token-auth');
+      redirectToAuth();
     }
 
     return Promise.reject(error);

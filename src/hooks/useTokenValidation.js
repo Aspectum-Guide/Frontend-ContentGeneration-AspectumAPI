@@ -6,6 +6,7 @@
 
 import { useEffect, useState, useCallback, useRef } from 'react';
 import TokenManager from '../utils/TokenManager';
+import { redirectToAuth as redirectToAuthPage } from '../utils/authRedirect';
 
 export function useTokenValidation() {
   const hasRedirectedRef = useRef(false);
@@ -21,11 +22,7 @@ export function useTokenValidation() {
     }
 
     hasRedirectedRef.current = true;
-    TokenManager.clearTokens();
-
-    if (window.location.pathname !== '/token-auth') {
-      window.location.replace('/token-auth');
-    }
+    redirectToAuthPage();
   }, []);
 
   // Локальная проверка токенов без сетевых запросов.
@@ -62,9 +59,26 @@ export function useTokenValidation() {
         return;
       }
 
-      // Access невалиден: если refresh валиден, не разлогиниваем (interceptor обновит по 401).
+      // Access невалиден: пробуем refresh заранее, не ждём 401 на запросе
       if (refreshValidation.isValid) {
-        console.warn('⚠️ [TokenValidation] Access expired, refresh still valid. Waiting for interceptor refresh.');
+        const refreshResult = await TokenManager.refreshTokens(tokens.refresh);
+        if (refreshResult.success) {
+          setValidationStatus({
+            isValid: true,
+            isChecking: false,
+            lastCheck: new Date().toISOString(),
+          });
+          return;
+        }
+        if (refreshResult.isAuthError || refreshResult.isExpired) {
+          setValidationStatus({
+            isValid: false,
+            isChecking: false,
+            lastCheck: new Date().toISOString(),
+          });
+          redirectToAuth();
+          return;
+        }
         setValidationStatus({
           isValid: true,
           isChecking: false,

@@ -2,6 +2,9 @@
  * JWT Token Manager for ContentGeneration Frontend
  * Handles token storage, validation, and automatic refresh
  * Based on mobile app TokenManager pattern
+ *
+ * SECURITY: tokens are stored in localStorage (XSS surface). See docs/SECURITY.md.
+ * httpOnly cookies require coordinated backend changes.
  */
 
 const TOKEN_KEY = 'jwt_tokens';

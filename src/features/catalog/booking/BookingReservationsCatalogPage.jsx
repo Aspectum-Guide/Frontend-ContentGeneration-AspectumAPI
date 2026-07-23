@@ -7,6 +7,7 @@ import Modal from '../../../components/ui/Modal';
 import { useLayoutActions } from '../../../context/useLayoutActions';
 import { parseApiError } from '../../../utils/apiError';
 import { useCatalogFilters } from '../core/useCatalogFilters';
+import { useCatalogPagedReload } from '../core/useCatalogPagedReload';
 import { useCatalogResource } from '../core/useCatalogResource';
 import { useEventOptions, useTicketTypeMap, useTicketTypeOptions } from '../shared/bookingOptions';
 import CatalogPageHeader from '../shared/components/CatalogPageHeader';
@@ -110,14 +111,12 @@ export default function BookingReservationsCatalogPage() {
     );
   }, [reservations.load, eventFilter, statusFilter, ticketTypeFilter, slotFilter, debouncedSearch]);
 
-  useEffect(() => {
-    reload(page);
-  }, [page, reload]);
-
-  useEffect(() => {
-    setPage(1);
-    reload(1);
-  }, [eventFilter, statusFilter, ticketTypeFilter, slotFilter, debouncedSearch, reload, setPage]);
+  useCatalogPagedReload({
+    page,
+    setPage,
+    reload,
+    filterSignature: `${eventFilter}|${statusFilter}|${ticketTypeFilter}|${slotFilter}|${debouncedSearch}`,
+  });
 
   useEffect(() => {
     setMobileActions([]);

@@ -7,6 +7,7 @@ import Modal, { ConfirmModal } from '../../../components/ui/Modal';
 import { useLayoutActions } from '../../../context/useLayoutActions';
 import { parseApiError } from '../../../utils/apiError';
 import { useCatalogFilters } from '../core/useCatalogFilters';
+import { useCatalogPagedReload } from '../core/useCatalogPagedReload';
 import { useCatalogResource } from '../core/useCatalogResource';
 import { useEventOptions, useTicketTypeMap, useTicketTypeOptions } from '../shared/bookingOptions';
 import ActiveCheckboxField from '../shared/components/ActiveCheckboxField';
@@ -122,14 +123,12 @@ export default function TicketPricesCatalog() {
     );
   }, [prices.load, eventFilter, ticketTypeFilter, statusFilter, debouncedSearch]);
 
-  useEffect(() => {
-    reload(page);
-  }, [page, reload]);
-
-  useEffect(() => {
-    setPage(1);
-    reload(1);
-  }, [eventFilter, ticketTypeFilter, statusFilter, debouncedSearch, reload, setPage]);
+  useCatalogPagedReload({
+    page,
+    setPage,
+    reload,
+    filterSignature: `${eventFilter}|${ticketTypeFilter}|${statusFilter}|${debouncedSearch}`,
+  });
 
   useEffect(() => {
     const actions = [

@@ -24,28 +24,79 @@ async function checkIsStaff(accessToken) {
 }
 
 export default function ProtectedRoute({ children }) {
-  const tokens = TokenManager.getTokens();
-  const [staffStatus, setStaffStatus] = useState('checking'); // 'checking' | 'staff' | 'not-staff'
-
-  const hasValidTokens = (() => {
-    if (!tokens?.access) return false;
-    const validation = TokenManager.validateToken(tokens.access);
-    if (validation.isValid) return true;
-    const refreshValidation = TokenManager.validateToken(tokens.refresh);
-    return refreshValidation.isValid;
-  })();
+  // checking | denied | staff-check | staff | not-staff
+  const [gate, setGate] = useState('checking');
+  const [accessToken, setAccessToken] = useState(null);
 
   useEffect(() => {
-    if (!hasValidTokens) return;
     let cancelled = false;
-    checkIsStaff(tokens.access).then((isStaff) => {
-      if (!cancelled) setStaffStatus(isStaff ? 'staff' : 'not-staff');
+
+    (async () => {
+      const tokens = TokenManager.getTokens();
+      if (!tokens?.access) {
+        if (!cancelled) setGate('denied');
+        return;
+      }
+
+      const accessValidation = TokenManager.validateToken(tokens.access);
+      if (accessValidation.isValid) {
+        if (!cancelled) {
+          setAccessToken(tokens.access);
+          setGate('staff-check');
+        }
+        return;
+      }
+
+      const refreshValidation = TokenManager.validateToken(tokens.refresh);
+      if (!refreshValidation.isValid) {
+        if (!cancelled) setGate('denied');
+        return;
+      }
+
+      // Access истёк, refresh ещё жив — обновляем до входа в защищённые страницы
+      const refreshResult = await TokenManager.refreshTokens(tokens.refresh);
+      if (cancelled) return;
+
+      if (refreshResult.success) {
+        setAccessToken(refreshResult.data?.access || TokenManager.getTokens()?.access || null);
+        setGate('staff-check');
+        return;
+      }
+
+      if (refreshResult.isAuthError || refreshResult.isExpired) {
+        setGate('denied');
+        return;
+      }
+
+      // Временная ошибка сети — не выкидываем, пусть interceptor попробует на 401
+      setAccessToken(tokens.access);
+      setGate('staff-check');
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (gate !== 'staff-check') return;
+    let cancelled = false;
+    checkIsStaff(accessToken).then((isStaff) => {
+      if (!cancelled) setGate(isStaff ? 'staff' : 'not-staff');
     });
     return () => { cancelled = true; };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [hasValidTokens, tokens?.access]);
+  }, [gate, accessToken]);
 
-  if (!hasValidTokens) {
+  if (gate === 'checking' || gate === 'staff-check') {
+    return (
+      <div className="min-h-[30vh] flex items-center justify-center text-sm text-gray-500">
+        Проверка сессии…
+      </div>
+    );
+  }
+
+  if (gate === 'denied') {
+    TokenManager.clearTokens();
     return <Navigate to="/token-auth" replace />;
   }
 
@@ -54,15 +105,7 @@ export default function ProtectedRoute({ children }) {
   // на всех соответствующих эндпоинтах. Не пускаем не-staff пользователей
   // даже до первого запроса, чтобы не показывать формы, которые всё равно
   // упадут с 403.
-  if (staffStatus === 'checking') {
-    return (
-      <div className="flex items-center justify-center min-h-screen text-sm text-gray-400">
-        Проверка доступа...
-      </div>
-    );
-  }
-
-  if (staffStatus === 'not-staff') {
+  if (gate === 'not-staff') {
     return (
       <div className="flex flex-col items-center justify-center min-h-screen gap-3 text-center px-4">
         <p className="text-lg font-semibold text-gray-800">Доступ только для сотрудников</p>

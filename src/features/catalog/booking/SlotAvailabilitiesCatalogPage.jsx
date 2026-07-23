@@ -8,6 +8,7 @@ import { useLayoutActions } from '../../../context/useLayoutActions';
 import { parseApiError } from '../../../utils/apiError';
 import { useCatalogFilters } from '../core/useCatalogFilters';
 import { useCatalogCrud } from '../core/useCatalogCrud';
+import { useCatalogPagedReload } from '../core/useCatalogPagedReload';
 import { useCatalogResource } from '../core/useCatalogResource';
 import BulkActionModal from '../../../components/bulk/BulkActionModal';
 import { useEventOptions, useTicketTypeMapForEvents, useTicketTypeOptions } from '../shared/bookingOptions';
@@ -185,14 +186,12 @@ export default function SlotAvailabilitiesCatalog() {
     );
   }, [avail.load, eventFilter, ticketTypeFilter]);
 
-  useEffect(() => {
-    reload(page);
-  }, [page, reload]);
-
-  useEffect(() => {
-    setPage(1);
-    reload(1);
-  }, [eventFilter, ticketTypeFilter, reload, setPage]);
+  useCatalogPagedReload({
+    page,
+    setPage,
+    reload,
+    filterSignature: `${eventFilter}|${ticketTypeFilter}`,
+  });
 
   useEffect(() => {
     const actions = [

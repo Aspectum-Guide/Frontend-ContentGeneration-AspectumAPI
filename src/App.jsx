@@ -42,6 +42,7 @@ import ImportGoogleSheet from './pages/import/ImportGoogleSheet';
 import Login from './pages/Login';
 import MyTasks from './pages/tasks/MyTasks';
 import TokenAuth from './pages/TokenAuth';
+import { registerAuthNavigate } from './utils/authRedirect';
 
 const ENABLE_LOGIN = false;
 
@@ -217,6 +218,10 @@ const router = createBrowserRouter(routes, {
     v7_relativeSplatPath: true,
   },
 });
+
+// Позволяет разлогинивать (redirectToAuth) через SPA-навигацию из кода вне
+// дерева компонентов (axios-интерсепторы, TokenManager) без полной перезагрузки.
+registerAuthNavigate((path, opts) => router.navigate(path, opts));
 
 function App() {
   return (
