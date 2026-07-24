@@ -1,4 +1,5 @@
 import { Component } from 'react';
+import { reportError } from '../utils/errorReporting';
 
 export default class ErrorBoundary extends Component {
   constructor(props) {
@@ -12,6 +13,7 @@ export default class ErrorBoundary extends Component {
 
   componentDidCatch(error, info) {
     console.error('[ErrorBoundary]', error, info.componentStack);
+    reportError(error, { componentStack: info.componentStack });
   }
 
   render() {
