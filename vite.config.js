@@ -48,7 +48,10 @@ export default defineConfig(({ mode }) => {
     },
     build: {
       outDir: 'dist',
-      sourcemap: true,
+      // 'hidden': maps are generated but the bundle carries no sourceMappingURL,
+      // so browsers/devtools never auto-fetch them in prod (they're still on
+      // disk for local upload to an error tracker, and nginx denies *.map too).
+      sourcemap: mode === 'production' ? 'hidden' : true,
     },
     test: {
       environment: 'jsdom',
