@@ -24,46 +24,34 @@ const apiClient = axios.create({
   },
 });
 
-// Simple in-memory cache and in-flight dedupe for GET requests to reduce 429
+// In-flight GET dedupe (e.g. React 18 double-effects firing the same request
+// twice) + retry on 429. No response caching here on purpose: catalog pages
+// own their own reload timing (useCatalogResource + onAfterSave/onAfterDelete
+// reload right after a mutation), and a blanket "serve this response again
+// for 2s" cache was a second, uncoordinated caching layer on top of that —
+// see docs/CATALOG_REFACTOR_BLUEPRINT.md for the fuller picture (TanStack
+// Query is the other one, used only by SessionsList.jsx).
 const inFlightRequests = new Map();
-const responseCache = new Map();
-const CACHE_TTL = 2000; // ms
 const MAX_429_RETRIES = 3;
 
 const sleep = (ms) => new Promise((res) => setTimeout(res, ms));
 
-/** Сброс GET-кэша после мутаций (create/update/delete). */
-export function clearApiGetCache() {
-  responseCache.clear();
-  inFlightRequests.clear();
-}
-
-// Wrap GET to add dedupe/cache/retry behaviour
+// Wrap GET to add dedupe/retry behaviour
 const originalGet = apiClient.get.bind(apiClient);
 apiClient.get = async (url, config = {}) => {
   const { skipApiGetCache, ...axiosConfig } = config;
-  const skipCache = skipApiGetCache === true;
 
   const paramsKey = axiosConfig.params ? JSON.stringify(axiosConfig.params) : '';
   const key = `GET:${url}?${paramsKey}`;
-  const inFlightKey = skipCache ? `${key}#skip` : key;
+  // `skipApiGetCache: true` means "don't dedupe this with an in-flight
+  // request for the same URL" — callers use it to force a genuinely
+  // independent fresh request (e.g. re-fetching a session right after an
+  // async generation task completes, where coalescing with a stale in-flight
+  // request for the same URL would return outdated data).
+  const inFlightKey = skipApiGetCache === true ? `${key}#skip` : key;
 
-  if (!skipCache) {
-    // Return cached response if fresh
-    const cached = responseCache.get(key);
-    if (cached && Date.now() < cached.expiry) {
-      return Promise.resolve(cached.value);
-    }
-
-    // If identical request in flight, return the same promise
-    if (inFlightRequests.has(inFlightKey)) {
-      return inFlightRequests.get(inFlightKey);
-    }
-  } else {
-    responseCache.delete(key);
-    if (inFlightRequests.has(inFlightKey)) {
-      return inFlightRequests.get(inFlightKey);
-    }
+  if (inFlightRequests.has(inFlightKey)) {
+    return inFlightRequests.get(inFlightKey);
   }
 
   // Make request with retry on 429
@@ -71,10 +59,7 @@ apiClient.get = async (url, config = {}) => {
     let attempt = 0;
     for (;;) {
       try {
-        const resp = await originalGet(url, axiosConfig);
-        // cache shallowly (including after skipCache — replaces stale entry)
-        responseCache.set(key, { value: resp, expiry: Date.now() + CACHE_TTL });
-        return resp;
+        return await originalGet(url, axiosConfig);
       } catch (err) {
         const status = err?.response?.status;
         if (status === 429 && attempt < MAX_429_RETRIES) {
@@ -123,11 +108,6 @@ apiClient.interceptors.request.use(
 // Интерсептор для обработки ошибок и автоматического обновления токена
 apiClient.interceptors.response.use(
   (response) => {
-    const method = String(response.config?.method || 'get').toLowerCase();
-    if (method !== 'get') {
-      clearApiGetCache();
-    }
-
     if (IS_DEV) {
       console.log('📥 API Response:', {
         status: response.status,

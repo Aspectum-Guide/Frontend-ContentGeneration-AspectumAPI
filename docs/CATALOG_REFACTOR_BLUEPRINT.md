@@ -104,3 +104,32 @@ Replace monolithic `src/api/generation.js` usage in catalogs with domain wrapper
 - [x] Catalog docs updated (this checklist, 2026-07-24)
 
 Remaining catalog `alert()`/`window.confirm()` usage lives outside this blueprint's original scope (in the session-generation wizard: `SessionSidebar.jsx`, `CommonsImagePicker.jsx`, `GenerationList.jsx`, `Step1City.tsx`) — not covered here.
+
+## Caching: three mechanisms, one decision (2026-07-24)
+
+The app had three ways of caching/fetching data at once: an axios-level GET
+response cache in `src/api/client.js` (2s TTL), the manual
+`useCatalogResource`/`useCatalogPagedReload` hooks above (used by all 9
+catalog pages), and TanStack Query (used only by `SessionsList.jsx`). They
+didn't actually conflict — the axios cache was cleared on every mutation, so
+catalog pages never saw stale data — but it was a second, uncoordinated
+caching layer doing a job `useCatalogResource` already does correctly
+(reload right after `onAfterSave`/`onAfterDelete`).
+
+**Decision: removed the axios response cache, kept in-flight GET dedupe +
+429 retry** (both are still load-bearing — dedupe protects against React 18
+double-effects firing the same request twice, retry protects against rate
+limiting). Did **not** migrate the 9 catalog pages onto `useQuery`/
+`useMutation` — `useCatalogResource.load(params)` is called imperatively
+(page/filter changes drive it via `useCatalogPagedReload`), while `useQuery`
+is declarative (keyed, auto-refetch-on-key-change); reconciling that is a
+real architecture change touching every catalog page, not a safe cleanup,
+and was deliberately left alone.
+
+**Convention going forward:**
+- Catalog CRUD pages (load-on-mount-or-filter-change, reload-after-mutation)
+  → `useCatalogResource` + `useCatalogCrud` + `useCatalogPagedReload`.
+- Anything needing background refetch, polling, or cross-component cache
+  sharing → TanStack Query (`useQuery`/`useMutation`), as `SessionsList.jsx`
+  already does.
+- Don't add a third pattern without updating this section.
