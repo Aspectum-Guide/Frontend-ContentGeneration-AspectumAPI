@@ -39,12 +39,9 @@ import SessionWizard from './pages/generation/SessionWizard';
 import UploadFile from './pages/generation/UploadFile';
 import Home from './pages/Home';
 import ImportGoogleSheet from './pages/import/ImportGoogleSheet';
-import Login from './pages/Login';
 import MyTasks from './pages/tasks/MyTasks';
 import TokenAuth from './pages/TokenAuth';
 import { registerAuthNavigate } from './utils/authRedirect';
-
-const ENABLE_LOGIN = false;
 
 const routes = [
   {
@@ -55,9 +52,6 @@ const routes = [
     path: '/',
     element: <ErrorBoundary><Home /></ErrorBoundary>,
   },
-  ...(ENABLE_LOGIN
-    ? [{ path: '/login', element: <ErrorBoundary><Login /></ErrorBoundary> }]
-    : []),
   {
     path: '/generation',
     element: <ProtectedRoute><ErrorBoundary><SessionsList /></ErrorBoundary></ProtectedRoute>,
