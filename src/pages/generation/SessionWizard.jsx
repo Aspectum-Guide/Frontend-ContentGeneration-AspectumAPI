@@ -312,7 +312,6 @@ export default function SessionWizard({ components = {} } = {}) {
     setAttractionInfoGenerationLang,
     attractionInfoGenerationTargetId,
     setAttractionInfoGenerationTargetId,
-    openAttractionInfoGenerateModal,
     handleOpenAttractionInfoGenerateModal,
     closeAttractionInfoGenerateModal,
     setAttractionInfoGeneratePrompt,

@@ -39,7 +39,6 @@ export function countSlotOnlyPrices(slotPrices, typeId, hasBase) {
  * @returns {{ kind: 'saved'|'draft'|'rules'|'slots'|'empty', label: string }}
  */
 export function getPriceRowStatus({
-  typeId,
   row,
   savedBase,
   isDirty,

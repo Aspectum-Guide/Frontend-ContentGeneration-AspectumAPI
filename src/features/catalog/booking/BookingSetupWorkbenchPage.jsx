@@ -5,7 +5,6 @@ import {
   eventSlotPricingAPI,
   eventTicketTypePricesAPI,
   pricingRulesAPI,
-  ticketTypesForceAPI,
   ticketPricesAPI,
   ticketTypesAPI,
 } from '../../../api/booking';
@@ -530,10 +529,6 @@ export default function BookingSetupWorkbenchPage() {
   const [pricePreviewLoading, setPricePreviewLoading] = useState(false);
   const [pricePreviewError, setPricePreviewError] = useState('');
   const [priceDirtyTick, setPriceDirtyTick] = useState(0);
-
-  const [syncSlotsSaving, setSyncSlotsSaving] = useState(false);
-  const [syncSlotsError, setSyncSlotsError] = useState('');
-  const [syncSlotsOk, setSyncSlotsOk] = useState('');
 
   const [basePrices, setBasePrices] = useState([]);
   const [basePricesLoading, setBasePricesLoading] = useState(false);
@@ -1080,26 +1075,6 @@ export default function BookingSetupWorkbenchPage() {
     finally { setTtSaving(false); }
   };
 
-  const handleCloneTypeToEvent = async (tt) => {
-    if (!eventId || resolveTicketTypeEventId(tt)) return;
-    setTtError('');
-    try {
-      await ticketTypesAPI.create({
-        event: eventId,
-        code: tt.code || '',
-        name: tt.name || {},
-        description: tt.description || {},
-        sort_order: tt.sort_order ?? 0,
-        is_active: true,
-      });
-      setTtOk(`Тип «${getTicketTypeLabel(tt)}» привязан к событию`);
-      await loadTicketTypes(eventId);
-    } catch (err) {
-      setTtError(parseApiError(err, 'Не удалось привязать тип к событию'));
-      setShowTtForm(true);
-    }
-  };
-
   const handleDeleteTt = async (tt) => {
     if (!confirm(`Удалить тип «${getTicketTypeLabel(tt)}»?`)) return;
     try {
@@ -1185,200 +1160,6 @@ export default function BookingSetupWorkbenchPage() {
       await loadPricingData(eventId, eventTicketTypes, priceCurrency);
     } catch (err) { setSlotError(parseApiError(err, 'Ошибка создания слотов')); }
     finally { setSlotSaving(false); }
-  };
-
-  const handleSyncSlotTicketTypes = async () => {
-    if (!eventId || !eventTicketTypes.length) return;
-    setSyncSlotsError(''); setSyncSlotsOk('');
-    setSyncSlotsSaving(true);
-    try {
-      // Приводим ticket_types на слотах к глобальным типам по `code` (без event-owned копий).
-      const [typesR, slotsR, basePricesR] = await Promise.all([
-        ticketTypesAPI.list({ event: eventId, page_size: 1000, ordering: 'sort_order', is_active: 'true' }),
-        eventSlotAvailabilitiesAPI.list({ event: eventId, page_size: 1000 }),
-        eventTicketTypePricesAPI.list({ event: eventId, page_size: 1000, is_active: 'true' }),
-      ]);
-
-      const allTypes = normalizeListResponse(typesR?.data, ['results', 'data']);
-      const slots = normalizeListResponse(slotsR?.data, ['results', 'data']);
-      const baseRows = normalizeListResponse(basePricesR?.data, ['results', 'data']);
-
-      const globalByCode = new Map(); // code -> global ticket_type_id
-      const codeById = new Map(); // ticket_type_id -> code
-      for (const tt of allTypes || []) {
-        const tid = String(tt?.id || '');
-        const code = String(tt?.code || '').trim().toLowerCase();
-        if (!tid || !code) continue;
-        codeById.set(tid, code);
-        if (!resolveTicketTypeEventId(tt)) {
-          globalByCode.set(code, tid);
-        }
-      }
-
-      const globalIdsFallback = eventTicketTypes.map((tt) => String(tt.id));
-      const mapIdToGlobal = (id) => {
-        const code = codeById.get(String(id));
-        if (!code) return null;
-        return globalByCode.get(code) || null;
-      };
-
-      // 1) Мигрируем base_price на глобальные типы (по code) при необходимости.
-      const baseByTicketType = new Map();
-      for (const row of baseRows || []) {
-        const tid = String(row?.ticket_type || '');
-        if (!tid) continue;
-        baseByTicketType.set(tid, row);
-      }
-
-      let migratedBase = 0;
-      for (const row of baseRows || []) {
-        const oldTid = String(row?.ticket_type || '');
-        if (!oldTid) continue;
-        const newTid = mapIdToGlobal(oldTid);
-        if (!newTid || newTid === oldTid) continue;
-
-        if (baseByTicketType.has(newTid)) {
-          // Обновим существующую запись
-          await eventTicketTypePricesAPI.update(baseByTicketType.get(newTid).id, {
-            base_price: row.base_price,
-            currency: row.currency || 'EUR',
-            is_active: true,
-          });
-        } else {
-          await eventTicketTypePricesAPI.create({
-            event: eventId,
-            ticket_type: newTid,
-            base_price: row.base_price,
-            currency: row.currency || 'EUR',
-            is_active: true,
-          });
-          baseByTicketType.set(newTid, { id: null });
-        }
-        migratedBase += 1;
-      }
-
-      // 2) Обновляем M2M на слотах: заменяем ticket_types на глобальные по code.
-      let updatedSlots = 0;
-      const typeIdsBySlot = slots.map((slot) => {
-        const current = Array.isArray(slot.ticket_types) ? slot.ticket_types : [];
-        if (!current.length) return globalIdsFallback;
-        const desired = current.map((id) => mapIdToGlobal(id)).filter(Boolean);
-        if (!desired.length) return globalIdsFallback;
-        return Array.from(new Set(desired.map((x) => String(x))));
-      });
-
-      // Обновляем только отличающиеся слоты.
-      for (let i = 0; i < slots.length; i += 1) {
-        const slot = slots[i];
-        const desired = typeIdsBySlot[i] || [];
-        const current = Array.isArray(slot.ticket_types) ? slot.ticket_types.map((x) => String(x)) : [];
-        const eq =
-          desired.length === current.length &&
-          desired.every((id) => current.includes(String(id)));
-        if (!eq) {
-          await eventSlotAvailabilitiesAPI.update(slot.id, { ticket_types: desired });
-          updatedSlots += 1;
-        }
-      }
-
-      // 3) Перенос PricingRule и TicketPrice на глобальные типы по `code`
-      let migratedRules = 0;
-      let migratedTicketPrices = 0;
-      let mergedTicketPrices = 0;
-      try {
-        const [rulesR2, ticketPricesR2] = await Promise.all([
-          pricingRulesAPI.list({ event: eventId, page_size: 1000 }),
-          ticketPricesAPI.list({ event: eventId, page_size: 1000 }),
-        ]);
-
-        const rules = normalizeListResponse(rulesR2?.data, ['results', 'data']);
-        const ticketPrices = normalizeListResponse(ticketPricesR2?.data, ['results', 'data']);
-
-        for (const rule of rules || []) {
-          const oldTid = String(rule?.ticket_type || '');
-          const newTid = mapIdToGlobal(oldTid);
-          if (!newTid || newTid === oldTid) continue;
-          await pricingRulesAPI.update(rule.id, { ticket_type: newTid });
-          migratedRules += 1;
-        }
-
-        const tpKey = (slotId, typeId) => `${String(slotId)}|${String(typeId)}`;
-        const existingByKey = new Map();
-        for (const row of ticketPrices || []) {
-          const slotId = row?.slot;
-          const typeId = row?.ticket_type;
-          if (!slotId || !typeId) continue;
-          existingByKey.set(tpKey(slotId, typeId), row);
-        }
-
-        for (const row of ticketPrices || []) {
-          const oldTid = String(row?.ticket_type || '');
-          const newTid = mapIdToGlobal(oldTid);
-          if (!newTid || newTid === oldTid) continue;
-
-          const slotId = row?.slot;
-          if (!slotId) continue;
-
-          const oldKey = tpKey(slotId, oldTid);
-          const newKey = tpKey(slotId, newTid);
-
-          const existing = existingByKey.get(newKey);
-          if (existing?.id) {
-            // Если конфликт уже есть — обновим existing значением старого и удалим старое.
-            await ticketPricesAPI.update(existing.id, {
-              price: row.price,
-              currency: row.currency || 'EUR',
-              is_active: row.is_active !== false,
-            });
-            await ticketPricesAPI.delete(row.id);
-            mergedTicketPrices += 1;
-            existingByKey.delete(oldKey);
-            continue;
-          }
-
-          await ticketPricesAPI.update(row.id, { ticket_type: newTid, is_active: row.is_active !== false });
-          migratedTicketPrices += 1;
-
-          const oldObj = existingByKey.get(oldKey);
-          existingByKey.delete(oldKey);
-          if (oldObj) {
-            existingByKey.set(newKey, { ...oldObj, ticket_type: newTid });
-          }
-        }
-      } catch (e) {
-        // Переносы pricing могут быть неактуальны, если у события нет PricingRule/TicketPrice.
-        // Не валим основной sync, но сообщаем пользователю ошибку в OK/ERR.
-        console.warn('[booking-setup] pricing migration skipped/failed', e);
-      }
-
-      setSyncSlotsOk(
-        `Типы приведены к глобальным: слоты обновлены=${updatedSlots}, база перенесена=${migratedBase}, rules перенесены=${migratedRules}, ticket-prices обновлены=${migratedTicketPrices}, объединены=${mergedTicketPrices}.`,
-      );
-
-      // 3.1) Радикальная очистка: удалить все TicketType с event=<event>.
-      // Бэкенд сам:
-      // - перелинкует BookingReservation.ticket_type на глобальные по code (или ставит null)
-      // - перелинкует slot.ticket_types на глобальные по code (или очищает)
-      // - удалит event-owned TicketType.
-      const purgeRes = await ticketTypesForceAPI.purgeEventTicketTypes(eventId);
-      const purgeData = purgeRes?.data || {};
-      if (purgeData?.success) {
-        setSyncSlotsOk((prev) => {
-          const deleted = purgeData.deleted ?? 0;
-          const reboundReservations = purgeData.rebound_reservations ?? purgeData.reboundReservations ?? 0;
-          const updatedSlots2 = purgeData.updated_slots ?? purgeData.updatedSlots ?? 0;
-          return `${prev} Force-purge: deleted=${deleted}, rebound_reservations=${reboundReservations}, updated_slots=${updatedSlots2}.`;
-        });
-      }
-
-      await loadSlots(eventId);
-      await loadPricingData(eventId, eventTicketTypes, priceCurrency);
-      await loadPricePreview(eventId, null, eventTicketTypes, { refetchSlots: true });
-    } catch (err) {
-      setSyncSlotsError(parseApiError(err, 'Ошибка синхронизации типов'));
-    } finally {
-      setSyncSlotsSaving(false);
-    }
   };
 
   const handleSaveAllPrices = async (e) => {
@@ -1693,7 +1474,6 @@ export default function BookingSetupWorkbenchPage() {
                           const savedBase = basePriceByType[id];
                           const isDirty = dirtyPriceIds.has(id);
                           const status = getPriceRowStatus({
-                            typeId: id,
                             row,
                             savedBase,
                             isDirty,
@@ -1823,13 +1603,6 @@ export default function BookingSetupWorkbenchPage() {
               ) : (
                 <p className="text-sm text-gray-400">Слотов нет — добавьте первый</p>
               )}
-              {(syncSlotsError || syncSlotsOk) && (
-                <div className="mt-2 flex gap-2">
-                  <Err msg={syncSlotsError} />
-                  <Ok msg={syncSlotsOk} />
-                </div>
-              )}
-
               {showSlotForm && (
                 <form onSubmit={handleCreateSlots} className="mt-4 pt-4 border-t border-gray-100 space-y-3">
                   <div className="flex flex-wrap gap-2">

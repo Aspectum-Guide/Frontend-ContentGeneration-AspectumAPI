@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { TextInput } from '../../../components/ui/FormField';
 import { getTicketTypeLabel } from '../shared/labels';
-import { formatSlotLabel, getPriceRowStatus, priceStatusClass } from './bookingSetupPricingHelpers';
+import { formatSlotLabel, priceStatusClass } from './bookingSetupPricingHelpers';
 
 function Spinner() {
   return <span className="inline-block w-4 h-4 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />;
@@ -142,7 +142,6 @@ export function SlotPriceOverrideMatrix({
                         return (
                           <SlotPriceCell
                             key={`${key}-${existing?.id || 'new'}-${existing?.price || ''}`}
-                            cellKey={key}
                             existing={existing}
                             fallback={base ? String(base.base_price) : ''}
                             currency={existing?.currency || base?.currency || defaultCurrency}
@@ -169,7 +168,7 @@ export function SlotPriceOverrideMatrix({
   );
 }
 
-function SlotPriceCell({ cellKey, existing, fallback, currency, saving, onSave }) {
+function SlotPriceCell({ existing, fallback, currency, saving, onSave }) {
   const [value, setValue] = useState(existing ? String(existing.price) : '');
   const [dirty, setDirty] = useState(false);
 
