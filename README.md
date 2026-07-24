@@ -1,194 +1,117 @@
-# Aspectum Admin - Content Generation Frontend
+# Aspectum Admin — Content Generation
 
-Веб-приложение для управления генерацией контента городов и достопримечательностей.
+Админ-панель для AspectumAPI: генерация контента городов/достопримечательностей через AI-визард, справочники (каталог) и настройки AI-провайдеров.
 
-## Технологии
+## Стек
 
-- **Vite** - быстрый dev server и сборщик
-- **React 18** - UI библиотека
-- **React Router** - роутинг
-- **React Hook Form** - управление формами
-- **Zod** - валидация
-- **Axios** - HTTP клиент
-- **Tailwind CSS** - стилизация
-- **Zustand** - state management (опционально)
+- **Vite 5** + **React 18** + **React Router 6**
+- **Tailwind CSS** — стилизация
+- **Axios** — HTTP-клиент (`src/api/client.js`, JWT в заголовке, дедуп GET-запросов + retry на 429)
+- **React Hook Form** + **Zod** — формы и валидация (используются частично, не во всех страницах — см. `docs/CATALOG_REFACTOR_BLUEPRINT.md`)
+- **TanStack Query** — используется точечно (`SessionsList.jsx`); большинство страниц каталога используют собственные хуки `useCatalog*` (`src/features/catalog/core/`)
+- **TypeScript** — частично, только в отдельных файлах (`.ts`/`.tsx`), остальное — `.jsx`/`.js`
+- **Vitest** — тесты
+- **Sentry** (`@sentry/react`) — опциональный crash reporting, no-op пока не задан `VITE_SENTRY_DSN`
 
-## Установка
+## Быстрый старт
 
 ```bash
-# Установить зависимости
 npm install
-
-# Запустить dev server
-npm run dev
-
-# Собрать для production
-npm run build
-
-# Предпросмотр production сборки
-npm run preview
+cp .env.example .env   # заполнить VITE_API_URL под свой backend
+npm run dev             # http://localhost:17000, проксирует /api на бэкенд из VITE_API_PROXY_TARGET
 ```
+
+Другие команды:
+
+```bash
+npm run build     # прод-сборка в dist/ (sourcemap: 'hidden' — на диске, но бандл на них не ссылается)
+npm run preview   # предпросмотр прод-сборки локально
+npm run lint       # eslint . --ext js,jsx,ts,tsx
+npm test           # vitest run
+npm run test:watch
+```
+
+### Переменные окружения (`.env`)
+
+| Переменная | Обязательна | Назначение |
+|---|---|---|
+| `VITE_API_URL` | да | Базовый URL backend API (используется в собранном билде) |
+| `VITE_API_PROXY_TARGET` | нет (только dev) | Куда проксирует Vite dev-сервер `/api/*`; по умолчанию `http://localhost:8443` |
+| `VITE_SENTRY_DSN` | нет | DSN проекта Sentry; если не задан — crash reporting не инициализируется |
+
+`.env` в `.gitignore` — не коммитить реальные значения, ориентир — `.env.example`.
 
 ## Структура проекта
 
 ```
-frontend/
-├── src/
-│   ├── api/              # API клиенты
-│   │   ├── client.js     # Axios instance с interceptors
-│   │   └── generation.js # API для генерации контента
-│   ├── components/       # React компоненты
-│   │   ├── ui/          # Базовые UI компоненты
-│   │   ├── forms/       # Компоненты форм
-│   │   ├── wizard/      # Компоненты wizard
-│   │   └── Layout.jsx   # Основной layout
-│   ├── pages/           # Страницы приложения
-│   │   ├── generation/  # Страницы генерации
-│   │   │   ├── SessionsList.jsx
-│   │   │   ├── NewSession.jsx
-│   │   │   ├── SessionWizard.jsx
-│   │   │   └── steps/   # Шаги wizard
-│   │   └── Home.jsx
-│   ├── utils/           # Утилиты
-│   │   ├── constants.js
-│   │   └── validation.js
-│   ├── hooks/           # Custom hooks (опционально)
-│   ├── stores/          # Zustand stores (опционально)
-│   ├── App.jsx          # Главный компонент
-│   └── main.jsx         # Точка входа
-├── public/              # Статические файлы
-├── index.html
-├── package.json
-├── vite.config.js
-└── tailwind.config.js
+src/
+├── api/
+│   ├── client.js         # axios-инстанс: JWT-заголовок, refresh на 401/302, GET-дедуп, retry на 429
+│   ├── auth.ts           # логин/токены
+│   └── generation.js     # монолитный API-клиент генерации контента (используется по всему pages/generation)
+├── features/
+│   └── catalog/          # справочники — по одному поддиректорию на сущность
+│       ├── core/         # useCatalogResource / useCatalogCrud / useCatalogFilters / useCatalogPagedReload
+│       ├── shared/       # общие адаптеры, i18n-хелперы, лейблы
+│       ├── cities/ events/ tags/ photos/ booking/ subscriptions/ audioguides/ il/ llm/
+│       │   ├── api.js               # доменная обёртка над api/generation.js
+│       │   ├── *CatalogPage.jsx     # страница списка
+│       │   └── *EditorModal.jsx     # модалка создания/редактирования
+├── pages/
+│   ├── catalog/          # тонкие ре-экспорты (`export default from features/catalog/...`), исторический путь роутов
+│   ├── generation/        # сессии генерации контента + визард (session-wizard/, steps/)
+│   ├── ai/                # настройки AI-провайдеров, промпты, TTS, плейграунд, генерация картинок
+│   ├── export/            # экспорт городов/событий в ZIP
+│   ├── import/             # импорт из Google Sheets
+│   ├── tasks/              # мои фоновые задачи
+│   ├── TokenAuth.jsx        # единственный реальный способ логина (см. "Аутентификация")
+│   └── Home.jsx
+├── components/
+│   ├── ui/                # Modal/ConfirmModal, FormField, DataTable, Toast — общий дизайн-кит
+│   ├── generation/         # CommonsImagePicker и др., специфичные для визарда
+│   ├── ErrorBoundary.jsx
+│   ├── ProtectedRoute.jsx  # staff-гейт через /auth/me
+│   └── Layout.jsx
+└── utils/
+    ├── TokenManager.js     # хранение/рефреш JWT (localStorage, ключ `jwt_tokens`)
+    └── errorReporting.js   # обёртка над Sentry (no-op без VITE_SENTRY_DSN)
 ```
 
-## API Интеграция
+## Аутентификация
 
-Приложение использует прокси для API запросов (настроено в `vite.config.js`):
+- JWT (access + refresh) хранятся в `localStorage` под ключом `jwt_tokens` (`TokenManager.js`) — известный компромисс SPA без httpOnly-cookie, подробности и митигации в `docs/SECURITY.md`.
+- Реальная точка входа — `/token-auth` (`TokenAuth.jsx`). Страница `/login` существовала, но была отключена (`ENABLE_LOGIN=false`) и удалена как мёртвый код.
+- `ProtectedRoute.jsx` проверяет `is_staff` через `/auth/me` с кэшем на уровне модуля; `api/client.js` сам обновляет access-токен на 401/302 и один раз повторяет запрос.
+- `useTokenValidation` в `Layout.jsx` периодически (раз в 5 минут) перепроверяет валидность токена.
 
-```javascript
-// Все запросы к /api/* проксируются на http://localhost:8000
-```
+## Каталог (справочники)
 
-### Аутентификация
+Все страницы `/catalog/*` построены по одному паттерну (`docs/CATALOG_REFACTOR_BLUEPRINT.md` — полное описание архитектуры и её история):
 
-JWT токен хранится в `localStorage` и автоматически добавляется в заголовки запросов через axios interceptor.
+- `useCatalogResource` — загрузка списка + пагинация.
+- `useCatalogCrud` — состояние create/edit/delete модалок.
+- `useCatalogPagedReload` — синхронизация перезагрузки при смене страницы/фильтров.
+- Ошибки/подтверждения — только через `ConfirmModal`/`Toast`, без `alert()`/`window.confirm()`.
 
-## Основные функции
+Добавляя новую сущность в каталог — копируйте структуру уже мигрированной (`features/catalog/cities/` как образец), не пишите с нуля.
 
-### ✅ Реализовано
+## Backend
 
-- Список сессий генерации
-- Создание новой сессии
-- Wizard с шагами
-- Шаг 1: Данные города (базовая версия)
-- Мультиязычные формы
-- API интеграция
+Приложение — фронтенд к `AspectumAPI` (Django). Через `docker-compose.dev.yml` бэкенд не поднимается — предполагается, что он уже запущен отдельно (см. репозиторий `AspectumAPI`), а этот проект только проксирует `/api` на него.
 
-### 🚧 В разработке
-
-- Шаг 2: Достопримечательности
-- Шаг 3: Контент и аудиогиды
-- Шаг 4: Сохранение в основную систему
-- Drag & Drop для достопримечательностей
-- Загрузка медиафайлов
-- Интеграция с ИИ (генерация контента)
-- Редактор контента
-
-## Разработка
-
-### Запуск dev server
+## Docker / прод
 
 ```bash
-npm run dev
+docker build -t aspectum-admin .
 ```
 
-Приложение будет доступно на `http://localhost:3000`
+Собирает статику и раздаёт её через nginx (`nginx.conf` в корне репозитория): security-заголовки (CSP, X-Frame-Options и т.д.), SPA `try_files`-фоллбэк, запрет прямого доступа к `*.map`. Для локальной разработки в контейнере — `Dockerfile.dev` + `docker-compose.dev.yml`.
 
-### Настройка API
+## Тесты
 
-Убедитесь, что Django backend запущен на `http://localhost:8000` или измените прокси в `vite.config.js`.
+`npm test` — Vitest. На момент написания покрыты `TokenManager` (JWT-валидация, single-flight refresh, cooldown — 26 тестов) и часть `useCatalog*` хуков; остальной код тестами не покрыт — это известный технический долг, а не то, что стоит принимать за полноту.
 
-### Добавление новых компонентов
+## Связанная документация
 
-1. Создайте компонент в соответствующей директории
-2. Импортируйте и используйте в страницах
-3. Добавьте стили через Tailwind CSS
-
-### Работа с формами
-
-Используйте `react-hook-form` с `zod` для валидации:
-
-```jsx
-import { useForm } from 'react-hook-form';
-import { zodResolver } from '@hookform/resolvers/zod';
-
-const schema = z.object({
-  name: z.string().min(1, 'Обязательное поле'),
-});
-
-function MyForm() {
-  const { register, handleSubmit, formState: { errors } } = useForm({
-    resolver: zodResolver(schema),
-  });
-
-  return (
-    <form onSubmit={handleSubmit(onSubmit)}>
-      <input {...register('name')} />
-      {errors.name && <span>{errors.name.message}</span>}
-    </form>
-  );
-}
-```
-
-## Сборка для production
-
-```bash
-npm run build
-```
-
-Собранные файлы будут в директории `dist/`. Их можно развернуть на любом статическом хостинге или через nginx.
-
-## Интеграция с Django
-
-### CORS настройки
-
-Убедитесь, что в Django `settings.py` настроен CORS:
-
-```python
-CORS_ALLOWED_ORIGINS = [
-    'http://localhost:3000',
-]
-```
-
-### JWT токены
-
-Токен должен быть сохранен в `localStorage` после авторизации:
-
-```javascript
-localStorage.setItem('access_token', token);
-```
-
-## Дополнительные библиотеки (опционально)
-
-Для расширенной функциональности можно добавить:
-
-- `@dnd-kit/core` - drag & drop
-- `@tiptap/react` - rich text editor
-- `react-query` - кеширование API запросов
-- `react-dropzone` - загрузка файлов
-
-## Troubleshooting
-
-### Ошибка CORS
-
-Убедитесь, что Django backend разрешает запросы с `http://localhost:3000`.
-
-### Токен не работает
-
-Проверьте, что токен сохранен в `localStorage` и формат правильный (Bearer token).
-
-### API не отвечает
-
-Проверьте, что Django сервер запущен и доступен на порту 8000.
+- `docs/SECURITY.md` — модель угроз фронтенда, что уже смитигировано и что нет.
+- `docs/CATALOG_REFACTOR_BLUEPRINT.md` — архитектура каталога, статус миграции по сущностям, конвенция по кэшированию данных (когда использовать `useCatalogResource`, когда — TanStack Query).
