@@ -71,11 +71,14 @@ export default function LLMKeysCatalogPage() {
         render: (value) => <span className="text-sm text-gray-700">{value || '—'}</span>,
       },
       {
-        key: 'api_key',
+        key: 'has_api_key',
         label: 'API Key',
-        render: (value) => (
-          <span className="text-xs font-mono text-gray-800 break-all">{value || '—'}</span>
-        ),
+        render: (hasKey) =>
+          hasKey ? (
+            <span className="text-xs text-green-700">✅ сохранён</span>
+          ) : (
+            <span className="text-xs text-amber-600">⚠️ не задан</span>
+          ),
       },
       {
         key: 'base_url',
@@ -159,7 +162,7 @@ export default function LLMKeysCatalogPage() {
     <Layout>
       <CatalogPageHeader
         title="Ключи LLM API"
-        description="Список provider keys. `api_key` показывается (только admin)."
+        description="Список provider keys. Сами значения ключей не отображаются — только статус наличия."
         createLabel="Создать ключ"
         onCreate={() => {
           setSaveError(null);
@@ -225,11 +228,18 @@ export default function LLMKeysCatalogPage() {
 
             <Field label="API key (для создания/обновления)">
               <TextInput
-                value={editingItem.api_key}
+                type="password"
+                autoComplete="new-password"
+                value={editingItem.api_key || ''}
                 onChange={(e) => setEditingItem((prev) => ({ ...prev, api_key: e.target.value }))}
                 maxLength={512}
-                placeholder={editingItem.id ? 'Можно оставить как есть' : 'Введите новый key'}
+                placeholder={editingItem.id ? 'Оставьте пустым, чтобы не менять' : 'Введите новый key'}
               />
+              {editingItem.id && (
+                <p className="text-xs text-gray-500 mt-1">
+                  {editingItem.has_api_key ? '✅ Ключ уже сохранён' : '⚠️ Ключ не задан'}
+                </p>
+              )}
             </Field>
 
             <ActiveCheckboxField
