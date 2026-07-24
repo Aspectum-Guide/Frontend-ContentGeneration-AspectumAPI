@@ -12,6 +12,11 @@ dist
 dist-ssr
 *.local
 
+# Env files: локальная/окружение-специфичная конфигурация, не должна лежать в git
+.env
+.env.*
+!.env.example
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
