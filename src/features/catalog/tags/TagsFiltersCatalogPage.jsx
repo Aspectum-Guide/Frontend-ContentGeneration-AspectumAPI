@@ -5,7 +5,7 @@ import Modal from '../../../components/ui/Modal';
 import { ConfirmModal } from '../../../components/ui/Modal';
 import { Field, TextInput, FormActions } from '../../../components/ui/FormField';
 import Toast, { useToast } from '../../../components/ui/Toast.jsx';
-import { appLanguagesAPI, cityFiltersAPI, eventFiltersAPI } from '../../../api/generation';
+import { appLanguagesAPI, cityFiltersAPI, eventFiltersAPI } from './api';
 import { isNotFoundError, parseApiError } from '../../../utils/apiError';
 import MultiLangInput from '../../../components/forms/MultiLangInput';
 import { getMultiLangValue } from '../shared/i18n';

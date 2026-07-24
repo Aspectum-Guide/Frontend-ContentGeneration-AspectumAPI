@@ -1,6 +1,6 @@
 import 'leaflet/dist/leaflet.css';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { ilCatalogAPI, imagesAPI } from '../../../api/generation';
+import { ilCatalogAPI, imagesAPI } from './api';
 import Layout from '../../../components/Layout';
 import DataTable from '../../../components/ui/DataTable';
 import { Field, TextInput } from '../../../components/ui/FormField';

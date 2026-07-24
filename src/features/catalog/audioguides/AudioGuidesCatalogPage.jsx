@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { eventAudioGuidesAPI, audioAPI, eventsAPI } from '../../../api/generation';
+import { eventAudioGuidesAPI, audioAPI, eventsAPI } from './api';
 import Layout from '../../../components/Layout';
 import Modal, { ConfirmModal } from '../../../components/ui/Modal';
 import { parseApiError } from '../../../utils/apiError';

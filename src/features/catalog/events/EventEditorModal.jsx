@@ -2,7 +2,7 @@ import 'leaflet/dist/leaflet.css';
 import { useEffect, useRef, useState } from 'react';
 import CommonsImagePicker from '../../../components/generation/CommonsImagePicker';
 import { Field, FormActions, TextInput } from '../../../components/ui/FormField';
-import Modal from '../../../components/ui/Modal';
+import Modal, { ConfirmModal } from '../../../components/ui/Modal';
 import { createCoordinatePasteHandler } from '../../../utils/coordinates';
 import { buildLangOptions, getMultiLangValue } from '../shared/i18n';
 import { LangBlock, LangTabs } from '../shared/LangFields';
@@ -29,6 +29,7 @@ export default function EventEditorModal({
 }) {
   const [activeTab, setActiveTab] = useState('content');
   const [commonsModalOpen, setCommonsModalOpen] = useState(false);
+  const [showDiscardConfirm, setShowDiscardConfirm] = useState(false);
 
   const mapElRef = useRef(null);
   const mapRef = useRef(null);
@@ -48,8 +49,14 @@ export default function EventEditorModal({
 
   const handleClose = () => {
     if (snapshotRef.current && JSON.stringify(event) !== snapshotRef.current) {
-      if (!window.confirm('Есть несохранённые изменения. Закрыть без сохранения?')) return;
+      setShowDiscardConfirm(true);
+      return;
     }
+    onClose();
+  };
+
+  const handleConfirmDiscard = () => {
+    setShowDiscardConfirm(false);
     onClose();
   };
 
@@ -400,6 +407,16 @@ export default function EventEditorModal({
         }}
         getSessionUuid={() => ''}
         defaultQuery={getMultiLangValue(event?.title || '')}
+      />
+
+      <ConfirmModal
+        open={showDiscardConfirm}
+        onClose={() => setShowDiscardConfirm(false)}
+        onConfirm={handleConfirmDiscard}
+        title="Закрыть без сохранения?"
+        message="Есть несохранённые изменения. Закрыть без сохранения?"
+        confirmLabel="Закрыть"
+        danger
       />
     </>
   );

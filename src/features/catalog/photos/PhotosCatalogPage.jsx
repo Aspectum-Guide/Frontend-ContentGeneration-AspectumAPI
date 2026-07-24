@@ -1,7 +1,8 @@
 import { useState, useEffect, useCallback } from 'react';
 import Layout from '../../../components/Layout';
 import apiClient from '../../../api/client';
-import { imagesAPI } from '../../../api/generation';
+import { imagesAPI } from './api';
+import { ConfirmModal } from '../../../components/ui/Modal';
 
 export default function PhotosCatalog() {
   const [images, setImages] = useState([]);
@@ -12,6 +13,9 @@ export default function PhotosCatalog() {
   const [actionError, setActionError] = useState(null);
   const [page, setPage] = useState(1);
   const [totalCount, setTotalCount] = useState(0);
+  const [deleteTarget, setDeleteTarget] = useState(null);
+  const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState(null);
 
   const PAGE_SIZE = 24;
 
@@ -60,14 +64,18 @@ export default function PhotosCatalog() {
     }
   };
 
-  const handleDelete = async (img) => {
-    if (!window.confirm('Удалить изображение?')) return;
-    setActionError(null);
+  const handleConfirmDelete = async () => {
+    if (!deleteTarget?.id) return;
     try {
-      await imagesAPI.delete(img.id);
+      setDeleteError(null);
+      setDeleting(true);
+      await imagesAPI.delete(deleteTarget.id);
+      setDeleteTarget(null);
       await loadImages(page);
     } catch (err) {
-      setActionError(err?.response?.data?.error || 'Ошибка удаления');
+      setDeleteError(err?.response?.data?.error || 'Ошибка удаления');
+    } finally {
+      setDeleting(false);
     }
   };
 
@@ -140,7 +148,7 @@ export default function PhotosCatalog() {
                     ✏️
                   </button>
                   <button
-                    onClick={() => handleDelete(img)}
+                    onClick={() => setDeleteTarget(img)}
                     className="p-1.5 bg-white rounded-md shadow text-xs text-red-600 hover:bg-red-50"
                     title="Удалить"
                   >
@@ -204,6 +212,20 @@ export default function PhotosCatalog() {
           </div>
         </div>
       )}
+
+      <ConfirmModal
+        open={!!deleteTarget}
+        onClose={() => {
+          setDeleteTarget(null);
+          setDeleteError(null);
+        }}
+        onConfirm={handleConfirmDelete}
+        title="Удалить изображение?"
+        message={deleteError || 'Изображение будет удалено без возможности восстановления.'}
+        confirmLabel="Удалить"
+        danger
+        loading={deleting}
+      />
     </Layout>
   );
 }

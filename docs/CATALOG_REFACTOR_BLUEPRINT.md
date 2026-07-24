@@ -91,10 +91,16 @@ Replace monolithic `src/api/generation.js` usage in catalogs with domain wrapper
 - Large page files reduced significantly (target: each page < 300-350 LOC, editor modals separate).
 
 ## Migration Checklist
-- [ ] Cities migrated
-- [ ] Events migrated
-- [ ] Tags migrated
-- [ ] Ticket types migrated
-- [ ] Photos migrated
-- [ ] Duplicate helpers removed
-- [ ] Catalog docs updated
+- [x] Cities migrated (`features/catalog/cities/`)
+- [x] Events migrated (`features/catalog/events/`)
+- [x] Tags migrated (`features/catalog/tags/`)
+- [x] Ticket types / prices / booking migrated (`features/catalog/booking/`)
+- [x] Photos migrated (`features/catalog/photos/`)
+- [x] Audioguides, interactive locations, subscriptions, LLM keys also migrated (`features/catalog/{audioguides,il,subscriptions,llm}/`) — beyond original scope, same pattern
+- [x] `pages/catalog/*.jsx` are now thin re-export wrappers only (2-15 LOC each) pointing at `features/catalog/*`
+- [x] Catalog pages no longer import `src/api/generation.js` directly — added `api.js` wrappers for `tags`, `audioguides`, `photos`, `il` (matching the existing `cities/api.js`/`events/api.js` pattern); only the domain `api.js` files and the shared `bookingOptions.js` helper still import from `generation.js`, which is the intended one level of indirection
+- [x] `alert`/`window.confirm` removed from catalog pages — last two holdouts (`EventEditorModal.jsx`'s unsaved-changes-on-close prompt, `PhotosCatalogPage.jsx`'s delete confirmation) now use the shared `ConfirmModal`
+- [ ] Duplicate helpers removed (still open — no further audit done on cross-catalog code duplication beyond the above)
+- [x] Catalog docs updated (this checklist, 2026-07-24)
+
+Remaining catalog `alert()`/`window.confirm()` usage lives outside this blueprint's original scope (in the session-generation wizard: `SessionSidebar.jsx`, `CommonsImagePicker.jsx`, `GenerationList.jsx`, `Step1City.tsx`) — not covered here.
