@@ -1,14 +1,64 @@
 import { useState, useEffect, useCallback } from 'react';
+import { Link } from 'react-router-dom';
 import Layout from '../../../components/Layout';
 import apiClient from '../../../api/client';
 import { imagesAPI } from './api';
 import { ConfirmModal } from '../../../components/ui/Modal';
+
+const USAGE_KIND_LABELS = {
+  city: 'Город',
+  event: 'Событие',
+  event_feed: 'Лента события',
+  city_filter: 'Фильтр города',
+  event_filter: 'Фильтр события',
+  il: 'IL',
+  il_photo: 'IL фото',
+  session_city: 'Сессия · город',
+  session_attraction: 'Сессия · достопримечательность',
+};
+
+const ROLE_LABELS = {
+  title_pic: 'обложка',
+  pic: 'иконка',
+  'event_media.title': 'обложка',
+  'event_media.image': 'галерея',
+  image: 'изображение',
+  icon: 'иконка',
+};
+
+function usageKindLabel(kind) {
+  return USAGE_KIND_LABELS[kind] || kind || '—';
+}
+
+function usageRoleLabel(role) {
+  if (!role) return '';
+  if (ROLE_LABELS[role]) return ROLE_LABELS[role];
+  if (String(role).startsWith('feed[')) return `лента ${role}`;
+  return role;
+}
+
+function CopyableMono({ value, empty = '—' }) {
+  if (!value) {
+    return <span className="text-sm text-gray-400">{empty}</span>;
+  }
+  return (
+    <button
+      type="button"
+      title="Скопировать"
+      onClick={() => navigator.clipboard?.writeText(String(value))}
+      className="block w-full text-left font-mono text-xs text-gray-800 bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 break-all hover:bg-gray-100"
+    >
+      {value}
+    </button>
+  );
+}
 
 export default function PhotosCatalog() {
   const [images, setImages] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [editingImage, setEditingImage] = useState(null);
+  const [detailLoading, setDetailLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [actionError, setActionError] = useState(null);
   const [page, setPage] = useState(1);
@@ -23,7 +73,6 @@ export default function PhotosCatalog() {
     try {
       setLoading(true);
       setError(null);
-      // Use media/images API endpoint
       const response = await apiClient.get('/media/images/', {
         params: { page: pageNum, page_size: PAGE_SIZE },
       });
@@ -37,7 +86,6 @@ export default function PhotosCatalog() {
       })));
       setTotalCount(data?.count || list.length);
     } catch (err) {
-      // Fallback: endpoint might not support listing; show friendly message
       setError('Список изображений: ' + (err?.response?.data?.error || err.message || 'недоступен'));
       setImages([]);
     } finally {
@@ -49,12 +97,55 @@ export default function PhotosCatalog() {
     loadImages(page);
   }, [page, loadImages]);
 
+  const openEdit = async (img) => {
+    setActionError(null);
+    setEditingImage({
+      id: img.id,
+      image_url: img.image_url || img.url || null,
+      copyright: img.copyright || '',
+      path: img.path || '',
+      filename: img.filename || '',
+      source_url: img.source_url || '',
+      original_image_url: img.original_image_url || '',
+      file_page_url: img.file_page_url || '',
+      usages: [],
+    });
+    setDetailLoading(true);
+    try {
+      const { data } = await imagesAPI.get(img.id);
+      const detail = data?.image || data || {};
+      setEditingImage((prev) => ({
+        ...prev,
+        ...detail,
+        id: detail.id || img.id,
+        image_url: detail.url || detail.image_url || prev?.image_url || null,
+        copyright: detail.copyright ?? prev?.copyright ?? '',
+        path: detail.path || prev?.path || '',
+        filename: detail.filename || prev?.filename || '',
+        source_url: detail.source_url || '',
+        original_image_url: detail.original_image_url || '',
+        file_page_url: detail.file_page_url || '',
+        usages: Array.isArray(detail.usages) ? detail.usages : [],
+      }));
+    } catch (err) {
+      setActionError(err?.response?.data?.error || 'Не удалось загрузить детали изображения');
+    } finally {
+      setDetailLoading(false);
+    }
+  };
+
   const handleSave = async (e) => {
     e.preventDefault();
     if (!editingImage?.id) return;
     try {
       setSaving(true);
-      await imagesAPI.update(editingImage.id, { copyright: editingImage.copyright });
+      setActionError(null);
+      await imagesAPI.update(editingImage.id, {
+        copyright: editingImage.copyright,
+        source_url: editingImage.source_url,
+        file_page_url: editingImage.file_page_url,
+        original_image_url: editingImage.original_image_url,
+      });
       setEditingImage(null);
       await loadImages(page);
     } catch (err) {
@@ -136,12 +227,12 @@ export default function PhotosCatalog() {
                   </div>
                 )}
                 <div className="p-2">
-                  <p className="text-xs text-gray-500 truncate">{img.copyright || '—'}</p>
-                  <p className="text-xs text-gray-300 font-mono">#{img.id}</p>
+                  <p className="text-xs text-gray-500 truncate">{img.filename || img.copyright || '—'}</p>
+                  <p className="text-xs text-gray-300 font-mono truncate" title={img.id}>#{img.id}</p>
                 </div>
                 <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors flex items-center justify-center opacity-0 group-hover:opacity-100 gap-2">
                   <button
-                    onClick={() => setEditingImage({ ...img })}
+                    onClick={() => openEdit(img)}
                     className="p-1.5 bg-white rounded-md shadow text-xs text-gray-700 hover:bg-gray-50"
                     title="Редактировать"
                   >
@@ -175,19 +266,55 @@ export default function PhotosCatalog() {
         </>
       )}
 
-      {/* Edit Modal */}
       {editingImage && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-          <div className="bg-white rounded-xl shadow-xl w-full max-w-md">
-            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
+          <div className="bg-white rounded-xl shadow-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 sticky top-0 bg-white z-10">
               <h2 className="text-lg font-semibold text-gray-900">Редактировать изображение</h2>
               <button onClick={() => setEditingImage(null)} className="text-gray-400 hover:text-gray-600 text-xl font-light">✕</button>
             </div>
             <form onSubmit={handleSave} className="px-6 py-4 space-y-4">
               {editingImage.image_url && (
                 <img src={editingImage.image_url} alt="preview"
-                  className="w-full max-h-48 object-contain rounded-lg border border-gray-200" />
+                  className="w-full max-h-56 object-contain rounded-lg border border-gray-200 bg-gray-50" />
               )}
+
+              {detailLoading && (
+                <p className="text-sm text-gray-500">Загрузка деталей...</p>
+              )}
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">ID</label>
+                <CopyableMono value={editingImage.id} />
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Имя файла</label>
+                  <CopyableMono value={editingImage.filename} />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Путь на сервере</label>
+                  <CopyableMono value={editingImage.path} />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">URL файла</label>
+                {editingImage.image_url || editingImage.url ? (
+                  <a
+                    href={editingImage.image_url || editingImage.url}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="block font-mono text-xs text-blue-700 bg-blue-50 border border-blue-100 rounded-lg px-3 py-2 break-all hover:underline"
+                  >
+                    {editingImage.image_url || editingImage.url}
+                  </a>
+                ) : (
+                  <CopyableMono value={null} />
+                )}
+              </div>
+
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Авторское право</label>
                 <input
@@ -198,8 +325,94 @@ export default function PhotosCatalog() {
                   placeholder="© Author Name"
                 />
               </div>
-              <div className="flex gap-3 pt-2">
-                <button type="submit" disabled={saving}
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Source URL</label>
+                <input
+                  type="url"
+                  value={editingImage.source_url || ''}
+                  onChange={(e) => setEditingImage((p) => ({ ...p, source_url: e.target.value }))}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+                  placeholder="https://..."
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Страница источника (file page)</label>
+                <input
+                  type="url"
+                  value={editingImage.file_page_url || ''}
+                  onChange={(e) => setEditingImage((p) => ({ ...p, file_page_url: e.target.value }))}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+                  placeholder="https://commons.wikimedia.org/..."
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Original image URL</label>
+                <input
+                  type="url"
+                  value={editingImage.original_image_url || ''}
+                  onChange={(e) => setEditingImage((p) => ({ ...p, original_image_url: e.target.value }))}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+                  placeholder="https://..."
+                />
+              </div>
+
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <label className="block text-sm font-medium text-gray-700">Где используется</label>
+                  <span className="text-xs text-gray-400">
+                    {(editingImage.usages || []).length} связей
+                  </span>
+                </div>
+                {(editingImage.usages || []).length === 0 ? (
+                  <p className="text-sm text-gray-400 bg-gray-50 border border-dashed border-gray-200 rounded-lg px-3 py-4 text-center">
+                    {detailLoading ? 'Ищем связи…' : 'Нигде не используется (или только в черновиках без привязки)'}
+                  </p>
+                ) : (
+                  <ul className="divide-y divide-gray-100 border border-gray-200 rounded-lg overflow-hidden">
+                    {editingImage.usages.map((u, idx) => {
+                      const title = `${usageKindLabel(u.kind)}: ${u.label || '—'}`;
+                      const role = usageRoleLabel(u.role);
+                      const inner = (
+                        <>
+                          <div className="min-w-0">
+                            <p className="text-sm text-gray-900 truncate">{title}</p>
+                            <p className="text-xs text-gray-500 truncate">
+                              {role}
+                              {u.id ? ` · #${u.id}` : ''}
+                            </p>
+                          </div>
+                          {u.href ? (
+                            <span className="text-xs text-blue-600 shrink-0">открыть →</span>
+                          ) : null}
+                        </>
+                      );
+                      return (
+                        <li key={`${u.kind}-${u.id}-${u.role}-${idx}`}>
+                          {u.href ? (
+                            <Link
+                              to={u.href}
+                              className="flex items-center justify-between gap-3 px-3 py-2.5 hover:bg-blue-50"
+                              onClick={() => setEditingImage(null)}
+                            >
+                              {inner}
+                            </Link>
+                          ) : (
+                            <div className="flex items-center justify-between gap-3 px-3 py-2.5">
+                              {inner}
+                            </div>
+                          )}
+                        </li>
+                      );
+                    })}
+                  </ul>
+                )}
+              </div>
+
+              <div className="flex gap-3 pt-2 sticky bottom-0 bg-white pb-1">
+                <button type="submit" disabled={saving || detailLoading}
                   className="flex-1 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-50">
                   {saving ? 'Сохранение...' : 'Сохранить'}
                 </button>
