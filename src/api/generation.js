@@ -258,18 +258,41 @@ export const cityInfosAPI = {
 
 // ─── Cities (reference) ───────────────────────────────────────────────────────
 export const citiesAPI = {
+  create: (data) => apiClient.post(`${BASE}/cities/create/`, data),
   get: (cityId) => apiClient.get(`${BASE}/cities/${cityId}/`),
   update: (cityId, data) => apiClient.patch(`${BASE}/cities/${cityId}/update/`, data),
   delete: (cityId) => apiClient.delete(`${BASE}/cities/${cityId}/delete/`),
   exportJson: () =>
     apiClient.get(`${BASE}/cities/export/`, { responseType: 'blob' }),
+  listUsefulInformation: (cityId) =>
+    apiClient.get(`${BASE}/cities/${cityId}/useful-information/`),
+  createUsefulInformation: (cityId, data) =>
+    apiClient.post(`${BASE}/cities/${cityId}/useful-information/`, data),
+  updateUsefulInformation: (cityId, infoId, data) =>
+    apiClient.patch(`${BASE}/cities/${cityId}/useful-information/${infoId}/`, data),
+  deleteUsefulInformation: (cityId, infoId) =>
+    apiClient.delete(`${BASE}/cities/${cityId}/useful-information/${infoId}/`),
   // CityAPI list (used in CitiesCatalog)
   list: (params) => apiClient.get('/city/list', { params }),
+};
+
+// ─── Admin utilities ─────────────────────────────────────────────────────────
+export const adminAPI = {
+  calculateNearestEvents: (cityId) =>
+    apiClient.get(
+      cityId
+        ? `/admin/calculate-nearest-events/${cityId}`
+        : '/admin/calculate-nearest-events',
+    ),
 };
 
 // ─── IAP admin (city product sync) ─────────────────────────────────────────────
 export const iapAdminAPI = {
   syncCity: (cityId) => apiClient.post(`/iap/admin/cities/${cityId}/sync`),
+  bulkSync: (cityIds) =>
+    apiClient.post('/iap/admin/cities/bulk-sync/', {
+      city_ids: cityIds?.length ? cityIds : undefined,
+    }),
 };
 
 // ─── Images ──────────────────────────────────────────────────────────────────
@@ -304,7 +327,7 @@ export const tasksAPI = {
 // Canonical REST (CityAPI) — same store as Session Wizard / static reference JS
 export const cityFiltersAPI = {
   getTree: () => apiClient.get('/city/filters/tree/'),
-  /** Flat list; default backend: type=tag, is_show=true */
+  /** Flat list; default backend: type=tag, is_show=true. Pass all=1 to include hidden. */
   getTags: (params = {}) =>
     apiClient.get('/city/filters/', { params: { type: 'tag', ...params } }),
   get: (id) => apiClient.get(`/city/filters/${id}/`),
@@ -403,6 +426,22 @@ export const eventsAPI = {
     apiClient.delete(`${BASE}/events/${eventId}/delete/`),
   setMedia: (eventId, data) =>
     apiClient.post(`${BASE}/events/${eventId}/media/`, data),
+  listInformation: (eventId) =>
+    apiClient.get(`${BASE}/events/${eventId}/information/`),
+  createInformation: (eventId, data) =>
+    apiClient.post(`${BASE}/events/${eventId}/information/`, data),
+  updateInformation: (eventId, infoId, data) =>
+    apiClient.patch(`${BASE}/events/${eventId}/information/${infoId}/`, data),
+  deleteInformation: (eventId, infoId) =>
+    apiClient.delete(`${BASE}/events/${eventId}/information/${infoId}/`),
+  listFeed: (eventId) =>
+    apiClient.get(`${BASE}/events/${eventId}/feed/`),
+  createFeedItem: (eventId, data) =>
+    apiClient.post(`${BASE}/events/${eventId}/feed/`, data),
+  updateFeedItem: (eventId, feedId, data) =>
+    apiClient.patch(`${BASE}/events/${eventId}/feed/${feedId}/`, data),
+  deleteFeedItem: (eventId, feedId) =>
+    apiClient.delete(`${BASE}/events/${eventId}/feed/${feedId}/`),
   filtersReference: () =>
     apiClient.get(`${BASE}/events/filters-reference/`),
   cities: () => apiClient.get(`${BASE}/events/cities/`),
@@ -443,9 +482,11 @@ export { citiesAPI as citiesAPI_legacy };
 
 export const eventAudioGuidesAPI = {
   list: (eventId) =>
-    apiClient.get(`${BASE}/event-audio-guides/`, { params: { event_id: eventId } }),
+    apiClient.get(`${BASE}/event-audio-guides/`, { params: eventId ? { event_id: eventId } : {} }),
+  create: (data) => apiClient.post(`${BASE}/event-audio-guides/`, data),
   update: (guideId, data) =>
     apiClient.patch(`${BASE}/event-audio-guides/${guideId}/`, data),
+  delete: (guideId) => apiClient.delete(`${BASE}/event-audio-guides/${guideId}/`),
   upsertTrack: (guideId, data) =>
     apiClient.post(`${BASE}/event-audio-guides/${guideId}/tracks/`, data),
   deleteTrack: (guideId, trackId) =>
@@ -457,4 +498,11 @@ export const ilCatalogAPI = {
   create: (data) => apiClient.post(`${BASE}/interactive-locations/`, data),
   update: (id, data) => apiClient.patch(`${BASE}/interactive-locations/${id}/`, data),
   delete: (id) => apiClient.delete(`${BASE}/interactive-locations/${id}/`),
+};
+
+export const ilPhotosAPI = {
+  list: (cityId) => apiClient.get(`${BASE}/cities/${cityId}/il-photos/`),
+  create: (cityId, data) => apiClient.post(`${BASE}/cities/${cityId}/il-photos/`, data),
+  update: (cityId, photoId, data) => apiClient.patch(`${BASE}/cities/${cityId}/il-photos/${photoId}/`, data),
+  remove: (cityId, photoId) => apiClient.delete(`${BASE}/cities/${cityId}/il-photos/${photoId}/`),
 };

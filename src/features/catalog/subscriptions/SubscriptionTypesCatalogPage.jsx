@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
+import { citiesAPI, eventsAPI } from '../../../api/generation';
 import { subscriptionTypesAPI } from '../../../api/subscription';
 import Layout from '../../../components/Layout';
 import DataTable from '../../../components/ui/DataTable';
@@ -11,6 +12,7 @@ import CatalogPageHeader from '../shared/components/CatalogPageHeader';
 import FormErrorAlert from '../shared/components/FormErrorAlert';
 import StatusBadge from '../shared/components/StatusBadge';
 import TableRowActions from '../shared/components/TableRowActions';
+import { getCityLabel, getEventLabel } from './subscriptionLabels';
 
 const PAGE_SIZE = 20;
 
@@ -20,7 +22,14 @@ function createEmptyType() {
     name: '',
     description: '',
     is_active: true,
+    cities: [],
+    events: [],
   };
+}
+
+function normalizeIdList(value) {
+  if (!Array.isArray(value)) return [];
+  return value.map((item) => String(item));
 }
 
 export default function SubscriptionTypesCatalogPage() {
@@ -41,6 +50,32 @@ export default function SubscriptionTypesCatalogPage() {
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [deleting, setDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState(null);
+  const [cities, setCities] = useState([]);
+  const [events, setEvents] = useState([]);
+  const [refsLoading, setRefsLoading] = useState(true);
+
+  const loadRefs = useCallback(async () => {
+    try {
+      setRefsLoading(true);
+      const [citiesResp, eventsResp] = await Promise.all([
+        citiesAPI.list({ page_size: 1000, limit: 1000 }),
+        eventsAPI.list({ page_size: 1000 }),
+      ]);
+      const citiesData = citiesResp?.data;
+      const eventsData = eventsResp?.data;
+      setCities(Array.isArray(citiesData?.results) ? citiesData.results : Array.isArray(citiesData) ? citiesData : []);
+      setEvents(Array.isArray(eventsData?.results) ? eventsData.results : Array.isArray(eventsData) ? eventsData : []);
+    } catch {
+      setCities([]);
+      setEvents([]);
+    } finally {
+      setRefsLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadRefs();
+  }, [loadRefs]);
 
   const loadItems = useCallback(async (paramsState) => {
     const state = paramsState || { search, statusFilter, page };
@@ -117,6 +152,8 @@ export default function SubscriptionTypesCatalogPage() {
       name: editingItem.name,
       description: editingItem.description || '',
       is_active: !!editingItem.is_active,
+      cities: normalizeIdList(editingItem.cities),
+      events: normalizeIdList(editingItem.events),
     };
 
     try {
@@ -163,6 +200,16 @@ export default function SubscriptionTypesCatalogPage() {
       render: (value) => <span className="text-sm text-gray-700">{value || '—'}</span>,
     },
     {
+      key: 'cities',
+      label: 'Города',
+      render: (value) => <span className="text-sm text-gray-700">{Array.isArray(value) ? value.length : 0}</span>,
+    },
+    {
+      key: 'events',
+      label: 'События',
+      render: (value) => <span className="text-sm text-gray-700">{Array.isArray(value) ? value.length : 0}</span>,
+    },
+    {
       key: 'is_active',
       label: 'Статус',
       render: (active) => <StatusBadge active={active} />,
@@ -173,7 +220,7 @@ export default function SubscriptionTypesCatalogPage() {
     <Layout>
       <CatalogPageHeader
         title="Справочник типов подписки"
-        description="Типы подписок для активационных кодов"
+        description="Типы подписок: название, города, события, статус"
         createLabel="Создать тип подписки"
         onCreate={() => {
           setSaveError(null);
@@ -216,6 +263,8 @@ export default function SubscriptionTypesCatalogPage() {
                 name: row.name || '',
                 description: row.description || '',
                 is_active: row.is_active !== false,
+                cities: normalizeIdList(row.cities),
+                events: normalizeIdList(row.events),
               });
             }}
             onDelete={() => setDeleteTarget(row)}
@@ -255,6 +304,42 @@ export default function SubscriptionTypesCatalogPage() {
               onChange={(next) => setEditingItem((prev) => ({ ...prev, is_active: next }))}
               text="Активный тип подписки"
             />
+
+            <Field label="Города" hint="Ctrl/Cmd + click для множественного выбора">
+              <select
+                multiple
+                size={8}
+                disabled={refsLoading}
+                value={normalizeIdList(editingItem.cities)}
+                onChange={(e) => {
+                  const selected = Array.from(e.target.selectedOptions).map((o) => o.value);
+                  setEditingItem((prev) => ({ ...prev, cities: selected }));
+                }}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+              >
+                {cities.map((city) => (
+                  <option key={city.id} value={city.id}>{getCityLabel(city)}</option>
+                ))}
+              </select>
+            </Field>
+
+            <Field label="События" hint="Ctrl/Cmd + click для множественного выбора">
+              <select
+                multiple
+                size={8}
+                disabled={refsLoading}
+                value={normalizeIdList(editingItem.events)}
+                onChange={(e) => {
+                  const selected = Array.from(e.target.selectedOptions).map((o) => o.value);
+                  setEditingItem((prev) => ({ ...prev, events: selected }));
+                }}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+              >
+                {events.map((event) => (
+                  <option key={event.id} value={event.id}>{getEventLabel(event)}</option>
+                ))}
+              </select>
+            </Field>
 
             <FormActions
               saving={saving}

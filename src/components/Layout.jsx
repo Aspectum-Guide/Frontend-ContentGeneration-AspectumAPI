@@ -130,6 +130,10 @@ export default function Layout({ children, pageHeader = null, pageHeaderMode = '
       items: [
         { label: 'Типы подписки', to: '/catalog/subscription-types' },
         { label: 'Коды активации', to: '/catalog/activation-codes' },
+        { label: 'Логи активации', to: '/catalog/code-usage-logs' },
+        { label: 'Подписки пользователей', to: '/catalog/user-subscriptions' },
+        { label: 'Все подписки на города', to: '/catalog/city-subscriptions' },
+        { label: 'IAP покупки', to: '/catalog/iap-purchases' },
       ],
     },
     {
@@ -172,6 +176,10 @@ export default function Layout({ children, pageHeader = null, pageHeaderMode = '
     { startsWith: '/catalog/reservations', title: 'Резервации' },
     { startsWith: '/catalog/subscription-types', title: 'Справочник типов подписки' },
     { startsWith: '/catalog/activation-codes', title: 'Справочник кодов активации' },
+    { startsWith: '/catalog/user-subscriptions', title: 'Подписки пользователей' },
+    { startsWith: '/catalog/city-subscriptions', title: 'Все подписки на города' },
+    { startsWith: '/catalog/code-usage-logs', title: 'Логи активации кодов' },
+    { startsWith: '/catalog/iap-purchases', title: 'IAP покупки' },
     { startsWith: '/catalog/audio-guides', title: 'Аудиогиды' },
     { startsWith: '/catalog/interactive-locations', title: 'Интерактивные локации' },
     { startsWith: '/catalog/photos', title: 'Каталог фото' },

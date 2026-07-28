@@ -40,12 +40,16 @@ export const BOOKING_CATALOG_SECTION = {
 export const SUBSCRIPTION_CATALOG_SECTION = {
   id: 'subscription',
   title: 'Подписки',
-  description: 'Управление типами подписок и кодами активации',
+  description: 'Полный цикл подписок без Django admin: типы, коды, логи, пользователи, IAP',
   badge: 'SUBSCRIPTION',
   badgeClass: 'bg-emerald-100 text-emerald-700',
   items: [
-    { to: '/catalog/subscription-types', title: 'Типы подписки', description: 'Настройка пакетов подписки', icon: '🧩' },
-    { to: '/catalog/activation-codes', title: 'Коды активации', description: 'Коды для активации подписок', icon: '🔐' },
+    { to: '/catalog/subscription-types', title: 'Типы подписки', description: 'Пакеты + привязка городов и событий', icon: '🧩' },
+    { to: '/catalog/activation-codes', title: 'Коды активации', description: 'CRUD и массовая генерация кодов', icon: '🔐' },
+    { to: '/catalog/code-usage-logs', title: 'Логи активации', description: 'Журнал использования кодов (read-only)', icon: '📜' },
+    { to: '/catalog/user-subscriptions', title: 'Подписки пользователей', description: 'Поиск по email, выдача/отзыв доступа', icon: '👤' },
+    { to: '/catalog/city-subscriptions', title: 'Все подписки на города', description: 'Глобальный список CitySubscription', icon: '🏙️' },
+    { to: '/catalog/iap-purchases', title: 'IAP покупки', description: 'Apple/Google purchases, premium status', icon: '🛒' },
   ],
 };
 

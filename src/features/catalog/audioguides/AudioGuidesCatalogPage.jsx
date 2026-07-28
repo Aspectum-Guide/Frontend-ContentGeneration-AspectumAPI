@@ -1,7 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { eventAudioGuidesAPI, audioAPI, eventsAPI } from './api';
 import Layout from '../../../components/Layout';
 import Modal, { ConfirmModal } from '../../../components/ui/Modal';
+import { Field, TextInput } from '../../../components/ui/FormField';
 import { parseApiError } from '../../../utils/apiError';
 import { getMultiLangValue } from '../shared/i18n';
 import { normalizeListResponse } from '../shared/normalize';
@@ -235,32 +237,150 @@ function GuideCard({ guide, onClick, eventLabel }) {
 
 // ─── GuideDetailModal ─────────────────────────────────────────────────────────
 
-function GuideDetailModal({ guide, open, onClose, onChanged, eventLabel }) {
+function GuideDetailModal({
+  guide,
+  open,
+  onClose,
+  onChanged,
+  onDeleted,
+  eventLabel,
+}) {
+  const [meta, setMeta] = useState({ titleRu: '', index: 0, is_show: true });
+  const [savingMeta, setSavingMeta] = useState(false);
+  const [metaError, setMetaError] = useState('');
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+
+  useEffect(() => {
+    if (!guide) return;
+    setMeta({
+      titleRu: guide.title?.ru || getMultiLangValue(guide.title) || '',
+      index: guide.index ?? 0,
+      is_show: guide.is_show !== false,
+    });
+    setMetaError('');
+  }, [guide?.id, open]);
+
   if (!guide) return null;
   const title = getMultiLangValue(guide.title) || `Гид #${guide.index + 1}`;
   const existingLangs = guide.tracks.map((t) => t.language);
 
+  const handleSaveMeta = async () => {
+    setSavingMeta(true);
+    setMetaError('');
+    try {
+      const titleObj = { ...(guide.title || {}), ru: meta.titleRu.trim() };
+      await eventAudioGuidesAPI.update(guide.id, {
+        title: titleObj,
+        index: Number(meta.index) || 0,
+        is_show: meta.is_show,
+      });
+      onChanged?.();
+    } catch (err) {
+      setMetaError(parseApiError(err, 'Ошибка сохранения'));
+    } finally {
+      setSavingMeta(false);
+    }
+  };
+
+  const handleDeleteGuide = async () => {
+    setDeleting(true);
+    try {
+      await eventAudioGuidesAPI.delete(guide.id);
+      setConfirmDelete(false);
+      onDeleted?.();
+    } catch (err) {
+      setMetaError(parseApiError(err, 'Ошибка удаления'));
+    } finally {
+      setDeleting(false);
+    }
+  };
+
   return (
-    <Modal open={open} onClose={onClose} title={title} size="lg">
-      {eventLabel && <p className="text-xs text-gray-400 mb-3">Событие: {eventLabel}</p>}
-      {guide.tracks.length === 0
-        ? <p className="text-sm text-gray-400 py-4 text-center">Треков нет</p>
-        : guide.tracks.map((track) => (
-          <TrackRow
-            key={track.id}
-            track={track}
-            guideId={guide.id}
-            onUploaded={onChanged}
-            onDeleted={onChanged}
-          />
-        ))
-      }
-      <AddLanguageRow
-        guideId={guide.id}
-        existingLangs={existingLangs}
-        onAdded={onChanged}
+    <>
+      <Modal open={open} onClose={onClose} title={title} size="lg">
+        {eventLabel && <p className="text-xs text-gray-400 mb-3">Событие: {eventLabel}</p>}
+
+        <div className="mb-5 p-4 border border-gray-200 rounded-xl bg-gray-50/50 space-y-3">
+          <p className="text-sm font-medium text-gray-700">Метаданные гида</p>
+          <Field label="Название (RU)">
+            <TextInput
+              value={meta.titleRu}
+              onChange={(e) => setMeta((p) => ({ ...p, titleRu: e.target.value }))}
+              disabled={savingMeta}
+            />
+          </Field>
+          <div className="grid grid-cols-2 gap-3">
+            <Field label="Индекс">
+              <TextInput
+                type="number"
+                min={0}
+                value={meta.index}
+                onChange={(e) => setMeta((p) => ({ ...p, index: e.target.value }))}
+                disabled={savingMeta}
+              />
+            </Field>
+            <label className="flex items-center gap-2 text-sm text-gray-700 pt-6">
+              <input
+                type="checkbox"
+                checked={meta.is_show}
+                onChange={(e) => setMeta((p) => ({ ...p, is_show: e.target.checked }))}
+                disabled={savingMeta}
+              />
+              Показывать в приложении
+            </label>
+          </div>
+          {metaError && <p className="text-xs text-red-600">{metaError}</p>}
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={handleSaveMeta}
+              disabled={savingMeta}
+              className="px-3 py-1.5 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-50"
+            >
+              {savingMeta ? 'Сохранение...' : 'Сохранить метаданные'}
+            </button>
+            <button
+              type="button"
+              onClick={() => setConfirmDelete(true)}
+              disabled={savingMeta || deleting}
+              className="px-3 py-1.5 text-sm font-medium text-red-600 bg-red-50 rounded-lg hover:bg-red-100 disabled:opacity-50"
+            >
+              Удалить гид
+            </button>
+          </div>
+        </div>
+
+        {guide.tracks.length === 0
+          ? <p className="text-sm text-gray-400 py-4 text-center">Треков нет</p>
+          : guide.tracks.map((track) => (
+            <TrackRow
+              key={track.id}
+              track={track}
+              guideId={guide.id}
+              onUploaded={onChanged}
+              onDeleted={onChanged}
+            />
+          ))
+        }
+        <AddLanguageRow
+          guideId={guide.id}
+          existingLangs={existingLangs}
+          onAdded={onChanged}
+        />
+      </Modal>
+
+      <ConfirmModal
+        open={confirmDelete}
+        onClose={() => setConfirmDelete(false)}
+        onConfirm={handleDeleteGuide}
+        title="Удалить аудиогид?"
+        message="Гид и все его треки будут удалены безвозвратно."
+        confirmLabel="Удалить"
+        danger
+        loading={deleting}
       />
-    </Modal>
+    </>
   );
 }
 
@@ -303,13 +423,23 @@ function CoverageSummary({ guides }) {
 // ─── Main page ────────────────────────────────────────────────────────────────
 
 export default function AudioGuidesCatalogPage() {
+  const [searchParams] = useSearchParams();
   const [eventOptions, setEventOptions] = useState([]);
   const [eventsLoading, setEventsLoading] = useState(true);
-  const [eventId, setEventId] = useState('');
+  const [eventId, setEventId] = useState(() => searchParams.get('event_id') || '');
   const [guides, setGuides] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [selectedGuide, setSelectedGuide] = useState(null);
+  const [createOpen, setCreateOpen] = useState(false);
+  const [creating, setCreating] = useState(false);
+  const [createError, setCreateError] = useState('');
+  const [createTitle, setCreateTitle] = useState('');
+
+  useEffect(() => {
+    const fromUrl = searchParams.get('event_id');
+    if (fromUrl) setEventId(fromUrl);
+  }, [searchParams]);
 
   useEffect(() => {
     setEventsLoading(true);
@@ -335,23 +465,72 @@ export default function AudioGuidesCatalogPage() {
 
   useEffect(() => { load(eventId); }, [eventId, load]);
 
-  const handleChanged = () => {
-    load(eventId);
-    setSelectedGuide(null);
+  const handleChanged = async () => {
+    try {
+      const r = await eventAudioGuidesAPI.list(eventId || null);
+      const nextGuides = r?.data?.guides || [];
+      setGuides(nextGuides);
+      if (selectedGuide) {
+        setSelectedGuide(nextGuides.find((g) => g.id === selectedGuide.id) || null);
+      }
+    } catch (e) {
+      setError(parseApiError(e, 'Ошибка обновления'));
+    }
+  };
+
+  const handleCreate = async (e) => {
+    e?.preventDefault();
+    if (!eventId) {
+      setCreateError('Выберите событие');
+      return;
+    }
+    if (!createTitle.trim()) {
+      setCreateError('Введите название');
+      return;
+    }
+    setCreating(true);
+    setCreateError('');
+    try {
+      const r = await eventAudioGuidesAPI.create({
+        event_id: eventId,
+        title: { ru: createTitle.trim() },
+        index: guides.length,
+        is_show: true,
+      });
+      const created = r?.data?.guide;
+      setCreateOpen(false);
+      setCreateTitle('');
+      await load(eventId);
+      if (created?.id) setSelectedGuide(created);
+    } catch (err) {
+      setCreateError(parseApiError(err, 'Ошибка создания'));
+    } finally {
+      setCreating(false);
+    }
   };
 
   const getEventLabel = (guide) => !eventId
-    ? getMultiLangValue(eventOptions.find((e) => String(e.id) === String(guide.event))?.title) || null
+    ? getMultiLangValue(eventOptions.find((ev) => String(ev.id) === String(guide.event))?.title) || null
     : null;
 
   return (
     <Layout>
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold text-gray-900">Аудиогиды</h1>
-        <p className="mt-1 text-sm text-gray-500">
-          <span className="text-green-600 font-medium">●</span> есть файл &nbsp;
-          <span className="text-gray-400">○</span> нет файла · клик → управление треками
-        </p>
+      <div className="mb-6 flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">Аудиогиды</h1>
+          <p className="mt-1 text-sm text-gray-500">
+            <span className="text-green-600 font-medium">●</span> есть файл &nbsp;
+            <span className="text-gray-400">○</span> нет файла · клик → управление треками
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={() => { setCreateError(''); setCreateTitle(''); setCreateOpen(true); }}
+          disabled={!eventId || creating}
+          className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors"
+        >
+          + Создать аудиогид
+        </button>
       </div>
 
       <div className="mb-4">
@@ -401,7 +580,51 @@ export default function AudioGuidesCatalogPage() {
         eventLabel={selectedGuide ? getEventLabel(selectedGuide) : null}
         onClose={() => setSelectedGuide(null)}
         onChanged={handleChanged}
+        onDeleted={() => { setSelectedGuide(null); load(eventId); }}
       />
+
+      <Modal
+        open={createOpen}
+        onClose={() => setCreateOpen(false)}
+        title="Создать аудиогид"
+        size="md"
+      >
+        <form onSubmit={handleCreate} className="space-y-4">
+          {createError && (
+            <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">{createError}</div>
+          )}
+          {!eventId && (
+            <p className="text-sm text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+              Сначала выберите событие в фильтре выше.
+            </p>
+          )}
+          <Field label="Название (RU)" required>
+            <TextInput
+              value={createTitle}
+              onChange={(e) => setCreateTitle(e.target.value)}
+              disabled={creating}
+              autoFocus
+              placeholder="Название аудиогида"
+            />
+          </Field>
+          <div className="flex gap-2 justify-end">
+            <button
+              type="button"
+              onClick={() => setCreateOpen(false)}
+              className="px-4 py-2 text-sm text-gray-600 bg-gray-100 rounded-lg hover:bg-gray-200"
+            >
+              Отмена
+            </button>
+            <button
+              type="submit"
+              disabled={creating || !eventId}
+              className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-50"
+            >
+              {creating ? 'Создание...' : 'Создать'}
+            </button>
+          </div>
+        </form>
+      </Modal>
     </Layout>
   );
 }

@@ -1,6 +1,8 @@
 import 'leaflet/dist/leaflet.css';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { ilCatalogAPI, imagesAPI } from './api';
+import ILCityPhotosEditor from './ILCityPhotosEditor';
+import { eventsCatalogAPI } from '../events/api';
 import Layout from '../../../components/Layout';
 import DataTable from '../../../components/ui/DataTable';
 import { Field, TextInput } from '../../../components/ui/FormField';
@@ -16,11 +18,15 @@ const ALL_LANGS = ['ru', 'en', 'it', 'fr', 'de', 'es'];
 
 const parseCoord = (v) => { const n = Number(v); return Number.isFinite(n) ? n : null; };
 
-function ILEditorModal({ open, onClose, location, onSaved, cityOptions }) {
+function ILEditorModal({ open, onClose, location, onSaved, cityOptions, tagOptions = [] }) {
   const isNew = !location?.id;
 
   const [activeLang, setActiveLang] = useState('ru');
-  const [form, setForm] = useState({ title: {}, description: {}, lat: '', lon: '', index: 0, is_show: true, city_id: '', image_id: null, image_url: null, icon_id: null, icon_url: null });
+  const [form, setForm] = useState({
+    title: {}, description: {}, lat: '', lon: '', index: 0, rank: '',
+    is_show: true, city_id: '', image_id: null, image_url: null, icon_id: null, icon_url: null,
+    tag_ids: [],
+  });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [activeTab, setActiveTab] = useState('content');
@@ -37,7 +43,11 @@ function ILEditorModal({ open, onClose, location, onSaved, cityOptions }) {
   useEffect(() => {
     if (!open) return;
     if (isNew) {
-      setForm({ title: {}, description: {}, lat: '', lon: '', index: 0, is_show: true, city_id: '', image_id: null, image_url: null, icon_id: null, icon_url: null });
+      setForm({
+        title: {}, description: {}, lat: '', lon: '', index: 0, rank: '',
+        is_show: true, city_id: '', image_id: null, image_url: null, icon_id: null, icon_url: null,
+        tag_ids: [],
+      });
     } else {
       setForm({
         title: location.title || {},
@@ -45,12 +55,14 @@ function ILEditorModal({ open, onClose, location, onSaved, cityOptions }) {
         lat: location.lat ?? '',
         lon: location.lon ?? '',
         index: location.index ?? 0,
+        rank: location.rank ?? '',
         is_show: location.is_show ?? true,
         city_id: location.city_id ? String(location.city_id) : '',
         image_id: location.image_id || null,
         image_url: location.image_url || null,
         icon_id: location.icon_id || null,
         icon_url: location.icon_url || null,
+        tag_ids: (location.tag_ids || []).map(String),
       });
     }
     setError('');
@@ -161,10 +173,12 @@ function ILEditorModal({ open, onClose, location, onSaved, cityOptions }) {
         lat: parseCoord(form.lat),
         lon: parseCoord(form.lon),
         index: Number(form.index || 0),
+        rank: form.rank === '' ? null : Number(form.rank),
         is_show: form.is_show,
         city_id: form.city_id || null,
         image_id: form.image_id || null,
         icon_id: form.icon_id || null,
+        tag_ids: form.tag_ids || [],
       };
       if (isNew) {
         await ilCatalogAPI.create(payload);
@@ -184,6 +198,7 @@ function ILEditorModal({ open, onClose, location, onSaved, cityOptions }) {
     { key: 'map', label: 'Карта' },
     { key: 'settings', label: 'Настройки' },
     { key: 'media', label: 'Медиа' },
+    { key: 'photos', label: 'Фото' },
   ];
 
   return (
@@ -271,6 +286,14 @@ function ILEditorModal({ open, onClose, location, onSaved, cityOptions }) {
                   onChange={(e) => setForm((p) => ({ ...p, index: +e.target.value || 0 }))}
                 />
               </Field>
+              <Field label="Ранг (rank)">
+                <TextInput
+                  type="number"
+                  value={form.rank}
+                  onChange={(e) => setForm((p) => ({ ...p, rank: e.target.value }))}
+                  placeholder="авто"
+                />
+              </Field>
               <Field label="Город">
                 <select
                   value={form.city_id}
@@ -293,6 +316,36 @@ function ILEditorModal({ open, onClose, location, onSaved, cityOptions }) {
               />
               <span className="text-sm text-gray-700">Показывать в приложении</span>
             </label>
+            {tagOptions.length > 0 && (
+              <Field label="Теги">
+                <div className="flex flex-wrap gap-2 max-h-36 overflow-y-auto p-2 border border-gray-200 rounded-lg bg-gray-50">
+                  {tagOptions.map((tag) => {
+                    const tid = String(tag.id);
+                    const selected = form.tag_ids.includes(tid);
+                    const label = tag.display_name || tag.slug || tid;
+                    return (
+                      <button
+                        key={tid}
+                        type="button"
+                        onClick={() => setForm((p) => ({
+                          ...p,
+                          tag_ids: selected
+                            ? p.tag_ids.filter((x) => x !== tid)
+                            : [...p.tag_ids, tid],
+                        }))}
+                        className={`px-2.5 py-1 rounded-full text-xs font-medium border transition-all ${
+                          selected
+                            ? 'bg-purple-600 text-white border-purple-600'
+                            : 'bg-white text-gray-600 border-gray-300 hover:border-purple-400 hover:text-purple-600'
+                        }`}
+                      >
+                        {label}
+                      </button>
+                    );
+                  })}
+                </div>
+              </Field>
+            )}
           </div>
         )}
 
@@ -351,6 +404,10 @@ function ILEditorModal({ open, onClose, location, onSaved, cityOptions }) {
           </div>
         )}
 
+        {activeTab === 'photos' && (
+          <ILCityPhotosEditor cityId={form.city_id || null} disabled={isNew && !form.city_id} />
+        )}
+
         <div className="flex items-center gap-3 mt-5 pt-4 border-t border-gray-100">
           <button
             type="submit"
@@ -386,11 +443,18 @@ export default function InteractiveLocationsCatalogPage() {
   const [cityFilter, setCityFilter] = useState('');
   const [showFilter, setShowFilter] = useState('');
   const [cities, setCities] = useState([]);
+  const [tagOptions, setTagOptions] = useState([]);
 
   const [editorOpen, setEditorOpen] = useState(false);
   const [editingRow, setEditingRow] = useState(null);
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [deleting, setDeleting] = useState(false);
+
+  useEffect(() => {
+    eventsCatalogAPI.listFilters()
+      .then((r) => setTagOptions(Array.isArray(r?.data) ? r.data : []))
+      .catch(() => setTagOptions([]));
+  }, []);
 
   useEffect(() => {
     const map = new Map();
@@ -596,6 +660,7 @@ export default function InteractiveLocationsCatalogPage() {
         location={editingRow}
         onSaved={handleSaved}
         cityOptions={cities}
+        tagOptions={tagOptions}
       />
 
       <ConfirmModal

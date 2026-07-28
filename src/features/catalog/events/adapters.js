@@ -7,11 +7,15 @@ export function createEmptyEvent() {
     city_id: '',
     is_show: true,
     is_bookable: false,
+    index: null,
+    rank: null,
     image_url: null,
     image_copyright: '',
     lat: null,
     lon: null,
     media: null,
+    information: [],
+    feed: [],
   };
 }
 
@@ -26,6 +30,8 @@ export function fromApiEventRow(row) {
     city_id: row.city_id ? String(row.city_id) : '',
     is_show: row.is_show ?? true,
     is_bookable: row.is_bookable ?? false,
+    index: row.index ?? null,
+    rank: row.rank ?? null,
     audio_guide_count: row.audio_guide_count ?? 0,
     image_url: row.image_url || row?.media?.image?.url || null,
     image_copyright: row.image_copyright || row?.media?.image?.copyright || '',
@@ -46,12 +52,16 @@ export function mergeEventWithDetail(row, detail) {
     tag_ids: (d.tag_ids || d.tags || base.tag_ids || []).map(String),
     is_show: d.is_show ?? base.is_show ?? true,
     is_bookable: d.is_bookable ?? base.is_bookable ?? false,
+    index: d.index ?? base.index ?? null,
+    rank: d.rank ?? base.rank ?? null,
     audio_guide_count: d.audio_guide_count ?? base.audio_guide_count ?? 0,
     image_url: d.image_url || base.image_url || null,
     image_copyright: d.image_copyright || base.image_copyright || '',
     lat: d.lat ?? base.lat ?? null,
     lon: d.lon ?? base.lon ?? null,
     media: d.media || base.media || null,
+    information: d.information || base.information || [],
+    feed: d.feed || base.feed || [],
   };
 }
 
@@ -64,6 +74,8 @@ export function toApiEventPayload(event) {
     city_id: event?.city_id || null,
     tag_ids: (event?.tag_ids || []).filter(Boolean).map(String),
   };
+  if (event?.index != null && event.index !== '') payload.index = Number(event.index);
+  if (event?.rank != null && event.rank !== '') payload.rank = Number(event.rank);
   if (event?.lat != null) payload.lat = Number(event.lat);
   if (event?.lon != null) payload.lon = Number(event.lon);
   return payload;

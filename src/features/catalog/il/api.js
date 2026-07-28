@@ -1,1 +1,1 @@
-export { ilCatalogAPI, imagesAPI } from '../../../api/generation';
+export { ilCatalogAPI, ilPhotosAPI, imagesAPI } from '../../../api/generation';

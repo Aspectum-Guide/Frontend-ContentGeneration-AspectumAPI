@@ -1,1 +1,1 @@
-export { appLanguagesAPI, cityFiltersAPI, eventFiltersAPI } from '../../../api/generation';
+export { appLanguagesAPI, citiesAPI, cityFiltersAPI, eventFiltersAPI } from '../../../api/generation';

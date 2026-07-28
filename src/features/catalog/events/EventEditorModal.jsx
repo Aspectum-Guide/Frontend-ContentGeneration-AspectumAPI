@@ -1,11 +1,28 @@
 import 'leaflet/dist/leaflet.css';
 import { useEffect, useRef, useState } from 'react';
-import CommonsImagePicker from '../../../components/generation/CommonsImagePicker';
+import EventMediaPanel from './EventMediaPanel';
 import { Field, FormActions, TextInput } from '../../../components/ui/FormField';
 import Modal, { ConfirmModal } from '../../../components/ui/Modal';
 import { createCoordinatePasteHandler } from '../../../utils/coordinates';
 import { buildLangOptions, getMultiLangValue } from '../shared/i18n';
 import { LangBlock, LangTabs } from '../shared/LangFields';
+import InformationBlocksEditor from '../shared/InformationBlocksEditor';
+import PublishedFeedEditor from '../shared/PublishedFeedEditor';
+import { eventsCatalogAPI } from './api';
+
+const eventInformationApi = {
+  list: (id) => eventsCatalogAPI.listInformation(id),
+  create: (id, data) => eventsCatalogAPI.createInformation(id, data),
+  update: (id, infoId, data) => eventsCatalogAPI.updateInformation(id, infoId, data),
+  remove: (id, infoId) => eventsCatalogAPI.deleteInformation(id, infoId),
+};
+
+const eventFeedApi = {
+  list: (id) => eventsCatalogAPI.listFeed(id),
+  create: (id, data) => eventsCatalogAPI.createFeedItem(id, data),
+  update: (id, feedId, data) => eventsCatalogAPI.updateFeedItem(id, feedId, data),
+  remove: (id, feedId) => eventsCatalogAPI.deleteFeedItem(id, feedId),
+};
 
 const parseCoord = (v) => { const n = Number(v); return Number.isFinite(n) ? n : null; };
 
@@ -23,12 +40,11 @@ export default function EventEditorModal({
   cityOptions,
   allEventFilters,
   toggleTag,
-  onSetMedia,
+  onPatchMedia,
   mediaSaving,
   mediaError,
 }) {
   const [activeTab, setActiveTab] = useState('content');
-  const [commonsModalOpen, setCommonsModalOpen] = useState(false);
   const [showDiscardConfirm, setShowDiscardConfirm] = useState(false);
 
   const mapElRef = useRef(null);
@@ -156,6 +172,8 @@ export default function EventEditorModal({
                 { key: 'content', label: 'Контент' },
                 { key: 'media', label: 'Обложка' },
                 { key: 'meta', label: 'Связи' },
+                { key: 'information', label: 'Инфо' },
+                { key: 'feed', label: 'Лента' },
                 { key: 'map', label: 'Карта' },
               ].map((tab) => (
                 <button
@@ -222,51 +240,13 @@ export default function EventEditorModal({
             ))}
 
             {activeTab === 'media' && (
-              <div className="space-y-3">
-                {mediaError && (
-                  <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">
-                    {mediaError}
-                  </div>
-                )}
-
-                {(event?.image_url || event?.media?.image?.url) ? (
-                  <div className="relative w-full h-[220px] rounded-xl overflow-hidden border border-gray-200 bg-gray-100">
-                    <img
-                      src={event?.image_url || event?.media?.image?.url}
-                      alt=""
-                      className="w-full h-full object-contain"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => onSetMedia?.(null)}
-                      disabled={!!mediaSaving}
-                      className="absolute top-2 right-2 w-7 h-7 bg-black/60 text-white rounded-full text-sm flex items-center justify-center hover:bg-black/80 disabled:opacity-50"
-                      title="Убрать обложку"
-                    >
-                      ×
-                    </button>
-                  </div>
-                ) : (
-                  <div className="w-full h-[220px] rounded-xl border border-dashed border-gray-300 bg-gray-50 flex items-center justify-center text-sm text-gray-400">
-                    Обложка не выбрана
-                  </div>
-                )}
-
-                <div className="flex flex-wrap gap-2 items-center">
-                  <button
-                    type="button"
-                    onClick={() => setCommonsModalOpen(true)}
-                    disabled={!!mediaSaving}
-                    className="px-3 py-2 text-sm font-medium text-blue-700 bg-blue-50 rounded-lg hover:bg-blue-100 disabled:opacity-50 transition-colors"
-                  >
-                    {mediaSaving ? 'Сохранение...' : '🖼️ Выбрать из Wikimedia Commons'}
-                  </button>
-                </div>
-
-                <p className="text-xs text-gray-400">
-                  Под капотом: импортируем изображение и привязываем его к ивенту через `/generation/events/&lt;id&gt;/media/`.
-                </p>
-              </div>
+              <EventMediaPanel
+                event={event}
+                disabled={editLoading || saving}
+                mediaSaving={mediaSaving}
+                mediaError={mediaError}
+                onPatchMedia={onPatchMedia}
+              />
             )}
 
             {activeTab === 'meta' && (
@@ -284,6 +264,30 @@ export default function EventEditorModal({
                       </option>
                     ))}
                   </select>
+                </Field>
+
+                <Field label="Индекс (index)">
+                  <TextInput
+                    type="number"
+                    value={event?.index ?? ''}
+                    onChange={(e) => setEvent((p) => ({
+                      ...p,
+                      index: e.target.value === '' ? null : Number(e.target.value),
+                    }))}
+                    placeholder="авто"
+                  />
+                </Field>
+
+                <Field label="Ранг (rank)">
+                  <TextInput
+                    type="number"
+                    value={event?.rank ?? ''}
+                    onChange={(e) => setEvent((p) => ({
+                      ...p,
+                      rank: e.target.value === '' ? null : Number(e.target.value),
+                    }))}
+                    placeholder="авто"
+                  />
                 </Field>
 
                 <Field label="Видимость">
@@ -357,6 +361,22 @@ export default function EventEditorModal({
               </Field>
             )}
 
+            {activeTab === 'information' && (
+              <InformationBlocksEditor
+                parentId={event?.id}
+                api={eventInformationApi}
+                disabled={editLoading || saving}
+              />
+            )}
+
+            {activeTab === 'feed' && (
+              <PublishedFeedEditor
+                parentId={event?.id}
+                api={eventFeedApi}
+                disabled={editLoading || saving}
+              />
+            )}
+
             {activeTab === 'map' && (
               <div className="space-y-4">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
@@ -397,17 +417,6 @@ export default function EventEditorModal({
           </form>
         )}
       </Modal>
-
-      <CommonsImagePicker
-        isOpen={commonsModalOpen}
-        onClose={() => setCommonsModalOpen(false)}
-        onImageSelected={async ({ imageId }) => {
-          setCommonsModalOpen(false);
-          await onSetMedia?.(imageId);
-        }}
-        getSessionUuid={() => ''}
-        defaultQuery={getMultiLangValue(event?.title || '')}
-      />
 
       <ConfirmModal
         open={showDiscardConfirm}

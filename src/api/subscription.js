@@ -16,3 +16,33 @@ export const activationCodesAPI = {
   delete: (id) => apiClient.delete(`/subscription/activation-codes/${id}/`),
   bulkGenerate: (data) => apiClient.post('/subscription/activation-codes/bulk-generate/', data),
 };
+
+export const citySubscriptionsAPI = {
+  list: (params) => apiClient.get('/subscription/city-subscriptions/', { params }),
+  get: (id) => apiClient.get(`/subscription/city-subscriptions/${id}/`),
+  create: (data) => apiClient.post('/subscription/city-subscriptions/', data),
+  update: (id, data) => apiClient.patch(`/subscription/city-subscriptions/${id}/`, data),
+  delete: (id) => apiClient.delete(`/subscription/city-subscriptions/${id}/`),
+};
+
+export const subscriptionUsersAdminAPI = {
+  list: (params) => apiClient.get('/subscription/admin/users/', { params }),
+  get: (id) => apiClient.get(`/subscription/admin/users/${id}/`),
+  grantSubscriptionType: (id, data) =>
+    apiClient.post(`/subscription/admin/users/${id}/grant-subscription-type/`, data),
+  grantAllCities: (id, data) =>
+    apiClient.post(`/subscription/admin/users/${id}/grant-all-cities/`, data),
+  revokeAllCities: (id) =>
+    apiClient.post(`/subscription/admin/users/${id}/revoke-all-cities/`),
+};
+
+export const iapPurchasesAdminAPI = {
+  list: (params) => apiClient.get('/subscription/admin/iap-purchases/', { params }),
+  get: (id) => apiClient.get(`/subscription/admin/iap-purchases/${id}/`),
+  update: (id, data) => apiClient.patch(`/subscription/admin/iap-purchases/${id}/`, data),
+};
+
+export const codeUsageLogsAPI = {
+  list: (params) => apiClient.get('/subscription/code-usage-logs/', { params }),
+  get: (id) => apiClient.get(`/subscription/code-usage-logs/${id}/`),
+};

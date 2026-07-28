@@ -6,7 +6,7 @@ import { buildLangOptions, getMultiLangValue, pickPrimaryLangCode } from '../sha
 import { parseApiError } from '../../../utils/apiError';
 import { useToast } from '../../../components/ui/Toast';
 import { citiesCatalogAPI } from './api';
-import { fromApiCity, mergeCityRowWithApiDetail, toApiCityUpdatePayload } from './adapters';
+import { createEmptyCity, fromApiCity, mergeCityRowWithApiDetail, toApiCityCreatePayload, toApiCityUpdatePayload } from './adapters';
 
 const PAGE_SIZE = 20;
 
@@ -94,6 +94,15 @@ export function useCitiesCatalog() {
   const totalCount = filtered.length;
   const rows = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
+  const openCreate = useCallback(() => {
+    setSaveError(null);
+    setDeleteError(null);
+    setSyncIapNote(null);
+    setActiveLang('ru');
+    setActiveEditTab('content');
+    setEditingCity(createEmptyCity());
+  }, []);
+
   const openEdit = useCallback(async (row) => {
     if (preparingEdit) return;
     setSaveError(null);
@@ -161,22 +170,44 @@ export function useCitiesCatalog() {
 
   const handleSave = useCallback(async (e) => {
     e?.preventDefault();
-    if (!editingCity?.id) return;
+    if (!editingCity) return;
+
+    const nameVal = editingCity?.name || {};
+    if (!Object.values(nameVal).some((v) => String(v || '').trim())) {
+      setSaveError('Введите название хотя бы на одном языке');
+      return;
+    }
 
     try {
       setSaving(true);
       setSaveError(null);
-      const payload = toApiCityUpdatePayload(editingCity);
-      await citiesCatalogAPI.update(editingCity.id, payload);
-      setEditingCity(null);
-      showToast('Город сохранён', 'success');
+      const isNew = !editingCity.id;
+      const payload = isNew
+        ? toApiCityCreatePayload(editingCity)
+        : toApiCityUpdatePayload(editingCity);
+
+      if (isNew) {
+        const r = await citiesCatalogAPI.create(payload);
+        const created = r?.data?.city || r?.data;
+        const id = created?.id || r?.data?.id;
+        if (id) {
+          setEditingCity(mergeCityRowWithApiDetail({ ...editingCity, id }, created));
+        } else {
+          setEditingCity(null);
+        }
+        showToast('Город создан', 'success');
+      } else {
+        await citiesCatalogAPI.update(editingCity.id, payload);
+        setEditingCity(null);
+        showToast('Город сохранён', 'success');
+      }
       await loadCities();
     } catch (err) {
-      setSaveError(parseApiError(err, 'Ошибка сохранения'));
+      setSaveError(parseApiError(err, editingCity?.id ? 'Ошибка сохранения' : 'Ошибка создания'));
     } finally {
       setSaving(false);
     }
-  }, [editingCity, loadCities]);
+  }, [editingCity, loadCities, showToast]);
 
   const [togglingIds, setTogglingIds] = useState(new Set());
 
@@ -265,6 +296,7 @@ export function useCitiesCatalog() {
     editingCity,
     setEditingCity,
     preparingEdit,
+    openCreate,
     openEdit,
     activeLang,
     setActiveLang,

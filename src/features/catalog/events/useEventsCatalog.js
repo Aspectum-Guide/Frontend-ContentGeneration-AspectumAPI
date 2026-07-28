@@ -128,20 +128,28 @@ export function useEventsCatalog() {
   const [mediaSaving, setMediaSaving] = useState(false);
   const [mediaError, setMediaError] = useState(null);
 
-  const setEventMedia = useCallback(async (imageId) => {
+  const patchEventMedia = useCallback(async (payload) => {
     if (!editingEvent?.id) return;
     try {
       setMediaSaving(true);
       setMediaError(null);
-      await eventsCatalogAPI.setMedia(editingEvent.id, { image_id: imageId });
-      const r = await eventsCatalogAPI.get(editingEvent.id);
-      setEditingEvent((prev) => mergeEventWithDetail(prev, r?.data));
+      const r = await eventsCatalogAPI.setMedia(editingEvent.id, payload);
+      const d = r?.data || {};
+      setEditingEvent((prev) => mergeEventWithDetail(prev, {
+        image_url: d.image_url ?? prev?.image_url,
+        image_copyright: d.image_copyright ?? prev?.image_copyright,
+        media: d.media ?? prev?.media,
+      }));
     } catch (err) {
-      setMediaError(parseApiError(err, 'Ошибка сохранения обложки'));
+      setMediaError(parseApiError(err, 'Ошибка сохранения медиа'));
     } finally {
       setMediaSaving(false);
     }
   }, [editingEvent?.id]);
+
+  const setEventMedia = useCallback(async (imageId) => {
+    await patchEventMedia({ image_id: imageId });
+  }, [patchEventMedia]);
 
   const handleSave = useCallback(async (e) => {
     e?.preventDefault();
@@ -245,6 +253,7 @@ export function useEventsCatalog() {
     descVal,
     allEventFilters,
     toggleTag,
+    patchEventMedia,
     setEventMedia,
     mediaSaving,
     mediaError,

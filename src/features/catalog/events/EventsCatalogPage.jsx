@@ -5,6 +5,8 @@ import DataTable from '../../../components/ui/DataTable';
 import { ConfirmModal } from '../../../components/ui/Modal';
 import Toast from '../../../components/ui/Toast';
 import { useLayoutActions } from '../../../context/useLayoutActions';
+import { adminAPI } from '../../../api/generation';
+import { parseApiError } from '../../../utils/apiError';
 import { getMultiLangValue } from '../shared/i18n';
 import EventEditorModal from './EventEditorModal';
 import { useEventsCatalog } from './useEventsCatalog';
@@ -14,6 +16,22 @@ export default function EventsCatalogPage() {
   const navigate = useNavigate();
   const e = useEventsCatalog();
   const [toggleConfirm, setToggleConfirm] = useState(null); // { id, field, value, label }
+  const [nearestLoading, setNearestLoading] = useState(false);
+  const [nearestNote, setNearestNote] = useState(null);
+
+  const handleCalculateNearest = async () => {
+    setNearestLoading(true);
+    setNearestNote(null);
+    try {
+      const r = await adminAPI.calculateNearestEvents(e.cityFilter || undefined);
+      const msg = r?.data?.message || r?.data?.status || 'Расчёт ближайших событий запущен';
+      setNearestNote({ type: 'success', text: String(msg) });
+    } catch (err) {
+      setNearestNote({ type: 'error', text: parseApiError(err, 'Ошибка расчёта ближайших событий') });
+    } finally {
+      setNearestLoading(false);
+    }
+  };
 
   const requestToggle = (id, field, value, label) => {
     if (!value) {
@@ -33,9 +51,17 @@ export default function EventsCatalogPage() {
           <div className="flex items-center gap-1.5 font-medium text-gray-900 text-sm">
             {getMultiLangValue(title) || '—'}
             {row.audio_guide_count > 0 && (
-              <span className="text-xs text-gray-400 font-normal" title={`${row.audio_guide_count} аудиогид(ов)`}>
+              <button
+                type="button"
+                onClick={(ev) => {
+                  ev.stopPropagation();
+                  navigate(`/catalog/audio-guides?event_id=${row.id}`);
+                }}
+                className="text-xs text-blue-600 font-normal hover:underline"
+                title={`${row.audio_guide_count} аудиогид(ов)`}
+              >
                 🎧{row.audio_guide_count}
-              </span>
+              </button>
             )}
           </div>
           {row.tags?.length > 0 && (
@@ -128,6 +154,13 @@ export default function EventsCatalogPage() {
         onClick: () => navigate('/catalog/tags?tab=event'),
         variant: 'secondary',
       },
+      {
+        id: 'calculate-nearest-events',
+        label: nearestLoading ? 'Расчёт...' : 'Рассчитать ближайшие',
+        onClick: () => { if (!nearestLoading) handleCalculateNearest(); },
+        disabled: nearestLoading,
+        variant: 'secondary',
+      },
     ];
 
     if (e.editingEvent) {
@@ -151,14 +184,35 @@ export default function EventsCatalogPage() {
 
     setMobileActions(actions);
     return () => setMobileActions([]);
-  }, [e.openCreate, e.saving, e.editingEvent, e.handleSave, e.setEditingEvent, navigate, setMobileActions]);
+  }, [e.openCreate, e.saving, e.editingEvent, e.handleSave, e.setEditingEvent, e.cityFilter, navigate, nearestLoading, setMobileActions]);
 
   return (
     <Layout>
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold text-gray-900">Справочник событий</h1>
-        <p className="mt-1 text-sm text-gray-500">Просмотр и редактирование событий</p>
+      <div className="mb-6 flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">Справочник событий</h1>
+          <p className="mt-1 text-sm text-gray-500">Просмотр и редактирование событий</p>
+        </div>
+        <button
+          type="button"
+          onClick={handleCalculateNearest}
+          disabled={nearestLoading}
+          className="px-3 py-2 text-sm font-medium text-blue-700 bg-blue-50 rounded-lg hover:bg-blue-100 disabled:opacity-50"
+        >
+          {nearestLoading ? 'Расчёт...' : 'Рассчитать ближайшие'}
+        </button>
       </div>
+
+      {nearestNote && (
+        <div className={`mb-4 text-sm rounded-lg px-3 py-2 border ${
+          nearestNote.type === 'error'
+            ? 'text-red-700 bg-red-50 border-red-200'
+            : 'text-green-700 bg-green-50 border-green-200'
+        }`}
+        >
+          {nearestNote.text}
+        </div>
+      )}
 
       {(e.cityOptionsError || e.filtersError) && (
         <div className="mb-4 flex flex-col gap-1">
@@ -236,7 +290,7 @@ export default function EventsCatalogPage() {
         cityOptions={e.cityOptions}
         allEventFilters={e.allEventFilters}
         toggleTag={e.toggleTag}
-        onSetMedia={e.setEventMedia}
+        onPatchMedia={e.patchEventMedia}
         mediaSaving={e.mediaSaving}
         mediaError={e.mediaError}
       />

@@ -238,7 +238,13 @@ export function mapCityTagCatalogRow(f, appLanguages) {
     slug: typeof f?.name === 'string' ? f.name : String(f.id),
     emoji: typeof desc.emoji === 'string' ? desc.emoji : '',
     description: f.description,
-    type: 'tag',
+    type: f.type || 'tag',
+    parent_id: f.parent_id ? String(f.parent_id) : (f.parent?.id ? String(f.parent.id) : null),
+    index: f.index ?? 0,
+    is_show: f.is_show ?? true,
+    pic_id: f.pic_id ?? null,
+    image_url: f.image_url ?? null,
+    city_ids: Array.isArray(f.city_ids) ? f.city_ids.map(String) : [],
   };
 }
 
@@ -286,14 +292,17 @@ export function buildCityTagCreatePayload(newFilter, appLanguages, defaultLang =
     ? ensureAppLanguages(titleObj, appLanguages, defaultLang)
     : titleObj;
   const ru = normalized.ru || getMultiLangValue(normalized) || '';
+  const isFolder = newFilter?.kind === 'folder' || newFilter?.type === 'folder';
   return {
-    type: 'tag',
-    parent_id: null,
-    name: makeUniqueTagName(ru, 'city-tag'),
+    type: isFolder ? 'folder' : 'tag',
+    parent_id: isFolder ? null : (newFilter?.parent_folder_id || newFilter?.parent_id || null),
+    name: makeUniqueTagName(ru, isFolder ? 'city-folder' : 'city-tag'),
     title: normalized,
     description: newFilter?.emoji?.trim() ? { emoji: newFilter.emoji.trim() } : {},
-    index: 0,
-    is_show: true,
+    index: Number(newFilter?.index) || 0,
+    is_show: newFilter?.is_show !== false,
+    pic_id: newFilter?.pic_id || null,
+    city_ids: (newFilter?.city_ids || []).map(String),
   };
 }
 
@@ -302,9 +311,13 @@ export function buildCityTagUpdatePayload(editingFilter, appLanguages) {
     ? ensureAppLanguages(editingFilter.name, appLanguages)
     : editingFilter.name;
   const payload = {
-    type: 'tag',
-    parent_id: null,
+    type: editingFilter.type || 'tag',
+    parent_id: editingFilter.type === 'tag' ? (editingFilter.parent_id || null) : null,
     title,
+    index: Number(editingFilter.index) || 0,
+    is_show: editingFilter.is_show !== false,
+    pic_id: editingFilter.pic_id || null,
+    city_ids: (editingFilter.city_ids || []).map(String),
   };
   const desc = typeof editingFilter.description === 'object' && editingFilter.description
     ? { ...editingFilter.description }

@@ -22,6 +22,10 @@ import BookingSetupWorkbench from './pages/catalog/BookingSetupWorkbench';
 import CityPricingWorkbench from './pages/catalog/CityPricingWorkbench';
 import SubscriptionTypesCatalog from './pages/catalog/SubscriptionTypesCatalog';
 import ActivationCodesCatalog from './pages/catalog/ActivationCodesCatalog';
+import UserSubscriptionsWorkbench from './pages/catalog/UserSubscriptionsWorkbench';
+import CodeUsageLogsCatalog from './pages/catalog/CodeUsageLogsCatalog';
+import CitySubscriptionsCatalog from './pages/catalog/CitySubscriptionsCatalog';
+import IAPPurchasesCatalog from './pages/catalog/IAPPurchasesCatalog';
 import BookingReservationsCatalog from './pages/catalog/BookingReservationsCatalog';
 import BasePricesCatalog from './pages/catalog/BasePricesCatalog';
 import PricingRulesCatalog from './pages/catalog/PricingRulesCatalog';
@@ -180,6 +184,22 @@ const routes = [
   {
     path: '/catalog/activation-codes',
     element: <ProtectedRoute><ErrorBoundary><ActivationCodesCatalog /></ErrorBoundary></ProtectedRoute>,
+  },
+  {
+    path: '/catalog/user-subscriptions',
+    element: <ProtectedRoute><ErrorBoundary><UserSubscriptionsWorkbench /></ErrorBoundary></ProtectedRoute>,
+  },
+  {
+    path: '/catalog/city-subscriptions',
+    element: <ProtectedRoute><ErrorBoundary><CitySubscriptionsCatalog /></ErrorBoundary></ProtectedRoute>,
+  },
+  {
+    path: '/catalog/code-usage-logs',
+    element: <ProtectedRoute><ErrorBoundary><CodeUsageLogsCatalog /></ErrorBoundary></ProtectedRoute>,
+  },
+  {
+    path: '/catalog/iap-purchases',
+    element: <ProtectedRoute><ErrorBoundary><IAPPurchasesCatalog /></ErrorBoundary></ProtectedRoute>,
   },
   {
     path: '/catalog/photos',

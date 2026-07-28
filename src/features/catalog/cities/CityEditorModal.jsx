@@ -6,11 +6,21 @@ import Modal from '../../../components/ui/Modal';
 import { createCoordinatePasteHandler } from '../../../utils/coordinates';
 import { buildLangOptions, getMultiLangValue } from '../shared/i18n';
 import { LangBlock, LangTabs } from '../shared/LangFields';
+import InformationBlocksEditor from '../shared/InformationBlocksEditor';
+import { citiesCatalogAPI } from './api';
+
+const cityUsefulInfoApi = {
+  list: (id) => citiesCatalogAPI.listUsefulInformation(id),
+  create: (id, data) => citiesCatalogAPI.createUsefulInformation(id, data),
+  update: (id, infoId, data) => citiesCatalogAPI.updateUsefulInformation(id, infoId, data),
+  remove: (id, infoId) => citiesCatalogAPI.deleteUsefulInformation(id, infoId),
+};
 
 const CITY_EDIT_TABS = [
   { key: 'content', label: 'Контент' },
   { key: 'media', label: 'Обложка' },
   { key: 'geo', label: 'Карта и теги' },
+  { key: 'useful', label: 'Полезное' },
   { key: 'iap', label: 'IAP' },
 ];
 
@@ -162,7 +172,9 @@ export default function CityEditorModal({
       <Modal
         open={open}
         onClose={onClose}
-        title={`Редактировать город${city ? ` — ${getMultiLangValue(city.name) || ''}` : ''}`}
+        title={city?.id
+          ? `Редактировать город — ${getMultiLangValue(city.name) || ''}`
+          : 'Создать город'}
         size="xl"
       >
         {city && (
@@ -387,6 +399,15 @@ export default function CityEditorModal({
               </div>
             )}
 
+            {activeTab === 'useful' && (
+              <InformationBlocksEditor
+                parentId={city?.id}
+                api={cityUsefulInfoApi}
+                showVisibility
+                disabled={preparing || saving}
+              />
+            )}
+
             {activeTab === 'iap' && (
               <div className="space-y-4">
                 <Field label="Видимость">
@@ -482,7 +503,11 @@ export default function CityEditorModal({
               </div>
             )}
 
-            <FormActions saving={saving} onCancel={onClose} />
+            <FormActions
+              saving={saving}
+              onCancel={onClose}
+              saveLabel={city?.id ? 'Сохранить' : 'Создать'}
+            />
           </form>
         )}
       </Modal>

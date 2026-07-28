@@ -4,6 +4,8 @@ import DataTable from '../../../components/ui/DataTable';
 import { ConfirmModal } from '../../../components/ui/Modal';
 import Toast from '../../../components/ui/Toast';
 import { useLayoutActions } from '../../../context/useLayoutActions';
+import { iapAdminAPI } from '../../../api/generation';
+import { parseApiError } from '../../../utils/apiError';
 import { getMultiLangValue } from '../shared/i18n';
 import CityEditorModal from './CityEditorModal';
 import { useCitiesCatalog } from './useCitiesCatalog';
@@ -12,6 +14,34 @@ export default function CitiesCatalogPage() {
   const { setMobileActions } = useLayoutActions();
   const c = useCitiesCatalog();
   const [toggleConfirm, setToggleConfirm] = useState(null); // { id, field, value, label }
+  const [selectedIds, setSelectedIds] = useState(() => new Set());
+  const [bulkSyncing, setBulkSyncing] = useState(false);
+  const [bulkSyncNote, setBulkSyncNote] = useState(null);
+
+  const toggleSelected = (id) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      const sid = String(id);
+      if (next.has(sid)) next.delete(sid);
+      else next.add(sid);
+      return next;
+    });
+  };
+
+  const handleBulkSync = async (all = false) => {
+    setBulkSyncing(true);
+    setBulkSyncNote(null);
+    try {
+      const cityIds = all ? [] : [...selectedIds];
+      const r = await iapAdminAPI.bulkSync(cityIds);
+      const queued = r?.data?.queued ?? 0;
+      setBulkSyncNote({ type: 'success', text: `В очередь поставлено: ${queued} город(ов)` });
+    } catch (err) {
+      setBulkSyncNote({ type: 'error', text: parseApiError(err, 'Ошибка bulk sync') });
+    } finally {
+      setBulkSyncing(false);
+    }
+  };
 
   const requestToggle = (id, field, value, label) => {
     if (!value) {
@@ -23,6 +53,19 @@ export default function CitiesCatalogPage() {
   };
 
   const columns = [
+    {
+      key: '_select',
+      label: '',
+      render: (_, row) => (
+        <input
+          type="checkbox"
+          checked={selectedIds.has(String(row.id))}
+          onChange={() => toggleSelected(row.id)}
+          onClick={(e) => e.stopPropagation()}
+          aria-label="Выбрать город"
+        />
+      ),
+    },
     {
       key: 'name',
       label: 'Название',
@@ -94,20 +137,23 @@ export default function CitiesCatalogPage() {
   useEffect(() => {
     if (c.editingCity) return;
     setMobileActions([
-      { id: 'create-city-session', label: 'Создать город', onClick: c.openNewSession, variant: 'primary' },
+      { id: 'create-city', label: 'Создать город', onClick: c.openCreate, variant: 'primary' },
+      { id: 'create-city-session', label: 'Через сессию', onClick: c.openNewSession, variant: 'secondary' },
       { id: 'create-city-tag', label: 'Создать тег города', onClick: c.openTags, variant: 'secondary' },
       { id: 'open-sessions', label: 'Открыть сессии', onClick: c.openSessions },
       { id: 'refresh-cities', label: 'Обновить справочник', onClick: c.reload },
     ]);
     return () => setMobileActions([]);
-  }, [c.editingCity, c.openNewSession, c.openTags, c.openSessions, c.reload, setMobileActions]);
+  }, [c.editingCity, c.openCreate, c.openNewSession, c.openTags, c.openSessions, c.reload, setMobileActions]);
 
   useEffect(() => {
     if (!c.editingCity) return;
     const actions = [
       {
         id: 'save-city',
-        label: c.saving ? 'Сохранение...' : 'Сохранить город',
+        label: c.saving
+          ? (c.editingCity?.id ? 'Сохранение...' : 'Создание...')
+          : (c.editingCity?.id ? 'Сохранить город' : 'Создать город'),
         onClick: () => { if (!c.saving) c.handleSave(); },
         disabled: c.saving,
         variant: 'primary',
@@ -136,6 +182,30 @@ export default function CitiesCatalogPage() {
 
   return (
     <Layout>
+      <div className="mb-4 flex flex-wrap items-center gap-2">
+        <button
+          type="button"
+          onClick={() => handleBulkSync(false)}
+          disabled={bulkSyncing || selectedIds.size === 0}
+          className="px-3 py-2 text-sm font-medium text-blue-700 bg-blue-50 rounded-lg hover:bg-blue-100 disabled:opacity-50"
+        >
+          {bulkSyncing ? 'Синк...' : `Синк выбранных (${selectedIds.size})`}
+        </button>
+        <button
+          type="button"
+          onClick={() => handleBulkSync(true)}
+          disabled={bulkSyncing}
+          className="px-3 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 disabled:opacity-50"
+        >
+          Синк всех с SKU
+        </button>
+        {bulkSyncNote && (
+          <span className={`text-sm ${bulkSyncNote.type === 'error' ? 'text-red-600' : 'text-green-700'}`}>
+            {bulkSyncNote.text}
+          </span>
+        )}
+      </div>
+
       <DataTable
         columns={columns}
         rows={c.rows}

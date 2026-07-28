@@ -1,3 +1,28 @@
+export function createEmptyCity() {
+  return {
+    id: null,
+    name: { ru: '' },
+    description: {},
+    country: {},
+    city_filter_ids: [],
+    lat: '',
+    lon: '',
+    image_id: null,
+    image_url: null,
+    image_copyright: '',
+    is_show: true,
+    iap_sku: '',
+    iap_price_usd: '',
+    iap_apple_status: 'not_created',
+    iap_google_status: 'not_created',
+    iap_synced_at: null,
+  };
+}
+
+export function toApiCityCreatePayload(city) {
+  return toApiCityUpdatePayload(city);
+}
+
 export function fromApiCity(row) {
   if (!row || typeof row !== 'object') return null;
   return {
