@@ -59,6 +59,8 @@ export const eventTicketTypePricesAPI = {
   create: (data) => apiClient.post('/booking/event-ticket-type-prices/', data),
   update: (id, data) => apiClient.patch(`/booking/event-ticket-type-prices/${id}/`, data),
   delete: (id) => apiClient.delete(`/booking/event-ticket-type-prices/${id}/`),
+  // Upsert base prices for many (event, ticket_type) pairs in one atomic call.
+  bulkUpsert: (data) => apiClient.post('/booking/event-ticket-type-prices/bulk-upsert/', data),
 };
 
 export const pricingRulesAPI = {

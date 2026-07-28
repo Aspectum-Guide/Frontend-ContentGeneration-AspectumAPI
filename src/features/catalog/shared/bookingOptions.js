@@ -27,6 +27,24 @@ async function loadAllReferenceEvents(pageSize = REFERENCE_PAGE_SIZE) {
   return { events: allEvents, cities };
 }
 
+/** Same pagination-loop shape as loadAllReferenceEvents, scoped to one city. */
+export async function loadReferenceEventsForCity(cityId, pageSize = REFERENCE_PAGE_SIZE) {
+  const allEvents = [];
+  let page = 1;
+  let totalPages = 1;
+
+  while (page <= totalPages) {
+    const response = await eventsAPI.list({ city_id: cityId, page, page_size: pageSize });
+    const data = response?.data;
+    const list = normalizeListResponse(data, ['events', 'results', 'data']);
+    allEvents.push(...list);
+    totalPages = Number(data?.total_pages) || 1;
+    page += 1;
+  }
+
+  return allEvents;
+}
+
 export function useEventOptions(pageSize = REFERENCE_PAGE_SIZE) {
   const [eventOptions, setEventOptions] = useState([]);
   const [cityOptions, setCityOptions] = useState([]);

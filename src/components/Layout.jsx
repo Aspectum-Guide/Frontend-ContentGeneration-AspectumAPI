@@ -119,6 +119,7 @@ export default function Layout({ children, pageHeader = null, pageHeaderMode = '
       title: 'Букинг',
       items: [
         { label: 'Настройка продаж', to: '/catalog/booking-setup' },
+        { label: 'Цены по городу', to: '/catalog/city-pricing' },
         { label: 'Справочники', to: '/catalog/booking' },
         { label: 'Аналитика', to: '/catalog/analytics' },
         { label: 'Резервации', to: '/catalog/reservations' },
@@ -164,6 +165,7 @@ export default function Layout({ children, pageHeader = null, pageHeaderMode = '
     { startsWith: '/catalog/pricing-rules', title: 'Правила ценообразования' },
     { startsWith: '/catalog/analytics', title: 'Аналитика бронирований' },
     { startsWith: '/catalog/booking-setup', title: 'Booking Setup (мастер)' },
+    { startsWith: '/catalog/city-pricing', title: 'Массовые цены по городу' },
     { startsWith: '/catalog/booking', title: 'Справочники букинга' },
     { startsWith: '/catalog/llm/keys', title: 'Ключи LLM API' },
     { startsWith: '/catalog/llm/usage', title: 'Использование моделей' },

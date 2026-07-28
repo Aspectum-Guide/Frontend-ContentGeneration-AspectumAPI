@@ -19,6 +19,7 @@ import TicketTypesCatalog from './pages/catalog/TicketTypesCatalog';
 import SlotAvailabilitiesCatalog from './pages/catalog/SlotAvailabilitiesCatalog';
 import TicketPricesCatalog from './pages/catalog/TicketPricesCatalog';
 import BookingSetupWorkbench from './pages/catalog/BookingSetupWorkbench';
+import CityPricingWorkbench from './pages/catalog/CityPricingWorkbench';
 import SubscriptionTypesCatalog from './pages/catalog/SubscriptionTypesCatalog';
 import ActivationCodesCatalog from './pages/catalog/ActivationCodesCatalog';
 import BookingReservationsCatalog from './pages/catalog/BookingReservationsCatalog';
@@ -143,6 +144,10 @@ const routes = [
   {
     path: '/catalog/booking-setup',
     element: <ProtectedRoute><ErrorBoundary><BookingSetupWorkbench /></ErrorBoundary></ProtectedRoute>,
+  },
+  {
+    path: '/catalog/city-pricing',
+    element: <ProtectedRoute><ErrorBoundary><CityPricingWorkbench /></ErrorBoundary></ProtectedRoute>,
   },
   {
     path: '/catalog/reservations',
