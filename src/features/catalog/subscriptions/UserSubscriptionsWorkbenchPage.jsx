@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { citiesAPI } from '../../../api/generation';
 import {
   citySubscriptionsAPI,
@@ -51,11 +51,16 @@ function createEmptyGrant() {
   };
 }
 
+const USERS_PAGE_SIZE = 20;
+
 export default function UserSubscriptionsWorkbenchPage() {
   const { setMobileActions } = useLayoutActions();
 
   const [emailSearch, setEmailSearch] = useState('');
   const [userResults, setUserResults] = useState([]);
+  const [usersPage, setUsersPage] = useState(1);
+  const [usersTotal, setUsersTotal] = useState(0);
+  const [listLoading, setListLoading] = useState(true);
   const [selectedUser, setSelectedUser] = useState(null);
   const [userLoading, setUserLoading] = useState(false);
   const [userError, setUserError] = useState(null);
@@ -123,50 +128,56 @@ export default function UserSubscriptionsWorkbenchPage() {
     return response?.data;
   }, []);
 
-  const searchUsers = useCallback(async () => {
-    const query = emailSearch.trim();
-    if (!query) {
-      setUserError('Введите email пользователя');
-      return;
-    }
-
+  const loadUsers = useCallback(async (page = 1, search = emailSearch) => {
     try {
-      setUserLoading(true);
+      setListLoading(true);
       setUserError(null);
-      setSelectedUser(null);
+      const query = (search || '').trim();
       const response = await subscriptionUsersAdminAPI.list({
-        search: query,
-        page_size: 20,
+        ...(query ? { search: query } : {}),
+        page,
+        page_size: USERS_PAGE_SIZE,
         ordering: '-created_at',
       });
       const data = response?.data;
       const list = Array.isArray(data?.results) ? data.results : Array.isArray(data) ? data : [];
       setUserResults(list);
-      if (list.length === 1) {
-        await loadUserDetail(list[0].id);
-      } else if (list.length === 0) {
-        setUserError('Пользователь не найден');
-      }
+      setUsersTotal(data?.count ?? list.length);
+      setUsersPage(page);
     } catch (err) {
       setUserResults([]);
-      setUserError(parseApiError(err, 'Ошибка поиска пользователя'));
+      setUsersTotal(0);
+      setUserError(parseApiError(err, 'Ошибка загрузки пользователей'));
     } finally {
-      setUserLoading(false);
+      setListLoading(false);
     }
-  }, [emailSearch, loadUserDetail]);
+  }, [emailSearch]);
 
   useEffect(() => {
     loadRefs();
   }, [loadRefs]);
 
+  // Initial list load
+  useEffect(() => {
+    void loadUsers(1, '');
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Debounced search filter (skip first empty run — already loaded on mount)
+  const searchBootstrapped = useRef(false);
+  useEffect(() => {
+    if (!searchBootstrapped.current) {
+      searchBootstrapped.current = true;
+      return;
+    }
+    const timer = setTimeout(() => {
+      void loadUsers(1, emailSearch);
+    }, 350);
+    return () => clearTimeout(timer);
+  }, [emailSearch, loadUsers]);
+
   useEffect(() => {
     setMobileActions([
-      {
-        id: 'search-user-subscriptions',
-        label: 'Найти пользователя',
-        onClick: () => void searchUsers(),
-        variant: 'primary',
-      },
       ...(selectedUser
         ? [{
           id: 'grant-city-subscription',
@@ -176,12 +187,17 @@ export default function UserSubscriptionsWorkbenchPage() {
             setGrantForm(createEmptyGrant());
             setGrantOpen(true);
           },
-          variant: 'secondary',
+          variant: 'primary',
         }]
-        : []),
+        : [{
+          id: 'refresh-users',
+          label: 'Обновить список',
+          onClick: () => void loadUsers(usersPage, emailSearch),
+          variant: 'secondary',
+        }]),
     ]);
     return () => setMobileActions([]);
-  }, [searchUsers, selectedUser, setMobileActions]);
+  }, [loadUsers, selectedUser, setMobileActions, usersPage, emailSearch]);
 
   const refreshSelectedUser = useCallback(async () => {
     if (!selectedUser?.id) return;
@@ -315,6 +331,45 @@ export default function UserSubscriptionsWorkbenchPage() {
   const citySubscriptions = selectedUser?.city_subscriptions || [];
   const iapPurchases = selectedUser?.iap_purchases || [];
 
+  const userColumns = [
+    {
+      key: 'email',
+      label: 'Email',
+      render: (v, row) => (
+        <div>
+          <div className={`text-sm font-medium ${selectedUser?.id === row.id ? 'text-violet-700' : 'text-gray-900'}`}>
+            {v || '—'}
+          </div>
+          {row.username ? <div className="text-xs text-gray-400">@{row.username}</div> : null}
+        </div>
+      ),
+    },
+    {
+      key: 'active_city_subscriptions_count',
+      label: 'Города',
+      render: (v) => <span className="text-sm text-gray-700">{v ?? 0}</span>,
+    },
+    {
+      key: 'iap_purchases_count',
+      label: 'IAP',
+      render: (v) => <span className="text-sm text-gray-700">{v ?? 0}</span>,
+    },
+    {
+      key: 'is_active',
+      label: 'Активен',
+      render: (v) => (
+        <span className={`text-xs font-medium ${v ? 'text-green-600' : 'text-gray-400'}`}>
+          {v ? 'да' : 'нет'}
+        </span>
+      ),
+    },
+    {
+      key: 'created_at',
+      label: 'Создан',
+      render: (v) => <span className="text-xs text-gray-500">{formatDate(v)}</span>,
+    },
+  ];
+
   const subscriptionColumns = [
     {
       key: 'city_name',
@@ -435,11 +490,11 @@ export default function UserSubscriptionsWorkbenchPage() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
         <CatalogPageHeader
           title="Подписки пользователей"
-          description="Поиск по email, выдача доступа к городам, отключение подписок и правка IAP premium."
+          description="Список пользователей, выдача доступа к городам, отключение подписок и правка IAP premium."
           createLabel="Выдать город"
           onCreate={() => {
             if (!selectedUser) {
-              setUserError('Сначала найдите пользователя по email');
+              setUserError('Сначала выберите пользователя из списка');
               return;
             }
             setGrantError(null);
@@ -448,49 +503,40 @@ export default function UserSubscriptionsWorkbenchPage() {
           }}
         />
 
-        <div className="bg-white border border-gray-200 rounded-2xl p-4 sm:p-5 space-y-4">
-          <div className="flex flex-col sm:flex-row gap-3">
-            <TextInput
-              value={emailSearch}
-              onChange={(e) => setEmailSearch(e.target.value)}
-              placeholder="Email пользователя"
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') void searchUsers();
-              }}
-            />
-            <button
-              type="button"
-              className="px-4 py-2 rounded-xl bg-violet-600 text-white text-sm font-medium disabled:opacity-60"
-              disabled={userLoading}
-              onClick={() => void searchUsers()}
-            >
-              {userLoading ? 'Поиск…' : 'Найти'}
-            </button>
-          </div>
-
+        <div className="space-y-3">
           {userError ? <FormErrorAlert message={userError} /> : null}
-
-          {userResults.length > 1 ? (
-            <div className="space-y-2">
-              <p className="text-sm text-gray-600">Найдено несколько пользователей — выберите нужного:</p>
-              <div className="flex flex-wrap gap-2">
-                {userResults.map((user) => (
-                  <button
-                    key={user.id}
-                    type="button"
-                    className={`px-3 py-2 rounded-xl border text-sm ${
-                      selectedUser?.id === user.id
-                        ? 'border-violet-500 bg-violet-50 text-violet-800'
-                        : 'border-gray-200 bg-white text-gray-700'
-                    }`}
-                    onClick={() => void handleSelectUser(user)}
-                  >
-                    {user.email}
-                  </button>
-                ))}
-              </div>
-            </div>
-          ) : null}
+          <DataTable
+            columns={userColumns}
+            rows={userResults}
+            loading={listLoading}
+            error={null}
+            emptyIcon="👤"
+            emptyText={emailSearch.trim() ? 'По запросу никого не найдено' : 'Пользователей пока нет'}
+            isFiltered={!!emailSearch.trim()}
+            search={emailSearch}
+            onSearch={setEmailSearch}
+            searchPlaceholder="Фильтр по email, имени…"
+            page={usersPage}
+            totalCount={usersTotal}
+            pageSize={USERS_PAGE_SIZE}
+            onPage={(p) => void loadUsers(p, emailSearch)}
+            onRowClick={(row) => void handleSelectUser(row)}
+          />
+          {selectedUser ? (
+            <p className="text-xs text-gray-500">
+              Выбран: <span className="font-medium text-gray-800">{selectedUser.email}</span>
+              {' · '}
+              <button
+                type="button"
+                className="text-violet-600 hover:underline"
+                onClick={() => setSelectedUser(null)}
+              >
+                снять выбор
+              </button>
+            </p>
+          ) : (
+            <p className="text-xs text-gray-400">Кликните по пользователю, чтобы открыть подписки и IAP.</p>
+          )}
         </div>
 
         {selectedUser ? (
