@@ -17,6 +17,14 @@ export const eventsCatalogAPI = {
   createFeedItem: (id, data) => eventsAPI.createFeedItem(id, data),
   updateFeedItem: (id, feedId, data) => eventsAPI.updateFeedItem(id, feedId, data),
   deleteFeedItem: (id, feedId) => eventsAPI.deleteFeedItem(id, feedId),
+  listItinerary: (id) => eventsAPI.listItinerary(id),
+  createItineraryStep: (id, data) => eventsAPI.createItineraryStep(id, data),
+  updateItineraryStep: (id, stepId, data) => eventsAPI.updateItineraryStep(id, stepId, data),
+  deleteItineraryStep: (id, stepId) => eventsAPI.deleteItineraryStep(id, stepId),
+  listInclusions: (id) => eventsAPI.listInclusions(id),
+  createInclusion: (id, data) => eventsAPI.createInclusion(id, data),
+  updateInclusion: (id, itemId, data) => eventsAPI.updateInclusion(id, itemId, data),
+  deleteInclusion: (id, itemId) => eventsAPI.deleteInclusion(id, itemId),
   listCities: (params) => citiesAPI.list(params),
   /** Event editor tag chips: only `type === 'tag'` rows from EventsAPI tree. */
   listFilters: async () => {

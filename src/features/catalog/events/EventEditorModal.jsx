@@ -8,6 +8,8 @@ import { buildLangOptions, getMultiLangValue } from '../shared/i18n';
 import { LangBlock, LangTabs } from '../shared/LangFields';
 import InformationBlocksEditor from '../shared/InformationBlocksEditor';
 import PublishedFeedEditor from '../shared/PublishedFeedEditor';
+import EventItineraryTab from './EventItineraryTab';
+import EventInclusionsTab from './EventInclusionsTab';
 import { eventsCatalogAPI } from './api';
 
 const eventInformationApi = {
@@ -174,6 +176,13 @@ export default function EventEditorModal({
                 { key: 'meta', label: 'Связи' },
                 { key: 'information', label: 'Инфо' },
                 { key: 'feed', label: 'Лента' },
+                // Shop-only content (BookingAPI.EventItineraryStep/EventInclusion,
+                // see ARCHITECTURE.md) — meaningless before the event is saved or
+                // for events not open for sale.
+                ...(event?.id && event?.is_bookable ? [
+                  { key: 'itinerary', label: 'Маршрут' },
+                  { key: 'inclusions', label: 'Что включено' },
+                ] : []),
                 { key: 'map', label: 'Карта' },
               ].map((tab) => (
                 <button
@@ -375,6 +384,14 @@ export default function EventEditorModal({
                 api={eventFeedApi}
                 disabled={editLoading || saving}
               />
+            )}
+
+            {activeTab === 'itinerary' && event?.id && (
+              <EventItineraryTab eventId={event.id} activeLang={activeLang} />
+            )}
+
+            {activeTab === 'inclusions' && event?.id && (
+              <EventInclusionsTab eventId={event.id} activeLang={activeLang} />
             )}
 
             {activeTab === 'map' && (

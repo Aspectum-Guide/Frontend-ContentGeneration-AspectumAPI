@@ -442,6 +442,23 @@ export const eventsAPI = {
     apiClient.patch(`${BASE}/events/${eventId}/feed/${feedId}/`, data),
   deleteFeedItem: (eventId, feedId) =>
     apiClient.delete(`${BASE}/events/${eventId}/feed/${feedId}/`),
+  // Shop-only content (BookingAPI.EventItineraryStep/EventInclusion) — see ARCHITECTURE.md.
+  listItinerary: (eventId) =>
+    apiClient.get(`${BASE}/events/${eventId}/itinerary/`),
+  createItineraryStep: (eventId, data) =>
+    apiClient.post(`${BASE}/events/${eventId}/itinerary/`, data),
+  updateItineraryStep: (eventId, stepId, data) =>
+    apiClient.patch(`${BASE}/events/${eventId}/itinerary/${stepId}/`, data),
+  deleteItineraryStep: (eventId, stepId) =>
+    apiClient.delete(`${BASE}/events/${eventId}/itinerary/${stepId}/`),
+  listInclusions: (eventId) =>
+    apiClient.get(`${BASE}/events/${eventId}/inclusions/`),
+  createInclusion: (eventId, data) =>
+    apiClient.post(`${BASE}/events/${eventId}/inclusions/`, data),
+  updateInclusion: (eventId, itemId, data) =>
+    apiClient.patch(`${BASE}/events/${eventId}/inclusions/${itemId}/`, data),
+  deleteInclusion: (eventId, itemId) =>
+    apiClient.delete(`${BASE}/events/${eventId}/inclusions/${itemId}/`),
   filtersReference: () =>
     apiClient.get(`${BASE}/events/filters-reference/`),
   cities: () => apiClient.get(`${BASE}/events/cities/`),
