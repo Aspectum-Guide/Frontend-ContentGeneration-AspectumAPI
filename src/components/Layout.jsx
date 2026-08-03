@@ -113,6 +113,7 @@ export default function Layout({ children, pageHeader = null, pageHeaderMode = '
         { label: 'Аудиогиды', to: '/catalog/audio-guides' },
         { label: 'Интерактивные локации', to: '/catalog/interactive-locations' },
         { label: 'Фотографии', to: '/catalog/photos' },
+        { label: 'Продуктовая аналитика', to: '/catalog/product-analytics' },
       ],
     },
     {
@@ -167,6 +168,7 @@ export default function Layout({ children, pageHeader = null, pageHeaderMode = '
     { startsWith: '/catalog/ticket-prices', title: 'Справочник цен билетов' },
     { startsWith: '/catalog/base-prices', title: 'Базовые цены' },
     { startsWith: '/catalog/pricing-rules', title: 'Правила ценообразования' },
+    { startsWith: '/catalog/product-analytics', title: 'Продуктовая аналитика' },
     { startsWith: '/catalog/analytics', title: 'Аналитика бронирований' },
     { startsWith: '/catalog/booking-setup', title: 'Booking Setup (мастер)' },
     { startsWith: '/catalog/city-pricing', title: 'Массовые цены по городу' },

@@ -11,6 +11,7 @@ export const CONTENT_CATALOG_SECTION = {
     { to: '/catalog/audio-guides', title: 'Аудиогиды', description: 'Треки по языкам, загрузка MP3', icon: '🎧' },
     { to: '/catalog/interactive-locations', title: 'Интерактивные локации', description: 'Опубликованные IL из сессий, тогл видимости', icon: '📍' },
     { to: '/catalog/photos', title: 'Фотографии', description: 'Медиа (изображения)', icon: '🖼️' },
+    { to: '/catalog/product-analytics', title: 'Продуктовая аналитика', description: 'События приложения: экраны, карта, аудио, paywall', icon: '📈' },
   ],
 };
 

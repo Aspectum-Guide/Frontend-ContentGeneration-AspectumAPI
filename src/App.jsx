@@ -30,6 +30,7 @@ import BookingReservationsCatalog from './pages/catalog/BookingReservationsCatal
 import BasePricesCatalog from './pages/catalog/BasePricesCatalog';
 import PricingRulesCatalog from './pages/catalog/PricingRulesCatalog';
 import BookingAnalytics from './pages/catalog/BookingAnalytics';
+import ProductAnalytics from './pages/catalog/ProductAnalytics';
 import AudioGuidesCatalog from './pages/catalog/AudioGuidesCatalog';
 import InteractiveLocationsCatalog from './pages/catalog/InteractiveLocationsCatalog';
 import LLMKeysCatalog from './pages/catalog/LLMKeysCatalog';
@@ -168,6 +169,10 @@ const routes = [
   {
     path: '/catalog/analytics',
     element: <ProtectedRoute><ErrorBoundary><BookingAnalytics /></ErrorBoundary></ProtectedRoute>,
+  },
+  {
+    path: '/catalog/product-analytics',
+    element: <ProtectedRoute><ErrorBoundary><ProductAnalytics /></ErrorBoundary></ProtectedRoute>,
   },
   {
     path: '/catalog/audio-guides',
