@@ -480,6 +480,9 @@ export function TTSProviderSettingsPanel({
 }) {
   const loadTriggeredRef = useRef(false);
   const previewAudioRef = useRef(null);
+  const [fishVoiceMode, setFishVoiceMode] = useState(() =>
+    voiceId ? 'custom' : 'default',
+  );
 
   useEffect(() => {
     if (!loadTriggeredRef.current) {
@@ -491,6 +494,12 @@ export function TTSProviderSettingsPanel({
   useEffect(() => {
     if (provider === 'elevenlabs') onLoadElevenLabsSettings?.();
   }, [provider, onLoadElevenLabsSettings]);
+
+  useEffect(() => {
+    if (provider === 'fish_audio' && voiceId) {
+      setFishVoiceMode('custom');
+    }
+  }, [provider, voiceId]);
 
   const providerList = Array.isArray(providerSettings?.providers)
     ? providerSettings.providers
@@ -593,17 +602,37 @@ export function TTSProviderSettingsPanel({
             </select>
           </div>
           <div>
-            <label className="mb-1 block text-sm font-medium text-gray-800">
-              Reference ID голоса
-            </label>
-            <input
-              value={voiceId}
-              onChange={(event) => onVoiceChange?.(event.target.value)}
+            <label className="mb-1 block text-sm font-medium text-gray-800">Голос</label>
+            <select
+              value={fishVoiceMode}
+              onChange={(event) => {
+                const nextMode = event.target.value;
+                setFishVoiceMode(nextMode);
+                if (nextMode === 'default') {
+                  onVoiceChange?.('');
+                }
+              }}
               disabled={disabled}
-              placeholder="Пусто — стандартный голос Fish Audio"
               className="w-full rounded-lg border border-gray-300 px-2 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50"
-            />
+            >
+              <option value="default">Стандартный голос Fish Audio</option>
+              <option value="custom">Конкретный голос по Reference ID</option>
+            </select>
           </div>
+          {fishVoiceMode === 'custom' ? (
+            <div>
+              <label className="mb-1 block text-sm font-medium text-gray-800">
+                Reference ID голоса
+              </label>
+              <input
+                value={voiceId}
+                onChange={(event) => onVoiceChange?.(event.target.value)}
+                disabled={disabled}
+                placeholder="Введите Reference ID из Fish Audio"
+                className="w-full rounded-lg border border-gray-300 px-2 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50"
+              />
+            </div>
+          ) : null}
         </>
       ) : (
         <>
