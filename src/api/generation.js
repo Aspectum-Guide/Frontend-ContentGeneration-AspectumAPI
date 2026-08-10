@@ -165,6 +165,18 @@ export const attractionAudioGuidesAPI = {
       payload,
     ),
 
+  getMissingAudioStatus: (sessionId, params = {}) =>
+    apiClient.get(
+      `${BASE}/sessions/${sessionId}/attraction-audio-guides/generate-missing-audio/`,
+      { params },
+    ),
+
+  generateMissingAudio: (sessionId, payload = {}) =>
+    apiClient.post(
+      `${BASE}/sessions/${sessionId}/attraction-audio-guides/generate-missing-audio/`,
+      payload,
+    ),
+
   regenerateChapterAudio: (sessionId, guideId, trackId, payload = {}) =>
     apiClient.post(
       `${BASE}/sessions/${sessionId}/attraction-audio-guides/${guideId}/tracks/${trackId}/regenerate-chapter-audio/`,
@@ -185,11 +197,16 @@ export const attractionAudioGuidesAPI = {
 };
 
 export const ttsAPI = {
+  getSettings: () => apiClient.get(`${BASE}/tts/settings/`),
   getElevenLabsSettings: ({ refresh = false } = {}) =>
     apiClient.get(`${BASE}/tts/elevenlabs/settings/`, {
       params: refresh ? { refresh: 1 } : undefined,
       skipApiGetCache: refresh,
     }),
+  updateElevenLabsAudioProcessing: (settings) =>
+    apiClient.patch(`${BASE}/tts/elevenlabs/audio-processing/`, { settings }),
+  updateAudioProcessing: (settings) =>
+    apiClient.patch(`${BASE}/tts/audio-processing/`, { settings }),
 };
 
 // ─── Audio uploads / streaming ───────────────────────────────────────────────

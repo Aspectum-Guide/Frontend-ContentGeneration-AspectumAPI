@@ -1,8 +1,7 @@
 /**
  * SessionsList — grouped admin table for generation sessions.
  *
- * Each session is rendered as a compact group header, and each city draft is a
- * real table row inside that session.
+ * Each session is rendered as a compact group header with its single city row.
  */
 import { Fragment, useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
@@ -584,11 +583,6 @@ export default function SessionsList({ components = {} } = {}) {
       .filter(Boolean);
   }, [sessions, search]);
 
-  const visibleRowCount = useMemo(
-    () => filteredGroups.reduce((sum, group) => sum + group.cityRows.length, 0),
-    [filteredGroups]
-  );
-
   const allSelected =
     filteredGroups.length > 0 &&
     filteredGroups.every((group) => isGroupFullySelected(group, selected));
@@ -715,7 +709,7 @@ export default function SessionsList({ components = {} } = {}) {
     <Layout
       pageHeader={{
         title: 'Сессии генерации',
-        description: 'Каждая строка — отдельный рабочий город внутри сессии',
+        description: 'Одна сессия — один рабочий город',
         actions: [
           {
             id: 'create-session-header',
@@ -788,7 +782,7 @@ export default function SessionsList({ components = {} } = {}) {
           <div className="flex items-center gap-3">
             {!loading && filteredGroups.length > 0 && (
               <div className="hidden sm:block text-xs text-gray-500">
-                {visibleRowCount} городов в {filteredGroups.length} сессиях
+                {filteredGroups.length} сессий
               </div>
             )}
 
@@ -904,19 +898,11 @@ export default function SessionsList({ components = {} } = {}) {
                               </span>
                             </div>
 
-                            <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-slate-500">
-                              {group.matchedRowsCount !== group.totalRowsCount && (
-                                <span>
-                                  Показано {group.matchedRowsCount} из {group.totalRowsCount} городов
-                                </span>
-                              )}
-                            </div>
                           </div>
                         </div>
 
                         <div className="text-xs text-slate-500">
-                          {group.totalRowsCount}{' '}
-                          {group.totalRowsCount === 1 ? 'город' : group.totalRowsCount < 5 ? 'города' : 'городов'}
+                          Один город
                         </div>
                       </div>
                     </td>
@@ -1008,7 +994,7 @@ export default function SessionsList({ components = {} } = {}) {
 
         {!loading && filteredGroups.length > 0 && (
           <div className="px-4 py-2.5 border-t border-gray-100 text-xs text-gray-400">
-            Показано: {visibleRowCount} городов в {filteredGroups.length} сессиях из {sessions.length} сессий
+            Показано сессий: {filteredGroups.length} из {sessions.length}
           </div>
         )}
       </div>

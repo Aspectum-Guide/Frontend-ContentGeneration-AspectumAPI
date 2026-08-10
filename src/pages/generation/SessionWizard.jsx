@@ -211,6 +211,10 @@ export default function SessionWizard({ components = {} } = {}) {
     audioGuideGeneratingItemTextById,
     generatingAudioGuideTrack,
     audioGuideTrackGenerationError,
+    batchAudioGenerating,
+    batchAudioProgress,
+    batchAudioCurrentStep,
+    batchAudioResult,
 
     attractionGenerationOpen,
     attractionGenerationPrompt,
@@ -429,6 +433,8 @@ export default function SessionWizard({ components = {} } = {}) {
     audioGuideItemTextGeneratePrompt,
     audioGuideItemTextGenerationError,
     generateAttractionAudioGuideTrackAudio,
+    prepareMissingAttractionAudio,
+    generateMissingAttractionAudio,
     regenerateAttractionAudioGuideChapter,
     audioGuideRegeneratingChapterId,
     generateAttractionAudioGuideTtsStress,
@@ -439,9 +445,17 @@ export default function SessionWizard({ components = {} } = {}) {
     elevenLabsSettingsLoading,
     elevenLabsSettingsError,
     elevenLabsSettings,
+    ttsSettingsLoading,
+    ttsSettingsError,
+    ttsSettings,
+    audioGuideTtsProvider,
     audioGuideTtsVoiceId,
+    audioGuideTtsModelId,
     loadElevenLabsSettings,
+    loadTtsSettings,
+    updateAudioGuideTtsProvider,
     updateAudioGuideTtsVoiceId,
+    updateAudioGuideTtsModelId,
 
     handleClose,
     handlePublish,
@@ -1224,6 +1238,26 @@ export default function SessionWizard({ components = {} } = {}) {
               onImportAttractionsFromText={importAttractionsFromText}
               attractionGenerationOpen={attractionGenerationOpen}
               attractionGenerationProgress={attractionGenerationProgress}
+              batchAudioGenerating={batchAudioGenerating}
+              batchAudioProgress={batchAudioProgress}
+              batchAudioCurrentStep={batchAudioCurrentStep}
+              batchAudioResult={batchAudioResult}
+              onPrepareMissingAttractionAudio={prepareMissingAttractionAudio}
+              onGenerateMissingAttractionAudio={generateMissingAttractionAudio}
+              elevenLabsSettingsLoading={elevenLabsSettingsLoading}
+              elevenLabsSettingsError={elevenLabsSettingsError}
+              elevenLabsSettings={elevenLabsSettings}
+              ttsSettingsLoading={ttsSettingsLoading}
+              ttsSettingsError={ttsSettingsError}
+              ttsSettings={ttsSettings}
+              audioGuideTtsProvider={audioGuideTtsProvider}
+              audioGuideTtsVoiceId={audioGuideTtsVoiceId}
+              audioGuideTtsModelId={audioGuideTtsModelId}
+              onLoadTtsSettings={loadTtsSettings}
+              onSetAudioGuideTtsProvider={updateAudioGuideTtsProvider}
+              onLoadElevenLabsSettings={loadElevenLabsSettings}
+              onSetAudioGuideTtsVoiceId={updateAudioGuideTtsVoiceId}
+              onSetAudioGuideTtsModelId={updateAudioGuideTtsModelId}
               attractionGenerationPrompt={attractionGenerationPrompt}
               attractionGenerating={attractionGenerating}
               attractionGenerationTaskId={attractionGenerationTaskId}
@@ -1445,9 +1479,17 @@ export default function SessionWizard({ components = {} } = {}) {
                 elevenLabsSettingsLoading={elevenLabsSettingsLoading}
                 elevenLabsSettingsError={elevenLabsSettingsError}
                 elevenLabsSettings={elevenLabsSettings}
+                ttsSettingsLoading={ttsSettingsLoading}
+                ttsSettingsError={ttsSettingsError}
+                ttsSettings={ttsSettings}
+                audioGuideTtsProvider={audioGuideTtsProvider}
                 audioGuideTtsVoiceId={audioGuideTtsVoiceId}
+                audioGuideTtsModelId={audioGuideTtsModelId}
+                onLoadTtsSettings={loadTtsSettings}
+                onSetAudioGuideTtsProvider={updateAudioGuideTtsProvider}
                 onLoadElevenLabsSettings={loadElevenLabsSettings}
                 onSetAudioGuideTtsVoiceId={updateAudioGuideTtsVoiceId}
+                onSetAudioGuideTtsModelId={updateAudioGuideTtsModelId}
                 onGoToStep={goToStep}
               />
             </div>

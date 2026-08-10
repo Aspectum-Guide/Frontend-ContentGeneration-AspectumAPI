@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import AiGenerationModal, { WizardGenerationActionFooter } from '../../../components/generation/AiGenerationModal.jsx';
 import AiGenerationQualitySettings from '../../../components/generation/AiGenerationQualitySettings.jsx';
 import AiGenerationDedupeToggle from '../../../components/generation/AiGenerationDedupeToggle.jsx';
@@ -7,6 +7,7 @@ import { getAttrName, getFlag, getSessionEntityImagePreview, resolveSessionEntit
 import { usePasteImageOnHover } from '../../../hooks/usePasteImageOnHover';
 import SessionWizardAttractionTagsPicker from './SessionWizardAttractionTagsPicker.jsx';
 import UsefulInfoTextImportBox from './UsefulInfoTextImportBox.jsx';
+import { TTSProviderSettingsPanel } from './SessionWizardAttractionAudioGuidesBlock.jsx';
 import { createCoordinatePasteHandler } from '../../../utils/coordinates';
 
 const getCityDisplayName = (city) => {
@@ -470,6 +471,26 @@ export default function SessionWizardAttractionsStep({
   attractions,
 
   attractionGenerationProgress = null,
+  batchAudioGenerating = false,
+  batchAudioProgress = 0,
+  batchAudioCurrentStep = '',
+  batchAudioResult = null,
+  onPrepareMissingAttractionAudio,
+  onGenerateMissingAttractionAudio,
+  elevenLabsSettingsLoading = false,
+  elevenLabsSettingsError = '',
+  elevenLabsSettings = null,
+  ttsSettingsLoading = false,
+  ttsSettingsError = '',
+  ttsSettings = null,
+  audioGuideTtsProvider = 'fish_audio',
+  audioGuideTtsVoiceId = '',
+  audioGuideTtsModelId = '',
+  onLoadTtsSettings,
+  onSetAudioGuideTtsProvider,
+  onLoadElevenLabsSettings,
+  onSetAudioGuideTtsVoiceId,
+  onSetAudioGuideTtsModelId,
 
   referenceCities = [],
   cityDrafts = [],
@@ -503,9 +524,6 @@ export default function SessionWizardAttractionsStep({
   attractionGenerationPrompt = '',
   attractionGenerating = false,
   attractionGenerationError = '',
-  attractionGenerationAssignedCityType = 'none',
-  attractionGenerationSessionCityId = '',
-  attractionGenerationDatabaseCityId = '',
   attractionGenerationLang = 'ru',
   attractionGenerationCount = 5,
   attractionDedupeExistingItems = true,
@@ -514,9 +532,6 @@ export default function SessionWizardAttractionsStep({
   onOpenAttractionGenerationModal,
   onCloseAttractionGenerationModal,
   onAttractionGenerationPromptChange,
-  onAttractionGenerationAssignedCityTypeChange,
-  onAttractionGenerationSessionCityIdChange,
-  onAttractionGenerationDatabaseCityIdChange,
   onAttractionGenerationLangChange,
   onGenerateAttractionsFromPrompt,
   onOpenAttractionInfoGenerateModal,
@@ -530,12 +545,52 @@ export default function SessionWizardAttractionsStep({
   const [selectMode, setSelectMode] = useState(false);
   const [selectedAttractionIds, setSelectedAttractionIds] = useState(() => new Set());
   const [regenDetailLoading, setRegenDetailLoading] = useState(false);
-
-  const assignedCityType = currentAttr?.assigned_city_type || 'none';
-  const selectedDatabaseCityId = normalizeId(currentAttr?.city_id ?? currentAttr?.city);
-  const selectedDraftCityId = normalizeId(
-    currentAttr?.session_city_id ?? currentAttr?.session_city
+  const [batchAudioModalOpen, setBatchAudioModalOpen] = useState(false);
+  const [batchAudioStatusLoading, setBatchAudioStatusLoading] = useState(false);
+  const [batchAudioStatusError, setBatchAudioStatusError] = useState('');
+  const [batchAudioStatus, setBatchAudioStatus] = useState(null);
+  const batchTotal = Number(
+    batchAudioResult?.total ?? batchAudioResult?.ready_count ?? 0,
   );
+  const batchProcessed = Number(batchAudioResult?.processed ?? 0);
+  const displayedBatchProgress = Math.max(
+    0,
+    Math.min(100, Number(batchAudioProgress || 0)),
+  );
+  const selectedTtsProvider = (ttsSettings?.providers || []).find(
+    (provider) => provider?.id === audioGuideTtsProvider,
+  );
+  const readyForBatchAudio = Number(batchAudioStatus?.ready_count || 0);
+  const batchAudioCanStart =
+    !batchAudioStatusLoading &&
+    selectedTtsProvider?.configured !== false &&
+    (batchAudioStatus === null || readyForBatchAudio > 0 || batchAudioStatus?.active_task);
+
+  const openBatchAudioModal = async () => {
+    if (batchAudioGenerating) return;
+    setBatchAudioModalOpen(true);
+    setBatchAudioStatusLoading(true);
+    setBatchAudioStatusError('');
+    setBatchAudioStatus(null);
+    try {
+      const status = await onPrepareMissingAttractionAudio?.();
+      setBatchAudioStatus(status || {});
+    } catch (error) {
+      setBatchAudioStatusError(
+        error?.response?.data?.error ||
+          error?.message ||
+          'Не удалось проверить готовность ОЛ к озвучке',
+      );
+    } finally {
+      setBatchAudioStatusLoading(false);
+    }
+  };
+
+  const startBatchAudio = async () => {
+    if (!batchAudioCanStart) return;
+    setBatchAudioModalOpen(false);
+    await onGenerateMissingAttractionAudio?.({ skipConfirmation: true });
+  };
 
   const localeLabel =
     attrCurrentLocale.lang?.toUpperCase() ||
@@ -581,43 +636,7 @@ export default function SessionWizardAttractionsStep({
     if (!res?.cancelled) exitSelectMode();
   };
 
-  const sessionDraftsForAi = useMemo(
-    () => (cityDrafts || []).filter((d) => d.id && d.id !== 'legacy'),
-    [cityDrafts]
-  );
-
-  const attractionGenBindingHint = useMemo(() => {
-    switch (attractionGenerationAssignedCityType) {
-      case 'draft':
-        return 'Достопримечательности будут привязаны к выбранному городу из сессии.';
-      case 'database':
-        return 'Достопримечательности будут привязаны к городу из базы.';
-      default:
-        return 'Достопримечательности будут созданы без привязки к городу.';
-    }
-  }, [attractionGenerationAssignedCityType]);
-
-  const attractionGenCanSubmit = useMemo(() => {
-    if (!attractionGenerationPrompt?.trim()) return false;
-    if (
-      attractionGenerationAssignedCityType === 'draft' &&
-      !attractionGenerationSessionCityId
-    ) {
-      return false;
-    }
-    if (
-      attractionGenerationAssignedCityType === 'database' &&
-      !attractionGenerationDatabaseCityId
-    ) {
-      return false;
-    }
-    return true;
-  }, [
-    attractionGenerationPrompt,
-    attractionGenerationAssignedCityType,
-    attractionGenerationSessionCityId,
-    attractionGenerationDatabaseCityId,
-  ]);
+  const attractionGenCanSubmit = Boolean(attractionGenerationPrompt?.trim());
 
   return (
     <div>
@@ -654,90 +673,11 @@ export default function SessionWizardAttractionsStep({
           Сгенерировать достопримечательности
         </h2>
 
-        <p className="text-sm text-gray-600">{attractionGenBindingHint}</p>
+        <p className="text-sm text-gray-600">
+          Все созданные достопримечательности автоматически привязываются к городу сессии.
+        </p>
 
         <div className="space-y-3">
-          <div>
-            <label
-              htmlFor="attraction-gen-city-binding"
-              className="block text-sm font-medium text-gray-700 mb-1"
-            >
-              Привязка к городу
-            </label>
-            <select
-              id="attraction-gen-city-binding"
-              value={attractionGenerationAssignedCityType}
-              onChange={(e) =>
-                onAttractionGenerationAssignedCityTypeChange?.(e.target.value)
-              }
-              disabled={attractionGenerating}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
-            >
-              <option value="none">Без города</option>
-              <option value="draft">Город из сессии</option>
-              <option value="database">Город из базы</option>
-            </select>
-          </div>
-
-          {attractionGenerationAssignedCityType === 'draft' && (
-            <div>
-              <label
-                htmlFor="attraction-gen-session-city"
-                className="block text-sm font-medium text-gray-700 mb-1"
-              >
-                Черновик города в сессии
-              </label>
-              <select
-                id="attraction-gen-session-city"
-                value={attractionGenerationSessionCityId || ''}
-                onChange={(e) =>
-                  onAttractionGenerationSessionCityIdChange?.(e.target.value)
-                }
-                disabled={attractionGenerating}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
-              >
-                <option value="">— Выберите —</option>
-                {sessionDraftsForAi.map((draft) => (
-                  <option key={String(draft.id)} value={String(draft.id)}>
-                    {getDraftCityDisplayName(draft)}
-                  </option>
-                ))}
-              </select>
-              {sessionDraftsForAi.length === 0 && (
-                <p className="text-xs text-amber-700 mt-1">
-                  Нет черновиков города (кроме унаследованной строки). Создайте черновик на шаге «Город».
-                </p>
-              )}
-            </div>
-          )}
-
-          {attractionGenerationAssignedCityType === 'database' && (
-            <div>
-              <label
-                htmlFor="attraction-gen-db-city"
-                className="block text-sm font-medium text-gray-700 mb-1"
-              >
-                Город из базы
-              </label>
-              <select
-                id="attraction-gen-db-city"
-                value={attractionGenerationDatabaseCityId || ''}
-                onChange={(e) =>
-                  onAttractionGenerationDatabaseCityIdChange?.(e.target.value)
-                }
-                disabled={attractionGenerating}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
-              >
-                <option value="">— Выберите —</option>
-                {(referenceCities || []).map((city) => (
-                  <option key={normalizeId(city.id)} value={normalizeId(city.id)}>
-                    {getCityDisplayName(city)}
-                  </option>
-                ))}
-              </select>
-            </div>
-          )}
-
           <div>
             <label
               htmlFor="attraction-gen-lang"
@@ -806,6 +746,87 @@ export default function SessionWizardAttractionsStep({
         />
       </AiGenerationModal>
 
+      <AiGenerationModal
+        open={batchAudioModalOpen}
+        onBackdropClick={() => {
+          if (!batchAudioGenerating) setBatchAudioModalOpen(false);
+        }}
+        titleId="batch-attraction-audio-title"
+        busy={batchAudioGenerating}
+        busyLabel="Запускаем озвучку…"
+        maxWidthClass="max-w-xl"
+        footer={(
+          <WizardGenerationActionFooter>
+            <button
+              type="button"
+              onClick={() => setBatchAudioModalOpen(false)}
+              disabled={batchAudioGenerating}
+              className="px-4 py-2 text-sm font-medium text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50"
+            >
+              Отмена
+            </button>
+            <button
+              type="button"
+              onClick={startBatchAudio}
+              disabled={batchAudioGenerating || !batchAudioCanStart}
+              className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              Запустить озвучку
+            </button>
+          </WizardGenerationActionFooter>
+        )}
+      >
+        <h2 id="batch-attraction-audio-title" className="text-lg font-semibold text-gray-900">
+          Озвучить основные локации
+        </h2>
+
+        <div className="rounded-lg bg-blue-50 px-3 py-2 text-sm text-blue-900">
+          {batchAudioStatusLoading ? (
+            'Проверяем готовность аудиогидов…'
+          ) : batchAudioStatus ? (
+            <>
+              Готово к озвучке: <strong>{readyForBatchAudio}</strong>.
+              {' '}Язык: <strong>{String(batchAudioStatus.language_code || 'ru').toUpperCase()}</strong>.
+              {' '}Существующее аудио не будет перезаписано.
+            </>
+          ) : (
+            'Будут озвучены только ОЛ с полным текстом и без готовой аудиодорожки.'
+          )}
+        </div>
+
+        {batchAudioStatus && readyForBatchAudio === 0 && !batchAudioStatus.active_task ? (
+          <p className="text-sm text-amber-700">
+            Новых ОЛ для озвучки нет. Уже озвучено: {Number(batchAudioStatus.already_voiced_count || 0)},
+            {' '}без полного текста: {Number(batchAudioStatus.missing_text_count || 0)},
+            {' '}без аудиогида: {Number(batchAudioStatus.missing_guide_count || 0)}.
+          </p>
+        ) : null}
+
+        {batchAudioStatusError ? (
+          <p className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+            {batchAudioStatusError}
+          </p>
+        ) : null}
+
+        <TTSProviderSettingsPanel
+          provider={audioGuideTtsProvider}
+          providerSettings={ttsSettings}
+          providerSettingsLoading={ttsSettingsLoading}
+          providerSettingsError={ttsSettingsError}
+          elevenLabsSettings={elevenLabsSettings}
+          elevenLabsLoading={elevenLabsSettingsLoading}
+          elevenLabsError={elevenLabsSettingsError}
+          voiceId={audioGuideTtsVoiceId}
+          modelId={audioGuideTtsModelId}
+          onProviderChange={onSetAudioGuideTtsProvider}
+          onVoiceChange={onSetAudioGuideTtsVoiceId}
+          onModelChange={onSetAudioGuideTtsModelId}
+          onLoadProviderSettings={onLoadTtsSettings}
+          onLoadElevenLabsSettings={onLoadElevenLabsSettings}
+          disabled={batchAudioGenerating}
+        />
+      </AiGenerationModal>
+
       {attrView === 'list' ? (
         <div className="space-y-4">
           <div className="flex items-start justify-between gap-3">
@@ -822,6 +843,18 @@ export default function SessionWizardAttractionsStep({
 
               {!selectMode && (
                 <div className="flex items-center gap-2">
+                  {onGenerateMissingAttractionAudio ? (
+                    <button
+                      type="button"
+                      onClick={openBatchAudioModal}
+                      disabled={batchAudioGenerating || attractions.length === 0}
+                      className="px-3 py-1.5 text-sm font-medium text-blue-700 border border-blue-300 bg-white rounded-lg hover:bg-blue-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      {batchAudioGenerating
+                        ? 'Озвучиваем ОЛ...'
+                        : 'Озвучить все ОЛ без аудио'}
+                    </button>
+                  ) : null}
                   <button
                     type="button"
                     onClick={() => onOpenAttractionGenerationModal?.()}
@@ -879,6 +912,45 @@ export default function SessionWizardAttractionsStep({
               </div>
             )}
           </div>
+
+          {(batchAudioGenerating || batchAudioResult || batchAudioCurrentStep) ? (
+            <div className="space-y-2 py-1">
+              <div className="flex items-center justify-between gap-3 text-xs text-gray-600">
+                <span className="truncate">
+                  {batchAudioCurrentStep || 'Пакетная озвучка завершена'}
+                </span>
+                <span className="shrink-0 tabular-nums">
+                  {batchAudioGenerating && batchTotal > 0
+                    ? `${batchProcessed}/${batchTotal}`
+                    : `${Math.round(displayedBatchProgress)}%`}
+                </span>
+              </div>
+              <div
+                className="h-2 w-full overflow-hidden rounded bg-gray-200"
+                role="progressbar"
+                aria-label="Прогресс озвучки основных локаций"
+                aria-valuemin="0"
+                aria-valuemax="100"
+                aria-valuenow={Math.round(displayedBatchProgress)}
+              >
+                <div
+                  className="h-full bg-blue-600 transition-[width] duration-300"
+                  style={{ width: `${displayedBatchProgress}%` }}
+                />
+              </div>
+              {!batchAudioGenerating && batchAudioResult ? (
+                <p className="text-xs text-gray-500">
+                  Озвучено: {Number(batchAudioResult.generated_count || 0)}.
+                  {' '}Уже было готово: {Number(batchAudioResult.already_voiced_count || 0)}.
+                  {' '}Без полного текста: {Number(batchAudioResult.missing_text_count || 0)}.
+                  {' '}Без аудиогида: {Number(batchAudioResult.missing_guide_count || 0)}.
+                  {Number(batchAudioResult.failed_count || 0) > 0
+                    ? ` Ошибок: ${Number(batchAudioResult.failed_count)}.`
+                    : ''}
+                </p>
+              ) : null}
+            </div>
+          ) : null}
 
           <UsefulInfoTextImportBox
             title="Вставить готовые достопримечательности"
@@ -1133,114 +1205,14 @@ export default function SessionWizardAttractionsStep({
                     onReloadEventFilters={onReloadEventFilters}
                   />
 
-                  <div className="p-3 border border-gray-200 rounded-lg bg-gray-50 space-y-3">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Привязка к городу
-                      </label>
-
-                      <select
-                        value={assignedCityType}
-                        onChange={(e) => {
-                          const type = e.target.value;
-
-                          updateAttractionPatch({
-                            assigned_city_type: type,
-
-                            city: null,
-                            city_id: null,
-
-                            session_city: null,
-                            session_city_id: null,
-                          });
-                        }}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      >
-                        <option value="none">Без города</option>
-                        <option value="database">Город из базы</option>
-                        <option value="draft">Город из сессии</option>
-                      </select>
-                    </div>
-
-                    {assignedCityType === 'database' && (
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">
-                          Город из базы
-                        </label>
-
-                        <select
-                          value={selectedDatabaseCityId}
-                          onChange={(e) => {
-                            const cityId = e.target.value || null;
-
-                            updateAttractionPatch({
-                              assigned_city_type: 'database',
-
-                              city: cityId,
-                              city_id: cityId,
-
-                              session_city: null,
-                              session_city_id: null,
-                            });
-                          }}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-                        >
-                          <option value="">Выберите город из базы</option>
-
-                          {referenceCities.map((city) => (
-                            <option key={city.id} value={city.id}>
-                              {getCityDisplayName(city)}
-                            </option>
-                          ))}
-                        </select>
-
-                        {referenceCities.length === 0 && (
-                          <p className="mt-1 text-xs text-amber-600">
-                            Список городов из базы не загружен.
-                          </p>
-                        )}
-                      </div>
-                    )}
-
-                    {assignedCityType === 'draft' && (
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">
-                          Город из сессии
-                        </label>
-
-                        <select
-                          value={selectedDraftCityId}
-                          onChange={(e) => {
-                            const draftId = e.target.value || null;
-
-                            updateAttractionPatch({
-                              assigned_city_type: 'draft',
-
-                              session_city: draftId,
-                              session_city_id: draftId,
-
-                              city: null,
-                              city_id: null,
-                            });
-                          }}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-                        >
-                          <option value="">Выберите город</option>
-
-                          {cityDrafts.map((draft) => (
-                            <option key={draft.id} value={draft.id}>
-                              {getDraftCityDisplayName(draft)}
-                            </option>
-                          ))}
-                        </select>
-
-                        {cityDrafts.length === 0 && (
-                          <p className="mt-1 text-xs text-amber-600">
-                            В текущей сессии пока нет городов.
-                          </p>
-                        )}
-                      </div>
-                    )}
+                  <div className="p-3 border border-gray-200 rounded-lg bg-gray-50">
+                    <p className="text-sm text-gray-700">
+                      Город: {getAttractionCityBindingLabel(
+                        currentAttr,
+                        referenceCities,
+                        cityDrafts
+                      )}. Привязка управляется автоматически.
+                    </p>
                   </div>
                 </div>
 

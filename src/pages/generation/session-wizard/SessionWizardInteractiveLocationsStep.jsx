@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import 'leaflet/dist/leaflet.css';
 import { usePasteImageOnHover } from '../../../hooks/usePasteImageOnHover';
 import AiGenerationModal, { WizardGenerationActionFooter } from '../../../components/generation/AiGenerationModal.jsx';
@@ -506,9 +506,6 @@ export default function SessionWizardInteractiveLocationsStep({
   ilGenerationPrompt = '',
   ilGenerating = false,
   ilGenerationError = '',
-  ilGenerationAssignedCityType = 'none',
-  ilGenerationSessionCityId = '',
-  ilGenerationDatabaseCityId = '',
   ilGenerationLang = 'ru',
   ilDedupeExistingLocations = true,
   onIlDedupeExistingLocationsChange,
@@ -517,9 +514,6 @@ export default function SessionWizardInteractiveLocationsStep({
   onOpenIlGenerationModal,
   onCloseIlGenerationModal,
   onIlGenerationPromptChange,
-  onIlGenerationAssignedCityTypeChange,
-  onIlGenerationSessionCityIdChange,
-  onIlGenerationDatabaseCityIdChange,
   onIlGenerationLangChange,
   onGenerateInteractiveLocationsFromPrompt,
   aiGenerationMode = 'instant',
@@ -530,49 +524,7 @@ export default function SessionWizardInteractiveLocationsStep({
   onGoToStep,
 }) {
   const ilCurrentLocale = ilLocaleData[ilActiveLocale] || {};
-
-  const sessionDraftsForAi = (cityDrafts || []).filter(
-    (draft) => normalizeId(draft.id) && normalizeId(draft.id) !== 'legacy',
-  );
-
-  const ilGenBindingHint = (() => {
-    switch (ilGenerationAssignedCityType) {
-      case 'draft':
-        return 'Новые локации будут привязаны к выбранному городу сессии.';
-      case 'database':
-        return 'Новые локации будут привязаны к городу из базы.';
-      default:
-        return 'Новые локации будут без привязки к городу (можно изменить в карточке).';
-    }
-  })();
-
-  const canSubmitIlGeneration = useMemo(() => {
-    if (!ilGenerationPrompt?.trim()) return false;
-    if (
-      ilGenerationAssignedCityType === 'draft' &&
-      !ilGenerationSessionCityId
-    ) {
-      return false;
-    }
-    if (
-      ilGenerationAssignedCityType === 'database' &&
-      !ilGenerationDatabaseCityId
-    ) {
-      return false;
-    }
-    return true;
-  }, [
-    ilGenerationPrompt,
-    ilGenerationAssignedCityType,
-    ilGenerationSessionCityId,
-    ilGenerationDatabaseCityId,
-  ]);
-
-  const assignedCityType = currentIl?.assigned_city_type || 'none';
-  const selectedDatabaseCityId = normalizeId(currentIl?.city_id ?? currentIl?.city);
-  const selectedDraftCityId = normalizeId(
-    currentIl?.session_city_id ?? currentIl?.session_city,
-  );
+  const canSubmitIlGeneration = Boolean(ilGenerationPrompt?.trim());
 
   const localeLabel =
     ilCurrentLocale.lang?.toUpperCase() ||
@@ -620,79 +572,11 @@ export default function SessionWizardInteractiveLocationsStep({
             Сгенерировать интерактивные локации
           </h2>
 
-          <p className="text-sm text-gray-600">{ilGenBindingHint}</p>
+          <p className="text-sm text-gray-600">
+            Все созданные интерактивные локации автоматически привязываются к городу сессии.
+          </p>
 
           <div className="space-y-3">
-            <div>
-              <label
-                htmlFor="il-gen-city-binding"
-                className="block text-sm font-medium text-gray-700 mb-1"
-              >
-                Привязка к городу
-              </label>
-              <select
-                id="il-gen-city-binding"
-                value={ilGenerationAssignedCityType}
-                onChange={(e) => onIlGenerationAssignedCityTypeChange?.(e.target.value)}
-                disabled={ilGenerating}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
-              >
-                <option value="none">Без города</option>
-                <option value="draft">Город из сессии</option>
-                <option value="database">Город из базы</option>
-              </select>
-            </div>
-
-            {ilGenerationAssignedCityType === 'draft' && (
-              <div>
-                <label
-                  htmlFor="il-gen-session-city"
-                  className="block text-sm font-medium text-gray-700 mb-1"
-                >
-                  Черновик города в сессии
-                </label>
-                <select
-                  id="il-gen-session-city"
-                  value={ilGenerationSessionCityId || ''}
-                  onChange={(e) => onIlGenerationSessionCityIdChange?.(e.target.value)}
-                  disabled={ilGenerating}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
-                >
-                  <option value="">— Выберите —</option>
-                  {sessionDraftsForAi.map((draft) => (
-                    <option key={String(draft.id)} value={String(draft.id)}>
-                      {getDraftCityDisplayName(draft)}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            )}
-
-            {ilGenerationAssignedCityType === 'database' && (
-              <div>
-                <label
-                  htmlFor="il-gen-db-city"
-                  className="block text-sm font-medium text-gray-700 mb-1"
-                >
-                  Город из базы
-                </label>
-                <select
-                  id="il-gen-db-city"
-                  value={ilGenerationDatabaseCityId || ''}
-                  onChange={(e) => onIlGenerationDatabaseCityIdChange?.(e.target.value)}
-                  disabled={ilGenerating}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
-                >
-                  <option value="">— Выберите —</option>
-                  {(referenceCities || []).map((city) => (
-                    <option key={normalizeId(city.id)} value={normalizeId(city.id)}>
-                      {getCityDisplayName(city)}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            )}
-
             <div>
               <label
                 htmlFor="il-gen-lang"
@@ -772,7 +656,7 @@ export default function SessionWizardInteractiveLocationsStep({
             </h2>
 
             <p className="text-sm text-gray-500">
-              Добавьте объекты и при необходимости привяжите их к городу
+              Добавьте объекты — они будут привязаны к городу сессии автоматически
             </p>
           </div>
 
@@ -1002,108 +886,17 @@ export default function SessionWizardInteractiveLocationsStep({
                 onReloadEventFilters={onReloadEventFilters}
               />
 
-              <div className="p-3 border border-gray-200 rounded-lg bg-gray-50 space-y-3">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Привязка к городу
-                  </label>
-
-                  <select
-                    value={assignedCityType}
-                    onChange={(e) => {
-                      const type = e.target.value;
-
-                      updateIlPatch({
-                        assigned_city_type: type,
-                        city: null,
-                        city_id: null,
-                        session_city: null,
-                        session_city_id: null,
-                      });
-                    }}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  >
-                    <option value="none">Без города</option>
-                    <option value="database">Город из базы</option>
-                    <option value="draft">Город из сессии</option>
-                  </select>
-                </div>
-
-                {assignedCityType === 'database' && (
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Город из базы
-                    </label>
-
-                    <select
-                      value={selectedDatabaseCityId}
-                      onChange={(e) => {
-                        const cityId = e.target.value || null;
-
-                        updateIlPatch({
-                          assigned_city_type: 'database',
-                          city: cityId,
-                          city_id: cityId,
-                          session_city: null,
-                          session_city_id: null,
-                        });
-                      }}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    >
-                      <option value="">Выберите город из базы</option>
-
-                      {referenceCities.map((city) => (
-                        <option key={city.id} value={city.id}>
-                          {getCityDisplayName(city)}
-                        </option>
-                      ))}
-                    </select>
-
-                    {referenceCities.length === 0 && (
-                      <p className="mt-1 text-xs text-amber-600">
-                        Список городов из базы не загружен.
-                      </p>
-                    )}
-                  </div>
-                )}
-
-                {assignedCityType === 'draft' && (
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Город из сессии
-                    </label>
-
-                    <select
-                      value={selectedDraftCityId}
-                      onChange={(e) => {
-                        const draftId = e.target.value || null;
-
-                        updateIlPatch({
-                          assigned_city_type: 'draft',
-                          session_city: draftId,
-                          session_city_id: draftId,
-                          city: null,
-                          city_id: null,
-                        });
-                      }}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    >
-                      <option value="">Выберите город</option>
-
-                      {cityDrafts.map((draft) => (
-                        <option key={draft.id} value={draft.id}>
-                          {getDraftCityDisplayName(draft)}
-                        </option>
-                      ))}
-                    </select>
-
-                    {cityDrafts.length === 0 && (
-                      <p className="mt-1 text-xs text-amber-600">
-                        В текущей сессии пока нет городов.
-                      </p>
-                    )}
-                  </div>
-                )}
+              <div className="p-3 border border-gray-200 rounded-lg bg-gray-50">
+                <p className="text-sm font-medium text-gray-800">
+                  {getIlCityBindingLabel(
+                    currentIl,
+                    referenceCities,
+                    cityDrafts,
+                  )}
+                </p>
+                <p className="mt-1 text-xs text-gray-500">
+                  Привязка к городу сессии управляется автоматически.
+                </p>
               </div>
             </div>
 

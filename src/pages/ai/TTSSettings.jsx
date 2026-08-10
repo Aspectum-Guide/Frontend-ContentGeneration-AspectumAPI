@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import Layout from '../../components/Layout';
 import { ttsAPI } from '../../api/generation';
+import AudioProcessingMixer from '../../components/tts/AudioProcessingMixer';
 
 const CATEGORY_MESSAGES = {
   elevenlabs_access_restricted:
@@ -71,6 +72,7 @@ function VoiceCard({ voice, isDefault, onPreview }) {
 
 export default function TTSSettings() {
   const [data, setData] = useState(null);
+  const [providerData, setProviderData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState(null);
@@ -82,8 +84,12 @@ export default function TTSSettings() {
     try {
       refresh ? setRefreshing(true) : setLoading(true);
       setError(null);
-      const res = await ttsAPI.getElevenLabsSettings({ refresh });
-      setData(res.data);
+      const [providerRes, elevenLabsRes] = await Promise.all([
+        ttsAPI.getSettings(),
+        ttsAPI.getElevenLabsSettings({ refresh }),
+      ]);
+      setProviderData(providerRes.data);
+      setData(elevenLabsRes.data);
     } catch (err) {
       setError('Не удалось загрузить настройки ElevenLabs');
       console.error(err);
@@ -139,7 +145,7 @@ export default function TTSSettings() {
     return (
       <Layout>
         <div className="flex items-center justify-center min-h-96 text-gray-400 text-sm">
-          Загрузка настроек ElevenLabs...
+          Загрузка настроек TTS...
         </div>
       </Layout>
     );
@@ -152,10 +158,10 @@ export default function TTSSettings() {
         {/* Заголовок */}
         <div className="flex items-start justify-between gap-4">
           <div>
-            <h1 className="text-2xl font-bold text-gray-900">Настройки TTS — ElevenLabs</h1>
+            <h1 className="text-2xl font-bold text-gray-900">Настройки TTS</h1>
             <p className="text-sm text-gray-500 mt-1">
-              Настройки берутся из переменных окружения сервера. Здесь можно проверить статус подключения,
-              доступные голоса и лимиты подписки.
+              Fish Audio используется по умолчанию, ElevenLabs остаётся доступен для выбора.
+              Общий профиль обработки хранится в базе.
             </p>
           </div>
           <button
@@ -178,7 +184,36 @@ export default function TTSSettings() {
           </div>
         )}
 
-        {/* Статус подключения */}
+        {providerData?.providers?.find((item) => item.id === 'fish_audio') ? (() => {
+          const fish = providerData.providers.find((item) => item.id === 'fish_audio');
+          const usesFreeModel = fish.defaults?.model_id === 's2.1-pro-free';
+          const noCredit = !usesFreeModel && fish.credit &&
+            Number(fish.credit.credit || 0) <= 0 && !fish.credit.has_free_credit;
+          return (
+            <div className="bg-white rounded-xl border border-gray-200 p-5 space-y-2">
+              <div className="flex items-center justify-between gap-3">
+                <h2 className="font-semibold text-gray-900">Fish Audio — S2.1 Pro Free</h2>
+                <span className={`text-xs font-medium ${fish.configured && !noCredit ? 'text-green-700' : 'text-red-700'}`}>
+                  {!fish.configured ? 'Ключ не настроен' : noCredit ? 'Нет API-кредита' : 'Готов'}
+                </span>
+              </div>
+              <p className="text-sm text-gray-500">
+                Провайдер по умолчанию: {providerData.default_provider === 'fish_audio' ? 'да' : 'нет'}.
+                Модель: {fish.defaults?.model_id || 's2.1-pro-free'}. Голос можно оставить
+                стандартным или указать Reference ID в аудиогиде.
+              </p>
+              {noCredit ? (
+                <p className="text-sm text-red-700">
+                  Fish API сообщает нулевой баланс без бесплатного кредита. Активируйте промо
+                  или API credit в кабинете Fish Audio.
+                </p>
+              ) : null}
+              {fish.warning ? <p className="text-sm text-amber-700">{fish.warning}</p> : null}
+            </div>
+          );
+        })() : null}
+
+        {/* Статус подключения ElevenLabs */}
         <div className="bg-white rounded-xl border border-gray-200 p-5 space-y-4">
           <div className="flex items-center justify-between">
             <h2 className="font-semibold text-gray-900">Статус подключения</h2>
@@ -277,6 +312,16 @@ export default function TTSSettings() {
             )}
           </div>
         )}
+
+        <AudioProcessingMixer
+          value={data?.audio_processing}
+          onSaved={(audioProcessing) =>
+            setData((current) => ({
+              ...(current || {}),
+              audio_processing: audioProcessing,
+            }))
+          }
+        />
 
         {/* Модели */}
         {models.length > 0 && (

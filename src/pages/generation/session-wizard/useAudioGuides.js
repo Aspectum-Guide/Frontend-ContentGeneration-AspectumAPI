@@ -17,6 +17,7 @@ import {
 import { buildGenerationPayloadFields } from '../../../components/generation/AiGenerationQualitySettings.jsx';
 
 const DEFAULT_AUDIO_GUIDE_PLAN_ITEMS_COUNT = 6;
+const DEFAULT_TTS_PROVIDER = 'fish_audio';
 const PREFERRED_DEFAULT_ELEVENLABS_VOICE_ID = 'ogi2DyUAKJb7CEdqqvlU';
 // v2: инвалидируем старый кэш (в нём было только 10 голосов из-за пагинации /v2/voices).
 const ELEVENLABS_SETTINGS_FRONTEND_CACHE_KEY = 'aspectum:elevenlabs:settings:v2';
@@ -312,6 +313,15 @@ const mapAudioGuideTrackTtsError = (error) => {
       'ElevenLabs недоступен с текущего IP или региона сервера. Проверьте VPN, хостинг или страну доступа.'
     );
   }
+  if (category === 'fish_audio_payment_required') {
+    return (
+      data.error ||
+      'На Fish Audio нет доступного API-кредита. Активируйте промо или пополните API credit.'
+    );
+  }
+  if (category === 'fish_audio_authentication') {
+    return data.error || 'Fish Audio отклонил API-ключ.';
+  }
   if (status === 502 || status === 503) {
     return data.error || 'Не удалось сгенерировать аудио. Попробуйте позже.';
   }
@@ -322,9 +332,12 @@ const mapAudioGuideTrackTtsError = (error) => {
 const mergeAudioGuideTrackFromTtsResponse = (guide, lang, data) => {
   const audio = data?.audio || {};
   const track = data?.track || {};
+  const tts = data?.tts || {};
   const audioId = audio.id ?? track.audio ?? null;
   const audioUrl = audio.url ?? '';
-  const copyright = audio.copyright ?? 'Generated with ElevenLabs';
+  const copyright = audio.copyright ?? (
+    tts.provider === 'fish_audio' ? 'Generated with Fish Audio' : 'Generated with ElevenLabs'
+  );
   const chapters = Array.isArray(data?.chapters)
     ? data.chapters
     : Array.isArray(track?.chapters)
@@ -352,6 +365,10 @@ const mergeAudioGuideTrackFromTtsResponse = (guide, lang, data) => {
         duration_seconds: durationSeconds,
         chapters,
         chapter_timings: chapters,
+        tts_provider: tts.provider ?? track.tts_provider ?? '',
+        tts_voice_id: tts.voice_id ?? track.tts_voice_id ?? '',
+        tts_model_id: tts.model_id ?? track.tts_model_id ?? '',
+        tts_output_format: tts.output_format ?? track.tts_output_format ?? '',
       },
     },
   });
@@ -673,6 +690,11 @@ function resolveDefaultElevenLabsVoiceId(settings) {
   return voices[0]?.voice_id || '';
 }
 
+function getTtsProviderConfig(settings, provider) {
+  const providers = Array.isArray(settings?.providers) ? settings.providers : [];
+  return providers.find((item) => item?.id === provider) || null;
+}
+
 function readElevenLabsSettingsFromFrontendCache() {
   try {
     const raw = sessionStorage.getItem(ELEVENLABS_SETTINGS_FRONTEND_CACHE_KEY);
@@ -823,6 +845,12 @@ export function useAudioGuides({
     useState('');
   const [generatingAudioGuideTrack, setGeneratingAudioGuideTrack] = useState(false);
   const [audioGuideTrackGenerationError, setAudioGuideTrackGenerationError] = useState(null);
+  const [batchAudioGenerating, setBatchAudioGenerating] = useState(false);
+  const [batchAudioProgress, setBatchAudioProgress] = useState(0);
+  const [batchAudioCurrentStep, setBatchAudioCurrentStep] = useState('');
+  const [batchAudioResult, setBatchAudioResult] = useState(null);
+  const batchAudioGeneratingRef = useRef(false);
+  const batchAudioResumedTaskRef = useRef('');
   const [audioGuideRegeneratingChapterId, setAudioGuideRegeneratingChapterId] = useState(null);
   // Идёт расстановка ударений: null | 'all' | planItemId
   const [audioGuideStressBusyId, setAudioGuideStressBusyId] = useState(null);
@@ -833,10 +861,16 @@ export function useAudioGuides({
   const [elevenLabsSettingsLoading, setElevenLabsSettingsLoading] = useState(false);
   const [elevenLabsSettingsError, setElevenLabsSettingsError] = useState('');
   const [elevenLabsSettings, setElevenLabsSettings] = useState(null);
+  const [ttsSettingsLoading, setTtsSettingsLoading] = useState(false);
+  const [ttsSettingsError, setTtsSettingsError] = useState('');
+  const [ttsSettings, setTtsSettings] = useState(null);
+  const [audioGuideTtsProvider, setAudioGuideTtsProvider] = useState(DEFAULT_TTS_PROVIDER);
   const [audioGuideTtsVoiceId, setAudioGuideTtsVoiceId] = useState('');
-  const [audioGuideTtsModelId, setAudioGuideTtsModelId] = useState('');
+  const [audioGuideTtsModelId, setAudioGuideTtsModelId] = useState('s2.1-pro-free');
+  const audioGuideTtsProviderRef = useRef(DEFAULT_TTS_PROVIDER);
   const audioGuideTtsVoiceIdRef = useRef('');
-  const audioGuideTtsModelIdRef = useRef('');
+  const audioGuideTtsModelIdRef = useRef('s2.1-pro-free');
+  const audioGuideTtsProviderTouchedRef = useRef(false);
   const audioGuideTtsVoiceTouchedRef = useRef(false);
   const audioGuideTtsModelTouchedRef = useRef(false);
 
@@ -846,6 +880,10 @@ export function useAudioGuides({
       clearTimeout(attractionAudioGuideAutoSavedTimerRef.current);
     };
   }, []);
+
+  useEffect(() => {
+    audioGuideTtsProviderRef.current = audioGuideTtsProvider;
+  }, [audioGuideTtsProvider]);
 
   useEffect(() => {
     audioGuideTtsVoiceIdRef.current = audioGuideTtsVoiceId;
@@ -905,12 +943,63 @@ export function useAudioGuides({
     setAudioGuideTtsVoiceId(next);
   }, []);
 
+  const applyTtsProviderDefaults = useCallback((settings, provider) => {
+    const config = getTtsProviderConfig(settings, provider);
+    const defaults = config?.defaults || {};
+    if (!audioGuideTtsVoiceTouchedRef.current) {
+      const voiceId = String(defaults.voice_id || '').trim();
+      audioGuideTtsVoiceIdRef.current = voiceId;
+      setAudioGuideTtsVoiceId(voiceId);
+    }
+    if (!audioGuideTtsModelTouchedRef.current) {
+      const modelId = String(
+        defaults.model_id || (provider === 'fish_audio' ? 's2.1-pro-free' : ''),
+      ).trim();
+      audioGuideTtsModelIdRef.current = modelId;
+      setAudioGuideTtsModelId(modelId);
+    }
+  }, []);
+
+  const updateAudioGuideTtsProvider = useCallback((value) => {
+    const provider = value === 'elevenlabs' ? 'elevenlabs' : 'fish_audio';
+    audioGuideTtsProviderTouchedRef.current = true;
+    audioGuideTtsProviderRef.current = provider;
+    audioGuideTtsVoiceTouchedRef.current = false;
+    audioGuideTtsModelTouchedRef.current = false;
+    setAudioGuideTtsProvider(provider);
+    applyTtsProviderDefaults(ttsSettings, provider);
+  }, [ttsSettings, applyTtsProviderDefaults]);
+
   const updateAudioGuideTtsModelId = useCallback((value) => {
     const next = (value || '').trim();
     audioGuideTtsModelTouchedRef.current = true;
     audioGuideTtsModelIdRef.current = next;
     setAudioGuideTtsModelId(next);
   }, []);
+
+  const loadTtsSettings = useCallback(async () => {
+    if (ttsSettings) return ttsSettings;
+    setTtsSettingsLoading(true);
+    setTtsSettingsError('');
+    try {
+      const res = await ttsAPI.getSettings();
+      const data = res?.data || {};
+      if (!data.ok) throw new Error(data.error || 'Не удалось загрузить настройки TTS');
+      setTtsSettings(data);
+      const provider = audioGuideTtsProviderTouchedRef.current
+        ? audioGuideTtsProviderRef.current
+        : (data.default_provider || DEFAULT_TTS_PROVIDER);
+      audioGuideTtsProviderRef.current = provider;
+      setAudioGuideTtsProvider(provider);
+      applyTtsProviderDefaults(data, provider);
+      return data;
+    } catch (error) {
+      setTtsSettingsError(parseApiError(error) || 'Не удалось загрузить настройки TTS');
+      return null;
+    } finally {
+      setTtsSettingsLoading(false);
+    }
+  }, [ttsSettings, applyTtsProviderDefaults]);
 
   const applyElevenLabsDefaultSelections = useCallback((settings) => {
     if (!audioGuideTtsVoiceTouchedRef.current) {
@@ -920,8 +1009,12 @@ export function useAudioGuides({
     }
 
     if (!audioGuideTtsModelTouchedRef.current) {
-      audioGuideTtsModelIdRef.current = '';
-      setAudioGuideTtsModelId('');
+      const models = Array.isArray(settings?.models) ? settings.models : [];
+      const nextModel = String(
+        settings?.defaults?.model_id || models[0]?.model_id || '',
+      ).trim();
+      audioGuideTtsModelIdRef.current = nextModel;
+      setAudioGuideTtsModelId(nextModel);
     }
   }, []);
 
@@ -2137,8 +2230,10 @@ export function useAudioGuides({
       }
 
       try {
+        const provider = audioGuideTtsProviderRef.current || DEFAULT_TTS_PROVIDER;
         const voiceId = (audioGuideTtsVoiceId || audioGuideTtsVoiceIdRef.current || '').trim();
         const payload = {
+          provider,
           language_code: lang,
           replace_existing: Boolean(replaceExisting) || Boolean(force),
           async: true,
@@ -2146,13 +2241,13 @@ export function useAudioGuides({
         if (force) payload.force = true;
         if (voiceId) payload.voice_id = voiceId;
 
-        if (audioGuideTtsModelTouchedRef.current) {
+        if (provider === 'fish_audio' || audioGuideTtsModelTouchedRef.current) {
           const modelId = (audioGuideTtsModelId || audioGuideTtsModelIdRef.current || '').trim();
           if (modelId) payload.model_id = modelId;
         }
 
         if (import.meta.env.DEV) {
-          console.debug('ElevenLabs generate audio payload', payload);
+          console.debug('TTS generate audio payload', payload);
         }
 
         const res = await attractionAudioGuidesAPI.generateChapteredTrackAudio(
@@ -2213,7 +2308,12 @@ export function useAudioGuides({
         setGeneratingAudioGuideTrack(false);
       }
     },
-    [sessionId, showNote, audioGuideTtsVoiceId, audioGuideTtsModelId],
+    [
+      sessionId,
+      showNote,
+      audioGuideTtsVoiceId,
+      audioGuideTtsModelId,
+    ],
   );
 
   const regenerateAttractionAudioGuideChapter = useCallback(
@@ -2250,7 +2350,14 @@ export function useAudioGuides({
           sessionId,
           guide.id,
           trackId,
-          { language_code: lang, plan_item_id: planItemId, async: true },
+          {
+            provider: audioGuideTtsProviderRef.current || DEFAULT_TTS_PROVIDER,
+            language_code: lang,
+            plan_item_id: planItemId,
+            voice_id: audioGuideTtsVoiceIdRef.current || undefined,
+            model_id: audioGuideTtsModelIdRef.current || undefined,
+            async: true,
+          },
         );
 
         let data = res?.data || {};
@@ -2287,6 +2394,193 @@ export function useAudioGuides({
     },
     [sessionId, showNote],
   );
+
+  const prepareMissingAttractionAudio = useCallback(async () => {
+    const languageCode = getLocaleLang(
+      attractionAudioGuideActiveLocaleRef.current,
+    );
+    const response = await attractionAudioGuidesAPI.getMissingAudioStatus(
+      sessionId,
+      { language_code: languageCode },
+    );
+    return response?.data || {};
+  }, [sessionId]);
+
+  const generateMissingAttractionAudio = useCallback(async (
+    { skipConfirmation = false } = {},
+  ) => {
+    if (batchAudioGeneratingRef.current) return;
+
+    const languageCode = getLocaleLang(
+      attractionAudioGuideActiveLocaleRef.current,
+    );
+    const provider = audioGuideTtsProviderRef.current || DEFAULT_TTS_PROVIDER;
+    const voiceId = (audioGuideTtsVoiceIdRef.current || '').trim();
+    const modelId = (audioGuideTtsModelIdRef.current || '').trim();
+
+    try {
+      const status = await prepareMissingAttractionAudio();
+      const readyCount = Number(status.ready_count || 0);
+      const activeTask = status.active_task;
+
+      if (!activeTask && readyCount === 0) {
+        const details = [];
+        if (status.already_voiced_count) {
+          details.push(`уже озвучено: ${status.already_voiced_count}`);
+        }
+        if (status.missing_text_count) {
+          details.push(`без полного текста: ${status.missing_text_count}`);
+        }
+        if (status.missing_guide_count) {
+          details.push(`без аудиогида: ${status.missing_guide_count}`);
+        }
+        showNote(
+          details.length
+            ? `Нет готовых ОЛ для озвучки (${details.join(', ')})`
+            : 'Нет готовых ОЛ для озвучки',
+          'success',
+        );
+        setBatchAudioResult(status);
+        return;
+      }
+
+      if (!activeTask && !skipConfirmation) {
+        const providerLabel = provider === 'elevenlabs' ? 'ElevenLabs' : 'Fish Audio';
+        const approved = await confirm({
+          message:
+            `Озвучить ${readyCount} ОЛ на языке ${languageCode.toUpperCase()} ` +
+            `через ${providerLabel}? Уже готовое аудио не изменится.`,
+        });
+        if (!approved) return;
+      }
+
+      batchAudioGeneratingRef.current = true;
+      setBatchAudioGenerating(true);
+      setBatchAudioProgress(Number(activeTask?.progress || 0));
+      setBatchAudioCurrentStep(
+        activeTask?.current_step || 'Запускаем пакетную озвучку...',
+      );
+      setBatchAudioResult(null);
+
+      const payload = {
+        provider,
+        language_code: languageCode,
+      };
+      if (voiceId) payload.voice_id = voiceId;
+      if (modelId) payload.model_id = modelId;
+
+      const response = await attractionAudioGuidesAPI.generateMissingAudio(
+        sessionId,
+        payload,
+      );
+      const data = response?.data || {};
+      if (!data.async || !data.task_id) {
+        setBatchAudioResult(data);
+        setBatchAudioProgress(100);
+        setBatchAudioCurrentStep('Нет новых ОЛ для озвучки');
+        return;
+      }
+
+      const task = await pollGenerationTask(data.task_id, {
+        tasksAPI,
+        intervalMs: 3000,
+        maxWaitMs: 7 * 60 * 60 * 1000,
+        onProgress: (progressTask) => {
+          setBatchAudioProgress(Number(progressTask?.progress || 0));
+          setBatchAudioCurrentStep(
+            progressTask?.current_step || 'Пакетная озвучка выполняется...',
+          );
+          if (progressTask?.result_data) {
+            setBatchAudioResult(progressTask.result_data);
+          }
+        },
+      });
+      const result = task?.result_data || {};
+      const generated = Array.isArray(result.results)
+        ? result.results.filter((item) => item?.status === 'generated')
+        : [];
+
+      if (generated.length) {
+        const generatedByGuide = new Map(
+          generated.map((item) => [normalizeId(item.guide_id), item]),
+        );
+        setAttractionAudioGuides((items) =>
+          items.map((guide) => {
+            const item = generatedByGuide.get(normalizeId(guide.id));
+            return item
+              ? mergeAudioGuideTrackFromTtsResponse(guide, languageCode, item)
+              : guide;
+          }),
+        );
+        setCurrentAttractionAudioGuide((guide) => {
+          if (!guide) return guide;
+          const item = generatedByGuide.get(normalizeId(guide.id));
+          return item
+            ? mergeAudioGuideTrackFromTtsResponse(guide, languageCode, item)
+            : guide;
+        });
+      }
+
+      setBatchAudioResult(result);
+      setBatchAudioProgress(100);
+      setBatchAudioCurrentStep(task?.current_step || 'Пакетная озвучка завершена');
+      const failedCount = Number(result.failed_count || 0);
+      showNote(
+        failedCount
+          ? `Озвучено: ${result.generated_count || 0}, ошибок: ${failedCount}`
+          : `Озвучено ОЛ: ${result.generated_count || 0}`,
+        failedCount ? 'error' : 'success',
+      );
+    } catch (error) {
+      const message = mapAudioGuideTrackTtsError(error);
+      setBatchAudioCurrentStep(message);
+      showNote(message, 'error');
+    } finally {
+      batchAudioGeneratingRef.current = false;
+      setBatchAudioGenerating(false);
+    }
+  }, [
+    sessionId,
+    showNote,
+    confirm,
+    prepareMissingAttractionAudio,
+  ]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const resumeActiveBatch = async () => {
+      try {
+        const languageCode = getLocaleLang(
+          attractionAudioGuideActiveLocaleRef.current,
+        );
+        const response = await attractionAudioGuidesAPI.getMissingAudioStatus(
+          sessionId,
+          { language_code: languageCode },
+        );
+        const taskId = String(response?.data?.active_task?.id || '');
+        if (
+          cancelled ||
+          !taskId ||
+          batchAudioGeneratingRef.current ||
+          batchAudioResumedTaskRef.current === taskId
+        ) {
+          return;
+        }
+        batchAudioResumedTaskRef.current = taskId;
+        await generateMissingAttractionAudio();
+      } catch {
+        // Status probing must not make the session wizard noisy on page load.
+      }
+    };
+
+    if (sessionId) {
+      void resumeActiveBatch();
+    }
+    return () => {
+      cancelled = true;
+    };
+  }, [sessionId, generateMissingAttractionAudio]);
 
   // Расстановка ударений (U+0301) для озвучки: пишет вторую версию текста в
   // content_texts_tts. planItemId=null → весь текст языка; иначе одна глава.
@@ -3081,10 +3375,18 @@ export function useAudioGuides({
     audioGuideItemTextGenerationError,
     generatingAudioGuideTrack,
     audioGuideTrackGenerationError,
+    batchAudioGenerating,
+    batchAudioProgress,
+    batchAudioCurrentStep,
+    batchAudioResult,
     audioGuidePlanGenerationState,
     elevenLabsSettingsLoading,
     elevenLabsSettingsError,
     elevenLabsSettings,
+    ttsSettingsLoading,
+    ttsSettingsError,
+    ttsSettings,
+    audioGuideTtsProvider,
     audioGuideTtsVoiceId,
     audioGuideTtsModelId,
     attractionAudioGuideLocaleData,
@@ -3106,6 +3408,8 @@ export function useAudioGuides({
     removeAttractionAudioGuideTrack,
     uploadAttractionAudioGuideTrack,
     generateAttractionAudioGuideTrackAudio,
+    prepareMissingAttractionAudio,
+    generateMissingAttractionAudio,
     regenerateAttractionAudioGuideChapter,
     audioGuideRegeneratingChapterId,
     generateAttractionAudioGuideTtsStress,
@@ -3129,6 +3433,8 @@ export function useAudioGuides({
     setAttractionAudioGuidePlanGenerationPrompt,
     setAttractionAudioGuidePlanItemsCount,
     loadElevenLabsSettings,
+    loadTtsSettings,
+    updateAudioGuideTtsProvider,
     updateAudioGuideTtsVoiceId,
     updateAudioGuideTtsModelId,
     applyElevenLabsDefaultSelections,

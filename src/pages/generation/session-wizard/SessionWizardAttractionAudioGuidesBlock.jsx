@@ -461,14 +461,22 @@ const getTrackChapters = (track) => {
   return [];
 };
 
-function ElevenLabsSettingsPanel({
-  settings = null,
-  loading = false,
-  error = '',
+export function TTSProviderSettingsPanel({
+  provider = 'fish_audio',
+  providerSettings = null,
+  providerSettingsLoading = false,
+  providerSettingsError = '',
+  elevenLabsSettings = null,
+  elevenLabsLoading = false,
+  elevenLabsError = '',
   voiceId = '',
+  modelId = '',
+  onProviderChange,
   onVoiceChange,
-  onLoadSettings,
-  voiceSelectDisabled = false,
+  onModelChange,
+  onLoadProviderSettings,
+  onLoadElevenLabsSettings,
+  disabled = false,
 }) {
   const loadTriggeredRef = useRef(false);
   const previewAudioRef = useRef(null);
@@ -476,16 +484,36 @@ function ElevenLabsSettingsPanel({
   useEffect(() => {
     if (!loadTriggeredRef.current) {
       loadTriggeredRef.current = true;
-      onLoadSettings?.();
+      onLoadProviderSettings?.();
     }
-  }, [onLoadSettings]);
+  }, [onLoadProviderSettings]);
 
-  const voices = Array.isArray(settings?.voices) ? settings.voices : [];
+  useEffect(() => {
+    if (provider === 'elevenlabs') onLoadElevenLabsSettings?.();
+  }, [provider, onLoadElevenLabsSettings]);
+
+  const providerList = Array.isArray(providerSettings?.providers)
+    ? providerSettings.providers
+    : [];
+  const providerConfig = providerList.find((item) => item?.id === provider) || null;
+  const providerModels = Array.isArray(providerConfig?.models) ? providerConfig.models : [];
+  const elevenLabsModels = Array.isArray(elevenLabsSettings?.models)
+    ? elevenLabsSettings.models
+    : [];
+  const models = provider === 'elevenlabs' && elevenLabsModels.length
+    ? elevenLabsModels
+    : providerModels;
+  const voices = Array.isArray(elevenLabsSettings?.voices)
+    ? elevenLabsSettings.voices
+    : [];
   const hasVoices = voices.length > 0;
   const selectedVoice = voices.find((voice) => voice.voice_id === voiceId);
   const previewUrl = selectedVoice?.preview_url || '';
-  const displayMessage = resolveElevenLabsSettingsDisplayMessage(settings, error);
-  const voiceSelectDisabledState = voiceSelectDisabled || loading || !hasVoices;
+  const displayMessage = resolveElevenLabsSettingsDisplayMessage(
+    elevenLabsSettings,
+    elevenLabsError,
+  );
+  const voiceSelectDisabledState = disabled || elevenLabsLoading || !hasVoices;
 
   const handlePreview = () => {
     if (!previewUrl) return;
@@ -501,44 +529,138 @@ function ElevenLabsSettingsPanel({
   };
 
   return (
-    <div className="space-y-2 rounded-lg border border-gray-200 bg-white px-3 py-3">
-      <label className="block text-sm font-medium text-gray-800">Голос</label>
-
-      {loading ? (
-        <p className="text-xs text-gray-500">Загружаем голоса…</p>
-      ) : null}
-
-      {displayMessage ? (
-        <p className="text-xs text-amber-700">{displayMessage}</p>
-      ) : null}
-
-      <div className="flex flex-wrap items-center gap-2">
+    <div className="space-y-3 rounded-lg border border-gray-200 bg-white px-3 py-3">
+      <div>
+        <label className="mb-1 block text-sm font-medium text-gray-800">
+          Провайдер озвучки
+        </label>
         <select
-          value={voiceId || ''}
-          onChange={(event) => onVoiceChange?.(event.target.value)}
-          disabled={voiceSelectDisabledState}
-          className="min-w-[220px] flex-1 rounded-lg border border-gray-300 px-2 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50"
+          value={provider}
+          onChange={(event) => onProviderChange?.(event.target.value)}
+          disabled={disabled || providerSettingsLoading}
+          className="w-full rounded-lg border border-gray-300 px-2 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50"
         >
-          {!hasVoices ? (
-            <option value="">Голоса недоступны</option>
-          ) : (
-            voices.map((voice) => (
-              <option key={voice.voice_id} value={voice.voice_id}>
-                {buildElevenLabsVoiceLabel(voice)}
-              </option>
-            ))
-          )}
+          <option value="fish_audio">Fish Audio — S2.1 Pro Free (по умолчанию)</option>
+          <option value="elevenlabs">ElevenLabs</option>
         </select>
-
-        <button
-          type="button"
-          onClick={handlePreview}
-          disabled={!previewUrl || voiceSelectDisabledState}
-          className="rounded-md border border-gray-200 bg-white px-2.5 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
-        >
-          ▶ Прослушать
-        </button>
       </div>
+
+      {providerSettingsLoading ? (
+        <p className="text-xs text-gray-500">Загружаем настройки TTS…</p>
+      ) : null}
+      {providerSettingsError ? (
+        <p className="text-xs text-amber-700">{providerSettingsError}</p>
+      ) : null}
+      {providerConfig?.configured === false ? (
+        <p className="text-xs text-red-600">
+          Ключ этого провайдера не настроен на сервере.
+        </p>
+      ) : null}
+      {provider === 'fish_audio' &&
+      modelId !== 's2.1-pro-free' &&
+      providerConfig?.credit &&
+      Number(providerConfig.credit.credit || 0) <= 0 &&
+      !providerConfig.credit.has_free_credit ? (
+        <p className="text-xs text-red-600">
+          На Fish Audio нет доступного API-кредита. Активируйте промо или пополните
+          API credit в кабинете Fish Audio.
+        </p>
+      ) : null}
+      {providerConfig?.warning ? (
+        <p className="text-xs text-amber-700">{providerConfig.warning}</p>
+      ) : null}
+
+      {provider === 'fish_audio' ? (
+        <>
+          <div>
+            <label className="mb-1 block text-sm font-medium text-gray-800">Модель</label>
+            <select
+              value={modelId || 's2.1-pro-free'}
+              onChange={(event) => onModelChange?.(event.target.value)}
+              disabled={disabled}
+              className="w-full rounded-lg border border-gray-300 px-2 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50"
+            >
+              {(models.length ? models : [
+                { model_id: 's2.1-pro-free', name: 'S2.1 Pro Free', recommended: true },
+                { model_id: 's2-pro', name: 'S2-Pro' },
+                { model_id: 's1', name: 'S1' },
+              ]).map((model) => (
+                <option key={model.model_id} value={model.model_id}>
+                  {model.name || model.model_id}
+                  {model.recommended ? ' — рекомендуется' : ''}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className="mb-1 block text-sm font-medium text-gray-800">
+              Reference ID голоса
+            </label>
+            <input
+              value={voiceId}
+              onChange={(event) => onVoiceChange?.(event.target.value)}
+              disabled={disabled}
+              placeholder="Пусто — стандартный голос Fish Audio"
+              className="w-full rounded-lg border border-gray-300 px-2 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50"
+            />
+          </div>
+        </>
+      ) : (
+        <>
+          <div>
+            <label className="mb-1 block text-sm font-medium text-gray-800">Модель</label>
+            <select
+              value={modelId || ''}
+              onChange={(event) => onModelChange?.(event.target.value)}
+              disabled={disabled || elevenLabsLoading}
+              className="w-full rounded-lg border border-gray-300 px-2 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50"
+            >
+              {models.length ? (
+                models.map((model) => (
+                  <option key={model.model_id} value={model.model_id}>
+                    {model.name || model.model_id}
+                  </option>
+                ))
+              ) : (
+                <option value="">Модель ElevenLabs по умолчанию</option>
+              )}
+            </select>
+          </div>
+          <label className="block text-sm font-medium text-gray-800">Голос</label>
+          {elevenLabsLoading ? (
+            <p className="text-xs text-gray-500">Загружаем голоса…</p>
+          ) : null}
+          {displayMessage ? (
+            <p className="text-xs text-amber-700">{displayMessage}</p>
+          ) : null}
+          <div className="flex flex-wrap items-center gap-2">
+            <select
+              value={voiceId || ''}
+              onChange={(event) => onVoiceChange?.(event.target.value)}
+              disabled={voiceSelectDisabledState}
+              className="min-w-[220px] flex-1 rounded-lg border border-gray-300 px-2 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50"
+            >
+              {!hasVoices ? (
+                <option value="">Голоса недоступны</option>
+              ) : (
+                voices.map((voice) => (
+                  <option key={voice.voice_id} value={voice.voice_id}>
+                    {buildElevenLabsVoiceLabel(voice)}
+                  </option>
+                ))
+              )}
+            </select>
+            <button
+              type="button"
+              onClick={handlePreview}
+              disabled={!previewUrl || voiceSelectDisabledState}
+              className="rounded-md border border-gray-200 bg-white px-2.5 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              ▶ Прослушать
+            </button>
+          </div>
+        </>
+      )}
     </div>
   );
 }
@@ -621,9 +743,17 @@ export default function SessionWizardAttractionAudioGuidesBlock({
   elevenLabsSettingsLoading = false,
   elevenLabsSettingsError = '',
   elevenLabsSettings = null,
+  ttsSettingsLoading = false,
+  ttsSettingsError = '',
+  ttsSettings = null,
+  audioGuideTtsProvider = 'fish_audio',
   audioGuideTtsVoiceId = '',
+  audioGuideTtsModelId = 's2.1-pro-free',
+  onLoadTtsSettings,
+  onSetAudioGuideTtsProvider,
   onLoadElevenLabsSettings,
   onSetAudioGuideTtsVoiceId,
+  onSetAudioGuideTtsModelId,
   onGoToStep,
 }) {
   const audioFileRef = useRef(null);
@@ -1344,7 +1474,7 @@ export default function SessionWizardAttractionAudioGuidesBlock({
           {planPoints.length > 0 && onGenerateAttractionAudioGuideTtsStress ? (
             <div className="flex flex-wrap items-center justify-between gap-2 p-2.5 bg-purple-50/60 border border-purple-200 rounded-lg">
               <span className="text-xs text-purple-800">
-                Ударения для озвучки ElevenLabs — вторая версия текста (U+0301).
+                Произносимая версия для TTS с ударениями (U+0301).
               </span>
               <div className="flex items-center gap-2">
                 {onBuildSessionStressDictionary ? (
@@ -1478,7 +1608,7 @@ export default function SessionWizardAttractionAudioGuidesBlock({
                       <div className="mt-2 pt-2 border-t border-dashed border-gray-200 space-y-1.5">
                         <div className="flex items-center justify-between gap-2">
                           <label className="block text-xs font-medium text-purple-700">
-                            Текст с ударениями (для ElevenLabs)
+                            Текст с ударениями (для TTS)
                           </label>
                           <button
                             type="button"
@@ -1627,14 +1757,24 @@ export default function SessionWizardAttractionAudioGuidesBlock({
               <p className="text-xs text-red-600">{audioGuideTrackGenerationError}</p>
             ) : null}
 
-            <ElevenLabsSettingsPanel
-              settings={elevenLabsSettings}
-              loading={elevenLabsSettingsLoading}
-              error={elevenLabsSettingsError}
+            <TTSProviderSettingsPanel
+              provider={audioGuideTtsProvider}
+              providerSettings={ttsSettings}
+              providerSettingsLoading={ttsSettingsLoading}
+              providerSettingsError={ttsSettingsError}
+              elevenLabsSettings={elevenLabsSettings}
+              elevenLabsLoading={elevenLabsSettingsLoading}
+              elevenLabsError={elevenLabsSettingsError}
               voiceId={audioGuideTtsVoiceId}
+              modelId={audioGuideTtsModelId}
+              onProviderChange={onSetAudioGuideTtsProvider}
               onVoiceChange={onSetAudioGuideTtsVoiceId}
-              onLoadSettings={() => onLoadElevenLabsSettings?.({ refresh: true })}
-              voiceSelectDisabled={generatingAudioGuideTrack}
+              onModelChange={onSetAudioGuideTtsModelId}
+              onLoadProviderSettings={onLoadTtsSettings}
+              onLoadElevenLabsSettings={() =>
+                onLoadElevenLabsSettings?.({ refresh: true })
+              }
+              disabled={generatingAudioGuideTrack}
             />
 
             {hasTrackAudio ? (
@@ -1688,7 +1828,7 @@ export default function SessionWizardAttractionAudioGuidesBlock({
                     })
                   }
                   disabled={!canGenerateFullAudio}
-                  title="Переозвучить все главы заново, даже если текст не менялся (при глюках ElevenLabs)"
+                  title="Переозвучить все главы заново, даже если текст не менялся"
                   className="px-3 py-1.5 text-xs font-medium text-blue-700 bg-white border border-blue-300 rounded-lg hover:bg-blue-50 disabled:opacity-50 transition-colors"
                 >
                   ↻ Заново, без кэша

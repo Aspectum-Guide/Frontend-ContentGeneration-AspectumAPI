@@ -366,6 +366,7 @@ export interface AudioGuidesState {
   attractionAudioGuideAutoSaving: boolean;
   attractionAudioGuideAutoSaved: boolean;
   audioGuidePlanGenerationState: 'idle' | 'generating' | 'done' | 'error';
+  audioGuideTtsProvider: 'fish_audio' | 'elevenlabs';
   audioGuideTtsVoiceId: string;
   audioGuideTtsModelId: string;
   elevenLabsSettingsLoading: boolean;
@@ -390,6 +391,8 @@ export interface AudioGuidesActions {
   generateAttractionAudioGuideMainText: () => Promise<void>;
   generateAttractionAudioGuideMainTextItem: (itemId: string) => Promise<void>;
   loadElevenLabsSettings: () => Promise<void>;
+  loadTtsSettings: () => Promise<void>;
+  updateAudioGuideTtsProvider: (provider: 'fish_audio' | 'elevenlabs') => void;
   updateAudioGuideTtsVoiceId: (voiceId: string) => void;
   updateAudioGuideTtsModelId: (modelId: string) => void;
 }

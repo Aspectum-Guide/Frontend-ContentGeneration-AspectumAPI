@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { getCityDraftName, getFlag } from './sessionWizardShared.jsx';
+import { getFlag } from './sessionWizardShared.jsx';
 import { createCoordinatePasteHandler } from '../../../utils/coordinates';
 import { usePasteImageOnHover } from '../../../hooks/usePasteImageOnHover';
 
@@ -202,14 +202,12 @@ function PhotoPanel({
 // ─── main ────────────────────────────────────────────────────────────────────
 
 export default function SessionWizardCityStep({
-  cityDrafts, activeCityDraftId,
   localeData, activeLocale, defaultLocale, currentLocale,
   lat, lon, savedLat, savedLon,
   imagePreview, photoUploading, imageOriginalUrl, imageCopyright,
   setMapContainerRef, photoFileRef,
   onOpenCommonsModal, onPhotoFileChange, onPhotoDelete,
   onImageOriginalUrlChange, onImageCopyrightChange,
-  onCreateDraft, onSelectDraft, onDeleteDraft,
   onSwitchLocale, onSetDefaultLocale, onAddLocale, onRemoveLocale,
   onUpdateLocaleField,
   onLatChange, onLonChange, onRestoreSavedCoords,
@@ -247,46 +245,6 @@ export default function SessionWizardCityStep({
 
   return (
     <div className="space-y-4">
-
-      {/* Черновики */}
-      <SectionCard
-        title="Города в сессии"
-        action={
-          <button
-            type="button" onClick={onCreateDraft}
-            className="px-2.5 py-1 text-xs font-medium text-blue-700 bg-blue-100 rounded-md hover:bg-blue-200 transition-colors"
-          >
-            + Добавить город
-          </button>
-        }
-      >
-        <div className="flex flex-wrap gap-2">
-          {cityDrafts.length === 0
-            ? <span className="text-sm text-gray-400">Нет черновиков — добавьте первый город</span>
-            : cityDrafts.map((draft) => {
-              const isActive = String(draft.id) === String(activeCityDraftId);
-              return (
-                <div key={draft.id} className={`flex items-center gap-1 px-3 py-1.5 rounded-lg border text-sm transition-colors ${
-                  isActive ? 'bg-blue-600 border-blue-600 text-white' : 'bg-white border-gray-200 text-gray-700 hover:border-blue-300'
-                }`}>
-                  <button type="button" onClick={() => onSelectDraft(draft.id)} className="font-medium">
-                    {getCityDraftName(draft)}
-                  </button>
-                  {draft.id !== 'legacy' && (
-                    <button
-                      type="button"
-                      onClick={(e) => { e.stopPropagation(); onDeleteDraft(draft.id); }}
-                      className={`text-sm ml-0.5 ${isActive ? 'text-blue-200 hover:text-white' : 'text-gray-300 hover:text-red-500'} transition-colors`}
-                    >
-                      ×
-                    </button>
-                  )}
-                </div>
-              );
-            })
-          }
-        </div>
-      </SectionCard>
 
       {/* Языки */}
       <SectionCard title="Язык редактирования">
