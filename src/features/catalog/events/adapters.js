@@ -4,6 +4,8 @@ export function createEmptyEvent() {
     title: {},
     description: {},
     tag_ids: [],
+    related_event_ids: [],
+    related_events: [],
     city_id: '',
     is_show: true,
     is_bookable: false,
@@ -50,6 +52,8 @@ export function mergeEventWithDetail(row, detail) {
     description: d.description || base.description || {},
     city_id: d.city_id ? String(d.city_id) : (base.city_id || ''),
     tag_ids: (d.tag_ids || d.tags || base.tag_ids || []).map(String),
+    related_event_ids: (d.related_event_ids || base.related_event_ids || []).map(String),
+    related_events: d.related_events || base.related_events || [],
     is_show: d.is_show ?? base.is_show ?? true,
     is_bookable: d.is_bookable ?? base.is_bookable ?? false,
     index: d.index ?? base.index ?? null,
@@ -73,6 +77,7 @@ export function toApiEventPayload(event) {
     is_bookable: !!event?.is_bookable,
     city_id: event?.city_id || null,
     tag_ids: (event?.tag_ids || []).filter(Boolean).map(String),
+    related_event_ids: (event?.related_event_ids || []).filter(Boolean).map(String),
   };
   if (event?.index != null && event.index !== '') payload.index = Number(event.index);
   if (event?.rank != null && event.rank !== '') payload.rank = Number(event.rank);

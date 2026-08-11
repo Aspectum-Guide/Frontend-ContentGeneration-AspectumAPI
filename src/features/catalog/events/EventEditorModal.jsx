@@ -10,6 +10,7 @@ import InformationBlocksEditor from '../shared/InformationBlocksEditor';
 import PublishedFeedEditor from '../shared/PublishedFeedEditor';
 import EventItineraryTab from './EventItineraryTab';
 import EventInclusionsTab from './EventInclusionsTab';
+import RelatedEventsField from './RelatedEventsField';
 import { eventsCatalogAPI } from './api';
 
 const eventInformationApi = {
@@ -368,6 +369,36 @@ export default function EventEditorModal({
                   Выбрано: {(event?.tag_ids || []).length} тегов
                 </p>
               </Field>
+            )}
+
+            {activeTab === 'meta' && (
+              <RelatedEventsField
+                eventId={event?.id}
+                relatedEvents={event?.related_events}
+                onAdd={(row) =>
+                  setEvent((p) => {
+                    const ids = new Set(p?.related_event_ids || []);
+                    ids.add(String(row.id));
+                    return {
+                      ...p,
+                      related_event_ids: Array.from(ids),
+                      related_events: [
+                        ...(p?.related_events || []),
+                        { id: String(row.id), title: row.title },
+                      ],
+                    };
+                  })
+                }
+                onRemove={(id) =>
+                  setEvent((p) => ({
+                    ...p,
+                    related_event_ids: (p?.related_event_ids || []).filter((x) => x !== String(id)),
+                    related_events: (p?.related_events || []).filter(
+                      (r) => String(r.id) !== String(id)
+                    ),
+                  }))
+                }
+              />
             )}
 
             {activeTab === 'information' && (
