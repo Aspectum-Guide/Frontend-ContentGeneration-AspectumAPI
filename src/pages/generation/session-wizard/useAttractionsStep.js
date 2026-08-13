@@ -177,6 +177,8 @@ const normalizeAttraction = (attr = {}) => {
     contents: attr.contents ?? {},
 
     tags: normalizeTagIds(attr.tags ?? []),
+    related_event_ids: normalizeTagIds(attr.related_event_ids ?? []),
+    related_events: attr.related_events ?? [],
   };
 };
 
@@ -356,6 +358,7 @@ const buildAttractionPayload = (attr, name, description) => {
     order: index,
 
     tags: normalizeTagIds(attr.tags ?? []),
+    related_event_ids: normalizeTagIds(attr.related_event_ids ?? []),
   };
 
   if (assignedType === 'database') {
@@ -1599,6 +1602,65 @@ export function useAttractionsStep(ctx) {
           normalizeId(item.id) === normalizeId(updated.id)
             ? updated
             : item
+        )
+      );
+
+      return updated;
+    });
+  }, []);
+
+  // ─── addCurrentAttractionRelatedEvent / removeCurrentAttractionRelatedEvent ──
+  const addCurrentAttractionRelatedEvent = useCallback((row) => {
+    const id = normalizeId(row?.id);
+
+    if (!id) return;
+
+    setCurrentAttr((prev) => {
+      if (!prev) return prev;
+
+      const currentIds = normalizeTagIds(prev.related_event_ids);
+      if (currentIds.includes(id)) return prev;
+
+      const updated = normalizeAttraction({
+        ...prev,
+        related_event_ids: [...currentIds, id],
+        related_events: [
+          ...(prev.related_events || []),
+          { id, title: row.title ?? row.name ?? {}, kind: row.kind ?? 'session' },
+        ],
+      });
+
+      setAttractions((items) =>
+        items.map((item) =>
+          normalizeId(item.id) === normalizeId(updated.id) ? updated : item
+        )
+      );
+
+      return updated;
+    });
+  }, []);
+
+  const removeCurrentAttractionRelatedEvent = useCallback((eventId) => {
+    const id = normalizeId(eventId);
+
+    if (!id) return;
+
+    setCurrentAttr((prev) => {
+      if (!prev) return prev;
+
+      const updated = normalizeAttraction({
+        ...prev,
+        related_event_ids: normalizeTagIds(prev.related_event_ids).filter(
+          (item) => item !== id,
+        ),
+        related_events: (prev.related_events || []).filter(
+          (item) => normalizeId(item.id) !== id,
+        ),
+      });
+
+      setAttractions((items) =>
+        items.map((item) =>
+          normalizeId(item.id) === normalizeId(updated.id) ? updated : item
         )
       );
 
@@ -3642,6 +3704,8 @@ export function useAttractionsStep(ctx) {
     persistAttractionImage,
     handleAttractionPhotoFile,
     toggleCurrentAttractionTag,
+    addCurrentAttractionRelatedEvent,
+    removeCurrentAttractionRelatedEvent,
     openAttractionCommonsModal,
 
     addAttractionInfo,

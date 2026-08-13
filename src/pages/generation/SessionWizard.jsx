@@ -329,6 +329,8 @@ export default function SessionWizard({ components = {} } = {}) {
     updateAttrLocaleField,
     updateCurrentAttrPatch,
     toggleCurrentAttractionTag,
+    addCurrentAttractionRelatedEvent,
+    removeCurrentAttractionRelatedEvent,
 
     openIlDetail,
     addInteractiveLocation,
@@ -1299,6 +1301,8 @@ export default function SessionWizard({ components = {} } = {}) {
               eventFilterTreeError={eventFilterTreeError}
               onReloadEventFilters={loadEventFilterTree}
               onToggleCurrentAttractionTag={toggleCurrentAttractionTag}
+              onAddCurrentAttractionRelatedEvent={addCurrentAttractionRelatedEvent}
+              onRemoveCurrentAttractionRelatedEvent={removeCurrentAttractionRelatedEvent}
             />
 
             <div className="pt-5 border-t border-gray-200">

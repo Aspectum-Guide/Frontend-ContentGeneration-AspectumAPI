@@ -6,6 +6,7 @@ import AiGenerationCountField from '../../../components/generation/AiGenerationC
 import { getAttrName, getFlag, getSessionEntityImagePreview, resolveSessionEntityImageOriginalUrl, resolveSessionEntityImageCopyright, normalizeId } from './sessionWizardShared.jsx';
 import { usePasteImageOnHover } from '../../../hooks/usePasteImageOnHover';
 import SessionWizardAttractionTagsPicker from './SessionWizardAttractionTagsPicker.jsx';
+import SessionWizardAttractionRelatedEventsPicker from './SessionWizardAttractionRelatedEventsPicker.jsx';
 import UsefulInfoTextImportBox from './UsefulInfoTextImportBox.jsx';
 import { TTSProviderSettingsPanel } from './SessionWizardAttractionAudioGuidesBlock.jsx';
 import { createCoordinatePasteHandler } from '../../../utils/coordinates';
@@ -519,6 +520,8 @@ export default function SessionWizardAttractionsStep({
   eventFilterTreeError = '',
   onReloadEventFilters,
   onToggleCurrentAttractionTag,
+  onAddCurrentAttractionRelatedEvent,
+  onRemoveCurrentAttractionRelatedEvent,
 
   attractionGenerationOpen = false,
   attractionGenerationPrompt = '',
@@ -1203,6 +1206,14 @@ export default function SessionWizardAttractionsStep({
                     eventFilterTreeError={eventFilterTreeError}
                     onToggleTag={onToggleCurrentAttractionTag}
                     onReloadEventFilters={onReloadEventFilters}
+                  />
+
+                  <SessionWizardAttractionRelatedEventsPicker
+                    currentAttrId={currentAttr?.id}
+                    relatedEvents={currentAttr?.related_events || []}
+                    attractions={attractions}
+                    onAdd={onAddCurrentAttractionRelatedEvent}
+                    onRemove={onRemoveCurrentAttractionRelatedEvent}
                   />
 
                   <div className="p-3 border border-gray-200 rounded-lg bg-gray-50">
