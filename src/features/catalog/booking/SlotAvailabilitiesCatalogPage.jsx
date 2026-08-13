@@ -32,6 +32,17 @@ import {
 
 const PAGE_SIZE = 20;
 
+// Совпадает с backend settings.LANGUAGES (AspectumBack/settings.py) — те же
+// 6 языков, что и в мобильном приложении. Пусто = слот доступен на любом языке.
+const SLOT_LANGUAGE_OPTIONS = [
+  ['en', 'Английский'],
+  ['ru', 'Русский'],
+  ['it', 'Итальянский'],
+  ['fr', 'Французский'],
+  ['de', 'Немецкий'],
+  ['es', 'Испанский'],
+];
+
 function createEmptyAvailability() {
   return {
     id: null,
@@ -41,6 +52,7 @@ function createEmptyAvailability() {
     booking_closes_minutes_before: 60,
     available_seats: 0,
     is_active: true,
+    languages: [],
   };
 }
 
@@ -81,6 +93,7 @@ function createEmptyBulk() {
     booking_closes_minutes_before: 60,
     available_seats: 0,
     is_active: true,
+    languages: [],
     // optional prices auto-create
     also_create_prices: false,
     price_mode: 'single', // single | per_type
@@ -128,6 +141,7 @@ export default function SlotAvailabilitiesCatalog() {
       booking_closes_minutes_before: Number(row?.booking_closes_minutes_before ?? 60),
       available_seats: Number(row?.available_seats ?? 0),
       is_active: row?.is_active !== false,
+      languages: Array.isArray(row?.languages) ? row.languages.map((x) => String(x)) : [],
     }),
     mapEditToPayload: (editingAvailability) => ({
       event: editingAvailability.event || null,
@@ -138,6 +152,9 @@ export default function SlotAvailabilitiesCatalog() {
       booking_closes_minutes_before: Number(editingAvailability.booking_closes_minutes_before || 0),
       available_seats: Number(editingAvailability.available_seats || 0),
       is_active: !!editingAvailability.is_active,
+      languages: Array.isArray(editingAvailability.languages)
+        ? editingAvailability.languages.filter(Boolean)
+        : [],
     }),
     onAfterSave: async () => {
       await reload(page);
@@ -285,6 +302,15 @@ export default function SlotAvailabilitiesCatalog() {
       label: 'Статус',
       render: (active) => <StatusBadge active={active} />,
     },
+    {
+      key: 'languages',
+      label: 'Языки',
+      render: (langs) => {
+        const codes = Array.isArray(langs) ? langs : [];
+        if (!codes.length) return <span className="text-sm text-gray-400">любой</span>;
+        return <span className="text-sm text-gray-700">{codes.join(', ')}</span>;
+      },
+    },
   ];
 
   return (
@@ -420,6 +446,38 @@ export default function SlotAvailabilitiesCatalog() {
               />
             </div>
 
+            <Field
+              label="Языки"
+              hint="Слот показывается только при выборе одного из этих языков в приложении. Ничего не выбрано — слот виден на любом языке."
+            >
+              <div className="flex flex-wrap gap-3">
+                {SLOT_LANGUAGE_OPTIONS.map(([code, label]) => {
+                  const checked = (crud.editingItem.languages || []).includes(code);
+                  return (
+                    <label key={code} className="inline-flex items-center gap-2 text-sm text-gray-700">
+                      <input
+                        type="checkbox"
+                        checked={checked}
+                        onChange={(e) => {
+                          const nextChecked = e.target.checked;
+                          crud.setEditingItem((prev) => {
+                            const curr = Array.isArray(prev.languages) ? prev.languages : [];
+                            return {
+                              ...prev,
+                              languages: nextChecked
+                                ? Array.from(new Set([...curr, code]))
+                                : curr.filter((x) => x !== code),
+                            };
+                          });
+                        }}
+                      />
+                      {label}
+                    </label>
+                  );
+                })}
+              </div>
+            </Field>
+
             <FormHint>
               Можно выбирать только глобальные типы билетов; событие задает контекст только для слота и цен.
             </FormHint>
@@ -524,6 +582,7 @@ export default function SlotAvailabilitiesCatalog() {
             booking_closes_minutes_before: Number(values.booking_closes_minutes_before || 0),
             available_seats: Number(values.available_seats || 0),
             is_active: !!values.is_active,
+            languages: Array.isArray(values.languages) ? values.languages.filter(Boolean) : [],
           };
 
           if (!payload.event) throw new Error('Выберите событие');
@@ -697,6 +756,38 @@ export default function SlotAvailabilitiesCatalog() {
                 text="Активны"
               />
             </div>
+
+            <Field
+              label="Языки"
+              hint="Применится ко всем создаваемым слотам. Ничего не выбрано — доступны на любом языке."
+            >
+              <div className="flex flex-wrap gap-3">
+                {SLOT_LANGUAGE_OPTIONS.map(([code, label]) => {
+                  const checked = (values.languages || []).includes(code);
+                  return (
+                    <label key={code} className="inline-flex items-center gap-2 text-sm text-gray-700">
+                      <input
+                        type="checkbox"
+                        checked={checked}
+                        onChange={(e) => {
+                          const nextChecked = e.target.checked;
+                          setValues((prev) => {
+                            const curr = Array.isArray(prev.languages) ? prev.languages : [];
+                            return {
+                              ...prev,
+                              languages: nextChecked
+                                ? Array.from(new Set([...curr, code]))
+                                : curr.filter((x) => x !== code),
+                            };
+                          });
+                        }}
+                      />
+                      {label}
+                    </label>
+                  );
+                })}
+              </div>
+            </Field>
 
             <div className="flex items-center gap-2">
               <button
