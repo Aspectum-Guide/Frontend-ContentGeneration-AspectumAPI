@@ -127,6 +127,18 @@ export default function CitiesCatalogPage() {
       },
     },
     {
+      key: 'parent_city',
+      label: 'Спец. гид',
+      render: (parentCity) =>
+        parentCity ? (
+          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-purple-50 text-purple-700 border border-purple-200">
+            Спец. гид
+          </span>
+        ) : (
+          <span className="text-sm text-gray-300">—</span>
+        ),
+    },
+    {
       key: 'id',
       label: 'ID',
       className: 'font-mono text-xs text-gray-400',
@@ -261,6 +273,7 @@ export default function CitiesCatalogPage() {
         onCommonsSelect={c.handleCommonsImageSelect}
         allFilters={c.allFilters}
         toggleFilter={c.toggleFilter}
+        allCities={c.allCities}
         syncIap={c.syncIap}
         syncingIap={c.syncingIap}
         syncIapNote={c.syncIapNote}

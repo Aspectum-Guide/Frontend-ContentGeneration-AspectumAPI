@@ -286,6 +286,7 @@ export function useCitiesCatalog() {
     setSearch,
     pageSize: PAGE_SIZE,
     reload: loadCities,
+    allCities,
 
     // actions shortcuts
     openNewSession,

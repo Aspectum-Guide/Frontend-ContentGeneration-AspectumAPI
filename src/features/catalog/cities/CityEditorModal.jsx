@@ -65,6 +65,7 @@ export default function CityEditorModal({
   onCommonsSelect,
   allFilters,
   toggleFilter,
+  allCities,
   syncIap,
   syncingIap,
   syncIapNote,
@@ -428,6 +429,26 @@ export default function CityEditorModal({
                       </span>
                     </label>
                   </div>
+                </Field>
+
+                <Field
+                  label="Родительский город (Спец. гид)"
+                  hint="Если выбрано — этот город скрыт с карты и из «ближайших городов»/«ближайших эвентов», но показывается в блоке «Гиды от партнеров» на странице выбранного родительского города."
+                >
+                  <select
+                    value={city?.parent_city || ''}
+                    onChange={(e) => setCity((p) => ({ ...p, parent_city: e.target.value }))}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+                  >
+                    <option value="">Не привязан</option>
+                    {(allCities || [])
+                      .filter((c) => String(c.id) !== String(city?.id) && !c.parent_city)
+                      .map((c) => (
+                        <option key={c.id} value={c.id}>
+                          {getMultiLangValue(c.name) || c.id}
+                        </option>
+                      ))}
+                  </select>
                 </Field>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3">

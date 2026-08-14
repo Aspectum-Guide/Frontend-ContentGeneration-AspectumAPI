@@ -11,6 +11,7 @@ export function createEmptyCity() {
     image_url: null,
     image_copyright: '',
     is_show: true,
+    parent_city: '',
     iap_sku: '',
     iap_price_usd: '',
     iap_apple_status: 'not_created',
@@ -38,6 +39,7 @@ export function fromApiCity(row) {
     image_url: row.image_url ?? null,
     image_copyright: row.image_copyright ?? '',
     is_show: row.is_show ?? true,
+    parent_city: row.parent_city ? String(row.parent_city) : '',
     iap_sku: row.iap_sku ?? '',
     iap_price_usd: row.iap_price_usd ?? '',
     iap_apple_status: row.iap_apple_status ?? 'not_created',
@@ -62,6 +64,7 @@ export function mergeCityRowWithApiDetail(row, detail) {
     image_copyright: d.image_copyright ?? base.image_copyright ?? '',
     city_filter_ids: (d.city_filter_ids || base.city_filter_ids || []).map(String),
     is_show: d.is_show ?? base.is_show ?? true,
+    parent_city: d.parent_city != null ? String(d.parent_city) : (base.parent_city ?? ''),
     iap_sku: d.iap_sku ?? base.iap_sku ?? '',
     iap_price_usd: d.iap_price_usd ?? base.iap_price_usd ?? '',
     iap_apple_status: d.iap_apple_status ?? base.iap_apple_status ?? 'not_created',
@@ -77,6 +80,7 @@ export function toApiCityUpdatePayload(city) {
     country: city?.country || {},
     city_filter_ids: (city?.city_filter_ids || []).map(String),
     is_show: !!city?.is_show,
+    parent_city: city?.parent_city || null,
   };
 
   const latVal = city?.lat;
