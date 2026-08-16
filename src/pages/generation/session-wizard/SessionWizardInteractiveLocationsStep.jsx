@@ -166,7 +166,7 @@ function IlDraftsPanel({
   );
 }
 
-function IlPhotoPanel({
+export function IlPhotoPanel({
   currentIl,
   photoUploading,
   photoFileRef,
@@ -175,11 +175,13 @@ function IlPhotoPanel({
   onOpenCommonsModal,
   onPhotoFileChange,
   onIconFileChange,
+  onRemoveIcon,
   onUpdateIlPatch,
 }) {
   const preview = getSessionEntityImagePreview(currentIl);
   const imageOriginalUrl = resolveSessionEntityImageOriginalUrl(currentIl);
   const imageCopyright = resolveSessionEntityImageCopyright(currentIl);
+  const hasMapIcon = Boolean(currentIl?.icon_id || currentIl?.icon_url);
 
   const photoPaste = usePasteImageOnHover((file) =>
     onPhotoFileChange?.({ target: { files: [file], value: '' } }, currentIl),
@@ -273,9 +275,9 @@ function IlPhotoPanel({
       <div className="border-t border-gray-100 pt-3 space-y-2">
         <p className="text-xs text-gray-500 font-medium">Иконка на карте</p>
         <div className="flex items-center gap-2">
-          <div className="w-10 h-10 rounded-lg border border-gray-200 bg-gray-50 flex items-center justify-center shrink-0 overflow-hidden">
+          <div className="relative w-10 h-10 rounded-lg border border-gray-200 bg-gray-50 flex items-center justify-center shrink-0 overflow-hidden">
             {currentIl?.icon_url
-              ? <img src={currentIl.icon_url} alt="" className="w-full h-full object-contain" />
+              ? <img src={currentIl.icon_url} alt="Иконка на карте" className="w-full h-full object-contain" />
               : <span className="text-base">📍</span>
             }
             {iconUploading && (
@@ -284,16 +286,34 @@ function IlPhotoPanel({
               </div>
             )}
           </div>
-          <label className="flex-1 text-center text-xs text-blue-600 bg-blue-50 border border-blue-200 rounded-lg py-1.5 cursor-pointer hover:bg-blue-100 transition-colors">
-            {iconUploading ? 'Загрузка…' : '+ Иконка'}
+          <div className="flex-1 flex flex-col gap-1.5">
             <input
               ref={iconFileRef}
               type="file"
               accept="image/*,.svg"
               className="hidden"
+              disabled={iconUploading}
               onChange={(e) => onIconFileChange?.(e, currentIl)}
             />
-          </label>
+            <button
+              type="button"
+              disabled={iconUploading}
+              onClick={() => iconFileRef?.current?.click()}
+              className="w-full text-center text-xs text-blue-600 bg-blue-50 border border-blue-200 rounded-lg py-1.5 hover:bg-blue-100 transition-colors disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {iconUploading ? 'Сохранение…' : hasMapIcon ? 'Заменить' : '+ Добавить'}
+            </button>
+            {hasMapIcon && (
+              <button
+                type="button"
+                disabled={iconUploading}
+                onClick={() => onRemoveIcon?.(currentIl)}
+                className="w-full text-center text-xs text-red-600 bg-red-50 border border-red-200 rounded-lg py-1.5 hover:bg-red-100 transition-colors disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                Удалить
+              </button>
+            )}
+          </div>
         </div>
       </div>
     </aside>
@@ -490,6 +510,7 @@ export default function SessionWizardInteractiveLocationsStep({
   iconUploading,
   iconFileRef,
   onIconFileChange,
+  onRemoveIcon,
   onOpenIlDetail,
   onAddInteractiveLocation,
   onDeleteCurrentIl,
@@ -818,6 +839,7 @@ export default function SessionWizardInteractiveLocationsStep({
           onOpenCommonsModal={onOpenCommonsModal}
           onPhotoFileChange={onPhotoFileChange}
           onIconFileChange={onIconFileChange}
+          onRemoveIcon={onRemoveIcon}
           onUpdateIlPatch={updateIlPatch}
         />
 

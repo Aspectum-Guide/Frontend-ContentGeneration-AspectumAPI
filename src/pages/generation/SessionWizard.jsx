@@ -346,6 +346,7 @@ export default function SessionWizard({ components = {} } = {}) {
     toggleCurrentIlTag,
     handleIlPhotoFile,
     handleIlIconFile,
+    removeIlIcon,
     ilGenerationOpen,
     ilGenerationPrompt,
     ilGenerating,
@@ -1520,6 +1521,7 @@ export default function SessionWizard({ components = {} } = {}) {
             iconUploading={ilIconUploading}
             iconFileRef={ilIconFileRef}
             onIconFileChange={handleIlIconFile}
+            onRemoveIcon={removeIlIcon}
             onOpenIlDetail={openIlDetail}
             onAddInteractiveLocation={addInteractiveLocation}
             onDeleteCurrentIl={deleteCurrentIl}

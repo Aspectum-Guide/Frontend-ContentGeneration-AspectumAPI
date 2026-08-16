@@ -660,6 +660,55 @@ export default function useInteractiveLocationsStep({
     [sessionId, currentIl, ilLocaleData, showNote, imagesAPI],
   );
 
+  const removeIlIcon = useCallback(
+    async (il) => {
+      if (!il?.id || ilIconUploading) return;
+
+      const approved = await confirm({
+        title: 'Удалить иконку на карте?',
+        message: 'Иконка будет отвязана от интерактивной локации. Главное фото останется без изменений.',
+        danger: true,
+        confirmLabel: 'Удалить',
+      });
+      if (!approved) return;
+
+      setIlIconUploading(true);
+      try {
+        const merged = normalizeInteractiveLocation({
+          ...il,
+          icon_id: null,
+          icon_url: null,
+        });
+        const localeDataForSave = currentIl?.id === il.id ? ilLocaleData : {};
+        const updatedIl = await persistInteractiveLocationRecord(
+          sessionId,
+          merged,
+          localeDataForSave,
+        );
+        setInteractiveLocations((prev) =>
+          prev.map((item) => (item.id === il.id ? updatedIl : item)),
+        );
+        if (currentIl?.id === il.id) {
+          setCurrentIl(updatedIl);
+          ilSavedSnapshotRef.current = buildIlPersistSnapshot(updatedIl, ilLocaleData);
+        }
+        showNote('Иконка на карте удалена', 'success');
+      } catch (err) {
+        showNote('Ошибка удаления иконки: ' + parseApiError(err, err.message), 'error');
+      } finally {
+        setIlIconUploading(false);
+      }
+    },
+    [
+      sessionId,
+      currentIl,
+      ilLocaleData,
+      ilIconUploading,
+      showNote,
+      confirm,
+    ],
+  );
+
   const openIlGenerationModal = useCallback(() => {
     ilGenPollCancelledRef.current = false;
     setIlGenerationError('');
@@ -914,6 +963,7 @@ export default function useInteractiveLocationsStep({
     toggleCurrentIlTag,
     handleIlPhotoFile,
     handleIlIconFile,
+    removeIlIcon,
     leaveIlDetailView,
 
     openIlGenerationModal,
