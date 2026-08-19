@@ -14,6 +14,14 @@ export default function EventSelect({
   className,
   ariaLabel,
 }) {
+  const list = options || [];
+  // Пока `options` ещё грузятся (или само событие по какой-то причине не
+  // попало в справочник), для уже выбранного `value` может не быть <option>
+  // — без этого select молча откатывается на пустой placeholder, хотя
+  // событие на самом деле выбрано. Подставляем временный option с самим id,
+  // чтобы значение оставалось видимым, пока не подтянется настоящий лейбл.
+  const hasValueOption = !value || list.some((ev) => String(ev.id) === String(value));
+
   return (
     <select
       value={value || ''}
@@ -27,7 +35,8 @@ export default function EventSelect({
       }
     >
       <option value="">{placeholder}</option>
-      {(options || []).map((ev) => (
+      {!hasValueOption ? <option value={value}>{value}</option> : null}
+      {list.map((ev) => (
         <option key={ev.id} value={ev.id}>
           {getEventLabel(ev) || ev.id}
         </option>

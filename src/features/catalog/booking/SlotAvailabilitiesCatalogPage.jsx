@@ -168,6 +168,13 @@ export default function SlotAvailabilitiesCatalog() {
     deleteErrorMessage: 'Ошибка удаления слота',
   });
 
+  // Отдельный источник для формы редактирования/создания — раньше она
+  // переиспользовала `eventFilter` таблицы, из-за чего открытие "Ред."
+  // молча перефильтровывало и сбрасывало на 1-ю страницу основной список.
+  const editEventId = crud.editingItem?.event || '';
+  const { ticketTypeOptions: editTicketTypeOptions, ticketTypesLoading: editTicketTypesLoading } =
+    useTicketTypeOptions(editEventId, 500, { globalOnly: true });
+
   const [bulkOpen, setBulkOpen] = useState(false);
 
   const eventLabelById = useMemo(() => {
@@ -245,9 +252,6 @@ export default function SlotAvailabilitiesCatalog() {
 
   const openEdit = useCallback(async (row) => {
     await crud.openEdit(row);
-    const baseEvent = row?.event ? String(row.event) : '';
-    // trigger ticket type options load for edit form
-    setEventFilter(baseEvent || '');
   }, [crud]);
 
   const columns = [
@@ -392,9 +396,9 @@ export default function SlotAvailabilitiesCatalog() {
                   value={crud.editingItem.event}
                   onChange={(v) => {
                     crud.setEditingItem((prev) => ({ ...prev, event: v, ticket_types: [] }));
-                    setEventFilter(v);
                   }}
                   options={eventOptions}
+                  disabled={eventsLoading}
                   required
                 />
               </Field>
@@ -404,8 +408,8 @@ export default function SlotAvailabilitiesCatalog() {
                   multiple
                   value={crud.editingItem.ticket_types}
                   onChange={(selected) => crud.setEditingItem((prev) => ({ ...prev, ticket_types: selected }))}
-                  options={ticketTypeOptions}
-                  disabled={!crud.editingItem.event || ticketTypesLoading}
+                  options={editTicketTypeOptions}
+                  disabled={!crud.editingItem.event || editTicketTypesLoading}
                 />
               </Field>
             </div>
