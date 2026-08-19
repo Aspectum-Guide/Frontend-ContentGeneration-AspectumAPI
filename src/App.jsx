@@ -47,6 +47,7 @@ import Home from './pages/Home';
 import ImportGoogleSheet from './pages/import/ImportGoogleSheet';
 import MyTasks from './pages/tasks/MyTasks';
 import TokenAuth from './pages/TokenAuth';
+import AccountSettings from './pages/AccountSettings';
 import { registerAuthNavigate } from './utils/authRedirect';
 
 const routes = [
@@ -57,6 +58,10 @@ const routes = [
   {
     path: '/',
     element: <ErrorBoundary><Home /></ErrorBoundary>,
+  },
+  {
+    path: '/account/settings',
+    element: <ProtectedRoute><ErrorBoundary><AccountSettings /></ErrorBoundary></ProtectedRoute>,
   },
   {
     path: '/generation',

@@ -161,6 +161,7 @@ export default function Layout({ children, pageHeader = null, pageHeaderMode = '
     { startsWith: '/ai/images', title: 'Поиск картинок' },
     { startsWith: '/ai/cities', title: 'Генерация городов' },
     { startsWith: '/tasks', title: 'Мои задачи' },
+    { startsWith: '/account/settings', title: 'Настройки аккаунта' },
     { startsWith: '/catalog/cities', title: 'Справочник городов' },
     { startsWith: '/catalog/events', title: 'Справочник ивентов' },
     { startsWith: '/catalog/ticket-types', title: 'Справочник типов билетов' },
@@ -321,6 +322,14 @@ export default function Layout({ children, pageHeader = null, pageHeaderMode = '
 
         {/* User Actions */}
         <div className="border-t border-gray-200 p-3 space-y-2">
+          <Link
+            to="/account/settings"
+            className={`w-full flex items-center justify-center gap-2 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-100 transition-colors py-2 ${(sidebarExpanded || isMobile) ? 'px-3' : 'px-1'}`}
+            title={(!sidebarExpanded && !isMobile) ? 'Настройки аккаунта' : ''}
+          >
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15.5A3.5 3.5 0 1 0 12 8a3.5 3.5 0 0 0 0 7.5ZM19.4 15a1.7 1.7 0 0 0 .34 1.88l.06.06-2.12 2.12-.06-.06a1.7 1.7 0 0 0-1.88-.34 1.7 1.7 0 0 0-1.03 1.56V20.3h-3v-.08A1.7 1.7 0 0 0 10.68 18.66a1.7 1.7 0 0 0-1.88.34l-.06.06-2.12-2.12.06-.06A1.7 1.7 0 0 0 7.02 15a1.7 1.7 0 0 0-1.56-1.03h-.08v-3h.08A1.7 1.7 0 0 0 7.02 9.94a1.7 1.7 0 0 0-.34-1.88l-.06-.06 2.12-2.12.06.06a1.7 1.7 0 0 0 1.88.34 1.7 1.7 0 0 0 1.03-1.56v-.08h3v.08a1.7 1.7 0 0 0 1.03 1.56 1.7 1.7 0 0 0 1.88-.34l.06-.06L19.8 8l-.06.06a1.7 1.7 0 0 0-.34 1.88 1.7 1.7 0 0 0 1.56 1.03h.08v3h-.08A1.7 1.7 0 0 0 19.4 15Z" /></svg>
+            {(sidebarExpanded || isMobile) && 'Настройки аккаунта'}
+          </Link>
           <button
             onClick={handleLogout}
             className={`w-full flex items-center justify-center gap-2 rounded-lg text-sm font-medium text-red-600 hover:bg-red-50 transition-colors py-2 ${(sidebarExpanded || isMobile) ? 'px-3' : 'px-1'

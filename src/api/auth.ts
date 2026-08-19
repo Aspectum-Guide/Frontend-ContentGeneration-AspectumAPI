@@ -45,5 +45,10 @@ export const authAPI = {
    * UI should not let non-staff users in either.
    */
   me: () => apiClient.get('/auth/me'),
+  passkeys: () => apiClient.get('/auth/passkeys'),
+  passkeyRegistrationOptions: () => apiClient.post('/auth/passkeys/register/options'),
+  passkeyRegistrationVerify: (data: unknown) => apiClient.post('/auth/passkeys/register/verify', data),
+  deletePasskey: (id: string) => apiClient.delete(`/auth/passkeys/${id}`),
+  passkeyAuthenticationOptions: () => apiClient.post('/auth/passkeys/auth/options'),
+  passkeyAuthenticationVerify: (data: unknown) => apiClient.post('/auth/passkeys/auth/verify', data),
 };
-
