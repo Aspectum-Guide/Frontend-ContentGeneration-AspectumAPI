@@ -8,7 +8,7 @@ function Spinner() {
   return <span className="inline-block w-4 h-4 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />;
 }
 
-export function ReadinessChecklist({ items, readyCount, totalCount }) {
+export function ReadinessChecklist({ items, readyCount, totalCount, onAction }) {
   return (
     <div className="mt-4 rounded-xl border border-gray-200 bg-gray-50/80 p-3">
       <div className="flex items-center justify-between gap-2 mb-2">
@@ -33,6 +33,15 @@ export function ReadinessChecklist({ items, readyCount, totalCount }) {
                 <Link to={item.link} className="text-xs text-blue-600 hover:underline">
                   {item.linkLabel}
                 </Link>
+              )}
+              {item.actionLabel && onAction && (
+                <button
+                  type="button"
+                  onClick={() => onAction(item.actionId, item)}
+                  className="block text-xs text-blue-600 hover:underline"
+                >
+                  {item.actionLabel}
+                </button>
               )}
             </div>
           </li>

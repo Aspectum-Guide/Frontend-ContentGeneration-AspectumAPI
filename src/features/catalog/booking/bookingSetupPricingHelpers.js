@@ -116,6 +116,8 @@ export function buildReadinessItems({
         : slotTypesOk
           ? 'Все открытые слоты с типами'
           : `${slotsWithoutTypesCount} слотов без типов — нажмите «Синхр. типы»`,
+      actionId: slotsOk && !slotTypesOk ? 'sync-slot-types' : null,
+      actionLabel: slotsOk && !slotTypesOk ? 'Синхр. типы' : null,
     },
     {
       id: 'prices',

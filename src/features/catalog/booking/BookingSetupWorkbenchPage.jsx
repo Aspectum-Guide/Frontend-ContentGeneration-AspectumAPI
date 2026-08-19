@@ -30,6 +30,7 @@ import {
   ReadinessChecklist,
   SlotPriceOverrideMatrix,
 } from './BookingSetupPricingPanels';
+import SyncSlotTicketTypesModal from './SyncSlotTicketTypesModal';
 import {
   buildReadinessItems,
   buildRulesCountByType,
@@ -490,6 +491,7 @@ export default function BookingSetupWorkbenchPage() {
   // ── slots form ───────────────────────────────────────────────────────────
   const [showSlotForm, setShowSlotForm] = useState(false);
   const [showSlotsManager, setShowSlotsManager] = useState(false);
+  const [showSyncTypesModal, setShowSyncTypesModal] = useState(false);
   const [slotMode, setSlotMode] = useState('schedule');
   const [slotForm, setSlotForm] = useState({
     start_datetime: '', end_datetime: '', step_minutes: 60,
@@ -725,10 +727,12 @@ export default function BookingSetupWorkbenchPage() {
     [allActiveSlots],
   );
 
-  const slotsWithoutTypesCount = useMemo(
-    () => openSlots.filter((s) => !Array.isArray(s.ticket_types) || !s.ticket_types.length).length,
+  const slotsWithoutTypes = useMemo(
+    () => openSlots.filter((s) => !Array.isArray(s.ticket_types) || !s.ticket_types.length),
     [openSlots],
   );
+
+  const slotsWithoutTypesCount = slotsWithoutTypes.length;
 
   const usedTicketTypeIdsInOpenSlots = useMemo(() => {
     const set = new Set();
@@ -1286,6 +1290,9 @@ export default function BookingSetupWorkbenchPage() {
               items={readinessItems}
               readyCount={readinessReadyCount}
               totalCount={readinessItems.length}
+              onAction={(actionId) => {
+                if (actionId === 'sync-slot-types') setShowSyncTypesModal(true);
+              }}
             />
           )}
         </div>
@@ -1798,6 +1805,18 @@ export default function BookingSetupWorkbenchPage() {
         eventId={eventId}
         onClose={() => setShowSlotsManager(false)}
         onChanged={() => loadSlots(eventId)}
+      />
+
+      <SyncSlotTicketTypesModal
+        open={showSyncTypesModal}
+        onClose={() => setShowSyncTypesModal(false)}
+        slots={slotsWithoutTypes}
+        ticketTypeOptions={globalEventTicketTypes}
+        defaultTicketTypeIds={usedTicketTypeIdsInOpenSlots}
+        onDone={async () => {
+          await loadSlots(eventId);
+          await loadPricePreview(eventId, null, eventTicketTypes, { refetchSlots: true });
+        }}
       />
 
       <ConfirmModal
