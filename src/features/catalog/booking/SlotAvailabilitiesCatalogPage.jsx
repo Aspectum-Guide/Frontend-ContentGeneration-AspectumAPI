@@ -202,6 +202,17 @@ export default function SlotAvailabilitiesCatalog() {
 
   const [bulkOpen, setBulkOpen] = useState(false);
 
+  // BulkActionModal syncs this into its own state via a `[open, initialValues]`
+  // effect — an unmemoized object literal here would give it a new reference
+  // on every render (not just when the filters actually change), re-firing
+  // that effect continuously while the modal is open.
+  const bulkInitialValues = useMemo(() => {
+    const next = createEmptyBulk();
+    next.event = eventFilter || '';
+    next.ticket_types = ticketTypeFilter ? [ticketTypeFilter] : [];
+    return next;
+  }, [eventFilter, ticketTypeFilter]);
+
   const eventLabelById = useMemo(() => {
     const map = new Map();
     for (const eventItem of eventOptions) {
@@ -607,12 +618,7 @@ export default function SlotAvailabilitiesCatalog() {
         title="Массовое создание слотов"
         submitLabel="Создать слоты"
         parseError={(err) => parseApiError(err, err?.message || 'Ошибка массового создания слотов')}
-        initialValues={(() => {
-          const next = createEmptyBulk();
-          next.event = eventFilter || '';
-          next.ticket_types = ticketTypeFilter ? [ticketTypeFilter] : [];
-          return next;
-        })()}
+        initialValues={bulkInitialValues}
         onSubmit={async (values) => {
           const slot_datetimes =
             values.mode === 'interval'
