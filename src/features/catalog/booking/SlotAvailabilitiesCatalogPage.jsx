@@ -213,6 +213,17 @@ export default function SlotAvailabilitiesCatalog() {
     return next;
   }, [eventFilter, ticketTypeFilter]);
 
+  // `event.title` is a localized {code: text} map — an event is only
+  // considered "multi-language" when 2+ of those are actually filled in
+  // (matches BookingAPI.pricing_catalog.event_available_languages on the
+  // backend, which is what drives the mobile app's language picker).
+  const eventTitleLangCount = useCallback((eventId) => {
+    const ev = eventOptions.find((e) => String(e.id) === String(eventId));
+    const title = ev?.title;
+    if (!title || typeof title !== 'object') return 0;
+    return Object.values(title).filter(Boolean).length;
+  }, [eventOptions]);
+
   const eventLabelById = useMemo(() => {
     const map = new Map();
     for (const eventItem of eventOptions) {
@@ -517,9 +528,14 @@ export default function SlotAvailabilitiesCatalog() {
 
             <Field
               label="Язык"
-              hint="Один слот — один язык гида. Не выбрано — слот виден на любом языке."
+              hint={
+                eventTitleLangCount(crud.editingItem.event) >= 2
+                  ? 'У этого события несколько языков в заголовке — язык слота обязателен.'
+                  : 'Один слот — один язык гида. Не выбрано — слот виден на любом языке.'
+              }
             >
               <select
+                required={eventTitleLangCount(crud.editingItem.event) >= 2}
                 value={(crud.editingItem.languages || [])[0] || ''}
                 onChange={(e) =>
                   crud.setEditingItem((prev) => ({
@@ -812,9 +828,14 @@ export default function SlotAvailabilitiesCatalog() {
 
             <Field
               label="Язык"
-              hint="Один слот — один язык гида. Применится ко всем создаваемым слотам. Не выбрано — доступны на любом языке."
+              hint={
+                eventTitleLangCount(values.event) >= 2
+                  ? 'У этого события несколько языков в заголовке — язык слота обязателен.'
+                  : 'Один слот — один язык гида. Применится ко всем создаваемым слотам. Не выбрано — доступны на любом языке.'
+              }
             >
               <select
+                required={eventTitleLangCount(values.event) >= 2}
                 value={(values.languages || [])[0] || ''}
                 onChange={(e) =>
                   setValues((prev) => ({
