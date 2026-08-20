@@ -255,6 +255,9 @@ export default function SlotAvailabilitiesCatalog() {
     filterSignature: `${eventFilter}|${ticketTypeFilter}|${dateFrom}|${dateTo}`,
   });
 
+  // Do not depend on whole `crud`: inline mappers make it a new object every
+  // render, and setMobileActions → LayoutActionsContext soft-loops
+  // ("Maximum update depth exceeded").
   useEffect(() => {
     const actions = [
       {
@@ -286,11 +289,11 @@ export default function SlotAvailabilitiesCatalog() {
 
     setMobileActions(actions);
     return () => setMobileActions([]);
-  }, [crud, eventFilter, ticketTypeFilter, setMobileActions]);
+  }, [crud.editingItem, crud.openCreate, crud.closeEdit, setMobileActions]);
 
   const openEdit = useCallback(async (row) => {
     await crud.openEdit(row);
-  }, [crud]);
+  }, [crud.openEdit]);
 
   const columns = [
     {
