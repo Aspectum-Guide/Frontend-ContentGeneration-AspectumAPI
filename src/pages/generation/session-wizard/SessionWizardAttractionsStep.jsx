@@ -552,6 +552,9 @@ export default function SessionWizardAttractionsStep({
   const [batchAudioStatusLoading, setBatchAudioStatusLoading] = useState(false);
   const [batchAudioStatusError, setBatchAudioStatusError] = useState('');
   const [batchAudioStatus, setBatchAudioStatus] = useState(null);
+  // Перезапись существующего аудио. По умолчанию выключена: пакетная озвучка
+  // задумана как «добить недостающее», а замена стоит денег у провайдера.
+  const [batchAudioReplaceExisting, setBatchAudioReplaceExisting] = useState(false);
   const batchTotal = Number(
     batchAudioResult?.total ?? batchAudioResult?.ready_count ?? 0,
   );
@@ -564,10 +567,15 @@ export default function SessionWizardAttractionsStep({
     (provider) => provider?.id === audioGuideTtsProvider,
   );
   const readyForBatchAudio = Number(batchAudioStatus?.ready_count || 0);
+  const alreadyVoicedCount = Number(batchAudioStatus?.already_voiced_count || 0);
+  // ready_count уже рассчитан backend с учётом выбранного режима.
+  const batchAudioTargetCount = readyForBatchAudio;
   const batchAudioCanStart =
     !batchAudioStatusLoading &&
     selectedTtsProvider?.configured !== false &&
-    (batchAudioStatus === null || readyForBatchAudio > 0 || batchAudioStatus?.active_task);
+    (batchAudioStatus === null ||
+      batchAudioTargetCount > 0 ||
+      batchAudioStatus?.active_task);
 
   const openBatchAudioModal = async () => {
     if (batchAudioGenerating) return;
@@ -576,7 +584,27 @@ export default function SessionWizardAttractionsStep({
     setBatchAudioStatusError('');
     setBatchAudioStatus(null);
     try {
-      const status = await onPrepareMissingAttractionAudio?.();
+      const status = await onPrepareMissingAttractionAudio?.({
+        replaceExisting: batchAudioReplaceExisting,
+      });
+      setBatchAudioStatus(status || {});
+    } catch (error) {
+      setBatchAudioStatusError(
+        error?.response?.data?.error ||
+          error?.message ||
+          'Не удалось проверить готовность ОЛ к озвучке',
+      );
+    } finally {
+      setBatchAudioStatusLoading(false);
+    }
+  };
+
+  const changeBatchAudioReplaceMode = async (replaceExisting) => {
+    setBatchAudioReplaceExisting(replaceExisting);
+    setBatchAudioStatusLoading(true);
+    setBatchAudioStatusError('');
+    try {
+      const status = await onPrepareMissingAttractionAudio?.({ replaceExisting });
       setBatchAudioStatus(status || {});
     } catch (error) {
       setBatchAudioStatusError(
@@ -592,7 +620,10 @@ export default function SessionWizardAttractionsStep({
   const startBatchAudio = async () => {
     if (!batchAudioCanStart) return;
     setBatchAudioModalOpen(false);
-    await onGenerateMissingAttractionAudio?.({ skipConfirmation: true });
+    await onGenerateMissingAttractionAudio?.({
+      skipConfirmation: true,
+      replaceExisting: batchAudioReplaceExisting,
+    });
   };
 
   const localeLabel =
@@ -788,16 +819,36 @@ export default function SessionWizardAttractionsStep({
             'Проверяем готовность аудиогидов…'
           ) : batchAudioStatus ? (
             <>
-              Готово к озвучке: <strong>{readyForBatchAudio}</strong>.
+              Готово к озвучке: <strong>{batchAudioTargetCount}</strong>.
               {' '}Язык: <strong>{String(batchAudioStatus.language_code || 'ru').toUpperCase()}</strong>.
-              {' '}Существующее аудио не будет перезаписано.
+              {' '}{batchAudioReplaceExisting
+                ? 'Существующее аудио будет заменено, старые файлы удалятся.'
+                : 'Существующее аудио не будет перезаписано.'}
             </>
           ) : (
             'Будут озвучены только ОЛ с полным текстом и без готовой аудиодорожки.'
           )}
         </div>
 
-        {batchAudioStatus && readyForBatchAudio === 0 && !batchAudioStatus.active_task ? (
+        <label className="flex items-start gap-2 rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-800">
+          <input
+            type="checkbox"
+            className="mt-0.5"
+            checked={batchAudioReplaceExisting}
+            disabled={batchAudioGenerating || batchAudioStatusLoading}
+            onChange={(event) => changeBatchAudioReplaceMode(event.target.checked)}
+          />
+          <span>
+            Перезаписать существующее аудио
+            {alreadyVoicedCount > 0 ? ` (${alreadyVoicedCount} уже озвучено)` : ''}
+            <span className="block text-xs text-gray-500">
+              Старые файлы удаляются, чтобы не занимать место. Озвучка платная —
+              включайте, только если нужна именно замена.
+            </span>
+          </span>
+        </label>
+
+        {batchAudioStatus && batchAudioTargetCount === 0 && !batchAudioStatus.active_task ? (
           <p className="text-sm text-amber-700">
             Новых ОЛ для озвучки нет. Уже озвучено: {Number(batchAudioStatus.already_voiced_count || 0)},
             {' '}без полного текста: {Number(batchAudioStatus.missing_text_count || 0)},

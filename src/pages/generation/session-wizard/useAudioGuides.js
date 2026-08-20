@@ -2395,19 +2395,23 @@ export function useAudioGuides({
     [sessionId, showNote],
   );
 
-  const prepareMissingAttractionAudio = useCallback(async () => {
+  const prepareMissingAttractionAudio = useCallback(async (
+    { replaceExisting = false } = {},
+  ) => {
     const languageCode = getLocaleLang(
       attractionAudioGuideActiveLocaleRef.current,
     );
+    const params = { language_code: languageCode };
+    if (replaceExisting) params.replace_existing = true;
     const response = await attractionAudioGuidesAPI.getMissingAudioStatus(
       sessionId,
-      { language_code: languageCode },
+      params,
     );
     return response?.data || {};
   }, [sessionId]);
 
   const generateMissingAttractionAudio = useCallback(async (
-    { skipConfirmation = false } = {},
+    { skipConfirmation = false, replaceExisting = false } = {},
   ) => {
     if (batchAudioGeneratingRef.current) return;
 
@@ -2419,11 +2423,12 @@ export function useAudioGuides({
     const modelId = (audioGuideTtsModelIdRef.current || '').trim();
 
     try {
-      const status = await prepareMissingAttractionAudio();
+      const status = await prepareMissingAttractionAudio({ replaceExisting });
       const readyCount = Number(status.ready_count || 0);
       const activeTask = status.active_task;
+      const targetCount = readyCount;
 
-      if (!activeTask && readyCount === 0) {
+      if (!activeTask && targetCount === 0) {
         const details = [];
         if (status.already_voiced_count) {
           details.push(`уже озвучено: ${status.already_voiced_count}`);
@@ -2448,8 +2453,11 @@ export function useAudioGuides({
         const providerLabel = provider === 'elevenlabs' ? 'ElevenLabs' : 'Fish Audio';
         const approved = await confirm({
           message:
-            `Озвучить ${readyCount} ОЛ на языке ${languageCode.toUpperCase()} ` +
-            `через ${providerLabel}? Уже готовое аудио не изменится.`,
+            `Озвучить ${targetCount} ОЛ на языке ${languageCode.toUpperCase()} ` +
+            `через ${providerLabel}? ` +
+            (replaceExisting
+              ? 'Существующее аудио будет заменено, старые файлы удалятся.'
+              : 'Уже готовое аудио не изменится.'),
         });
         if (!approved) return;
       }
@@ -2466,6 +2474,7 @@ export function useAudioGuides({
         provider,
         language_code: languageCode,
       };
+      if (replaceExisting) payload.replace_existing = true;
       if (voiceId) payload.voice_id = voiceId;
       if (modelId) payload.model_id = modelId;
 
