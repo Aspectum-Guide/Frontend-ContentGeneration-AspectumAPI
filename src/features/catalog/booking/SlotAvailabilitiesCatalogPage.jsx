@@ -516,35 +516,24 @@ export default function SlotAvailabilitiesCatalog() {
             </div>
 
             <Field
-              label="Языки"
-              hint="Слот показывается только при выборе одного из этих языков в приложении. Ничего не выбрано — слот виден на любом языке."
+              label="Язык"
+              hint="Один слот — один язык гида. Не выбрано — слот виден на любом языке."
             >
-              <div className="flex flex-wrap gap-3">
-                {SLOT_LANGUAGE_OPTIONS.map(([code, label]) => {
-                  const checked = (crud.editingItem.languages || []).includes(code);
-                  return (
-                    <label key={code} className="inline-flex items-center gap-2 text-sm text-gray-700">
-                      <input
-                        type="checkbox"
-                        checked={checked}
-                        onChange={(e) => {
-                          const nextChecked = e.target.checked;
-                          crud.setEditingItem((prev) => {
-                            const curr = Array.isArray(prev.languages) ? prev.languages : [];
-                            return {
-                              ...prev,
-                              languages: nextChecked
-                                ? Array.from(new Set([...curr, code]))
-                                : curr.filter((x) => x !== code),
-                            };
-                          });
-                        }}
-                      />
-                      {label}
-                    </label>
-                  );
-                })}
-              </div>
+              <select
+                value={(crud.editingItem.languages || [])[0] || ''}
+                onChange={(e) =>
+                  crud.setEditingItem((prev) => ({
+                    ...prev,
+                    languages: e.target.value ? [e.target.value] : [],
+                  }))
+                }
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+              >
+                <option value="">Любой язык</option>
+                {SLOT_LANGUAGE_OPTIONS.map(([code, label]) => (
+                  <option key={code} value={code}>{label}</option>
+                ))}
+              </select>
             </Field>
 
             <FormHint>
@@ -822,35 +811,24 @@ export default function SlotAvailabilitiesCatalog() {
             </div>
 
             <Field
-              label="Языки"
-              hint="Применится ко всем создаваемым слотам. Ничего не выбрано — доступны на любом языке."
+              label="Язык"
+              hint="Один слот — один язык гида. Применится ко всем создаваемым слотам. Не выбрано — доступны на любом языке."
             >
-              <div className="flex flex-wrap gap-3">
-                {SLOT_LANGUAGE_OPTIONS.map(([code, label]) => {
-                  const checked = (values.languages || []).includes(code);
-                  return (
-                    <label key={code} className="inline-flex items-center gap-2 text-sm text-gray-700">
-                      <input
-                        type="checkbox"
-                        checked={checked}
-                        onChange={(e) => {
-                          const nextChecked = e.target.checked;
-                          setValues((prev) => {
-                            const curr = Array.isArray(prev.languages) ? prev.languages : [];
-                            return {
-                              ...prev,
-                              languages: nextChecked
-                                ? Array.from(new Set([...curr, code]))
-                                : curr.filter((x) => x !== code),
-                            };
-                          });
-                        }}
-                      />
-                      {label}
-                    </label>
-                  );
-                })}
-              </div>
+              <select
+                value={(values.languages || [])[0] || ''}
+                onChange={(e) =>
+                  setValues((prev) => ({
+                    ...prev,
+                    languages: e.target.value ? [e.target.value] : [],
+                  }))
+                }
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+              >
+                <option value="">Любой язык</option>
+                {SLOT_LANGUAGE_OPTIONS.map(([code, label]) => (
+                  <option key={code} value={code}>{label}</option>
+                ))}
+              </select>
             </Field>
 
             <div className="flex items-center gap-2">
