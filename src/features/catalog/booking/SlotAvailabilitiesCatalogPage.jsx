@@ -32,6 +32,26 @@ import {
 
 const PAGE_SIZE = 20;
 
+function todayDateInputValue() {
+  const d = new Date();
+  const pad = (n) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+}
+
+// `date` inputs are local YYYY-MM-DD with no time — widen to the full day in
+// local time before sending as the ISO bound the backend filters on.
+function dateInputToIsoStart(value) {
+  if (!value) return '';
+  const d = new Date(`${value}T00:00:00`);
+  return Number.isNaN(d.getTime()) ? '' : d.toISOString();
+}
+
+function dateInputToIsoEnd(value) {
+  if (!value) return '';
+  const d = new Date(`${value}T23:59:59.999`);
+  return Number.isNaN(d.getTime()) ? '' : d.toISOString();
+}
+
 // Совпадает с backend settings.LANGUAGES (AspectumBack/settings.py) — те же
 // 6 языков, что и в мобильном приложении. Пусто = слот доступен на любом языке.
 const SLOT_LANGUAGE_OPTIONS = [
@@ -127,6 +147,11 @@ export default function SlotAvailabilitiesCatalog() {
     globalOnly: true,
   });
   const [ticketTypeFilter, setTicketTypeFilter] = useState('');
+  // Defaults to hiding past slots — the table has no server-side search and
+  // the event's full slot history otherwise buries upcoming slots on page 1
+  // (ordering is slot_datetime ascending, oldest first).
+  const [dateFrom, setDateFrom] = useState(todayDateInputValue);
+  const [dateTo, setDateTo] = useState('');
 
   const crud = useCatalogCrud({
     createEmpty: createEmptyAvailability,
@@ -204,17 +229,19 @@ export default function SlotAvailabilitiesCatalog() {
         page_size: PAGE_SIZE,
         event: eventFilter || undefined,
         ticket_type: ticketTypeFilter || undefined,
+        date_from: dateInputToIsoStart(dateFrom) || undefined,
+        date_to: dateInputToIsoEnd(dateTo) || undefined,
         ordering: 'slot_datetime',
       },
       (err) => parseApiError(err, 'Ошибка загрузки слотов')
     );
-  }, [avail.load, eventFilter, ticketTypeFilter]);
+  }, [avail.load, eventFilter, ticketTypeFilter, dateFrom, dateTo]);
 
   useCatalogPagedReload({
     page,
     setPage,
     reload,
-    filterSignature: `${eventFilter}|${ticketTypeFilter}`,
+    filterSignature: `${eventFilter}|${ticketTypeFilter}|${dateFrom}|${dateTo}`,
   });
 
   useEffect(() => {
@@ -342,7 +369,7 @@ export default function SlotAvailabilitiesCatalog() {
         loading={avail.loading}
         error={avail.error}
         emptyIcon="🕒"
-        isFiltered={!!(eventFilter || ticketTypeFilter)}
+        isFiltered={!!(eventFilter || ticketTypeFilter || dateFrom || dateTo)}
         emptyText="Слотов пока нет"
         search={search}
         onSearch={setSearch}
@@ -370,6 +397,30 @@ export default function SlotAvailabilitiesCatalog() {
               placeholder={eventFilter ? 'Все типы' : 'Сначала выберите событие'}
               className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none"
             />
+
+            <input
+              type="date"
+              value={dateFrom}
+              onChange={(e) => setDateFrom(e.target.value)}
+              title="Слоты с этой даты"
+              className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+            />
+            <input
+              type="date"
+              value={dateTo}
+              onChange={(e) => setDateTo(e.target.value)}
+              title="Слоты по эту дату"
+              className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+            />
+            {(dateFrom || dateTo) && (
+              <button
+                type="button"
+                onClick={() => { setDateFrom(''); setDateTo(''); }}
+                className="px-3 py-2 text-sm text-gray-500 hover:text-gray-700"
+              >
+                Сбросить даты
+              </button>
+            )}
           </>
         )}
         actions={(row) => (
