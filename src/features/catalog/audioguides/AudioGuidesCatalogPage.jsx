@@ -424,6 +424,9 @@ function CoverageSummary({ guides }) {
 
 export default function AudioGuidesCatalogPage() {
   const [searchParams] = useSearchParams();
+  const [cityOptions, setCityOptions] = useState([]);
+  const [citiesLoading, setCitiesLoading] = useState(true);
+  const [cityId, setCityId] = useState(() => searchParams.get('city_id') || '');
   const [eventOptions, setEventOptions] = useState([]);
   const [eventsLoading, setEventsLoading] = useState(true);
   const [eventId, setEventId] = useState(() => searchParams.get('event_id') || '');
@@ -439,15 +442,34 @@ export default function AudioGuidesCatalogPage() {
   useEffect(() => {
     const fromUrl = searchParams.get('event_id');
     if (fromUrl) setEventId(fromUrl);
+    const cityFromUrl = searchParams.get('city_id');
+    if (cityFromUrl) setCityId(cityFromUrl);
   }, [searchParams]);
 
   useEffect(() => {
+    setCitiesLoading(true);
+    eventsAPI.cities()
+      .then((r) => setCityOptions(r?.data?.cities || []))
+      .catch(() => setCityOptions([]))
+      .finally(() => setCitiesLoading(false));
+  }, []);
+
+  useEffect(() => {
     setEventsLoading(true);
-    eventsAPI.list({ page_size: 500 })
-      .then((r) => setEventOptions(normalizeListResponse(r?.data, ['events', 'results', 'data'])))
+    eventsAPI.list({ page_size: 500, ...(cityId ? { city_id: cityId } : {}) })
+      .then((r) => {
+        const list = normalizeListResponse(r?.data, ['events', 'results', 'data']);
+        setEventOptions(list);
+        // Selected event no longer belongs to the chosen city — clear it
+        // instead of silently showing a mismatched event's guides.
+        if (eventId && !list.some((ev) => String(ev.id) === String(eventId))) {
+          setEventId('');
+        }
+      })
       .catch(() => setEventOptions([]))
       .finally(() => setEventsLoading(false));
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cityId]);
 
   const load = useCallback(async (evId) => {
     setLoading(true);
@@ -513,6 +535,15 @@ export default function AudioGuidesCatalogPage() {
     ? getMultiLangValue(eventOptions.find((ev) => String(ev.id) === String(guide.event))?.title) || null
     : null;
 
+  // eventOptions is already scoped to the selected city (see the effect
+  // above), so when no specific event is chosen this is just "does this
+  // guide's event belong to the current city's event list" — no extra
+  // per-guide city lookup needed.
+  const eventIdsInScope = cityId ? new Set(eventOptions.map((ev) => String(ev.id))) : null;
+  const visibleGuides = (!cityId || eventId)
+    ? guides
+    : guides.filter((g) => eventIdsInScope.has(String(g.event)));
+
   return (
     <Layout>
       <div className="mb-6 flex flex-wrap items-start justify-between gap-3">
@@ -533,14 +564,25 @@ export default function AudioGuidesCatalogPage() {
         </button>
       </div>
 
-      <div className="mb-4">
+      <div className="mb-4 flex flex-wrap gap-3">
+        <select
+          value={cityId}
+          onChange={(e) => setCityId(e.target.value)}
+          className={`w-full md:w-64 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none ${citiesLoading ? 'opacity-60 cursor-wait' : ''}`}
+          disabled={citiesLoading}
+        >
+          <option value="">{citiesLoading ? 'Загрузка…' : 'Все города'}</option>
+          {cityOptions.map((c) => (
+            <option key={c.id} value={c.id}>{c.name} ({c.events_count})</option>
+          ))}
+        </select>
         <select
           value={eventId}
           onChange={(e) => setEventId(e.target.value)}
           className={`w-full md:w-96 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none ${eventsLoading ? 'opacity-60 cursor-wait' : ''}`}
           disabled={eventsLoading}
         >
-          <option value="">{eventsLoading ? 'Загрузка…' : 'Все события'}</option>
+          <option value="">{eventsLoading ? 'Загрузка…' : cityId ? 'Все события города' : 'Все события'}</option>
           {eventOptions.map((ev) => (
             <option key={ev.id} value={ev.id}>{getMultiLangValue(ev.title) || ev.id}</option>
           ))}
@@ -549,21 +591,23 @@ export default function AudioGuidesCatalogPage() {
 
       {error && <div className="mb-4 text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">{error}</div>}
 
-      {!loading && guides.length > 0 && <CoverageSummary guides={guides} />}
+      {!loading && visibleGuides.length > 0 && <CoverageSummary guides={visibleGuides} />}
 
       {loading ? (
         <div className="flex items-center gap-2 text-sm text-gray-400 py-8">
           <span className="animate-spin w-4 h-4 border-2 border-blue-500 border-t-transparent rounded-full inline-block" />
           Загрузка...
         </div>
-      ) : guides.length === 0 ? (
+      ) : visibleGuides.length === 0 ? (
         <div className="text-center py-12 bg-white rounded-xl border border-gray-200">
           <div className="text-4xl mb-3">🎧</div>
-          <p className="text-gray-500 text-sm">{eventId ? 'У этого события нет аудиогидов' : 'Нет аудиогидов'}</p>
+          <p className="text-gray-500 text-sm">
+            {eventId ? 'У этого события нет аудиогидов' : cityId ? 'У этого города нет аудиогидов' : 'Нет аудиогидов'}
+          </p>
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-          {guides.map((guide) => (
+          {visibleGuides.map((guide) => (
             <GuideCard
               key={guide.id}
               guide={guide}
