@@ -8,4 +8,6 @@ export const mediaRecoveryAPI = {
       audio_id: audioId,
       force,
     }),
+  listUnlinkedAudio: () => apiClient.get('/media/recovery/unlinked-audio/'),
+  deleteOrphanAudio: (audioId) => apiClient.post(`/media/recovery/unlinked-audio/${audioId}/`),
 };
