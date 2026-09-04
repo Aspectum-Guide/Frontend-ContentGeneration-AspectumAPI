@@ -46,6 +46,7 @@ import UploadFile from './pages/generation/UploadFile';
 import Home from './pages/Home';
 import ImportGoogleSheet from './pages/import/ImportGoogleSheet';
 import MyTasks from './pages/tasks/MyTasks';
+import MediaRecovery from './pages/tasks/MediaRecovery';
 import TokenAuth from './pages/TokenAuth';
 import AccountSettings from './pages/AccountSettings';
 import { registerAuthNavigate } from './utils/authRedirect';
@@ -114,6 +115,10 @@ const routes = [
   {
     path: '/tasks',
     element: <ProtectedRoute><ErrorBoundary><MyTasks /></ErrorBoundary></ProtectedRoute>,
+  },
+  {
+    path: '/tasks/media-recovery',
+    element: <ProtectedRoute><ErrorBoundary><MediaRecovery /></ErrorBoundary></ProtectedRoute>,
   },
   {
     path: '/catalog',

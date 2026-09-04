@@ -102,7 +102,10 @@ export default function Layout({ children, pageHeader = null, pageHeaderMode = '
     },
     {
       title: 'Задачи',
-      items: [{ label: 'Мои задачи', to: '/tasks' }],
+      items: [
+        { label: 'Мои задачи', to: '/tasks' },
+        { label: 'Восстановление аудио', to: '/tasks/media-recovery' },
+      ],
     },
     {
       title: 'Контент',
