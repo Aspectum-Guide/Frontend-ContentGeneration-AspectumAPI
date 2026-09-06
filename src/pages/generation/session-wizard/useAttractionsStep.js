@@ -766,10 +766,11 @@ export function useAttractionsStep(ctx) {
     }
   }, [sessionId, showNote]);
 
-  useEffect(() => {
-    if (!sessionId) return;
-    reloadAttractionsFromServer();
-  }, [sessionId, reloadAttractionsFromServer]);
+  // The wizard controller already loads the complete session on mount.  Do
+  // not fetch the same (potentially very large) session payload again here;
+  // the effect below synchronizes this local editor state from `session`.
+  // `reloadAttractionsFromServer` is retained for explicit post-mutation
+  // refreshes.
 
   useEffect(() => {
     if (!session?.id || !Array.isArray(session.attractions)) return;

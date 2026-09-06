@@ -105,10 +105,9 @@ export default function useInteractiveLocationsStep({
     }
   }, [sessionId, showNote]);
 
-  useEffect(() => {
-    if (!sessionId) return;
-    reloadInteractiveLocationsFromServer();
-  }, [sessionId, reloadInteractiveLocationsFromServer]);
+  // Initial data comes from the controller's single session request.  Keep
+  // the dedicated reload function for explicit refreshes after mutations,
+  // but avoid fetching the full session snapshot a second time on mount.
 
   useEffect(() => {
     if (!session?.id || !Array.isArray(session.interactive_locations)) return;

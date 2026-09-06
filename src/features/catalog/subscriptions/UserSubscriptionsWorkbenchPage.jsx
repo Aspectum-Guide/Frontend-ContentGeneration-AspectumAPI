@@ -16,6 +16,7 @@ import ActiveCheckboxField from '../shared/components/ActiveCheckboxField';
 import CatalogPageHeader from '../shared/components/CatalogPageHeader';
 import FormErrorAlert from '../shared/components/FormErrorAlert';
 import StatusBadge from '../shared/components/StatusBadge';
+import TableRowActions from '../shared/components/TableRowActions';
 import RawJsonModal from '../shared/components/RawJsonModal';
 
 function formatDate(value) {
