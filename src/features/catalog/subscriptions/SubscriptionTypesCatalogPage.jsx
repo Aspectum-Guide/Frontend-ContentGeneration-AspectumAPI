@@ -21,10 +21,16 @@ function createEmptyType() {
     id: null,
     name: '',
     description: '',
+    ai_prompts: 0,
     is_active: true,
     cities: [],
     events: [],
   };
+}
+
+function normalizeAiPrompts(value) {
+  const number = Math.trunc(Number(value));
+  return Number.isFinite(number) && number > 0 ? number : 0;
 }
 
 function normalizeIdList(value) {
@@ -151,6 +157,7 @@ export default function SubscriptionTypesCatalogPage() {
     const payload = {
       name: editingItem.name,
       description: editingItem.description || '',
+      ai_prompts: normalizeAiPrompts(editingItem.ai_prompts),
       is_active: !!editingItem.is_active,
       cities: normalizeIdList(editingItem.cities),
       events: normalizeIdList(editingItem.events),
@@ -210,6 +217,11 @@ export default function SubscriptionTypesCatalogPage() {
       render: (value) => <span className="text-sm text-gray-700">{Array.isArray(value) ? value.length : 0}</span>,
     },
     {
+      key: 'ai_prompts',
+      label: 'Запросов ИИ',
+      render: (value) => <span className="text-sm text-gray-700">{value > 0 ? value : 'только гид'}</span>,
+    },
+    {
       key: 'is_active',
       label: 'Статус',
       render: (active) => <StatusBadge active={active} />,
@@ -220,7 +232,7 @@ export default function SubscriptionTypesCatalogPage() {
     <Layout>
       <CatalogPageHeader
         title="Справочник типов подписки"
-        description="Типы подписок: название, города, события, статус"
+        description="Типы подписок: название, города, события, запросы ИИ, статус"
         createLabel="Создать тип подписки"
         onCreate={() => {
           setSaveError(null);
@@ -262,6 +274,7 @@ export default function SubscriptionTypesCatalogPage() {
                 id: row.id,
                 name: row.name || '',
                 description: row.description || '',
+                ai_prompts: normalizeAiPrompts(row.ai_prompts),
                 is_active: row.is_active !== false,
                 cities: normalizeIdList(row.cities),
                 events: normalizeIdList(row.events),
@@ -296,6 +309,16 @@ export default function SubscriptionTypesCatalogPage() {
                 rows={3}
                 value={editingItem.description || ''}
                 onChange={(e) => setEditingItem((prev) => ({ ...prev, description: e.target.value }))}
+              />
+            </Field>
+
+            <Field label="Запросов ИИ" hint="Сколько запросов ИИ получает пользователь при активации кода. 0 — код открывает только диджитал-гид">
+              <TextInput
+                type="number"
+                min={0}
+                step={1}
+                value={editingItem.ai_prompts ?? 0}
+                onChange={(e) => setEditingItem((prev) => ({ ...prev, ai_prompts: e.target.value }))}
               />
             </Field>
 
