@@ -113,6 +113,10 @@ export default function SessionWizard({ components = {} } = {}) {
 
     imagePreview,
     imageOriginalUrl,
+    parentCityId,
+    setParentCityId,
+    authorIds,
+    setAuthorIds,
     imageCopyright,
     setImageOriginalUrl,
     setImageCopyright,
@@ -1079,6 +1083,11 @@ export default function SessionWizard({ components = {} } = {}) {
 
             <SessionWizardCityStep
               cityDrafts={cityDrafts}
+              referenceCities={referenceCities || []}
+              parentCityId={parentCityId}
+              setParentCityId={setParentCityId}
+              authorIds={authorIds}
+              setAuthorIds={setAuthorIds}
               activeCityDraftId={activeCityDraftId}
               localeData={localeData}
               activeLocale={activeLocale}
@@ -1214,6 +1223,7 @@ export default function SessionWizard({ components = {} } = {}) {
         {currentStep === 3 && (
           <div className="space-y-6">
             <SessionWizardAttractionsStep
+              sessionId={sessionId}
               attrView={attrView}
               currentAttr={currentAttr}
               attrActiveLocale={attrActiveLocale}

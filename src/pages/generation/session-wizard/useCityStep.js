@@ -115,6 +115,8 @@ const buildCityStepPayload = ({
   cityTags,
   imageId,
   imageOriginalUrl,
+  parentCityId,
+  authorIds,
   activeCityDraftId,
   baseUpdatedAt,
 }) => {
@@ -141,6 +143,8 @@ const buildCityStepPayload = ({
     tags: normalizeTagIds(cityTags),
     image_id: imageId,
     image_original_url: imageOriginalUrl || '',
+    parent_city: parentCityId || null,
+    author_ids: authorIds || [],
     ...(draftId && draftId !== 'legacy' ? { draft_id: draftId } : {}),
     // optimistic concurrency: версия драфта на момент загрузки формы —
     // сейв поверх более свежих данных (их пишет генерация) бэкенд отклонит 409.
@@ -492,6 +496,8 @@ export default function useCityStep(ctx) {
   });
 
   const [cityTags, setCityTags] = useState([]);
+  const [parentCityId, setParentCityId] = useState('');
+  const [authorIds, setAuthorIds] = useState([]);
   const [tagInput, setTagInput] = useState('');
 
   const [addLocaleOpen, setAddLocaleOpen] = useState(false);
@@ -833,6 +839,8 @@ export default function useCityStep(ctx) {
     setSavedLat(null);
     setSavedLon(null);
     setCityTags([]);
+    setParentCityId('');
+    setAuthorIds([]);
     setImagePreview('');
     setImageId(null);
     setImageOriginalUrl('');
@@ -876,6 +884,8 @@ export default function useCityStep(ctx) {
       city.image?.copyright ||
       ''
     );
+    setParentCityId(city.parent_city ? String(city.parent_city) : '');
+    setAuthorIds(Array.isArray(city.author_ids) ? city.author_ids.map(String) : []);
 
     const nameObj = city.name || {};
     const descObj = city.description || {};
@@ -997,6 +1007,8 @@ export default function useCityStep(ctx) {
       cityTags,
       imageId,
       imageOriginalUrl,
+      parentCityId,
+      authorIds,
       activeCityDraftId: activeCityDraftIdRef.current,
       baseUpdatedAt: cityBaseUpdatedAtRef.current,
     });
@@ -1061,7 +1073,7 @@ export default function useCityStep(ctx) {
     } finally {
       setSaving(false);
     }
-  }, [sessionId, localeData, defaultLocale, lat, lon, cityTags, imageId, imageOriginalUrl, showNote, loadSession, syncActiveDraftRoute, mergeCitySaveResponseIntoState, loadCityIntoForm, setActiveCityDraftId, sessionOpenedAtRef, firstCitySaveAtRef]);
+  }, [sessionId, localeData, defaultLocale, lat, lon, cityTags, imageId, imageOriginalUrl, parentCityId, authorIds, showNote, loadSession, syncActiveDraftRoute, mergeCitySaveResponseIntoState, loadCityIntoForm, setActiveCityDraftId, sessionOpenedAtRef, firstCitySaveAtRef]);
 
   const waitForCityPersistenceIdle = useCallback(async () => {
     const deadline = Date.now() + 15000;
@@ -1086,6 +1098,8 @@ export default function useCityStep(ctx) {
       cityTags,
       imageId,
       imageOriginalUrl,
+      parentCityId,
+      authorIds,
       activeCityDraftId: activeCityDraftIdRef.current,
       baseUpdatedAt: cityBaseUpdatedAtRef.current,
     });
@@ -1127,7 +1141,7 @@ export default function useCityStep(ctx) {
 
     // Свежий слепок формы — для немедленного flush при уходе со страницы.
     autosaveSnapshotRef.current = {
-      localeData, defaultLocale, lat, lon, cityTags, imageId, imageOriginalUrl,
+      localeData, defaultLocale, lat, lon, cityTags, imageId, imageOriginalUrl, parentCityId, authorIds,
     };
 
     // Таймерного автосейва больше НЕТ (сейвы каждые 2.5с дёргали сервер и
@@ -2806,6 +2820,8 @@ export default function useCityStep(ctx) {
     openCityCommonsModal, handleCommonsImageSelect,
 
     cityTags, setCityTags, tagInput, setTagInput,
+    parentCityId, setParentCityId,
+    authorIds, setAuthorIds,
 
     addLocaleOpen, setAddLocaleOpen, newLocaleCode, setNewLocaleCode, newLocaleLang, setNewLocaleLang,
 

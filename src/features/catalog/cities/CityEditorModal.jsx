@@ -1,5 +1,5 @@
 import 'leaflet/dist/leaflet.css';
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import CommonsImagePicker from '../../../components/generation/CommonsImagePicker';
 import { Field, FormActions, TextInput } from '../../../components/ui/FormField';
 import Modal from '../../../components/ui/Modal';
@@ -8,6 +8,7 @@ import { buildLangOptions, getMultiLangValue } from '../shared/i18n';
 import { LangBlock, LangTabs } from '../shared/LangFields';
 import InformationBlocksEditor from '../shared/InformationBlocksEditor';
 import { citiesCatalogAPI } from './api';
+import { contentAuthorsAPI } from '../../../api/generation';
 
 const cityUsefulInfoApi = {
   list: (id) => citiesCatalogAPI.listUsefulInformation(id),
@@ -74,6 +75,7 @@ export default function CityEditorModal({
   const cityMapRef = useRef(null);
   const cityMarkerRef = useRef(null);
   const leafletRef = useRef(null);
+  const [authors, setAuthors] = useState([]);
 
   const nameVal = typeof city?.name === 'object' ? city.name : {};
   const descVal = typeof city?.description === 'object' ? city.description : {};
@@ -166,6 +168,16 @@ export default function CityEditorModal({
       cityMapRef.current = null;
       cityMarkerRef.current = null;
     }
+  }, [open]);
+
+  useEffect(() => {
+    if (!open) return;
+    contentAuthorsAPI.list()
+      .then((response) => {
+        const data = response?.data;
+        setAuthors(Array.isArray(data?.data) ? data.data : Array.isArray(data) ? data : []);
+      })
+      .catch(() => setAuthors([]));
   }, [open]);
 
   return (
@@ -437,7 +449,11 @@ export default function CityEditorModal({
                 >
                   <select
                     value={city?.parent_city || ''}
-                    onChange={(e) => setCity((p) => ({ ...p, parent_city: e.target.value }))}
+                    onChange={(e) => setCity((p) => ({
+                      ...p,
+                      parent_city: e.target.value,
+                      author_ids: e.target.value ? p.author_ids : [],
+                    }))}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none"
                   >
                     <option value="">Не привязан</option>
@@ -450,6 +466,31 @@ export default function CityEditorModal({
                       ))}
                   </select>
                 </Field>
+
+                {city?.parent_city && (
+                  <Field label="Авторы спецгида" hint="Можно выбрать нескольких авторов из справочника.">
+                    {authors.length === 0 ? (
+                      <p className="text-sm text-gray-400">Сначала добавьте автора в разделе «Контент → Авторы».</p>
+                    ) : (
+                      <div className="flex flex-wrap gap-2 rounded-lg border border-gray-200 bg-gray-50 p-2">
+                        {authors.map((author) => {
+                          const id = String(author.id);
+                          const selected = (city?.author_ids || []).includes(id);
+                          return (
+                            <button key={id} type="button" onClick={() => setCity((p) => ({
+                              ...p,
+                              author_ids: selected
+                                ? (p.author_ids || []).filter((value) => value !== id)
+                                : [...(p.author_ids || []), id],
+                            }))} className={`rounded-full border px-3 py-1.5 text-xs font-medium ${selected ? 'border-blue-600 bg-blue-600 text-white' : 'border-gray-300 bg-white text-gray-700 hover:border-blue-400'}`}>
+                              {author.name}{selected ? ' ✓' : ''}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </Field>
+                )}
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                   <Field
@@ -552,4 +593,3 @@ export default function CityEditorModal({
     </>
   );
 }
-

@@ -112,6 +112,7 @@ export default function Layout({ children, pageHeader = null, pageHeaderMode = '
       items: [
         { label: 'Города', to: '/catalog/cities' },
         { label: 'Ивенты', to: '/catalog/events' },
+        { label: 'Авторы', to: '/catalog/authors' },
         { label: 'Теги и фильтры', to: '/catalog/tags' },
         { label: 'Аудиогиды', to: '/catalog/audio-guides' },
         { label: 'Интерактивные локации', to: '/catalog/interactive-locations' },
@@ -167,6 +168,7 @@ export default function Layout({ children, pageHeader = null, pageHeaderMode = '
     { startsWith: '/account/settings', title: 'Настройки аккаунта' },
     { startsWith: '/catalog/cities', title: 'Справочник городов' },
     { startsWith: '/catalog/events', title: 'Справочник ивентов' },
+    { startsWith: '/catalog/authors', title: 'Авторы контента' },
     { startsWith: '/catalog/ticket-types', title: 'Справочник типов билетов' },
     { startsWith: '/catalog/slot-availabilities', title: 'Справочник слотов (доступность)' },
     { startsWith: '/catalog/ticket-prices', title: 'Справочник цен билетов' },

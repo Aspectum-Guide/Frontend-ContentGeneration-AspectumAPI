@@ -74,6 +74,13 @@ export const attractionsAPI = {
     apiClient.post(`${BASE}/sessions/${sessionId}/attractions/${attrId}/content/`, data),
 };
 
+export const attractionCommerceAPI = {
+  listItinerary: (sessionId, attractionId) => apiClient.get(`${BASE}/sessions/${sessionId}/attractions/${attractionId}/itinerary/`),
+  addItinerary: (sessionId, attractionId, data) => apiClient.post(`${BASE}/sessions/${sessionId}/attractions/${attractionId}/itinerary/`, data),
+  listInclusions: (sessionId, attractionId) => apiClient.get(`${BASE}/sessions/${sessionId}/attractions/${attractionId}/inclusions/`),
+  addInclusion: (sessionId, attractionId, data) => apiClient.post(`${BASE}/sessions/${sessionId}/attractions/${attractionId}/inclusions/`, data),
+};
+
 // ─── Attraction Useful Info ─────────────────────────────────────────────────
 export const attractionInfosAPI = {
   create: (sessionId, data) =>
@@ -361,6 +368,14 @@ export const eventFiltersAPI = {
   create: (payload) => apiClient.post('/events/filters/', payload),
   update: (id, payload) => apiClient.patch(`/events/filters/${id}/`, payload),
   delete: (id) => apiClient.delete(`/events/filters/${id}/`),
+};
+
+// ─── Content authors (EventsAPI) ────────────────────────────────────────────
+export const contentAuthorsAPI = {
+  list: () => apiClient.get('/events/authors/'),
+  create: (payload) => apiClient.post('/events/authors/', payload),
+  update: (id, payload) => apiClient.patch(`/events/authors/${id}/`, payload),
+  delete: (id) => apiClient.delete(`/events/authors/${id}/`),
 };
 
 // ─── AI ───────────────────────────────────────────────────────────────────────

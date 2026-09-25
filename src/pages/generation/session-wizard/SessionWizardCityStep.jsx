@@ -1,4 +1,5 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import { contentAuthorsAPI } from '../../../api/generation';
 import { getFlag } from './sessionWizardShared.jsx';
 import { createCoordinatePasteHandler } from '../../../utils/coordinates';
 import { usePasteImageOnHover } from '../../../hooks/usePasteImageOnHover';
@@ -211,9 +212,13 @@ export default function SessionWizardCityStep({
   onSwitchLocale, onSetDefaultLocale, onAddLocale, onRemoveLocale,
   onUpdateLocaleField,
   onLatChange, onLonChange, onRestoreSavedCoords,
+  parentCityId, setParentCityId, referenceCities = [],
+  authorIds = [], setAuthorIds,
   onGoToStep, saving,
 }) {
   const [showValidation, setShowValidation] = useState(false);
+  const [authors, setAuthors] = useState([]);
+  useEffect(() => { contentAuthorsAPI.list().then((r) => setAuthors(r.data?.data || r.data || [])).catch(() => setAuthors([])); }, []);
 
   const localeLabel = (currentLocale.lang || activeLocale.split('-')[0]).toUpperCase();
 
@@ -267,6 +272,14 @@ export default function SessionWizardCityStep({
             </p>
           )}
         </div>
+      </SectionCard>
+      <SectionCard title="Спецгид">
+        <select value={parentCityId || ''} onChange={(e) => setParentCityId(e.target.value)} className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm">
+          <option value="">Обычный город</option>
+          {referenceCities.filter((city) => !city.parent_city).map((city) => <option key={city.id} value={city.id}>{city.name?.ru || city.name?.en || city.id}</option>)}
+        </select>
+        <p className="mt-1 text-xs text-gray-500">Выберите родительский город, если эта сессия создаёт спецгид.</p>
+        {parentCityId && <div className="mt-3 flex flex-wrap gap-2">{authors.map((author) => { const id = String(author.id); const active = authorIds.includes(id); return <button key={id} type="button" onClick={() => setAuthorIds(active ? authorIds.filter((value) => value !== id) : [...authorIds, id])} className={`rounded-full border px-3 py-1 text-xs ${active ? 'border-blue-600 bg-blue-600 text-white' : 'border-gray-300 bg-white'}`}>{author.name}{active ? ' ✓' : ''}</button>; })}</div>}
       </SectionCard>
 
       {/* Данные города + координаты */}

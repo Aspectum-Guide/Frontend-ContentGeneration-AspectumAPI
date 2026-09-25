@@ -35,6 +35,7 @@ import AudioGuidesCatalog from './pages/catalog/AudioGuidesCatalog';
 import InteractiveLocationsCatalog from './pages/catalog/InteractiveLocationsCatalog';
 import LLMKeysCatalog from './pages/catalog/LLMKeysCatalog';
 import LLMUsageCatalog from './pages/catalog/LLMUsageCatalog';
+import ContentAuthorsCatalog from './pages/catalog/ContentAuthorsCatalog';
 import ExportCities from './pages/export/ExportCities';
 import ExportEvents from './pages/export/ExportEvents';
 import ExportZip from './pages/export/ExportZip';
@@ -143,6 +144,10 @@ const routes = [
   {
     path: '/catalog/events',
     element: <ProtectedRoute><ErrorBoundary><EventsCatalog /></ErrorBoundary></ProtectedRoute>,
+  },
+  {
+    path: '/catalog/authors',
+    element: <ProtectedRoute><ErrorBoundary><ContentAuthorsCatalog /></ErrorBoundary></ProtectedRoute>,
   },
   {
     path: '/catalog/ticket-types',

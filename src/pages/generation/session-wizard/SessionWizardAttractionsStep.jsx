@@ -7,6 +7,7 @@ import { getAttrName, getFlag, getSessionEntityImagePreview, resolveSessionEntit
 import { usePasteImageOnHover } from '../../../hooks/usePasteImageOnHover';
 import SessionWizardAttractionTagsPicker from './SessionWizardAttractionTagsPicker.jsx';
 import SessionWizardAttractionRelatedEventsPicker from './SessionWizardAttractionRelatedEventsPicker.jsx';
+import SessionAttractionCommercePanel from './SessionAttractionCommercePanel.jsx';
 import UsefulInfoTextImportBox from './UsefulInfoTextImportBox.jsx';
 import { TTSProviderSettingsPanel } from './SessionWizardAttractionAudioGuidesBlock.jsx';
 import { createCoordinatePasteHandler } from '../../../utils/coordinates';
@@ -462,6 +463,7 @@ function AttractionMapPanel({
 }
 
 export default function SessionWizardAttractionsStep({
+  sessionId,
   attrView,
   currentAttr,
   attrActiveLocale,
@@ -1266,6 +1268,7 @@ export default function SessionWizardAttractionsStep({
                     onAdd={onAddCurrentAttractionRelatedEvent}
                     onRemove={onRemoveCurrentAttractionRelatedEvent}
                   />
+                  <SessionAttractionCommercePanel sessionId={sessionId} attractionId={currentAttr?.id} />
 
                   <div className="p-3 border border-gray-200 rounded-lg bg-gray-50">
                     <p className="text-sm text-gray-700">

@@ -7,6 +7,7 @@ export const CONTENT_CATALOG_SECTION = {
   items: [
     { to: '/catalog/cities', title: 'Города', description: 'Контент, карта, теги города', icon: '🏙️' },
     { to: '/catalog/events', title: 'Ивенты', description: 'События, видимость, букинг', icon: '🎪' },
+    { to: '/catalog/authors', title: 'Авторы', description: 'Профили авторов контента', icon: '✍️' },
     { to: '/catalog/tags', title: 'Теги и фильтры', description: 'Теги городов и событий', icon: '🏷️' },
     { to: '/catalog/audio-guides', title: 'Аудиогиды', description: 'Треки по языкам, загрузка MP3', icon: '🎧' },
     { to: '/catalog/interactive-locations', title: 'Интерактивные локации', description: 'Опубликованные IL из сессий, тогл видимости', icon: '📍' },
