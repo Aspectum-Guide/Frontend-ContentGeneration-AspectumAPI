@@ -88,3 +88,10 @@ export const ticketTypesForceAPI = {
 export const bookingAnalyticsAPI = {
   summary: (params) => apiClient.get('/booking/analytics/', { params }),
 };
+
+/** Approved external supplier catalog and a read-only live availability check. */
+export const externalProductsAPI = {
+  list: (cityId) => bookingGet('/booking/external-products/', { city: cityId }, { skipCache: true }),
+  availability: (productId, data) =>
+    apiClient.post(`/booking/external-products/${productId}/availability/`, data),
+};
