@@ -92,6 +92,7 @@ export const bookingAnalyticsAPI = {
 /** Approved external supplier catalog and a read-only live availability check. */
 export const externalProductsAPI = {
   list: (cityId) => bookingGet('/booking/external-products/', { city: cityId }, { skipCache: true }),
+  calendar: (productId, params) => bookingGet(`/booking/external-products/${productId}/availability-calendar/`, params, { skipCache: true }),
   availability: (productId, data) =>
     apiClient.post(`/booking/external-products/${productId}/availability/`, data),
 };

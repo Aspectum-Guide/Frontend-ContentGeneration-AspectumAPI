@@ -17,6 +17,12 @@ function today() {
   return new Date().toISOString().slice(0, 10);
 }
 
+function dateAfter(start, days) {
+  const value = new Date(`${start}T00:00:00Z`);
+  value.setUTCDate(value.getUTCDate() + days);
+  return value.toISOString().slice(0, 10);
+}
+
 function formatSupplierMoney(minor, currency, precision = 2) {
   if (minor == null || !currency) return '—';
   const amount = Number(minor) / (10 ** Number(precision || 0));
@@ -34,6 +40,8 @@ export default function ExternalProductsCatalogPage() {
   const [quantities, setQuantities] = useState({});
   const [date, setDate] = useState(today());
   const [availability, setAvailability] = useState(null);
+  const [calendar, setCalendar] = useState([]);
+  const [calendarLoading, setCalendarLoading] = useState(false);
   const [error, setError] = useState(null);
   const [checking, setChecking] = useState(false);
 
@@ -86,6 +94,23 @@ export default function ExternalProductsCatalogPage() {
     setQuantities(firstUnit?.id ? { [firstUnit.id]: 1 } : {});
     setAvailability(null);
   }, [optionId, option]);
+
+  useEffect(() => {
+    let active = true;
+    setCalendar([]);
+    if (!product || !option) return () => { active = false; };
+    const dateFrom = today();
+    setCalendarLoading(true);
+    externalProductsAPI.calendar(product.id, {
+      option: option.id,
+      date_from: dateFrom,
+      date_to: dateAfter(dateFrom, 30),
+    })
+      .then((response) => active && setCalendar(response?.data?.availability || []))
+      .catch((err) => active && setError(parseApiError(err, 'Не удалось загрузить календарь поставщика')))
+      .finally(() => active && setCalendarLoading(false));
+    return () => { active = false; };
+  }, [product, option]);
 
   const checkAvailability = async () => {
     const units = (option?.units || [])
@@ -155,6 +180,28 @@ export default function ExternalProductsCatalogPage() {
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Дата</label>
               <input type="date" value={date} min={today()} onChange={(e) => setDate(e.target.value)} className={inputClass} />
+            </div>
+            <div>
+              <div className="flex items-center justify-between gap-3 mb-2">
+                <p className="text-sm font-medium text-gray-700">Календарь доступности</p>
+                {calendarLoading && <span className="text-xs text-gray-400">Загрузка…</span>}
+              </div>
+              <div className="grid grid-cols-4 sm:grid-cols-5 gap-2">
+                {calendar.map((day) => {
+                  const selected = date === day.localDate;
+                  return (
+                    <button
+                      type="button" key={day.localDate} disabled={!day.available}
+                      onClick={() => setDate(day.localDate)}
+                      className={`rounded-lg border px-2 py-2 text-left text-xs transition ${selected ? 'border-blue-600 bg-blue-50 text-blue-800' : day.available ? 'border-emerald-200 bg-emerald-50 text-emerald-800 hover:border-emerald-400' : 'border-gray-200 bg-gray-50 text-gray-400 cursor-not-allowed'}`}
+                    >
+                      <span className="block font-medium">{day.localDate?.slice(8, 10)}.{day.localDate?.slice(5, 7)}</span>
+                      <span className="block mt-0.5">{day.available ? `${day.vacancies ?? 0} мест` : 'Закрыто'}</span>
+                    </button>
+                  );
+                })}
+              </div>
+              {!calendarLoading && calendar.length === 0 && <p className="text-xs text-gray-400">Нет данных на ближайший месяц.</p>}
             </div>
             <div>
               <p className="text-sm font-medium text-gray-700 mb-2">Билеты</p>
