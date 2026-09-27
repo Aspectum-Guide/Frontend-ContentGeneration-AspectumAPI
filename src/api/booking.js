@@ -99,4 +99,5 @@ export const externalProductsAPI = {
     apiClient.post(`/booking/external-products/${productId}/bookings/`, data, {
       headers: { 'Idempotency-Key': idempotencyKey },
     }),
+  holds: (productId) => bookingGet(`/booking/external-products/${productId}/bookings/`, {}, { skipCache: true }),
 };

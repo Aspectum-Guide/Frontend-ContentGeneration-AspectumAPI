@@ -48,6 +48,8 @@ export default function ExternalProductsCatalogPage() {
   const [email, setEmail] = useState('');
   const [booking, setBooking] = useState(null);
   const [bookingLoading, setBookingLoading] = useState(false);
+  const [holds, setHolds] = useState([]);
+  const [holdsLoading, setHoldsLoading] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -118,6 +120,26 @@ export default function ExternalProductsCatalogPage() {
     return () => { active = false; };
   }, [product, option]);
 
+  const loadHolds = async () => {
+    if (!product) return;
+    setHoldsLoading(true);
+    try {
+      const response = await externalProductsAPI.holds(product.id);
+      setHolds(Array.isArray(response?.data) ? response.data : []);
+    } catch (err) {
+      setError(parseApiError(err, 'Не удалось загрузить бронирования'));
+    } finally {
+      setHoldsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    setHolds([]);
+    if (product) loadHolds();
+  // loadHolds is intentionally invoked only when the selected product changes.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [productId]);
+
   const checkAvailability = async () => {
     const units = (option?.units || [])
       .map((unit) => ({ unit: String(unit.id), quantity: Number(quantities[unit.id] || 0) }))
@@ -166,6 +188,7 @@ export default function ExternalProductsCatalogPage() {
         email: email.trim(),
       }, idempotencyKey);
       setBooking(response?.data || null);
+      await loadHolds();
     } catch (err) {
       setError(parseApiError(err, 'Не удалось зарезервировать билеты у поставщика'));
     } finally {
@@ -302,6 +325,29 @@ export default function ExternalProductsCatalogPage() {
             <p className="mt-1">Сумма: {booking.total_price ?? '—'} {booking.currency}</p>
             <p className="mt-1 text-xs">Aspectum ID: <span className="font-mono">{booking.id}</span></p>
           </div>}
+          <div className="mt-5 border-t border-gray-200 pt-5">
+            <div className="flex items-center justify-between gap-3">
+              <h3 className="text-sm font-semibold text-gray-900">Мои внешние бронирования</h3>
+              <button type="button" onClick={loadHolds} disabled={!product || holdsLoading} className="text-xs text-blue-600 hover:text-blue-700 disabled:opacity-50">
+                {holdsLoading ? 'Обновляем…' : 'Обновить'}
+              </button>
+            </div>
+            {!holdsLoading && holds.length === 0 && <p className="mt-2 text-sm text-gray-400">Для этого продукта пока нет сохранённых бронирований.</p>}
+            <div className="mt-3 space-y-2">
+              {holds.map((item) => (
+                <article key={item.id} className="rounded-lg border border-gray-200 p-3 text-sm">
+                  <div className="flex justify-between gap-3">
+                    <p className="font-medium text-gray-900">{item.status}</p>
+                    <p className="text-gray-700">{item.total_price ?? '—'} {item.currency}</p>
+                  </div>
+                  <p className="mt-1 text-xs text-gray-500">Создано: {new Date(item.created_at).toLocaleString('ru-RU')}</p>
+                  {item.expires_at && <p className="text-xs text-gray-500">Hold до: {new Date(item.expires_at).toLocaleString('ru-RU')}</p>}
+                  {item.provider_booking_id && <p className="mt-1 text-xs text-gray-500">Supplier ID: <span className="font-mono">{item.provider_booking_id}</span></p>}
+                  <p className="mt-1 text-xs text-gray-400">Aspectum ID: <span className="font-mono">{item.id}</span></p>
+                </article>
+              ))}
+            </div>
+          </div>
         </section>
       </div>
     </Layout>
