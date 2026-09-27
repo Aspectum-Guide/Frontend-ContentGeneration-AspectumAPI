@@ -100,4 +100,6 @@ export const externalProductsAPI = {
       headers: { 'Idempotency-Key': idempotencyKey },
     }),
   holds: (productId) => bookingGet(`/booking/external-products/${productId}/bookings/`, {}, { skipCache: true }),
+  refreshHold: (bookingId) => apiClient.post(`/booking/external-bookings/${bookingId}/refresh/`),
+  cancelHold: (bookingId) => apiClient.post(`/booking/external-bookings/${bookingId}/cancel/`),
 };

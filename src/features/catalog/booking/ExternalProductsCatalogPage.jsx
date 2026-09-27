@@ -50,6 +50,7 @@ export default function ExternalProductsCatalogPage() {
   const [bookingLoading, setBookingLoading] = useState(false);
   const [holds, setHolds] = useState([]);
   const [holdsLoading, setHoldsLoading] = useState(false);
+  const [holdActionId, setHoldActionId] = useState('');
 
   useEffect(() => {
     let active = true;
@@ -130,6 +131,22 @@ export default function ExternalProductsCatalogPage() {
       setError(parseApiError(err, 'Не удалось загрузить бронирования'));
     } finally {
       setHoldsLoading(false);
+    }
+  };
+
+  const updateHold = async (holdId, action) => {
+    setHoldActionId(holdId);
+    setError(null);
+    try {
+      const response = action === 'cancel'
+        ? await externalProductsAPI.cancelHold(holdId)
+        : await externalProductsAPI.refreshHold(holdId);
+      const updated = response?.data;
+      if (updated?.id) setHolds((current) => current.map((item) => item.id === updated.id ? updated : item));
+    } catch (err) {
+      setError(parseApiError(err, action === 'cancel' ? 'Не удалось отменить hold' : 'Не удалось обновить статус hold'));
+    } finally {
+      setHoldActionId('');
     }
   };
 
@@ -344,6 +361,14 @@ export default function ExternalProductsCatalogPage() {
                   {item.expires_at && <p className="text-xs text-gray-500">Hold до: {new Date(item.expires_at).toLocaleString('ru-RU')}</p>}
                   {item.provider_booking_id && <p className="mt-1 text-xs text-gray-500">Supplier ID: <span className="font-mono">{item.provider_booking_id}</span></p>}
                   <p className="mt-1 text-xs text-gray-400">Aspectum ID: <span className="font-mono">{item.id}</span></p>
+                  <div className="mt-3 flex gap-3 text-xs">
+                    <button type="button" onClick={() => updateHold(item.id, 'refresh')} disabled={holdActionId === item.id} className="text-blue-600 hover:text-blue-700 disabled:opacity-50">
+                      {holdActionId === item.id ? 'Обновляем…' : 'Обновить статус'}
+                    </button>
+                    {item.status === 'on_hold' && <button type="button" onClick={() => updateHold(item.id, 'cancel')} disabled={holdActionId === item.id} className="text-red-600 hover:text-red-700 disabled:opacity-50">
+                      Отменить hold
+                    </button>}
+                  </div>
                 </article>
               ))}
             </div>
