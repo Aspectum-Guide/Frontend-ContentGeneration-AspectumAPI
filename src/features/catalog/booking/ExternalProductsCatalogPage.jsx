@@ -140,11 +140,13 @@ export default function ExternalProductsCatalogPage() {
     try {
       const response = action === 'cancel'
         ? await externalProductsAPI.cancelHold(holdId)
-        : await externalProductsAPI.refreshHold(holdId);
+        : action === 'test-pay'
+          ? await externalProductsAPI.testPay(holdId)
+          : await externalProductsAPI.refreshHold(holdId);
       const updated = response?.data;
       if (updated?.id) setHolds((current) => current.map((item) => item.id === updated.id ? updated : item));
     } catch (err) {
-      setError(parseApiError(err, action === 'cancel' ? 'Не удалось отменить hold' : 'Не удалось обновить статус hold'));
+      setError(parseApiError(err, action === 'cancel' ? 'Не удалось отменить hold' : action === 'test-pay' ? 'Не удалось подтвердить тестовую оплату' : 'Не удалось обновить статус hold'));
     } finally {
       setHoldActionId('');
     }
@@ -368,7 +370,15 @@ export default function ExternalProductsCatalogPage() {
                     {item.status === 'on_hold' && <button type="button" onClick={() => updateHold(item.id, 'cancel')} disabled={holdActionId === item.id} className="text-red-600 hover:text-red-700 disabled:opacity-50">
                       Отменить hold
                     </button>}
+                    {item.status === 'on_hold' && <button type="button" onClick={() => updateHold(item.id, 'test-pay')} disabled={holdActionId === item.id} className="text-emerald-600 hover:text-emerald-700 disabled:opacity-50">
+                      Тестово оплатить и подтвердить
+                    </button>}
                   </div>
+                  {item.status === 'confirmed' && <div className="mt-3 text-xs text-emerald-700">
+                    <p>Оплата: {item.payment_status || 'succeeded'} · подтверждено: {item.confirmed_at ? new Date(item.confirmed_at).toLocaleString('ru-RU') : '—'}</p>
+                    {item.fulfillment?.voucher_url && <a className="mt-1 inline-block underline" href={item.fulfillment.voucher_url} target="_blank" rel="noreferrer">Открыть ваучер</a>}
+                    {item.fulfillment?.tickets?.map((ticket, index) => <a key={`${ticket.url}-${index}`} className="mt-1 ml-3 inline-block underline" href={ticket.url} target="_blank" rel="noreferrer">Билет {index + 1}</a>)}
+                  </div>}
                 </article>
               ))}
             </div>
