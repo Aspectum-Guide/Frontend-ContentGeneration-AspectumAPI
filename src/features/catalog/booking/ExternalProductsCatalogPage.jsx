@@ -44,6 +44,10 @@ export default function ExternalProductsCatalogPage() {
   const [calendarLoading, setCalendarLoading] = useState(false);
   const [error, setError] = useState(null);
   const [checking, setChecking] = useState(false);
+  const [fullName, setFullName] = useState('');
+  const [email, setEmail] = useState('');
+  const [booking, setBooking] = useState(null);
+  const [bookingLoading, setBookingLoading] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -63,6 +67,7 @@ export default function ExternalProductsCatalogPage() {
     setOptionId('');
     setQuantities({});
     setAvailability(null);
+    setBooking(null);
     if (!cityId) return () => { active = false; };
 
     setProductsLoading(true);
@@ -87,6 +92,7 @@ export default function ExternalProductsCatalogPage() {
     const nextOption = product?.options?.find((item) => item.is_default) || product?.options?.[0] || null;
     setOptionId(nextOption?.id ? String(nextOption.id) : '');
     setAvailability(null);
+    setBooking(null);
   }, [productId, product]);
 
   useEffect(() => {
@@ -123,6 +129,7 @@ export default function ExternalProductsCatalogPage() {
     setChecking(true);
     setError(null);
     setAvailability(null);
+    setBooking(null);
     try {
       const response = await externalProductsAPI.availability(product.id, {
         option: option.id,
@@ -138,11 +145,39 @@ export default function ExternalProductsCatalogPage() {
     }
   };
 
+  const reserveHold = async () => {
+    const units = (option?.units || [])
+      .map((unit) => ({ unit: String(unit.id), quantity: Number(quantities[unit.id] || 0) }))
+      .filter((unit) => Number.isInteger(unit.quantity) && unit.quantity > 0);
+    if (!product || !option || !date || !units.length || !fullName.trim() || !email.trim()) {
+      setError('Для резервации заполните билеты, дату, имя и e-mail.');
+      return;
+    }
+    setBookingLoading(true);
+    setError(null);
+    try {
+      const idempotencyKey = globalThis.crypto?.randomUUID?.() || `${Date.now()}-${Math.random()}`;
+      const response = await externalProductsAPI.createHold(product.id, {
+        option: option.id,
+        date,
+        units,
+        currency: product.default_currency || undefined,
+        full_name: fullName.trim(),
+        email: email.trim(),
+      }, idempotencyKey);
+      setBooking(response?.data || null);
+    } catch (err) {
+      setError(parseApiError(err, 'Не удалось зарезервировать билеты у поставщика'));
+    } finally {
+      setBookingLoading(false);
+    }
+  };
+
   return (
     <Layout>
       <CatalogPageHeader
         title="Внешние продукты"
-        description="Тестовый read-only экран для каталога поставщика и live availability. Бронирования и платежи здесь не создаются."
+        description="Тестовый экран каталога, live availability и резервации у поставщика. Платёж и подтверждение брони пока не создаются."
       />
 
       {error && <div className="mb-4 text-sm text-red-700 bg-red-50 border border-red-200 rounded-lg px-3 py-2">{error}</div>}
@@ -225,6 +260,15 @@ export default function ExternalProductsCatalogPage() {
             <button type="button" onClick={checkAvailability} disabled={checking || !option} className="w-full rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50">
               {checking ? 'Проверяем…' : 'Проверить доступность'}
             </button>
+            <div className="border-t border-gray-200 pt-4 space-y-3">
+              <p className="text-sm font-medium text-gray-700">Тестовая резервация</p>
+              <input value={fullName} onChange={(e) => setFullName(e.target.value)} className={inputClass} placeholder="Имя гостя" />
+              <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} className={inputClass} placeholder="E-mail гостя" />
+              <button type="button" onClick={reserveHold} disabled={bookingLoading || !availability} className="w-full rounded-lg bg-amber-600 px-4 py-2 text-sm font-medium text-white hover:bg-amber-700 disabled:opacity-50">
+                {bookingLoading ? 'Резервируем…' : 'Создать hold на 10 минут'}
+              </button>
+              <p className="text-xs text-gray-500">Повторная проверка цены и мест выполняется на сервере перед запросом в Ventrata. Деньги не списываются.</p>
+            </div>
           </>}
         </section>
 
@@ -251,6 +295,12 @@ export default function ExternalProductsCatalogPage() {
               </article>
             ))}
             {availability.availability?.length === 0 && <p className="text-sm text-gray-500">Поставщик не вернул вариантов на эту дату.</p>}
+          </div>}
+          {booking && <div className="mt-5 rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
+            <p className="font-semibold">Hold создан</p>
+            <p className="mt-1">Статус: {booking.status} · до {booking.expires_at ? new Date(booking.expires_at).toLocaleString('ru-RU') : 'срок не передан поставщиком'}</p>
+            <p className="mt-1">Сумма: {booking.total_price ?? '—'} {booking.currency}</p>
+            <p className="mt-1 text-xs">Aspectum ID: <span className="font-mono">{booking.id}</span></p>
           </div>}
         </section>
       </div>

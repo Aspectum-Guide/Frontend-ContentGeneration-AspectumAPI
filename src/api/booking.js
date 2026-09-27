@@ -89,10 +89,14 @@ export const bookingAnalyticsAPI = {
   summary: (params) => apiClient.get('/booking/analytics/', { params }),
 };
 
-/** Approved external supplier catalog and a read-only live availability check. */
+/** Approved external supplier catalog, availability and reservation hold. */
 export const externalProductsAPI = {
   list: (cityId) => bookingGet('/booking/external-products/', { city: cityId }, { skipCache: true }),
   calendar: (productId, params) => bookingGet(`/booking/external-products/${productId}/availability-calendar/`, params, { skipCache: true }),
   availability: (productId, data) =>
     apiClient.post(`/booking/external-products/${productId}/availability/`, data),
+  createHold: (productId, data, idempotencyKey) =>
+    apiClient.post(`/booking/external-products/${productId}/bookings/`, data, {
+      headers: { 'Idempotency-Key': idempotencyKey },
+    }),
 };
