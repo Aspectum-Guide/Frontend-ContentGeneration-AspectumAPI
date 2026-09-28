@@ -103,4 +103,5 @@ export const externalProductsAPI = {
   refreshHold: (bookingId) => apiClient.post(`/booking/external-bookings/${bookingId}/refresh/`),
   cancelHold: (bookingId) => apiClient.post(`/booking/external-bookings/${bookingId}/cancel/`),
   testPay: (bookingId) => apiClient.post(`/booking/external-bookings/${bookingId}/test-pay/`),
+  refund: (bookingId) => apiClient.post(`/booking/external-bookings/${bookingId}/refund/`),
 };
