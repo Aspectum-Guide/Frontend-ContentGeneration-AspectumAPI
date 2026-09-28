@@ -77,8 +77,16 @@ export const attractionsAPI = {
 export const attractionCommerceAPI = {
   listItinerary: (sessionId, attractionId) => apiClient.get(`${BASE}/sessions/${sessionId}/attractions/${attractionId}/itinerary/`),
   addItinerary: (sessionId, attractionId, data) => apiClient.post(`${BASE}/sessions/${sessionId}/attractions/${attractionId}/itinerary/`, data),
+  updateItinerary: (sessionId, attractionId, stepId, data) =>
+    apiClient.patch(`${BASE}/sessions/${sessionId}/attractions/${attractionId}/itinerary/${stepId}/`, data),
+  deleteItinerary: (sessionId, attractionId, stepId) =>
+    apiClient.delete(`${BASE}/sessions/${sessionId}/attractions/${attractionId}/itinerary/${stepId}/`),
   listInclusions: (sessionId, attractionId) => apiClient.get(`${BASE}/sessions/${sessionId}/attractions/${attractionId}/inclusions/`),
   addInclusion: (sessionId, attractionId, data) => apiClient.post(`${BASE}/sessions/${sessionId}/attractions/${attractionId}/inclusions/`, data),
+  updateInclusion: (sessionId, attractionId, itemId, data) =>
+    apiClient.patch(`${BASE}/sessions/${sessionId}/attractions/${attractionId}/inclusions/${itemId}/`, data),
+  deleteInclusion: (sessionId, attractionId, itemId) =>
+    apiClient.delete(`${BASE}/sessions/${sessionId}/attractions/${attractionId}/inclusions/${itemId}/`),
 };
 
 // ─── Attraction Useful Info ─────────────────────────────────────────────────
