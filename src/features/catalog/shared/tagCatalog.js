@@ -378,5 +378,9 @@ export function buildEventFilterUpdatePayload(editingFilter, appLanguages) {
   if (editingFilter.emoji?.trim()) desc.emoji = editingFilter.emoji.trim();
   else delete desc.emoji;
   payload.description = desc;
+  // Пространство задаётся только папке (null — общая); тег наследует его от папки.
+  if (editingFilter.type === 'folder' && 'workspace' in editingFilter) {
+    payload.workspace = editingFilter.workspace || null;
+  }
   return payload;
 }

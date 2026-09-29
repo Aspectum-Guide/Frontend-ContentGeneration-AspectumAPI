@@ -81,15 +81,17 @@ export function unwrapEnvelope(payload) {
 /**
  * Flatten EventsAPI filter tree nodes (with `children`) into a list with `parent_id`.
  */
-export function flattenEventFilterTree(nodes, parentId = null, out = []) {
+export function flattenEventFilterTree(nodes, parentId = null, out = [], parentWorkspace = null) {
   if (!Array.isArray(nodes)) return out;
   for (const node of nodes) {
     if (!node || typeof node !== 'object') continue;
     const id = node.id;
     const pid = node.parent_id != null && node.parent_id !== undefined ? node.parent_id : parentId;
-    out.push({ ...node, parent_id: pid });
+    // Пространство приходит только у папки; тег живёт в пространстве папки.
+    const workspace = node.workspace !== undefined ? node.workspace : parentWorkspace;
+    out.push({ ...node, parent_id: pid, workspace });
     if (Array.isArray(node.children) && node.children.length) {
-      flattenEventFilterTree(node.children, id, out);
+      flattenEventFilterTree(node.children, id, out, workspace);
     }
   }
   return out;

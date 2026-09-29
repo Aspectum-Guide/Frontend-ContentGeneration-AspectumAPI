@@ -1,9 +1,64 @@
 import { useEffect, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { sessionsAPI } from '../api/generation';
+import { sessionsAPI, workspacesAPI } from '../api/generation';
 import { useLayoutActions } from '../context/useLayoutActions';
 import useTokenValidation from '../hooks/useTokenValidation';
 import TokenManager from '../utils/TokenManager';
+import { getWorkspace, setWorkspace, workspaceTitle } from '../utils/workspace';
+
+/**
+ * Переключатель рабочего пространства (Россия / Европа / …). Сужает списки
+ * сессий и тегов во всей админке; при смене страница перезагружается, чтобы
+ * все экраны взяли данные нового пространства.
+ */
+function WorkspaceSwitcher({ compact }) {
+  const [items, setItems] = useState([]);
+  const current = getWorkspace();
+
+  useEffect(() => {
+    workspacesAPI.list().then((r) => {
+      const list = Array.isArray(r?.data?.results) ? r.data.results : [];
+      setItems(list);
+      // Пространство удалили из справочника — сбрасываем на «все».
+      if (current && list.length && !list.some((w) => w.code === current)) {
+        setWorkspace('');
+        window.location.reload();
+      }
+    }).catch(() => { });
+  }, [current]);
+
+  const onChange = (event) => {
+    setWorkspace(event.target.value);
+    window.location.reload();
+  };
+
+  const active = items.find((w) => w.code === current);
+  if (compact) {
+    return (
+      <div
+        className="mx-auto rounded-md bg-gray-100 px-1.5 py-0.5 text-[11px] font-semibold text-gray-700"
+        title={`Пространство: ${active ? workspaceTitle(active) : 'все'}`}
+      >
+        {active ? workspaceTitle(active).slice(0, 3) : 'Все'}
+      </div>
+    );
+  }
+  return (
+    <label className="flex flex-col gap-1">
+      <span className="text-[11px] font-medium uppercase tracking-wide text-gray-500">Пространство</span>
+      <select
+        value={current}
+        onChange={onChange}
+        className="w-full rounded-lg border border-gray-300 bg-white px-2 py-1.5 text-sm text-gray-900 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+      >
+        <option value="">Все пространства</option>
+        {items.map((w) => (
+          <option key={w.code} value={w.code}>{workspaceTitle(w)}</option>
+        ))}
+      </select>
+    </label>
+  );
+}
 
 function getActiveSessions(sessions) {
   return sessions.filter(
@@ -318,6 +373,7 @@ export default function Layout({ children, pageHeader = null, pageHeaderMode = '
               </button>
             )}
           </div>
+          <WorkspaceSwitcher compact={!sidebarExpanded && !isMobile} />
         </div>
 
         {/* Navigation */}

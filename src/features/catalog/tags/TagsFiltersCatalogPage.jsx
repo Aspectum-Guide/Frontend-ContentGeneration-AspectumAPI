@@ -3,9 +3,10 @@ import Layout from '../../../components/Layout';
 import DataTable from '../../../components/ui/DataTable';
 import Modal from '../../../components/ui/Modal';
 import { ConfirmModal } from '../../../components/ui/Modal';
-import { Field, TextInput, FormActions } from '../../../components/ui/FormField';
+import { Field, TextInput, FormActions, Select } from '../../../components/ui/FormField';
 import Toast, { useToast } from '../../../components/ui/Toast.jsx';
-import { appLanguagesAPI, citiesAPI, cityFiltersAPI, eventFiltersAPI } from './api';
+import { appLanguagesAPI, citiesAPI, cityFiltersAPI, eventFiltersAPI, workspacesAPI } from './api';
+import { workspaceTitle } from '../../../utils/workspace';
 import CityFilterEditorFields from './CityFilterEditorFields';
 import { isNotFoundError, parseApiError } from '../../../utils/apiError';
 import MultiLangInput from '../../../components/forms/MultiLangInput';
@@ -96,6 +97,7 @@ function FilterTab({
   showNote,
   appLanguages,
   cityOptions = [],
+  workspaces = [],
   defaultLang = DEFAULT_TAG_LANG,
 }) {
   const multiLangLanguages = useMemo(
@@ -361,6 +363,17 @@ function FilterTab({
         className: 'text-xs text-gray-600 capitalize',
         render: (v) => (v === 'folder' ? 'Папка' : v === 'tag' ? 'Тег' : v || '—'),
       });
+      base.push({
+        key: 'workspace',
+        label: 'Пространство',
+        className: 'text-xs text-gray-600',
+        render: (code) => {
+          if (code === undefined) return '—';
+          if (!code) return <span className="text-gray-400">Общая</span>;
+          const ws = workspaces.find((w) => w.code === code);
+          return ws ? workspaceTitle(ws) : code;
+        },
+      });
     }
     if (mode === 'city') {
       base.push({
@@ -398,7 +411,7 @@ function FilterTab({
       render: (v) => v || '—',
     });
     return base;
-  }, [mode, appLanguages]);
+  }, [mode, appLanguages, workspaces]);
 
   return (
     <>
@@ -600,6 +613,23 @@ function FilterTab({
                 />
               </Field>
             )}
+            {mode === 'event' && editingFilter.type === 'folder' && workspaces.length > 0 && (
+              <Field
+                label="Пространство"
+                hint="Теги папки видны только в этом пространстве. «Общая» — во всех."
+              >
+                <Select
+                  value={editingFilter.workspace || ''}
+                  onChange={(e) => setEditingFilter((prev) => ({ ...prev, workspace: e.target.value || null }))}
+                  disabled={saving || editLoading}
+                >
+                  <option value="">Общая</option>
+                  {workspaces.map((w) => (
+                    <option key={w.code} value={w.code}>{workspaceTitle(w)}</option>
+                  ))}
+                </Select>
+              </Field>
+            )}
             <MultiLangInput
               label={editNameLabel}
               required
@@ -669,6 +699,13 @@ export default function TagsFilters() {
       }
     })();
     return () => { cancelled = true; };
+  }, []);
+
+  const [workspaces, setWorkspaces] = useState([]);
+  useEffect(() => {
+    workspacesAPI.list()
+      .then((r) => setWorkspaces(Array.isArray(r?.data?.results) ? r.data.results : []))
+      .catch(() => setWorkspaces([]));
   }, []);
 
   useEffect(() => {
@@ -753,6 +790,7 @@ export default function TagsFilters() {
           key="event"
           mode="event"
           api={eventCatalogApi}
+          workspaces={workspaces}
           icon="🎪"
           emptyText="Папок и тегов событий нет"
           createLabel="Создать папку или тег"

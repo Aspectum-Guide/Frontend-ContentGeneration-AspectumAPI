@@ -1,4 +1,5 @@
 import apiClient from './client';
+import { getWorkspace, withWorkspaceParams } from '../utils/workspace';
 
 const BASE = '/generation';
 
@@ -13,9 +14,16 @@ export const tagsAPI = {
     apiClient.post(`${BASE}/tags/translate-selected/`, payload),
 };
 
+// ─── Workspaces ──────────────────────────────────────────────────────────────
+/** Пространства (Россия / Европа / …) для переключателя в боковой панели. */
+export const workspacesAPI = {
+  list: () => apiClient.get(`${BASE}/workspaces/`),
+};
+
 // ─── Sessions ────────────────────────────────────────────────────────────────
 export const sessionsAPI = {
-  list: () => apiClient.get(`${BASE}/sessions/`),
+  // Только сессии текущего пространства (и ещё без страны — чтобы не терялись).
+  list: () => apiClient.get(`${BASE}/sessions/`, { params: withWorkspaceParams() }),
   get: (sessionId, config = {}) => apiClient.get(`${BASE}/sessions/${sessionId}/`, config),
   create: (data = {}) => apiClient.post(`${BASE}/sessions/create/`, data),
   close: (sessionId, mode = 'save') => apiClient.post(`${BASE}/sessions/${sessionId}/close/`, { mode }),
@@ -369,11 +377,19 @@ export const cityFiltersAPI = {
 };
 
 // ─── Event Filters ────────────────────────────────────────────────────────────
+function withFolderWorkspace(payload) {
+  const code = getWorkspace();
+  if (!code || !payload || payload.type !== 'folder' || 'workspace' in payload) return payload;
+  return { ...payload, workspace: code };
+}
+
 // Canonical CRUD + tree (EventsAPI) — same store as Session Wizard / static reference JS
 export const eventFiltersAPI = {
-  getTree: () => apiClient.get('/events/filters/tree/'),
+  // Теги текущего пространства и общие; у папки в ответе поле workspace.
+  getTree: () => apiClient.get('/events/filters/tree/', { params: withWorkspaceParams() }),
   get: (id) => apiClient.get(`/events/filters/${id}/`),
-  create: (payload) => apiClient.post('/events/filters/', payload),
+  // Новая папка попадает в текущее пространство, если его не указали явно.
+  create: (payload) => apiClient.post('/events/filters/', withFolderWorkspace(payload)),
   update: (id, payload) => apiClient.patch(`/events/filters/${id}/`, payload),
   delete: (id) => apiClient.delete(`/events/filters/${id}/`),
 };
@@ -500,7 +516,7 @@ export const eventsAPI = {
   deleteInclusion: (eventId, itemId) =>
     apiClient.delete(`${BASE}/events/${eventId}/inclusions/${itemId}/`),
   filtersReference: () =>
-    apiClient.get(`${BASE}/events/filters-reference/`),
+    apiClient.get(`${BASE}/events/filters-reference/`, { params: withWorkspaceParams() }),
   cities: () => apiClient.get(`${BASE}/events/cities/`),
   generate: (data) => apiClient.post(`${BASE}/events/generate/`, data),
   generateTasks: () => apiClient.get(`${BASE}/events/generate/tasks/`),
