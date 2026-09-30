@@ -947,7 +947,12 @@ export function useAudioGuides({
     const config = getTtsProviderConfig(settings, provider);
     const defaults = config?.defaults || {};
     if (!audioGuideTtsVoiceTouchedRef.current) {
-      const voiceId = String(defaults.voice_id || '').trim();
+      // У Fish голос проекта свой для каждого языка (defaults.voice_ids) —
+      // пустой voice_id, и сервер выберет голос по языку дорожки. Иначе
+      // русский голос по умолчанию уходил бы на все языки.
+      const perLanguage = provider === 'fish_audio' &&
+        Object.keys(defaults.voice_ids || {}).length > 0;
+      const voiceId = perLanguage ? '' : String(defaults.voice_id || '').trim();
       audioGuideTtsVoiceIdRef.current = voiceId;
       setAudioGuideTtsVoiceId(voiceId);
     }
@@ -2396,9 +2401,9 @@ export function useAudioGuides({
   );
 
   const prepareMissingAttractionAudio = useCallback(async (
-    { replaceExisting = false } = {},
+    { replaceExisting = false, languageCode: languageOverride = '' } = {},
   ) => {
-    const languageCode = getLocaleLang(
+    const languageCode = languageOverride || getLocaleLang(
       attractionAudioGuideActiveLocaleRef.current,
     );
     const params = { language_code: languageCode };
@@ -2410,20 +2415,26 @@ export function useAudioGuides({
     return response?.data || {};
   }, [sessionId]);
 
-  const generateMissingAttractionAudio = useCallback(async (
-    { skipConfirmation = false, replaceExisting = false } = {},
+  const generateMissingAttractionAudioForLanguage = useCallback(async (
+    {
+      skipConfirmation = false,
+      replaceExisting = false,
+      languageCode: languageOverride = '',
+      stepPrefix = '',
+    } = {},
   ) => {
     if (batchAudioGeneratingRef.current) return;
 
-    const languageCode = getLocaleLang(
+    const languageCode = languageOverride || getLocaleLang(
       attractionAudioGuideActiveLocaleRef.current,
     );
+    const withPrefix = (text) => (stepPrefix ? `${stepPrefix}: ${text}` : text);
     const provider = audioGuideTtsProviderRef.current || DEFAULT_TTS_PROVIDER;
     const voiceId = (audioGuideTtsVoiceIdRef.current || '').trim();
     const modelId = (audioGuideTtsModelIdRef.current || '').trim();
 
     try {
-      const status = await prepareMissingAttractionAudio({ replaceExisting });
+      const status = await prepareMissingAttractionAudio({ replaceExisting, languageCode });
       const readyCount = Number(status.ready_count || 0);
       const activeTask = status.active_task;
       const targetCount = readyCount;
@@ -2466,7 +2477,7 @@ export function useAudioGuides({
       setBatchAudioGenerating(true);
       setBatchAudioProgress(Number(activeTask?.progress || 0));
       setBatchAudioCurrentStep(
-        activeTask?.current_step || 'Запускаем пакетную озвучку...',
+        withPrefix(activeTask?.current_step || 'Запускаем пакетную озвучку...'),
       );
       setBatchAudioResult(null);
 
@@ -2486,7 +2497,7 @@ export function useAudioGuides({
       if (!data.async || !data.task_id) {
         setBatchAudioResult(data);
         setBatchAudioProgress(100);
-        setBatchAudioCurrentStep('Нет новых ОЛ для озвучки');
+        setBatchAudioCurrentStep(withPrefix('Нет новых ОЛ для озвучки'));
         return;
       }
 
@@ -2497,7 +2508,7 @@ export function useAudioGuides({
         onProgress: (progressTask) => {
           setBatchAudioProgress(Number(progressTask?.progress || 0));
           setBatchAudioCurrentStep(
-            progressTask?.current_step || 'Пакетная озвучка выполняется...',
+            withPrefix(progressTask?.current_step || 'Пакетная озвучка выполняется...'),
           );
           if (progressTask?.result_data) {
             setBatchAudioResult(progressTask.result_data);
@@ -2532,12 +2543,12 @@ export function useAudioGuides({
 
       setBatchAudioResult(result);
       setBatchAudioProgress(100);
-      setBatchAudioCurrentStep(task?.current_step || 'Пакетная озвучка завершена');
+      setBatchAudioCurrentStep(withPrefix(task?.current_step || 'Пакетная озвучка завершена'));
       const failedCount = Number(result.failed_count || 0);
       showNote(
         failedCount
-          ? `Озвучено: ${result.generated_count || 0}, ошибок: ${failedCount}`
-          : `Озвучено ОЛ: ${result.generated_count || 0}`,
+          ? `${languageCode.toUpperCase()}: озвучено ${result.generated_count || 0}, ошибок: ${failedCount}`
+          : `${languageCode.toUpperCase()}: озвучено ОЛ ${result.generated_count || 0}`,
         failedCount ? 'error' : 'success',
       );
     } catch (error) {
@@ -2554,6 +2565,29 @@ export function useAudioGuides({
     confirm,
     prepareMissingAttractionAudio,
   ]);
+
+  // Пакетная озвучка сразу на нескольких языках: языки идут по очереди, у Fish
+  // без явного голоса сервер берёт голос проекта для каждого языка.
+  const generateMissingAttractionAudio = useCallback(async (options = {}) => {
+    const languages = Array.isArray(options.languageCodes)
+      ? [...new Set(options.languageCodes.filter(Boolean))]
+      : [];
+    if (languages.length <= 1) {
+      return generateMissingAttractionAudioForLanguage({
+        ...options,
+        languageCode: languages[0] || options.languageCode || '',
+      });
+    }
+    for (let index = 0; index < languages.length; index += 1) {
+      await generateMissingAttractionAudioForLanguage({
+        ...options,
+        skipConfirmation: true,
+        languageCode: languages[index],
+        stepPrefix: `${languages[index].toUpperCase()} (${index + 1}/${languages.length})`,
+      });
+    }
+    return undefined;
+  }, [generateMissingAttractionAudioForLanguage]);
 
   useEffect(() => {
     let cancelled = false;

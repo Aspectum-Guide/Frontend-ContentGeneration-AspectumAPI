@@ -462,6 +462,20 @@ function AttractionMapPanel({
   );
 }
 
+// Суммарная готовность по нескольким языкам — те же поля, что у одного языка.
+function sumBatchAudioStatuses(byLanguage) {
+  const statuses = Object.values(byLanguage || {});
+  const sum = (field) => statuses.reduce((total, item) => total + Number(item?.[field] || 0), 0);
+  return {
+    ready_count: sum('ready_count'),
+    already_voiced_count: sum('already_voiced_count'),
+    missing_text_count: sum('missing_text_count'),
+    missing_guide_count: sum('missing_guide_count'),
+    active_task: statuses.find((item) => item?.active_task)?.active_task || null,
+    language_code: Object.keys(byLanguage || {}).join(','),
+  };
+}
+
 export default function SessionWizardAttractionsStep({
   sessionId,
   attrView,
@@ -547,6 +561,16 @@ export default function SessionWizardAttractionsStep({
   onAiUseWebSearchChange,
 }) {
   const attrCurrentLocale = attrLocaleData[attrActiveLocale] || {};
+  const batchAudioLanguageOptions = Object.entries(attrLocaleData || {}).reduce(
+    (options, [key, loc]) => {
+      const lang = loc?.lang || key.split('-')[0];
+      if (lang && !options.some((item) => item.lang === lang)) {
+        options.push({ lang, label: `${getFlag(loc?.code)} ${loc?.langName || lang.toUpperCase()}` });
+      }
+      return options;
+    },
+    [],
+  );
   const [selectMode, setSelectMode] = useState(false);
   const [selectedAttractionIds, setSelectedAttractionIds] = useState(() => new Set());
   const [regenDetailLoading, setRegenDetailLoading] = useState(false);
@@ -554,6 +578,9 @@ export default function SessionWizardAttractionsStep({
   const [batchAudioStatusLoading, setBatchAudioStatusLoading] = useState(false);
   const [batchAudioStatusError, setBatchAudioStatusError] = useState('');
   const [batchAudioStatus, setBatchAudioStatus] = useState(null);
+  // Языки пакетной озвучки: по умолчанию — язык открытой вкладки.
+  const [batchAudioLanguages, setBatchAudioLanguages] = useState([]);
+  const [batchAudioStatusByLanguage, setBatchAudioStatusByLanguage] = useState({});
   // Перезапись существующего аудио. По умолчанию выключена: пакетная озвучка
   // задумана как «добить недостающее», а замена стоит денег у провайдера.
   const [batchAudioReplaceExisting, setBatchAudioReplaceExisting] = useState(false);
@@ -574,22 +601,23 @@ export default function SessionWizardAttractionsStep({
   const batchAudioTargetCount = readyForBatchAudio;
   const batchAudioCanStart =
     !batchAudioStatusLoading &&
+    batchAudioLanguages.length > 0 &&
     selectedTtsProvider?.configured !== false &&
     (batchAudioStatus === null ||
       batchAudioTargetCount > 0 ||
       batchAudioStatus?.active_task);
 
-  const openBatchAudioModal = async () => {
-    if (batchAudioGenerating) return;
-    setBatchAudioModalOpen(true);
+  const loadBatchAudioStatus = async (languages, replaceExisting) => {
     setBatchAudioStatusLoading(true);
     setBatchAudioStatusError('');
-    setBatchAudioStatus(null);
     try {
-      const status = await onPrepareMissingAttractionAudio?.({
-        replaceExisting: batchAudioReplaceExisting,
-      });
-      setBatchAudioStatus(status || {});
+      const entries = await Promise.all(languages.map(async (languageCode) => [
+        languageCode,
+        (await onPrepareMissingAttractionAudio?.({ replaceExisting, languageCode })) || {},
+      ]));
+      const byLanguage = Object.fromEntries(entries);
+      setBatchAudioStatusByLanguage(byLanguage);
+      setBatchAudioStatus(languages.length ? sumBatchAudioStatuses(byLanguage) : null);
     } catch (error) {
       setBatchAudioStatusError(
         error?.response?.data?.error ||
@@ -601,22 +629,24 @@ export default function SessionWizardAttractionsStep({
     }
   };
 
+  const openBatchAudioModal = async () => {
+    if (batchAudioGenerating) return;
+    const languages = [attrCurrentLocale.lang || attrActiveLocale.split('-')[0] || 'ru'];
+    setBatchAudioLanguages(languages);
+    setBatchAudioModalOpen(true);
+    setBatchAudioStatus(null);
+    setBatchAudioStatusByLanguage({});
+    await loadBatchAudioStatus(languages, batchAudioReplaceExisting);
+  };
+
   const changeBatchAudioReplaceMode = async (replaceExisting) => {
     setBatchAudioReplaceExisting(replaceExisting);
-    setBatchAudioStatusLoading(true);
-    setBatchAudioStatusError('');
-    try {
-      const status = await onPrepareMissingAttractionAudio?.({ replaceExisting });
-      setBatchAudioStatus(status || {});
-    } catch (error) {
-      setBatchAudioStatusError(
-        error?.response?.data?.error ||
-          error?.message ||
-          'Не удалось проверить готовность ОЛ к озвучке',
-      );
-    } finally {
-      setBatchAudioStatusLoading(false);
-    }
+    await loadBatchAudioStatus(batchAudioLanguages, replaceExisting);
+  };
+
+  const changeBatchAudioLanguages = async (languages) => {
+    setBatchAudioLanguages(languages);
+    await loadBatchAudioStatus(languages, batchAudioReplaceExisting);
   };
 
   const startBatchAudio = async () => {
@@ -625,6 +655,10 @@ export default function SessionWizardAttractionsStep({
     await onGenerateMissingAttractionAudio?.({
       skipConfirmation: true,
       replaceExisting: batchAudioReplaceExisting,
+      languageCodes: batchAudioLanguages.filter(
+        (lang) => Number(batchAudioStatusByLanguage[lang]?.ready_count || 0) > 0 ||
+          batchAudioStatusByLanguage[lang]?.active_task,
+      ),
     });
   };
 
@@ -822,7 +856,17 @@ export default function SessionWizardAttractionsStep({
           ) : batchAudioStatus ? (
             <>
               Готово к озвучке: <strong>{batchAudioTargetCount}</strong>.
-              {' '}Язык: <strong>{String(batchAudioStatus.language_code || 'ru').toUpperCase()}</strong>.
+              {' '}{batchAudioLanguages.length > 1 ? 'Языки' : 'Язык'}:{' '}
+              <strong>
+                {batchAudioLanguages
+                  .map((lang) => {
+                    const count = batchAudioStatusByLanguage[lang]?.ready_count;
+                    return batchAudioLanguages.length > 1 && count !== undefined
+                      ? `${lang.toUpperCase()} (${count})`
+                      : lang.toUpperCase();
+                  })
+                  .join(', ')}
+              </strong>.
               {' '}{batchAudioReplaceExisting
                 ? 'Существующее аудио будет заменено, старые файлы удалятся.'
                 : 'Существующее аудио не будет перезаписано.'}
@@ -830,6 +874,52 @@ export default function SessionWizardAttractionsStep({
           ) : (
             'Будут озвучены только ОЛ с полным текстом и без готовой аудиодорожки.'
           )}
+        </div>
+
+        <div className="rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-800">
+          <div className="mb-1 flex items-center justify-between gap-2">
+            <span className="font-medium">Языки озвучки</span>
+            {batchAudioLanguageOptions.length > 1 ? (
+              <button
+                type="button"
+                className="text-xs text-blue-600 hover:underline disabled:opacity-50"
+                disabled={batchAudioGenerating || batchAudioStatusLoading}
+                onClick={() => changeBatchAudioLanguages(
+                  batchAudioLanguages.length === batchAudioLanguageOptions.length
+                    ? []
+                    : batchAudioLanguageOptions.map((item) => item.lang),
+                )}
+              >
+                {batchAudioLanguages.length === batchAudioLanguageOptions.length
+                  ? 'Снять все'
+                  : 'Все языки'}
+              </button>
+            ) : null}
+          </div>
+          <div className="flex flex-wrap gap-x-4 gap-y-1">
+            {batchAudioLanguageOptions.map((item) => (
+              <label key={item.lang} className="flex items-center gap-1.5">
+                <input
+                  type="checkbox"
+                  checked={batchAudioLanguages.includes(item.lang)}
+                  disabled={batchAudioGenerating || batchAudioStatusLoading}
+                  onChange={(event) => changeBatchAudioLanguages(
+                    event.target.checked
+                      ? batchAudioLanguageOptions
+                        .map((option) => option.lang)
+                        .filter((lang) => lang === item.lang || batchAudioLanguages.includes(lang))
+                      : batchAudioLanguages.filter((lang) => lang !== item.lang),
+                  )}
+                />
+                <span>{item.label}</span>
+              </label>
+            ))}
+          </div>
+          {batchAudioLanguages.length > 1 ? (
+            <p className="mt-1 text-xs text-gray-500">
+              Языки озвучиваются по очереди, у каждого свой голос проекта.
+            </p>
+          ) : null}
         </div>
 
         <label className="flex items-start gap-2 rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-800">

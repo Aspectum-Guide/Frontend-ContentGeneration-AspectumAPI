@@ -505,6 +505,9 @@ export function TTSProviderSettingsPanel({
     ? providerSettings.providers
     : [];
   const providerConfig = providerList.find((item) => item?.id === provider) || null;
+  const projectVoiceLanguages = Object.keys(
+    providerConfig?.defaults?.voice_ids || {},
+  );
   const providerModels = Array.isArray(providerConfig?.models) ? providerConfig.models : [];
   const elevenLabsModels = Array.isArray(elevenLabsSettings?.models)
     ? elevenLabsSettings.models
@@ -615,9 +618,24 @@ export function TTSProviderSettingsPanel({
               disabled={disabled}
               className="w-full rounded-lg border border-gray-300 px-2 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50"
             >
-              <option value="default">Стандартный голос Fish Audio</option>
+              <option value="default">
+                {projectVoiceLanguages.length
+                  ? 'Голос проекта для каждого языка'
+                  : 'Стандартный голос Fish Audio'}
+              </option>
               <option value="custom">Конкретный голос по Reference ID</option>
             </select>
+            {fishVoiceMode === 'default' && projectVoiceLanguages.length ? (
+              <p className="mt-1 text-xs text-gray-500">
+                Сервер сам подберёт голос по языку дорожки:{' '}
+                {projectVoiceLanguages.map((lang) => lang.toUpperCase()).join(', ')}.
+              </p>
+            ) : null}
+            {fishVoiceMode === 'custom' && projectVoiceLanguages.length ? (
+              <p className="mt-1 text-xs text-amber-700">
+                Этот голос уйдёт на все выбранные языки.
+              </p>
+            ) : null}
           </div>
           {fishVoiceMode === 'custom' ? (
             <div>
