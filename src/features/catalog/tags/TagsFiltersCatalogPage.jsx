@@ -146,11 +146,52 @@ function FilterTab({
   const [editEmoji, setEditEmoji] = useState('');
   const [editLoading, setEditLoading] = useState(false);
   const [loadingEditId, setLoadingEditId] = useState(null);
+  const [selectedTagIds, setSelectedTagIds] = useState(() => new Set());
+  const [moveTargetId, setMoveTargetId] = useState('');
+  const [moving, setMoving] = useState(false);
+  const [moveError, setMoveError] = useState(null);
+  const canMoveTags = mode === 'event' && typeof api.move === 'function';
 
   const folderOptions = useMemo(
     () => filters.filter((f) => f.type === 'folder'),
     [filters]
   );
+  const folderTitleById = useMemo(
+    () => new Map(folderOptions.map((f) => [String(f.id), getMultiLangValue(f.name) || f.slug || String(f.id)])),
+    [folderOptions],
+  );
+
+  const toggleTagSelection = (id) => {
+    setSelectedTagIds((prev) => {
+      const next = new Set(prev);
+      const key = String(id);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  };
+
+  const moveSelectedTags = async () => {
+    if (!moveTargetId || selectedTagIds.size === 0) return;
+    setMoving(true);
+    setMoveError(null);
+    const failed = [];
+    for (const id of selectedTagIds) {
+      try {
+        await api.move(id, moveTargetId);
+      } catch (err) {
+        failed.push(err?.response?.data?.error || err.message || id);
+      }
+    }
+    setMoving(false);
+    if (failed.length) {
+      setMoveError(`Не перенесено: ${failed.length}. ${failed[0]}`);
+    } else {
+      setSelectedTagIds(new Set());
+      setMoveTargetId('');
+    }
+    await reload();
+  };
 
   const filtered = filters.filter((f) => {
     if (!search.trim()) return true;
@@ -356,7 +397,31 @@ function FilterTab({
         ),
       },
     ];
+    if (canMoveTags) {
+      base.unshift({
+        key: 'id',
+        label: '',
+        className: 'w-8',
+        render: (id, row) => (row.type === 'tag' ? (
+          <input
+            type="checkbox"
+            aria-label="Выбрать тег для переноса"
+            checked={selectedTagIds.has(String(id))}
+            onClick={(e) => e.stopPropagation()}
+            onChange={() => toggleTagSelection(id)}
+          />
+        ) : null),
+      });
+    }
     if (mode === 'event') {
+      base.push({
+        key: 'parent_id',
+        label: 'Папка',
+        className: 'text-xs text-gray-600',
+        render: (parentId, row) => (row.type === 'tag'
+          ? (folderTitleById.get(String(parentId)) || '—')
+          : ''),
+      });
       base.push({
         key: 'type',
         label: 'Тип',
@@ -411,7 +476,7 @@ function FilterTab({
       render: (v) => v || '—',
     });
     return base;
-  }, [mode, appLanguages, workspaces]);
+  }, [mode, appLanguages, workspaces, canMoveTags, selectedTagIds, folderTitleById]);
 
   return (
     <>
@@ -431,6 +496,46 @@ function FilterTab({
           {creating ? 'Создание…' : (createLabel || 'Создать тег')}
         </button>
       </div>
+
+      {canMoveTags && selectedTagIds.size > 0 && (
+        <div className="mb-3 flex flex-wrap items-center gap-2 rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-sm">
+          <span className="font-medium text-blue-900">Выбрано тегов: {selectedTagIds.size}</span>
+          <span className="text-blue-900">→ в папку</span>
+          <select
+            value={moveTargetId}
+            onChange={(e) => setMoveTargetId(e.target.value)}
+            disabled={moving}
+            className="px-2 py-1 border border-gray-300 rounded-lg text-sm bg-white"
+          >
+            <option value="">— выберите папку —</option>
+            {folderOptions.map((f) => (
+              <option key={String(f.id)} value={String(f.id)}>
+                {getMultiLangValue(f.name) || f.slug || f.id}
+              </option>
+            ))}
+          </select>
+          <button
+            type="button"
+            onClick={moveSelectedTags}
+            disabled={moving || !moveTargetId}
+            className="px-3 py-1 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-50"
+          >
+            {moving ? 'Переносим…' : 'Перенести'}
+          </button>
+          <button
+            type="button"
+            onClick={() => { setSelectedTagIds(new Set()); setMoveError(null); }}
+            disabled={moving}
+            className="px-3 py-1 text-sm text-gray-700 border border-gray-300 rounded-lg bg-white hover:bg-gray-50"
+          >
+            Снять выбор
+          </button>
+          <span className="w-full text-xs text-blue-800">
+            Теги остаются теми же — привязки к достопримечательностям и ИЛ сохранятся.
+          </span>
+          {moveError && <span className="w-full text-xs text-red-700">{moveError}</span>}
+        </div>
+      )}
 
       <DataTable
         columns={columns}
@@ -613,6 +718,26 @@ function FilterTab({
                 />
               </Field>
             )}
+            {mode === 'event' && editingFilter.type === 'tag' && (
+              <Field
+                label="Папка"
+                hint="Можно перенести тег в другую папку — привязки к достопримечательностям и ИЛ сохранятся."
+              >
+                <Select
+                  value={editingFilter.parent_id ? String(editingFilter.parent_id) : ''}
+                  onChange={(e) => setEditingFilter((prev) => ({ ...prev, parent_id: e.target.value || null }))}
+                  disabled={saving || editLoading}
+                  required
+                >
+                  {!editingFilter.parent_id && <option value="">— выберите папку —</option>}
+                  {folderOptions.map((f) => (
+                    <option key={String(f.id)} value={String(f.id)}>
+                      {getMultiLangValue(f.name) || f.slug || f.id}
+                    </option>
+                  ))}
+                </Select>
+              </Field>
+            )}
             {mode === 'event' && editingFilter.type === 'folder' && workspaces.length > 0 && (
               <Field
                 label="Пространство"
@@ -741,6 +866,9 @@ export default function TagsFilters() {
     },
     create: (nf) => eventFiltersAPI.create(buildEventFilterCreatePayload(nf, appLanguages, DEFAULT_TAG_LANG)),
     update: (id, row) => eventFiltersAPI.update(id, buildEventFilterUpdatePayload(row, appLanguages)),
+    // Перенос тега в другую папку: тот же тег (id), меняется только родитель —
+    // привязки к событиям и ИЛ остаются.
+    move: (id, folderId) => eventFiltersAPI.update(id, { parent_id: folderId }),
     delete: (id) => eventFiltersAPI.delete(id),
   }), [appLanguages]);
 
