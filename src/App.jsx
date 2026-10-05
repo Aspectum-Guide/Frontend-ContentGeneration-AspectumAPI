@@ -13,6 +13,7 @@ import CatalogHome from './pages/catalog/CatalogHome';
 import BookingCatalogHome from './pages/catalog/BookingCatalogHome';
 import CitiesCatalog from './pages/catalog/CitiesCatalog';
 import EventsCatalog from './pages/catalog/EventsCatalog';
+import OrphanEvents from './pages/catalog/OrphanEvents';
 import PhotosCatalog from './pages/catalog/PhotosCatalog';
 import TagsFilters from './pages/catalog/TagsFilters';
 import TicketTypesCatalog from './pages/catalog/TicketTypesCatalog';
@@ -149,6 +150,10 @@ const routes = [
   {
     path: '/catalog/events',
     element: <ProtectedRoute><ErrorBoundary><EventsCatalog /></ErrorBoundary></ProtectedRoute>,
+  },
+  {
+    path: '/catalog/events/orphans',
+    element: <ProtectedRoute><ErrorBoundary><OrphanEvents /></ErrorBoundary></ProtectedRoute>,
   },
   {
     path: '/catalog/authors',

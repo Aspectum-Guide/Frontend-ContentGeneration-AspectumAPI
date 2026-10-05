@@ -167,6 +167,7 @@ export default function Layout({ children, pageHeader = null, pageHeaderMode = '
       items: [
         { label: 'Города', to: '/catalog/cities' },
         { label: 'Ивенты', to: '/catalog/events' },
+        { label: 'Ивенты без города', to: '/catalog/events/orphans' },
         { label: 'Авторы', to: '/catalog/authors' },
         { label: 'Теги и фильтры', to: '/catalog/tags' },
         { label: 'Аудиогиды', to: '/catalog/audio-guides' },
@@ -222,6 +223,7 @@ export default function Layout({ children, pageHeader = null, pageHeaderMode = '
     { startsWith: '/tasks', title: 'Мои задачи' },
     { startsWith: '/account/settings', title: 'Настройки аккаунта' },
     { startsWith: '/catalog/cities', title: 'Справочник городов' },
+    { startsWith: '/catalog/events/orphans', title: 'Ивенты без города' },
     { startsWith: '/catalog/events', title: 'Справочник ивентов' },
     { startsWith: '/catalog/authors', title: 'Авторы контента' },
     { startsWith: '/catalog/ticket-types', title: 'Справочник типов билетов' },
@@ -289,7 +291,8 @@ export default function Layout({ children, pageHeader = null, pageHeaderMode = '
           <div className="space-y-0.5">
             {section.items.map((item) => {
               const isActive = location.pathname === item.to
-                || (item.to !== '/' && location.pathname.startsWith(item.to) && item.to.length > 1);
+                || (item.to !== '/' && location.pathname.startsWith(item.to) && item.to.length > 1
+                  && !(item.to === '/catalog/events' && location.pathname.startsWith('/catalog/events/orphans')));
 
               return (
                 <Link
