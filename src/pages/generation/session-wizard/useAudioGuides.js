@@ -2566,7 +2566,7 @@ export function useAudioGuides({
     prepareMissingAttractionAudio,
   ]);
 
-  // Пакетная озвучка сразу на нескольких языках: языки идут по очереди, у Fish
+  // Пакетная озвучка сразу на нескольких языках: сервер ставит их в очередь, у Fish
   // без явного голоса сервер берёт голос проекта для каждого языка.
   const generateMissingAttractionAudio = useCallback(async (options = {}) => {
     const languages = Array.isArray(options.languageCodes)
@@ -2578,6 +2578,28 @@ export function useAudioGuides({
         languageCode: languages[0] || options.languageCode || '',
       });
     }
+    // Сначала отдаём серверу ВСЕ языки разом: очередь ведёт сервер и доводит её
+    // до конца даже при закрытой вкладке. Дальше вкладка лишь показывает ход.
+    const provider = audioGuideTtsProviderRef.current || DEFAULT_TTS_PROVIDER;
+    const voiceId = (audioGuideTtsVoiceIdRef.current || '').trim();
+    const modelId = (audioGuideTtsModelIdRef.current || '').trim();
+    await Promise.all(languages.map(async (languageCode) => {
+      try {
+        const payload = { provider, language_code: languageCode };
+        if (options.replaceExisting) payload.replace_existing = true;
+        if (voiceId) payload.voice_id = voiceId;
+        if (modelId) payload.model_id = modelId;
+        await attractionAudioGuidesAPI.generateMissingAudio(sessionId, payload);
+      } catch {
+        // Язык, который не удалось поставить в очередь, получит ту же ошибку
+        // ниже, когда дойдёт его очередь в этом окне.
+      }
+    }));
+    showNote(
+      `Озвучка ${languages.length} языков поставлена в очередь на сервере: ` +
+      'её можно не ждать, она идёт сама, даже если закрыть вкладку',
+      'success',
+    );
     for (let index = 0; index < languages.length; index += 1) {
       await generateMissingAttractionAudioForLanguage({
         ...options,
@@ -2587,7 +2609,7 @@ export function useAudioGuides({
       });
     }
     return undefined;
-  }, [generateMissingAttractionAudioForLanguage]);
+  }, [generateMissingAttractionAudioForLanguage, sessionId, showNote]);
 
   useEffect(() => {
     let cancelled = false;
