@@ -11,6 +11,7 @@ import PublishedFeedEditor from '../shared/PublishedFeedEditor';
 import EventItineraryTab from './EventItineraryTab';
 import EventInclusionsTab from './EventInclusionsTab';
 import RelatedEventsField from './RelatedEventsField';
+import ExternalProductField from './ExternalProductField';
 import { eventsCatalogAPI } from './api';
 
 const eventInformationApi = {
@@ -46,6 +47,9 @@ export default function EventEditorModal({
   onPatchMedia,
   mediaSaving,
   mediaError,
+  onPatchExternalProduct,
+  externalProductSaving,
+  externalProductError,
 }) {
   const [activeTab, setActiveTab] = useState('content');
   const [showDiscardConfirm, setShowDiscardConfirm] = useState(false);
@@ -339,6 +343,19 @@ export default function EventEditorModal({
                     </label>
                   </div>
                 </Field>
+
+                <div className="col-span-2">
+                <Field label="Адрес начала тура">
+                  <TextInput
+                    value={event?.start_address || ''}
+                    onChange={(e) => setEvent((p) => ({ ...p, start_address: e.target.value }))}
+                    placeholder="Например: Москва, Театральная площадь, у памятника Карлу Марксу"
+                  />
+                  <p className="mt-1 text-xs text-gray-400">
+                    Показывается покупателю при бронировании и в письме-подтверждении. Координаты на вкладке «Карта» остаются отдельными.
+                  </p>
+                </Field>
+                </div>
               </div>
             )}
 
@@ -398,6 +415,17 @@ export default function EventEditorModal({
                     ),
                   }))
                 }
+              />
+            )}
+
+            {activeTab === 'meta' && event?.id && (
+              <ExternalProductField
+                eventId={event.id}
+                externalProduct={event?.external_product}
+                onPick={(row) => onPatchExternalProduct?.(row.id)}
+                onClear={() => onPatchExternalProduct?.(null)}
+                saving={externalProductSaving}
+                error={externalProductError}
               />
             )}
 
@@ -478,5 +506,3 @@ export default function EventEditorModal({
     </>
   );
 }
-
-

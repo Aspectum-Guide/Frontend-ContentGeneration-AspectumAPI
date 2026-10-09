@@ -151,6 +151,24 @@ export function useEventsCatalog() {
     await patchEventMedia({ image_id: imageId });
   }, [patchEventMedia]);
 
+  const [externalProductSaving, setExternalProductSaving] = useState(false);
+  const [externalProductError, setExternalProductError] = useState(null);
+
+  const patchExternalProduct = useCallback(async (externalProductId) => {
+    if (!editingEvent?.id) return;
+    try {
+      setExternalProductSaving(true);
+      setExternalProductError(null);
+      const r = await eventsCatalogAPI.setExternalProduct(editingEvent.id, externalProductId);
+      const d = r?.data || {};
+      setEditingEvent((prev) => mergeEventWithDetail(prev, { external_product: d.external_product ?? null }));
+    } catch (err) {
+      setExternalProductError(parseApiError(err, 'Ошибка привязки внешнего продукта'));
+    } finally {
+      setExternalProductSaving(false);
+    }
+  }, [editingEvent?.id]);
+
   const handleSave = useCallback(async (e) => {
     e?.preventDefault();
     if (!editingEvent) return;
@@ -257,6 +275,9 @@ export function useEventsCatalog() {
     setEventMedia,
     mediaSaving,
     mediaError,
+    patchExternalProduct,
+    externalProductSaving,
+    externalProductError,
 
     // delete
     deleteTarget,

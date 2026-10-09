@@ -482,6 +482,10 @@ export const eventsAPI = {
     apiClient.delete(`${BASE}/events/${eventId}/delete/`),
   setMedia: (eventId, data) =>
     apiClient.post(`${BASE}/events/${eventId}/media/`, data),
+  listExternalProducts: (params) =>
+    apiClient.get(`${BASE}/events/external-products/reference/`, { params }),
+  setExternalProduct: (eventId, externalProductId) =>
+    apiClient.post(`${BASE}/events/${eventId}/external-product/`, { external_product_id: externalProductId }),
   listInformation: (eventId) =>
     apiClient.get(`${BASE}/events/${eventId}/information/`),
   createInformation: (eventId, data) =>

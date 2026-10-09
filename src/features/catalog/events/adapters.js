@@ -9,6 +9,7 @@ export function createEmptyEvent() {
     city_id: '',
     is_show: true,
     is_bookable: false,
+    start_address: '',
     index: null,
     rank: null,
     image_url: null,
@@ -18,6 +19,7 @@ export function createEmptyEvent() {
     media: null,
     information: [],
     feed: [],
+    external_product: null,
   };
 }
 
@@ -32,6 +34,7 @@ export function fromApiEventRow(row) {
     city_id: row.city_id ? String(row.city_id) : '',
     is_show: row.is_show ?? true,
     is_bookable: row.is_bookable ?? false,
+    start_address: row.start_address || '',
     index: row.index ?? null,
     rank: row.rank ?? null,
     audio_guide_count: row.audio_guide_count ?? 0,
@@ -40,6 +43,7 @@ export function fromApiEventRow(row) {
     lat: row.lat ?? null,
     lon: row.lon ?? null,
     media: row.media || null,
+    external_product: row.external_product || null,
   };
 }
 
@@ -56,6 +60,7 @@ export function mergeEventWithDetail(row, detail) {
     related_events: d.related_events || base.related_events || [],
     is_show: d.is_show ?? base.is_show ?? true,
     is_bookable: d.is_bookable ?? base.is_bookable ?? false,
+    start_address: d.start_address ?? base.start_address ?? '',
     index: d.index ?? base.index ?? null,
     rank: d.rank ?? base.rank ?? null,
     audio_guide_count: d.audio_guide_count ?? base.audio_guide_count ?? 0,
@@ -66,6 +71,7 @@ export function mergeEventWithDetail(row, detail) {
     media: d.media || base.media || null,
     information: d.information || base.information || [],
     feed: d.feed || base.feed || [],
+    external_product: d.external_product !== undefined ? d.external_product : (base.external_product || null),
   };
 }
 
@@ -75,6 +81,7 @@ export function toApiEventPayload(event) {
     description: event?.description || {},
     is_show: !!event?.is_show,
     is_bookable: !!event?.is_bookable,
+    start_address: event?.start_address || '',
     city_id: event?.city_id || null,
     tag_ids: (event?.tag_ids || []).filter(Boolean).map(String),
     related_event_ids: (event?.related_event_ids || []).filter(Boolean).map(String),
@@ -85,4 +92,3 @@ export function toApiEventPayload(event) {
   if (event?.lon != null) payload.lon = Number(event.lon);
   return payload;
 }
-

@@ -293,6 +293,9 @@ export default function EventsCatalogPage() {
         onPatchMedia={e.patchEventMedia}
         mediaSaving={e.mediaSaving}
         mediaError={e.mediaError}
+        onPatchExternalProduct={e.patchExternalProduct}
+        externalProductSaving={e.externalProductSaving}
+        externalProductError={e.externalProductError}
       />
 
       <ConfirmModal
