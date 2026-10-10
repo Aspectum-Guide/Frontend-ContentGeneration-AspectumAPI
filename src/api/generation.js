@@ -484,8 +484,15 @@ export const eventsAPI = {
     apiClient.post(`${BASE}/events/${eventId}/media/`, data),
   listExternalProducts: (params) =>
     apiClient.get(`${BASE}/events/external-products/reference/`, { params }),
-  setExternalProduct: (eventId, externalProductId) =>
-    apiClient.post(`${BASE}/events/${eventId}/external-product/`, { external_product_id: externalProductId }),
+  setExternalProduct: (eventId, externalProductId, options = {}) =>
+    apiClient.post(`${BASE}/events/${eventId}/external-product/`, {
+      external_product_id: externalProductId,
+      ...(typeof options.syncEventContent === 'boolean' ? { sync_event_content: options.syncEventContent } : {}),
+    }),
+  createEventFromExternalProduct: (productId) =>
+    apiClient.post(`${BASE}/events/external-products/${productId}/create-event/`, {}),
+  listEventCandidatesForExternalProduct: (productId, params) =>
+    apiClient.get(`${BASE}/events/external-products/${productId}/event-candidates/`, { params }),
   listInformation: (eventId) =>
     apiClient.get(`${BASE}/events/${eventId}/information/`),
   createInformation: (eventId, data) =>

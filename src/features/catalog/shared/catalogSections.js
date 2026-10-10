@@ -26,6 +26,7 @@ export const BOOKING_REFERENCE_ITEMS = [
 
 export const BOOKING_OPS_ITEMS = [
   { to: '/catalog/booking-setup', title: 'Настройка продаж', description: 'Мастер: типы, слоты, цены, готовность к shop', icon: '🧭' },
+  { to: '/catalog/external-products/linking', title: 'Привязка внешних продуктов', description: 'Слить продукты поставщика с событиями или создать события', icon: '🔗' },
   { to: '/catalog/external-products', title: 'Внешние продукты', description: 'Каталог поставщика и проверка live availability', icon: '🌐' },
   { to: '/catalog/analytics', title: 'Аналитика', description: 'Выручка и резервации по типам и ивентам', icon: '📊' },
   { to: '/catalog/reservations', title: 'Резервации', description: 'Подтверждённые бронирования', icon: '🧾' },

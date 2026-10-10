@@ -154,12 +154,12 @@ export function useEventsCatalog() {
   const [externalProductSaving, setExternalProductSaving] = useState(false);
   const [externalProductError, setExternalProductError] = useState(null);
 
-  const patchExternalProduct = useCallback(async (externalProductId) => {
+  const patchExternalProduct = useCallback(async (externalProductId, options) => {
     if (!editingEvent?.id) return;
     try {
       setExternalProductSaving(true);
       setExternalProductError(null);
-      const r = await eventsCatalogAPI.setExternalProduct(editingEvent.id, externalProductId);
+      const r = await eventsCatalogAPI.setExternalProduct(editingEvent.id, externalProductId, options);
       const d = r?.data || {};
       setEditingEvent((prev) => mergeEventWithDetail(prev, { external_product: d.external_product ?? null }));
     } catch (err) {

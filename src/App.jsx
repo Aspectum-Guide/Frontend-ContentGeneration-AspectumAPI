@@ -32,6 +32,7 @@ import BasePricesCatalog from './pages/catalog/BasePricesCatalog';
 import PricingRulesCatalog from './pages/catalog/PricingRulesCatalog';
 import BookingAnalytics from './pages/catalog/BookingAnalytics';
 import ExternalProductsCatalog from './pages/catalog/ExternalProductsCatalog';
+import ExternalProductsLinking from './pages/catalog/ExternalProductsLinking';
 import ProductAnalytics from './pages/catalog/ProductAnalytics';
 import AudioGuidesCatalog from './pages/catalog/AudioGuidesCatalog';
 import InteractiveLocationsCatalog from './pages/catalog/InteractiveLocationsCatalog';
@@ -134,6 +135,10 @@ const routes = [
   {
     path: '/catalog/external-products',
     element: <ProtectedRoute><ErrorBoundary><ExternalProductsCatalog /></ErrorBoundary></ProtectedRoute>,
+  },
+  {
+    path: '/catalog/external-products/linking',
+    element: <ProtectedRoute><ErrorBoundary><ExternalProductsLinking /></ErrorBoundary></ProtectedRoute>,
   },
   {
     path: '/catalog/llm/keys',

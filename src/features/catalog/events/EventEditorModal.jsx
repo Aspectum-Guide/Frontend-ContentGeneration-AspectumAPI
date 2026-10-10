@@ -424,6 +424,7 @@ export default function EventEditorModal({
                 externalProduct={event?.external_product}
                 onPick={(row) => onPatchExternalProduct?.(row.id)}
                 onClear={() => onPatchExternalProduct?.(null)}
+                onSetOwnership={(productId, syncEventContent) => onPatchExternalProduct?.(productId, { syncEventContent })}
                 saving={externalProductSaving}
                 error={externalProductError}
               />
