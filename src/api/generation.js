@@ -83,6 +83,11 @@ export const attractionsAPI = {
 };
 
 export const attractionCommerceAPI = {
+  // Тур поставщика (ExternalProduct) для события этого места; null — отвязать.
+  setExternalProduct: (sessionId, attractionId, externalProductId) =>
+    apiClient.post(`${BASE}/sessions/${sessionId}/attractions/${attractionId}/external-product/`, {
+      external_product_id: externalProductId,
+    }),
   listItinerary: (sessionId, attractionId) => apiClient.get(`${BASE}/sessions/${sessionId}/attractions/${attractionId}/itinerary/`),
   addItinerary: (sessionId, attractionId, data) => apiClient.post(`${BASE}/sessions/${sessionId}/attractions/${attractionId}/itinerary/`, data),
   updateItinerary: (sessionId, attractionId, stepId, data) =>
@@ -489,8 +494,10 @@ export const eventsAPI = {
       external_product_id: externalProductId,
       ...(typeof options.syncEventContent === 'boolean' ? { sync_event_content: options.syncEventContent } : {}),
     }),
-  createEventFromExternalProduct: (productId) =>
-    apiClient.post(`${BASE}/events/external-products/${productId}/create-event/`, {}),
+  createEventFromExternalProduct: (productId, options = {}) =>
+    apiClient.post(`${BASE}/events/external-products/${productId}/create-event/`, {
+      ...(options.cityId ? { city_id: options.cityId } : {}),
+    }),
   listEventCandidatesForExternalProduct: (productId, params) =>
     apiClient.get(`${BASE}/events/external-products/${productId}/event-candidates/`, { params }),
   listInformation: (eventId) =>

@@ -8,6 +8,7 @@ import { usePasteImageOnHover } from '../../../hooks/usePasteImageOnHover';
 import SessionWizardAttractionTagsPicker from './SessionWizardAttractionTagsPicker.jsx';
 import SessionWizardAttractionRelatedEventsPicker from './SessionWizardAttractionRelatedEventsPicker.jsx';
 import SessionAttractionCommercePanel from './SessionAttractionCommercePanel.jsx';
+import SessionAttractionTourPanel from './SessionAttractionTourPanel.jsx';
 import UsefulInfoTextImportBox from './UsefulInfoTextImportBox.jsx';
 import { TTSProviderSettingsPanel } from './SessionWizardAttractionAudioGuidesBlock.jsx';
 import { createCoordinatePasteHandler } from '../../../utils/coordinates';
@@ -1357,6 +1358,13 @@ export default function SessionWizardAttractionsStep({
                     attractions={attractions}
                     onAdd={onAddCurrentAttractionRelatedEvent}
                     onRemove={onRemoveCurrentAttractionRelatedEvent}
+                  />
+                  <SessionAttractionTourPanel
+                    sessionId={sessionId}
+                    attractionId={currentAttr?.id}
+                    attractionName={currentAttr?.name}
+                    externalProduct={currentAttr?.external_product}
+                    publishedEventId={currentAttr?.published_event_id}
                   />
                   <SessionAttractionCommercePanel sessionId={sessionId} attractionId={currentAttr?.id} />
 

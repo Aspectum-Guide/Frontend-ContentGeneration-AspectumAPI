@@ -36,6 +36,7 @@ function ProductRow({ row, saving, onPick, onDone }) {
             </span>
           )}
         </span>
+        {row.location_text && <span className="truncate text-xs text-gray-400">{row.location_text}</span>}
         {blocked && (
           <span className="text-xs text-gray-400">
             Уже привязан к другому событию: {getMultiLangValue(row.already_linked_event_title) || row.already_linked_event_id}
@@ -48,7 +49,6 @@ function ProductRow({ row, saving, onPick, onDone }) {
         )}
       </span>
       <span className="flex shrink-0 items-center gap-1 text-xs text-gray-400">
-        {row.city_display_name}
         {row.status && <span className="rounded bg-gray-100 px-1.5 py-0.5">{row.status}</span>}
       </span>
     </button>
@@ -181,17 +181,17 @@ export default function ExternalProductField({
           <TextInput
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Поиск продукта поставщика по названию..."
+            placeholder="Поиск продукта поставщика по названию или адресу..."
             disabled={saving}
           />
           <p className="mt-1 text-xs text-gray-400">
-            {search.trim() ? 'Результаты поиска' : 'Подсказки: продукты этого города, похожие по названию — сверху'}
+            {search.trim() ? 'Результаты поиска' : 'Подсказки: продукты, похожие по названию и месту, — сверху'}
           </p>
           <div className="mt-1 max-h-56 overflow-y-auto border border-gray-200 rounded-lg bg-white">
             {loading && <p className="p-2 text-xs text-gray-400">Поиск...</p>}
             {!loading && results.length === 0 && (
               <p className="p-2 text-xs text-gray-400">
-                {search.trim() ? 'Ничего не найдено' : 'Подходящих продуктов нет — у события должен быть указан город'}
+                {search.trim() ? 'Ничего не найдено' : 'Подходящих продуктов нет — попробуйте найти по названию или адресу'}
               </p>
             )}
             {!loading &&

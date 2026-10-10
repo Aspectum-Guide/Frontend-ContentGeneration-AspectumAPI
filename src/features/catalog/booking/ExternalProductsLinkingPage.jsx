@@ -76,8 +76,8 @@ function MergePanel({ product, onMerged, onError }) {
   return (
     <div className="mt-3 rounded-lg border border-blue-100 bg-blue-50/40 p-3">
       <p className="text-xs text-gray-600 mb-2">
-        Выберите ваше существующее событие — оно получит бронирование от поставщика. Сверху события из города продукта,
-        похожие по названию. Не нашли? Введите название.
+        Выберите ваше существующее событие — оно получит бронирование от поставщика. Сверху события, похожие по названию и
+        месту (адрес поставщика). Не нашли? Введите название.
       </p>
       <input
         value={search}
@@ -116,7 +116,38 @@ function MergePanel({ product, onMerged, onError }) {
   );
 }
 
-function ProductCard({ product, mergeOpen, onToggleMerge, onCreate, creating, onMerged, onError }) {
+function CreatePanel({ product, cities, creating, onCreate, onCancel }) {
+  const [cityId, setCityId] = useState(product.suggested_city_id || '');
+  return (
+    <div className="mt-3 rounded-lg border border-gray-200 bg-gray-50 p-3">
+      <p className="mb-2 text-xs text-gray-600">
+        Поставщик — не город: выберите город Aspectum, где находится это место
+        {product.location_text ? <> (адрес поставщика: <b>{product.location_text}</b>)</> : null}.
+        {product.suggested_city_id ? ' Город подобран по адресу — проверьте.' : ' По адресу город определить не удалось.'}
+        {' '}Без города событие будет скрыто.
+      </p>
+      <div className="flex flex-wrap items-center gap-2">
+        <select value={cityId} onChange={(e) => setCityId(e.target.value)} className={`${inputClass} sm:max-w-xs`}>
+          <option value="">— город не выбран —</option>
+          {cities.map((city) => (
+            <option key={city.id} value={city.id}>{label(city.name, city.id)}</option>
+          ))}
+        </select>
+        <button
+          type="button"
+          disabled={creating}
+          onClick={() => onCreate(product, cityId)}
+          className="rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-blue-700 disabled:opacity-50"
+        >
+          {creating ? 'Создаём…' : 'Создать событие'}
+        </button>
+        <button type="button" onClick={onCancel} className="text-xs text-gray-500 hover:text-gray-700">Отмена</button>
+      </div>
+    </div>
+  );
+}
+
+function ProductCard({ product, cities, mergeOpen, onToggleMerge, createOpen, onToggleCreate, onCreate, creating, onMerged, onError }) {
   const linked = Boolean(product.linked_event_id);
   const supplierOwned = linked && product.sync_event_content;
   return (
@@ -125,7 +156,7 @@ function ProductCard({ product, mergeOpen, onToggleMerge, onCreate, creating, on
         <div className="min-w-0">
           <h3 className="text-sm font-semibold text-gray-900 truncate">{label(product.title, product.external_id)}</h3>
           <p className="mt-1 flex flex-wrap items-center gap-1.5 text-xs text-gray-500">
-            <span>{product.city_display_name || 'город не указан'}</span>
+            <span>{product.location_text || product.city_display_name || 'место не указано'}</span>
             <span>·</span>
             <span>{product.connection_name}</span>
             <Badge tone={product.is_enabled ? 'green' : 'amber'}>
@@ -146,11 +177,10 @@ function ProductCard({ product, mergeOpen, onToggleMerge, onCreate, creating, on
           {!linked && (
             <button
               type="button"
-              disabled={creating}
-              onClick={() => onCreate(product)}
-              className="rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+              onClick={onToggleCreate}
+              className="rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50"
             >
-              {creating ? 'Создаём…' : 'Создать событие'}
+              {createOpen ? 'Закрыть' : 'Создать событие…'}
             </button>
           )}
           {(!linked || supplierOwned) && (
@@ -169,6 +199,9 @@ function ProductCard({ product, mergeOpen, onToggleMerge, onCreate, creating, on
         <p className="mt-2 text-xs text-gray-400">
           Чтобы отвязать или вернуть текст поставщику, откройте это событие в каталоге событий → вкладка «Мета» → «Бронирование у поставщика».
         </p>
+      )}
+      {createOpen && !linked && (
+        <CreatePanel product={product} cities={cities} creating={creating} onCreate={onCreate} onCancel={onToggleCreate} />
       )}
       {mergeOpen && (
         <MergePanel
@@ -193,6 +226,7 @@ export default function ExternalProductsLinkingPage() {
   const [notice, setNotice] = useState(null);
   const [mergeOpenId, setMergeOpenId] = useState('');
   const [creatingId, setCreatingId] = useState('');
+  const [createOpenId, setCreateOpenId] = useState('');
   const [reloadKey, setReloadKey] = useState(0);
 
   const onError = useCallback((message) => setError(message), []);
@@ -228,16 +262,17 @@ export default function ExternalProductsLinkingPage() {
     };
   }, [tab, page, cityId, debouncedSearch, reloadKey]);
 
-  const createEvent = async (product) => {
+  const createEvent = async (product, newCityId) => {
     setCreatingId(product.id);
     setError(null);
     setNotice(null);
     try {
-      const r = await eventsAPI.createEventFromExternalProduct(product.id);
+      const r = await eventsAPI.createEventFromExternalProduct(product.id, { cityId: newCityId });
       const warnings = r?.data?.warnings || [];
       setNotice(
         `Событие создано из «${label(product.title)}». ${warnings.join(' ')} Дальше: откройте его в каталоге событий, добавьте фото, аудиогид и переводы, затем «Забрать текст себе».`,
       );
+      setCreateOpenId('');
       reload();
     } catch (err) {
       setError(parseApiError(err, 'Не удалось создать событие'));
@@ -276,7 +311,7 @@ export default function ExternalProductsLinkingPage() {
                 Текст остаётся вашим, цены, билеты и доступность подключатся от поставщика.
               </li>
               <li>
-                <b>«Создать событие»</b> — если такого события нет. Создастся новое с текстом поставщика; потом
+                <b>«Создать событие…»</b> — если такого события нет. Выберите город (он подставляется по адресу поставщика) — создастся новое событие с текстом поставщика; потом
                 доработайте его в каталоге событий.
               </li>
             </ul>
@@ -331,10 +366,10 @@ export default function ExternalProductsLinkingPage() {
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           className={inputClass}
-          placeholder="Поиск по названию, ID поставщика…"
+          placeholder="Поиск по названию, адресу, ID поставщика…"
         />
         <select value={cityId} onChange={(e) => setCityId(e.target.value)} className={inputClass}>
-          <option value="">Все города</option>
+          <option value="">Все города (назначенные в Aspectum)</option>
           {cities.map((city) => (
             <option key={city.id} value={city.id}>{label(city.name, city.id)}</option>
           ))}
@@ -352,6 +387,9 @@ export default function ExternalProductsLinkingPage() {
           <ProductCard
             key={product.id}
             product={product}
+            cities={cities}
+            createOpen={createOpenId === product.id}
+            onToggleCreate={() => setCreateOpenId((current) => (current === product.id ? '' : product.id))}
             mergeOpen={mergeOpenId === product.id}
             onToggleMerge={() => setMergeOpenId((current) => (current === product.id ? '' : product.id))}
             onCreate={createEvent}
