@@ -74,6 +74,10 @@ export default function UserSubscriptionsWorkbenchPage() {
   const [grantForm, setGrantForm] = useState(createEmptyGrant());
   const [grantSaving, setGrantSaving] = useState(false);
   const [grantError, setGrantError] = useState(null);
+  const [aiGrantOpen, setAiGrantOpen] = useState(false);
+  const [aiGrantForm, setAiGrantForm] = useState({ amount: '', reason: '', request_id: '' });
+  const [aiGrantSaving, setAiGrantSaving] = useState(false);
+  const [aiGrantError, setAiGrantError] = useState(null);
 
   const [editSubscription, setEditSubscription] = useState(null);
   const [editSaving, setEditSaving] = useState(false);
@@ -216,6 +220,31 @@ export default function UserSubscriptionsWorkbenchPage() {
       setUserLoading(false);
     }
   }, [loadUserDetail]);
+
+  const openAiGrant = () => {
+    setAiGrantError(null);
+    setAiGrantForm({ amount: '', reason: '', request_id: crypto.randomUUID() });
+    setAiGrantOpen(true);
+  };
+
+  const handleAiGrantSave = async (event) => {
+    event.preventDefault();
+    if (!selectedUser?.id || aiGrantSaving) return;
+    try {
+      setAiGrantSaving(true);
+      setAiGrantError(null);
+      await subscriptionUsersAdminAPI.grantAiPrompts(selectedUser.id, {
+        ...aiGrantForm,
+        amount: Number(aiGrantForm.amount),
+      });
+      await refreshSelectedUser();
+      setAiGrantOpen(false);
+    } catch (error) {
+      setAiGrantError(parseApiError(error, 'Не удалось начислить запросы ИИ'));
+    } finally {
+      setAiGrantSaving(false);
+    }
+  };
 
   const handleGrantSave = async (e) => {
     e?.preventDefault();
@@ -491,7 +520,7 @@ export default function UserSubscriptionsWorkbenchPage() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
         <CatalogPageHeader
           title="Подписки пользователей"
-          description="Список пользователей, выдача доступа к городам, отключение подписок и правка IAP premium."
+          description="Пользователи, доступ к городам, квоты ИИ и IAP premium."
           createLabel="Выдать город"
           onCreate={() => {
             if (!selectedUser) {
@@ -516,7 +545,7 @@ export default function UserSubscriptionsWorkbenchPage() {
             isFiltered={!!emailSearch.trim()}
             search={emailSearch}
             onSearch={setEmailSearch}
-            searchPlaceholder="Фильтр по email, имени…"
+            searchPlaceholder="Поиск по email, логину или имени…"
             page={usersPage}
             totalCount={usersTotal}
             pageSize={USERS_PAGE_SIZE}
@@ -562,10 +591,20 @@ export default function UserSubscriptionsWorkbenchPage() {
                     }`}>
                       Premium: {selectedUser.has_premium ? 'да' : 'нет'}
                     </span>
+                    <span className="text-xs px-2 py-1 rounded-full bg-violet-100 text-violet-700">
+                      Запросов ИИ: {selectedUser.ai_prompts_balance ?? 0}
+                    </span>
                   </div>
                 </div>
 
                 <div className="flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    className="px-3 py-2 rounded-xl bg-violet-600 text-white text-sm"
+                    onClick={openAiGrant}
+                  >
+                    Начислить запросы ИИ
+                  </button>
                   <button
                     type="button"
                     className="px-3 py-2 rounded-xl bg-violet-600 text-white text-sm"
@@ -613,6 +652,31 @@ export default function UserSubscriptionsWorkbenchPage() {
               </div>
             </div>
 
+            <div className="bg-white border border-gray-200 rounded-2xl p-4 sm:p-5 space-y-3">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <h3 className="text-base font-semibold text-gray-900">Квота ИИ</h3>
+                <span className="text-sm text-gray-600">Осталось: {selectedUser.ai_prompts_balance ?? 0}</span>
+              </div>
+              <p className="text-xs text-gray-500">Один запрос — одно сообщение ассистенту или построение маршрута. Начисление увеличивает остаток, не меняя настройки типов подписки.</p>
+              {(selectedUser.ai_prompt_grants || []).length ? (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm text-left">
+                    <thead><tr className="text-gray-500 border-b"><th className="py-2">Когда</th><th>Запросов</th><th>Причина / источник</th><th>Кто выдал</th></tr></thead>
+                    <tbody>
+                      {selectedUser.ai_prompt_grants.map((grant) => (
+                        <tr key={grant.id} className="border-b border-gray-100">
+                          <td className="py-2 whitespace-nowrap">{formatDate(grant.created_at)}</td>
+                          <td>+{grant.amount}</td>
+                          <td className="max-w-sm break-words">{grant.reason || grant.source_key}</td>
+                          <td>{grant.granted_by || '—'}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              ) : <p className="text-sm text-gray-500">Начислений пока нет.</p>}
+            </div>
+
             <div className="space-y-3">
               <h3 className="text-base font-semibold text-gray-900">Доступ к городам</h3>
               <DataTable
@@ -635,6 +699,30 @@ export default function UserSubscriptionsWorkbenchPage() {
             </div>
           </>
         ) : null}
+
+        <Modal
+          open={aiGrantOpen}
+          title="Начислить запросы ИИ"
+          onClose={() => { if (!aiGrantSaving) setAiGrantOpen(false); }}
+        >
+          <form onSubmit={handleAiGrantSave} className="space-y-4">
+            {aiGrantError ? <FormErrorAlert message={aiGrantError} /> : null}
+            <p className="text-sm text-gray-600">Пользователь: {selectedUser?.email}. Текущий остаток: {selectedUser?.ai_prompts_balance ?? 0}</p>
+            <Field label="Количество запросов" required>
+              <TextInput type="number" min={1} max={1000000} step={1} required
+                value={aiGrantForm.amount}
+                onChange={(e) => setAiGrantForm((prev) => ({ ...prev, amount: e.target.value }))} />
+            </Field>
+            <Field label="Причина начисления" required>
+              <TextInput required minLength={3} maxLength={500}
+                value={aiGrantForm.reason}
+                onChange={(e) => setAiGrantForm((prev) => ({ ...prev, reason: e.target.value }))}
+                placeholder="Например: тестовый доступ для поддержки" />
+            </Field>
+            <FormActions onCancel={() => setAiGrantOpen(false)}
+              saveLabel="Начислить" saving={aiGrantSaving} />
+          </form>
+        </Modal>
 
         <Modal
           open={grantOpen}

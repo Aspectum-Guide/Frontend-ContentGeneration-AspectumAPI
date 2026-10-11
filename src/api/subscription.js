@@ -28,6 +28,8 @@ export const citySubscriptionsAPI = {
 export const subscriptionUsersAdminAPI = {
   list: (params) => apiClient.get('/subscription/admin/users/', { params }),
   get: (id) => apiClient.get(`/subscription/admin/users/${id}/`),
+  grantAiPrompts: (id, data) =>
+    apiClient.post(`/subscription/admin/users/${id}/grant-ai-prompts/`, data),
   grantSubscriptionType: (id, data) =>
     apiClient.post(`/subscription/admin/users/${id}/grant-subscription-type/`, data),
   grantAllCities: (id, data) =>
