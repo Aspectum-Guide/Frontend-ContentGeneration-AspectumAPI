@@ -1,7 +1,10 @@
 export function createEmptyEvent() {
   return {
     id: null,
-    title: {},
+    // Language tabs are built from the keys of title/description, so a new event
+    // must start with one language key (like createEmptyCity) or the editor shows
+    // "no translations" and there is nowhere to type the required title.
+    title: { ru: '' },
     description: {},
     tag_ids: [],
     related_event_ids: [],

@@ -112,7 +112,7 @@ export function useEventsCatalog() {
   const openCreate = useCallback(() => {
     setSaveError(null);
     setEditLoading(false);
-    setActiveLang('');
+    setActiveLang('ru');
     setEditingEvent(createEmptyEvent());
   }, []);
 
