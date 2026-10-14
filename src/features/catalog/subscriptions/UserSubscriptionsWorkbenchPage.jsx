@@ -18,30 +18,7 @@ import FormErrorAlert from '../shared/components/FormErrorAlert';
 import StatusBadge from '../shared/components/StatusBadge';
 import TableRowActions from '../shared/components/TableRowActions';
 import RawJsonModal from '../shared/components/RawJsonModal';
-
-function formatDate(value) {
-  if (!value) return '—';
-  const d = new Date(value);
-  if (Number.isNaN(d.getTime())) return String(value);
-  return d.toLocaleString();
-}
-
-function getLocalizedName(value) {
-  if (!value) return '';
-  if (typeof value === 'string') return value;
-  if (typeof value === 'object') {
-    return value.ru || value.en || value.it || Object.values(value).find(Boolean) || '';
-  }
-  return String(value);
-}
-
-function getCityLabel(city) {
-  if (!city) return '—';
-  if (typeof city === 'object') {
-    return getLocalizedName(city.city_name || city.name) || String(city.id || '—');
-  }
-  return String(city);
-}
+import { formatDateTime, getCityLabel } from './subscriptionLabels';
 
 function createEmptyGrant() {
   return {
@@ -396,7 +373,7 @@ export default function UserSubscriptionsWorkbenchPage() {
     {
       key: 'created_at',
       label: 'Создан',
-      render: (v) => <span className="text-xs text-gray-500">{formatDate(v)}</span>,
+      render: (v) => <span className="text-xs text-gray-500">{formatDateTime(v)}</span>,
     },
   ];
 
@@ -428,7 +405,7 @@ export default function UserSubscriptionsWorkbenchPage() {
     {
       key: 'created_at',
       label: 'Создана',
-      render: (v) => <span className="text-sm text-gray-600">{formatDate(v)}</span>,
+      render: (v) => <span className="text-sm text-gray-600">{formatDateTime(v)}</span>,
     },
     {
       key: 'actions',
@@ -497,7 +474,7 @@ export default function UserSubscriptionsWorkbenchPage() {
     {
       key: 'purchased_at',
       label: 'Куплено',
-      render: (v) => <span className="text-sm text-gray-600">{formatDate(v)}</span>,
+      render: (v) => <span className="text-sm text-gray-600">{formatDateTime(v)}</span>,
     },
     {
       key: 'raw_response',

@@ -1,6 +1,8 @@
 import { normalizeCurrency } from '../shared/currencies';
 import { getTicketTypeLabel } from '../shared/labels';
 
+export { formatSlot as formatSlotLabel } from '../shared/scheduleParsers';
+
 /** Слот доступен для бронирования (как в shop-events на бэкенде). */
 export function isSlotBookable(slot) {
   if (!slot?.is_active) return false;
@@ -150,21 +152,6 @@ export function buildReadinessItems({
       linkLabel: 'Открыть ивенты',
     },
   ].map((item) => ({ ...item, loading }));
-}
-
-export function formatSlotLabel(iso) {
-  if (!iso) return '—';
-  try {
-    return new Date(iso).toLocaleString('ru-RU', {
-      day: '2-digit',
-      month: '2-digit',
-      year: '2-digit',
-      hour: '2-digit',
-      minute: '2-digit',
-    });
-  } catch {
-    return String(iso);
-  }
 }
 
 export function collectDirtyPriceEntries(eventTicketTypes, priceByType, priceCurrency, dirtyIds) {

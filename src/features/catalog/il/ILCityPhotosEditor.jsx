@@ -3,10 +3,8 @@ import { Field, TextInput } from '../../../components/ui/FormField';
 import { ConfirmModal } from '../../../components/ui/Modal';
 import { imagesAPI } from '../../../api/generation';
 import { parseApiError } from '../../../utils/apiError';
-import { createCoordinatePasteHandler } from '../../../utils/coordinates';
+import { createCoordinatePasteHandler, parseCoord } from '../../../utils/coordinates';
 import { ilPhotosAPI } from './api';
-
-const parseCoord = (v) => { const n = Number(v); return Number.isFinite(n) ? n : null; };
 
 export default function ILCityPhotosEditor({ cityId, disabled = false }) {
   const [items, setItems] = useState([]);

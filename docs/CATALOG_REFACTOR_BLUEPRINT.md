@@ -100,7 +100,7 @@ Replace monolithic `src/api/generation.js` usage in catalogs with domain wrapper
 - [x] `pages/catalog/*.jsx` are now thin re-export wrappers only (2-15 LOC each) pointing at `features/catalog/*`
 - [x] Catalog pages no longer import `src/api/generation.js` directly — added `api.js` wrappers for `tags`, `audioguides`, `photos`, `il` (matching the existing `cities/api.js`/`events/api.js` pattern); only the domain `api.js` files and the shared `bookingOptions.js` helper still import from `generation.js`, which is the intended one level of indirection
 - [x] `alert`/`window.confirm` removed from catalog pages — last two holdouts (`EventEditorModal.jsx`'s unsaved-changes-on-close prompt, `PhotosCatalogPage.jsx`'s delete confirmation) now use the shared `ConfirmModal`
-- [ ] Duplicate helpers removed (still open — no further audit done on cross-catalog code duplication beyond the above)
+- [x] Duplicate helpers removed (2026-10-13): dates/slots in `shared/scheduleParsers.js`, city/event labels in `shared/labels.js`, `parseCoord` in `utils/coordinates.js`, `AudioPlayer` / `MetricCard` / `Spinner` in `shared/components/`
 - [x] Catalog docs updated (this checklist, 2026-07-24)
 
 Remaining catalog `alert()`/`window.confirm()` usage lives outside this blueprint's original scope (in the session-generation wizard: `SessionSidebar.jsx`, `CommonsImagePicker.jsx`, `GenerationList.jsx`, `Step1City.tsx`) — not covered here.

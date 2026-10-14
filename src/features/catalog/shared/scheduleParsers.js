@@ -16,6 +16,28 @@ export function parseInputToIso(value) {
   return Number.isNaN(d.getTime()) ? '' : d.toISOString();
 }
 
+/** ISO → value for <input type="datetime-local"> (YYYY-MM-DDTHH:mm, local time). */
+export function formatIsoForInput(iso) {
+  if (!iso) return '';
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return '';
+  const pad = (n) => String(n).padStart(2, '0');
+  const yyyy = d.getFullYear();
+  const mm = pad(d.getMonth() + 1);
+  const dd = pad(d.getDate());
+  const hh = pad(d.getHours());
+  const mi = pad(d.getMinutes());
+  return `${yyyy}-${mm}-${dd}T${hh}:${mi}`;
+}
+
+/** Display datetime. Empty → em dash, unparseable → original string. */
+export function formatDateTime(value) {
+  if (!value) return '—';
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return String(value);
+  return d.toLocaleString();
+}
+
 /** Lines → ISO strings. Accepts ISO, "YYYY-MM-DD HH:mm", "YYYY-MM-DDTHH:mm". */
 export function parseDatetimesText(text) {
   const lines = String(text || '')
@@ -114,7 +136,10 @@ export function buildFromInterval({ startIso, endIso, stepMinutes }) {
 
 /** Format ISO datetime for compact slot display ("DD.MM.YY HH:mm" in ru-RU). */
 export function formatSlot(iso) {
-  return new Date(iso).toLocaleString('ru-RU', {
+  if (!iso) return '—';
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return String(iso);
+  return d.toLocaleString('ru-RU', {
     day: '2-digit',
     month: '2-digit',
     year: '2-digit',

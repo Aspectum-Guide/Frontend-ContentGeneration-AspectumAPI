@@ -9,14 +9,12 @@ import { Field, TextInput } from '../../../components/ui/FormField';
 import Modal, { ConfirmModal } from '../../../components/ui/Modal';
 import { useLayoutActions } from '../../../context/useLayoutActions';
 import { parseApiError } from '../../../utils/apiError';
-import { createCoordinatePasteHandler } from '../../../utils/coordinates';
+import { createCoordinatePasteHandler, parseCoord } from '../../../utils/coordinates';
 import { buildLangOptions, getMultiLangValue } from '../shared/i18n';
 import { LangBlock, LangTabs } from '../shared/LangFields';
 
 const PAGE_SIZE = 20;
 const ALL_LANGS = ['ru', 'en', 'it', 'fr', 'de', 'es'];
-
-const parseCoord = (v) => { const n = Number(v); return Number.isFinite(n) ? n : null; };
 
 function ILEditorModal({ open, onClose, location, onSaved, cityOptions, tagOptions = [] }) {
   const isNew = !location?.id;

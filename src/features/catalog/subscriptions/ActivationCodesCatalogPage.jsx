@@ -14,6 +14,7 @@ import FormErrorAlert from '../shared/components/FormErrorAlert';
 import FormHint from '../shared/components/FormHint';
 import StatusBadge from '../shared/components/StatusBadge';
 import TableRowActions from '../shared/components/TableRowActions';
+import { formatIsoForInput, parseInputToIso } from '../shared/scheduleParsers';
 
 const PAGE_SIZE = 20;
 
@@ -28,26 +29,6 @@ function createEmptyCode() {
     max_uses: '',
     is_active: true,
   };
-}
-
-function formatIsoForInput(iso) {
-  if (!iso) return '';
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return '';
-  const pad = (n) => String(n).padStart(2, '0');
-  const yyyy = d.getFullYear();
-  const mm = pad(d.getMonth() + 1);
-  const dd = pad(d.getDate());
-  const hh = pad(d.getHours());
-  const mi = pad(d.getMinutes());
-  return `${yyyy}-${mm}-${dd}T${hh}:${mi}`;
-}
-
-function parseInputToIso(value) {
-  if (!value) return null;
-  const d = new Date(value);
-  if (Number.isNaN(d.getTime())) return null;
-  return d.toISOString();
 }
 
 function createEmptyBulkGenerate() {
@@ -112,7 +93,7 @@ export default function ActivationCodesCatalogPage() {
       subscription_type: editingItem.subscription_type || null,
       product_name: editingItem.product_name || '',
       description: editingItem.description || '',
-      expiry_date: parseInputToIso(editingItem.expiry_date),
+      expiry_date: parseInputToIso(editingItem.expiry_date) || null,
       max_uses: editingItem.max_uses === '' ? null : Number(editingItem.max_uses),
       is_active: !!editingItem.is_active,
     };

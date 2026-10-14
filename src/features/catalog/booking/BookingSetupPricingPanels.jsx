@@ -1,12 +1,9 @@
 import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { TextInput } from '../../../components/ui/FormField';
+import Spinner from '../shared/components/Spinner';
 import { getTicketTypeLabel } from '../shared/labels';
 import { formatSlotLabel, priceStatusClass } from './bookingSetupPricingHelpers';
-
-function Spinner() {
-  return <span className="inline-block w-4 h-4 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />;
-}
 
 export function ReadinessChecklist({ items, readyCount, totalCount, onAction }) {
   return (

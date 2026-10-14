@@ -26,6 +26,8 @@ import { getEventLabel, getTicketTypeLabel } from '../shared/labels';
 import {
   buildFromInterval as buildSlotDatetimesFromInterval,
   buildSlotDatetimesFromSchedule,
+  formatIsoForInput,
+  parseInputToIso,
   parseSlotDatetimesText,
   parseTimesText,
 } from '../shared/scheduleParsers';
@@ -74,26 +76,6 @@ function createEmptyAvailability() {
     is_active: true,
     languages: [],
   };
-}
-
-function formatIsoForInput(iso) {
-  if (!iso) return '';
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return '';
-  const pad = (n) => String(n).padStart(2, '0');
-  const yyyy = d.getFullYear();
-  const mm = pad(d.getMonth() + 1);
-  const dd = pad(d.getDate());
-  const hh = pad(d.getHours());
-  const mi = pad(d.getMinutes());
-  return `${yyyy}-${mm}-${dd}T${hh}:${mi}`;
-}
-
-function parseInputToIso(value) {
-  if (!value) return '';
-  const d = new Date(value);
-  if (Number.isNaN(d.getTime())) return '';
-  return d.toISOString();
 }
 
 function createEmptyBulk() {

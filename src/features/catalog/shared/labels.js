@@ -47,9 +47,16 @@ export function filterTicketTypesForEvent(ticketTypes, eventId) {
   });
 }
 
+export function getCityLabel(city) {
+  if (!city) return '';
+  if (typeof city === 'string') return city;
+  return getMultiLangValue(city.name || city.city_name) || String(city.id || '');
+}
+
 export function getEventLabel(event) {
   if (!event) return '';
-  return getMultiLangValue(event.title) || String(event.id || '');
+  if (typeof event === 'string') return event;
+  return getMultiLangValue(event.title || event.name) || String(event.id || '');
 }
 
 export function getEventLabelById(events, id) {

@@ -16,15 +16,9 @@ import TicketTypeSelect from '../shared/components/TicketTypeSelect';
 import { formatMoney } from '../shared/currencies';
 import { getEventLabelById } from '../shared/labels';
 import { normalizeListResponse } from '../shared/normalize';
+import { formatDateTime } from '../shared/scheduleParsers';
 
 const PAGE_SIZE = 20;
-
-function formatDate(value) {
-  if (!value) return '—';
-  const d = new Date(value);
-  if (Number.isNaN(d.getTime())) return String(value);
-  return d.toLocaleString();
-}
 
 function stringifyJson(value) {
   try {
@@ -133,7 +127,7 @@ export default function BookingReservationsCatalogPage() {
     {
       key: 'created_at',
       label: 'Создан',
-      render: (v) => <span className="text-sm text-gray-700">{formatDate(v)}</span>,
+      render: (v) => <span className="text-sm text-gray-700">{formatDateTime(v)}</span>,
     },
     {
       key: 'status',
@@ -260,7 +254,7 @@ export default function BookingReservationsCatalogPage() {
           <div className="space-y-3">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               <Field label="Создан">
-                <div className="text-sm text-gray-700">{formatDate(detail.created_at)}</div>
+                <div className="text-sm text-gray-700">{formatDateTime(detail.created_at)}</div>
               </Field>
               <Field label="Статус">
                 <div className="text-sm text-gray-700">{detail.status || '—'}</div>

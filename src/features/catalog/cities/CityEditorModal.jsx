@@ -3,7 +3,7 @@ import { useEffect, useRef, useState } from 'react';
 import CommonsImagePicker from '../../../components/generation/CommonsImagePicker';
 import { Field, FormActions, TextInput } from '../../../components/ui/FormField';
 import Modal from '../../../components/ui/Modal';
-import { createCoordinatePasteHandler } from '../../../utils/coordinates';
+import { createCoordinatePasteHandler, parseCoord } from '../../../utils/coordinates';
 import { buildLangOptions, getMultiLangValue } from '../shared/i18n';
 import { LangBlock, LangTabs } from '../shared/LangFields';
 import InformationBlocksEditor from '../shared/InformationBlocksEditor';
@@ -89,11 +89,6 @@ export default function CityEditorModal({
   }, [open, city, langOptions, activeLang, setActiveLang]);
 
   useEffect(() => {
-    const parseCoord = (v) => {
-      const n = Number(v);
-      return Number.isFinite(n) ? n : null;
-    };
-
     const initMap = async () => {
       if (!open || !city || activeTab !== 'geo' || !cityMapElRef.current || cityMapRef.current) return;
       const { default: L } = await import('leaflet');

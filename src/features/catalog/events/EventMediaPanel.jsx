@@ -1,53 +1,13 @@
-import { useEffect, useRef, useState } from 'react';
+import { useRef, useState } from 'react';
 import CommonsImagePicker from '../../../components/generation/CommonsImagePicker';
-import { Field, TextInput } from '../../../components/ui/FormField';
+import { Field } from '../../../components/ui/FormField';
 import { ConfirmModal } from '../../../components/ui/Modal';
 import { audioAPI } from '../../../api/generation';
 import { parseApiError } from '../../../utils/apiError';
+import AudioPlayer from '../shared/components/AudioPlayer';
 import { getMultiLangValue } from '../shared/i18n';
 
 const LANG_OPTIONS = ['ru', 'en', 'it', 'de', 'fr', 'es'];
-
-function AudioPlayer({ audioId }) {
-  const [blobUrl, setBlobUrl] = useState(null);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState(null);
-  const blobRef = useRef(null);
-
-  const load = async () => {
-    if (blobUrl || loading) return;
-    setLoading(true);
-    setError(null);
-    try {
-      const r = await audioAPI.getBlobByAudioId(audioId);
-      const blob = new Blob([r.data], { type: 'audio/mpeg' });
-      const u = URL.createObjectURL(blob);
-      blobRef.current = u;
-      setBlobUrl(u);
-    } catch {
-      setError('Не удалось загрузить');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => () => { if (blobRef.current) URL.revokeObjectURL(blobRef.current); }, []);
-
-  if (error) return <span className="text-xs text-red-500">{error}</span>;
-  if (!blobUrl) {
-    return (
-      <button
-        type="button"
-        onClick={load}
-        disabled={loading}
-        className="px-3 py-1.5 text-xs font-medium text-blue-600 bg-blue-50 rounded-lg hover:bg-blue-100 disabled:opacity-50"
-      >
-        {loading ? '⏳' : '▶ Слушать'}
-      </button>
-    );
-  }
-  return <audio controls src={blobUrl} className="h-8 flex-1 min-w-0" />;
-}
 
 function ImageBlock({ label, url, onPick, onClear, disabled, hint }) {
   return (

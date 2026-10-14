@@ -3,7 +3,7 @@ import { useEffect, useRef, useState } from 'react';
 import EventMediaPanel from './EventMediaPanel';
 import { Field, FormActions, TextInput } from '../../../components/ui/FormField';
 import Modal, { ConfirmModal } from '../../../components/ui/Modal';
-import { createCoordinatePasteHandler } from '../../../utils/coordinates';
+import { createCoordinatePasteHandler, parseCoord } from '../../../utils/coordinates';
 import { buildLangOptions, getMultiLangValue } from '../shared/i18n';
 import { LangBlock, LangTabs } from '../shared/LangFields';
 import InformationBlocksEditor from '../shared/InformationBlocksEditor';
@@ -27,8 +27,6 @@ const eventFeedApi = {
   update: (id, feedId, data) => eventsCatalogAPI.updateFeedItem(id, feedId, data),
   remove: (id, feedId) => eventsCatalogAPI.deleteFeedItem(id, feedId),
 };
-
-const parseCoord = (v) => { const n = Number(v); return Number.isFinite(n) ? n : null; };
 
 export default function EventEditorModal({
   open,

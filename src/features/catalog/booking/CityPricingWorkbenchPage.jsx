@@ -8,16 +8,12 @@ import { parseApiError } from '../../../utils/apiError';
 import { loadReferenceEventsForCity } from '../shared/bookingOptions';
 import TicketTypeSelect from '../shared/components/TicketTypeSelect';
 import { CURRENCIES, DEFAULT_CURRENCY, normalizeCurrency } from '../shared/currencies';
-import { getMultiLangValue } from '../shared/i18n';
+import { getCityLabel } from '../shared/labels';
 import { normalizeListResponse } from '../shared/normalize';
 import { getPriceRowStatus, priceStatusClass } from './bookingSetupPricingHelpers';
 import { buildCityPriceRows, collectCityBulkEntries, groupSlotsByEvent } from './cityPricingHelpers';
 
 const RU_MODE_STORAGE_KEY = 'aspectum.cityPricing.ruMode';
-
-function getCityLabel(city) {
-  return getMultiLangValue(city?.name) || String(city?.id || '');
-}
 
 function loadRuMode() {
   try {

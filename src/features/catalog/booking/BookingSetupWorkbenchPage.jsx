@@ -17,10 +17,12 @@ import EventSelect from '../shared/components/EventSelect';
 import { DEFAULT_CURRENCY, normalizeCurrency } from '../shared/currencies';
 import { getTicketTypeLabel, filterTicketTypesForEvent, resolveTicketTypeEventId } from '../shared/labels';
 import { normalizeListResponse } from '../shared/normalize';
+import Spinner from '../shared/components/Spinner';
 import {
   buildFromInterval,
   buildFromList,
   buildFromSchedule,
+  formatIsoForInput,
   formatSlot as fmtSlot,
   parseInputToIso,
 } from '../shared/scheduleParsers';
@@ -58,10 +60,6 @@ function SectionCard({ title, badge, children, action }) {
       <div className="p-4">{children}</div>
     </div>
   );
-}
-
-function Spinner() {
-  return <span className="inline-block w-4 h-4 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />;
 }
 
 function Err({ msg }) {
@@ -128,17 +126,6 @@ function extractCityMeta(eventItem) {
 
 const SLOTS_PAGE = 20;
 
-/** Converts ISO datetime string to datetime-local input value (YYYY-MM-DDTHH:mm). */
-function toDatetimeLocalValue(iso) {
-  if (!iso) return '';
-  try {
-    const d = new Date(iso);
-    if (!Number.isFinite(d.getTime())) return '';
-    const pad = (n) => String(n).padStart(2, '0');
-    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
-  } catch { return ''; }
-}
-
 function SlotsManagerModal({ open, eventId, onClose, onChanged }) {
   const [page, setPage] = useState(1);
   const [total, setTotal] = useState(0);
@@ -201,7 +188,7 @@ function SlotsManagerModal({ open, eventId, onClose, onChanged }) {
     setEditForm({
       available_seats: slot.available_seats,
       booking_closes_minutes_before: slot.booking_closes_minutes_before,
-      slot_datetime: toDatetimeLocalValue(slot.slot_datetime),
+      slot_datetime: formatIsoForInput(slot.slot_datetime),
     });
     setRowError((p) => { const n = { ...p }; delete n[slot.id]; return n; });
   };
