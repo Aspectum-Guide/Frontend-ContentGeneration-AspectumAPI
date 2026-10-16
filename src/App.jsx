@@ -50,6 +50,7 @@ import UploadFile from './pages/generation/UploadFile';
 import Home from './pages/Home';
 import ImportGoogleSheet from './pages/import/ImportGoogleSheet';
 import MyTasks from './pages/tasks/MyTasks';
+import AudioQueue from './pages/tasks/AudioQueue';
 import MediaRecovery from './pages/tasks/MediaRecovery';
 import TokenAuth from './pages/TokenAuth';
 import AccountSettings from './pages/AccountSettings';
@@ -119,6 +120,10 @@ const routes = [
   {
     path: '/tasks',
     element: <ProtectedRoute><ErrorBoundary><MyTasks /></ErrorBoundary></ProtectedRoute>,
+  },
+  {
+    path: '/tasks/audio-queue',
+    element: <ProtectedRoute><ErrorBoundary><AudioQueue /></ErrorBoundary></ProtectedRoute>,
   },
   {
     path: '/tasks/media-recovery',

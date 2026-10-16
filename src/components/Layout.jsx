@@ -159,6 +159,7 @@ export default function Layout({ children, pageHeader = null, pageHeaderMode = '
       title: 'Задачи',
       items: [
         { label: 'Мои задачи', to: '/tasks' },
+        { label: 'Очередь озвучки', to: '/tasks/audio-queue' },
         { label: 'Восстановление аудио', to: '/tasks/media-recovery' },
       ],
     },
@@ -220,6 +221,7 @@ export default function Layout({ children, pageHeader = null, pageHeaderMode = '
     { startsWith: '/ai/playground', title: 'Тестовый стенд' },
     { startsWith: '/ai/images', title: 'Поиск картинок' },
     { startsWith: '/ai/cities', title: 'Генерация городов' },
+    { startsWith: '/tasks/audio-queue', title: 'Очередь озвучки' },
     { startsWith: '/tasks', title: 'Мои задачи' },
     { startsWith: '/account/settings', title: 'Настройки аккаунта' },
     { startsWith: '/catalog/cities', title: 'Справочник городов' },
