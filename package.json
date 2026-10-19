@@ -1,7 +1,11 @@
 {
   "name": "aspectum-admin-content-generation",
   "version": "1.0.0",
+  "private": true,
   "type": "module",
+  "workspaces": [
+    "packages/*"
+  ],
   "description": "Aspectum Admin - Content Generation Platform",
   "scripts": {
     "dev": "vite --host",
@@ -18,6 +22,7 @@
     "codegen:verify": "node scripts/openapi-verify.js"
   },
   "dependencies": {
+    "@aspectum/admin-ui-web": "*",
     "@hookform/resolvers": "^3.3.0",
     "@sentry/react": "^10.67.0",
     "@tanstack/react-query": "^5.101.0",

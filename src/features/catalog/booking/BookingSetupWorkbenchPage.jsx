@@ -9,7 +9,7 @@ import {
   ticketTypesAPI,
 } from '../../../api/booking';
 import Layout from '../../../components/Layout';
-import { FormLabel, Alert, Button, Checkbox, ConfirmModal, DataTableSurface, EmptyState, Field, IconButton, InlineState, Modal, PageContainer, PageHeader, Panel, SectionHeader, SegmentedControl, Select, Switch, Textarea, TextInput, formGridClassName, Glyph } from '@aspectum/ui';
+import { FormLabel, Alert, Button, Checkbox, ConfirmModal, DataTableSurface, EmptyState, Field, IconButton, InlineState, Modal, PageContainer, PageHeader, Panel, SectionHeader, SegmentedControl, Select, Switch, Textarea, TextInput, formGridClassName, Glyph } from '@aspectum/admin-ui-web';
 import { parseApiError } from '../../../utils/apiError';
 import { useEventOptions } from '../shared/bookingOptions';
 import EventSelect from '../shared/components/EventSelect';

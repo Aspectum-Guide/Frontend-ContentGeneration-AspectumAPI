@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import Layout from '../../../components/Layout';
-import { Select, PageHeader, DataTable, Panel } from '@aspectum/ui';
+import { Select, PageHeader, DataTable, Panel } from '@aspectum/admin-ui-web';
 import { parseApiError } from '../../../utils/apiError';
 import { llmAPI } from '../../../api/llm';
 

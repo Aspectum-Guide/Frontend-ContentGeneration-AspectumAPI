@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { eventAudioGuidesAPI, audioAPI, eventsAPI } from './api';
 import Layout from '../../../components/Layout';
-import { FormLabel, Alert, Button, ConfirmModal, EmptyState, Field, FileButton, FormGrid, InlineState, Modal, PageHeader, Panel, Select, SelectableCard, Switch, TextInput, Glyph } from '@aspectum/ui';
+import { FormLabel, Alert, Button, ConfirmModal, EmptyState, Field, FileButton, FormGrid, InlineState, Modal, PageHeader, Panel, Select, SelectableCard, Switch, TextInput, Glyph } from '@aspectum/admin-ui-web';
 import { parseApiError } from '../../../utils/apiError';
 import AudioPlayer from '../shared/components/AudioPlayer';
 import { getMultiLangValue } from '../shared/i18n';

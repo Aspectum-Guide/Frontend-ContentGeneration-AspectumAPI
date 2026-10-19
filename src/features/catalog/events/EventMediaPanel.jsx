@@ -1,6 +1,6 @@
 import { useRef, useState } from 'react';
 import CommonsImagePicker from '../../../components/generation/CommonsImagePicker';
-import { Alert, Button, ConfirmModal, EmptyState, Field, FileButton, IconButton, LoadingOverlay, MediaPreview, Panel, Select, Glyph } from '@aspectum/ui';
+import { Alert, Button, ConfirmModal, EmptyState, Field, FileButton, IconButton, LoadingOverlay, MediaPreview, Panel, Select, Glyph } from '@aspectum/admin-ui-web';
 import { audioAPI } from '../../../api/generation';
 import { parseApiError } from '../../../utils/apiError';
 import AudioPlayer from '../shared/components/AudioPlayer';

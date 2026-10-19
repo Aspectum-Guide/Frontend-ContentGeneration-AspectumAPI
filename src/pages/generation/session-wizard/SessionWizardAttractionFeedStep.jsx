@@ -1,5 +1,5 @@
 import { useMemo, useRef, useState } from 'react';
-import { FormLabel, Alert, Button, ConfirmModal, EmptyState, FileButton, IconButton, LoadingOverlay, LocaleEditor, Panel, SectionHeader, Select, SelectableCard, Spinner, TextInput, Textarea, Glyph } from '@aspectum/ui';
+import { FormLabel, Alert, Button, ConfirmModal, EmptyState, FileButton, IconButton, LoadingOverlay, LocaleEditor, Panel, SectionHeader, Select, SelectableCard, Spinner, TextInput, Textarea, Glyph } from '@aspectum/admin-ui-web';
 
 import { normalizeId } from './sessionWizardShared.jsx';
 import { usePasteImageOnHover } from '../../../hooks/usePasteImageOnHover';

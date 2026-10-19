@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { SidebarGroup, SidebarLink } from './ui';
+import { SidebarGroup, SidebarLink } from '@aspectum/admin-ui-web';
 import { SESSION_ITEM_ICON, findActiveGroupId, getNavGroups, isNavItemActive } from '../config/nav';
 
 const STORAGE_KEY = 'navOpenGroups';

@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { citiesAPI, eventsAPI } from '../../../api/generation';
 import Layout from '../../../components/Layout';
-import { Alert, Button, ConfirmModal, EmptyState, Heading, IconButton, InlineState, PageHeader, Panel, Select, StatusBadge, Tabs, TextInput } from '@aspectum/ui';
+import { Alert, Button, ConfirmModal, EmptyState, Heading, IconButton, InlineState, PageHeader, Panel, Select, StatusBadge, Tabs, TextInput } from '@aspectum/admin-ui-web';
 import { parseApiError } from '../../../utils/apiError';
 import { useCatalogFilters } from '../core/useCatalogFilters';
 import { getMultiLangValue } from '../shared/i18n';

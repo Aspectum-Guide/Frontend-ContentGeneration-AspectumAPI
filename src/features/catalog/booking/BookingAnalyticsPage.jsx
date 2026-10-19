@@ -6,7 +6,7 @@ import EventSelect from '../shared/components/EventSelect';
 import { DEFAULT_CURRENCY, normalizeCurrency } from '../shared/currencies';
 import { getMultiLangValue } from '../shared/i18n';
 import { parseApiError } from '../../../utils/apiError';
-import { Alert, DataTable, EmptyState, MetricCard, PageHeader, SectionHeader, Spinner } from '@aspectum/ui';
+import { Alert, DataTable, EmptyState, MetricCard, PageHeader, SectionHeader, Spinner } from '@aspectum/admin-ui-web';
 
 export default function BookingAnalyticsPage() {
   const [data, setData] = useState(null);

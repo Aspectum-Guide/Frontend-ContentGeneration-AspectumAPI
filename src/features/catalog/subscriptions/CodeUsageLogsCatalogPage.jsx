@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { codeUsageLogsAPI } from '../../../api/subscription';
 import Layout from '../../../components/Layout';
-import { Select, PageHeader, DataTable, StatusBadge } from '@aspectum/ui';
+import { Select, PageHeader, DataTable, StatusBadge } from '@aspectum/admin-ui-web';
 import { useLayoutActions } from '../../../context/useLayoutActions';
 import { parseApiError } from '../../../utils/apiError';
 import { formatDateTime } from './subscriptionLabels';

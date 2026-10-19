@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import Layout from '../../../components/Layout';
-import { FormLabel, Alert, Button, ConfirmModal, EmptyState, Field, Heading, Modal, PageHeader, Panel, Spinner, StatusBadge, Switch, TextInput } from '@aspectum/ui';
+import { FormLabel, Alert, Button, ConfirmModal, EmptyState, Field, Heading, Modal, PageHeader, Panel, Spinner, StatusBadge, Switch, TextInput } from '@aspectum/admin-ui-web';
 import { contentAuthorsAPI } from '../../../api/generation';
 import { getMultiLangValue } from '../shared/i18n';
 import MultiLangField from '../shared/components/MultiLangField';

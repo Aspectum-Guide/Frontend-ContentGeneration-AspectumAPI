@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import { audioQueueAPI } from '../../api/generation';
 import Layout from '../../components/Layout';
 import { parseApiError } from '../../utils/apiError';
-import { Glyph } from '@aspectum/ui';
+import { Glyph } from '@aspectum/admin-ui-web';
 
 // Очередь пакетной озвучки по всем сессиям: что идёт, что ждёт и почему.
 // Сервер держит очередь сам; страница только показывает её состояние.

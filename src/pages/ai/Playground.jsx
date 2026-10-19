@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import Layout from '../../components/Layout';
 import apiClient from '../../api/client';
-import { FormLabel, Alert, Button, Checkbox, PageHeader, Panel, TextInput } from '@aspectum/ui';
+import { FormLabel, Alert, Button, Checkbox, PageHeader, Panel, TextInput } from '@aspectum/admin-ui-web';
 
 export default function Playground() {
   const [message, setMessage] = useState('Привет');

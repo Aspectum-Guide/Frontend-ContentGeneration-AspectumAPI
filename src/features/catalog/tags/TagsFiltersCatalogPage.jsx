@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import Layout from '../../../components/Layout';
-import { Alert, Button, Checkbox, ConfirmModal, DataTable, Field, FormActions, InlineState, Modal, MultiField, PageHeader, Panel, Select, Tabs, TextInput, Toast, useToast } from '@aspectum/ui';
+import { Alert, Button, Checkbox, ConfirmModal, DataTable, Field, FormActions, InlineState, Modal, MultiField, PageHeader, Panel, Select, Tabs, TextInput, Toast, useToast } from '@aspectum/admin-ui-web';
 import { citiesAPI, cityFiltersAPI, eventFiltersAPI, workspacesAPI } from './api';
 import { workspaceTitle } from '../../../utils/workspace';
 import CityFilterEditorFields from './CityFilterEditorFields';

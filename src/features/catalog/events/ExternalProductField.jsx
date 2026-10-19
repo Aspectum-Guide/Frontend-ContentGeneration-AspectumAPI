@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Alert, Button, ConfirmModal, Field, Panel, SearchSelect, StatusBadge } from '@aspectum/ui';
+import { Alert, Button, ConfirmModal, Field, Panel, SearchSelect, StatusBadge } from '@aspectum/admin-ui-web';
 import { getMultiLangValue } from '../shared/i18n';
 import { useCatalogFilters } from '../core/useCatalogFilters';
 import { eventsCatalogAPI } from './api';

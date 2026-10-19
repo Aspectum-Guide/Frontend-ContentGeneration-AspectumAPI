@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import Layout from '../../components/Layout';
 import apiClient from '../../api/client';
-import { FormLabel, Alert, Button, Checkbox, EmptyState, Heading, PageHeader, Panel, SectionHeader, Select, Spinner, TextInput, Glyph } from '@aspectum/ui';
+import { FormLabel, Alert, Button, Checkbox, EmptyState, Heading, PageHeader, Panel, SectionHeader, Select, Spinner, TextInput, Glyph } from '@aspectum/admin-ui-web';
 
 export default function AISettings() {
   const [settings, setSettings] = useState(null);

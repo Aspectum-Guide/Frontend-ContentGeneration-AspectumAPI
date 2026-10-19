@@ -1,6 +1,7 @@
 @import "tailwindcss";
-@import "./components/ui/theme.css";
-@import "./components/ui/theme-cs.css";
+@import "@aspectum/admin-ui-web/theme.css";
+@import "@aspectum/admin-ui-web/theme-cs.css";
+@source "../packages/admin-ui-web/src";
 
 :root {
   font-family: Inter, system-ui, Avenir, Helvetica, Arial, sans-serif;

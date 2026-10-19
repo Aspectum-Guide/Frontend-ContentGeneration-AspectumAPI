@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
 import Layout from '../../components/Layout';
 import { importAPI } from '../../api/generation';
-import { Alert, Button, Field, FileButton, PageContainer, PageHeader, Panel, SectionHeader, Spinner, TextInput, Glyph } from '@aspectum/ui';
+import { Alert, Button, Field, FileButton, PageContainer, PageHeader, Panel, SectionHeader, Spinner, TextInput, Glyph } from '@aspectum/admin-ui-web';
 
 export default function ImportGoogleSheet() {
   const [sheetUrl, setSheetUrl] = useState('');

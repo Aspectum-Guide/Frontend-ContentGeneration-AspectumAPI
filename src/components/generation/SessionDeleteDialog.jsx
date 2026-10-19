@@ -1,4 +1,4 @@
-import { Button, Modal } from '@aspectum/ui';
+import { Button, Modal } from '@aspectum/admin-ui-web';
 
 /**
  * Подтверждение удаления города из сессии или всей сессии (список сессий).

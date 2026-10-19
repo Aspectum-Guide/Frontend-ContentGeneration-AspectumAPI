@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { Button, Glyph } from '@aspectum/ui';
+import { Button, Glyph } from '@aspectum/admin-ui-web';
 import { audioAPI } from '../../../../api/generation';
 
 export default function AudioPlayer({ audioId }) {

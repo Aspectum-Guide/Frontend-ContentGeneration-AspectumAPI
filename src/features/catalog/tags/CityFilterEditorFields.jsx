@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react';
-import { FormLabel, Alert, Field, FormGrid, MediaUploadField, Panel, Select, Switch, TagPicker, TextInput } from '@aspectum/ui';
+import { FormLabel, Alert, Field, FormGrid, MediaUploadField, Panel, Select, Switch, TagPicker, TextInput } from '@aspectum/admin-ui-web';
 import { imagesAPI } from '../../../api/generation';
 import { parseApiError } from '../../../utils/apiError';
 import { getMultiLangValue } from '../shared/i18n';

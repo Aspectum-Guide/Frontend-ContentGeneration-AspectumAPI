@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Alert, Button, Panel, Select, Textarea } from '@aspectum/ui';
+import { Alert, Button, Panel, Select, Textarea } from '@aspectum/admin-ui-web';
 import { useAppLanguages } from '../../../hooks/useAppLanguages';
 
 export default function UsefulInfoTextImportBox({

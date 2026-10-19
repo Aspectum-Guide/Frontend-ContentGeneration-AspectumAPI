@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { tasksAPI, aiAPI } from '../../api/generation';
 import Layout from '../../components/Layout';
-import { Button, Alert, DataTable, Heading, Modal, PageHeader, Panel, ProgressBar, Spinner, formGridClassName } from '@aspectum/ui';
+import { Button, Alert, DataTable, Heading, Modal, PageHeader, Panel, ProgressBar, Spinner, formGridClassName } from '@aspectum/admin-ui-web';
 import { useLayoutActions } from '../../context/useLayoutActions';
 import { parseApiError } from '../../utils/apiError';
 

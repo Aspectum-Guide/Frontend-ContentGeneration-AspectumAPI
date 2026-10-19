@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import AiGenerationModal from '../../../components/generation/AiGenerationModal.jsx';
-import { FormLabel, WizardActionFooter as WizardGenerationActionFooter, formGridClassName, Glyph } from '@aspectum/ui';
+import { FormLabel, WizardActionFooter as WizardGenerationActionFooter, formGridClassName, Glyph } from '@aspectum/admin-ui-web';
 import AiGenerationQualitySettings from '../../../components/generation/AiGenerationQualitySettings.jsx';
 import AiGenerationDedupeToggle from '../../../components/generation/AiGenerationDedupeToggle.jsx';
 import AiGenerationCountField from '../../../components/generation/AiGenerationCountField.jsx';
@@ -14,7 +14,7 @@ import UsefulInfoTextImportBox from './UsefulInfoTextImportBox.jsx';
 import { TTSProviderSettingsPanel } from './SessionWizardAttractionAudioGuidesBlock.jsx';
 import { createCoordinatePasteHandler } from '../../../utils/coordinates';
 import { useAppLanguages } from '../../../hooks/useAppLanguages';
-import { Alert, Button, Checkbox, EmptyState, EntityDraftsPanel, LocaleEditor, MediaUploadField, Panel, ProgressBar, SectionHeader, Select, SelectableCard, Spinner, Textarea, TextInput } from '@aspectum/ui';
+import { Alert, Button, Checkbox, EmptyState, EntityDraftsPanel, LocaleEditor, MediaUploadField, Panel, ProgressBar, SectionHeader, Select, SelectableCard, Spinner, Textarea, TextInput } from '@aspectum/admin-ui-web';
 
 const getCityDisplayName = (city) => {
   if (!city) return 'Без названия';

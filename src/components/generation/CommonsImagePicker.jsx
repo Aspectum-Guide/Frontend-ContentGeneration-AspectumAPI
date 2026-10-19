@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
-import { Alert, Button, EmptyState, InlineState, MediaResultCard, Modal, SkeletonGrid, Tabs, TextInput } from '@aspectum/ui';
+import { Alert, Button, EmptyState, InlineState, MediaResultCard, Modal, SkeletonGrid, Tabs, TextInput } from '@aspectum/admin-ui-web';
 import { imagesAPI } from '../../api/generation';
 
 /**

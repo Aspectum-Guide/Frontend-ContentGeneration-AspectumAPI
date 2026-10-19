@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useMatch, useNavigate } from 'react-router-dom';
 import { ChevronsLeft, Plus, Search } from 'lucide-react';
-import { Button, ChoiceGroup, IconButton, Spinner, TextInput } from './ui';
+import { Button, ChoiceGroup, IconButton, Spinner, TextInput } from '@aspectum/admin-ui-web';
 import useSessionsSidebar from '../hooks/useSessionsSidebar';
 import { STATUS_DOT, STATUS_FILTERS, STATUS_LABELS, formatRelative, sessionTitle } from './sessionsPanelHelpers';
 

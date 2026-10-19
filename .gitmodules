@@ -1,0 +1,3 @@
+[submodule "packages/admin-ui-web"]
+	path = packages/admin-ui-web
+	url = https://github.com/Aspectum-Guide/AspectumAdminUIWeb.git

@@ -4,7 +4,7 @@ import { ilCatalogAPI, imagesAPI } from './api';
 import ILCityPhotosEditor from './ILCityPhotosEditor';
 import { eventsCatalogAPI } from '../events/api';
 import Layout from '../../../components/Layout';
-import { FormLabel, Alert, Button, Chip, ConfirmModal, DataTable, EmptyState, Field, FileButton, FormGrid, IconButton, Modal, PageHeader, Panel, Select, Switch, TableRowActions, Tabs, TextInput, Glyph } from '@aspectum/ui';
+import { FormLabel, Alert, Button, Chip, ConfirmModal, DataTable, EmptyState, Field, FileButton, FormGrid, IconButton, Modal, PageHeader, Panel, Select, Switch, TableRowActions, Tabs, TextInput, Glyph } from '@aspectum/admin-ui-web';
 import { useLayoutActions } from '../../../context/useLayoutActions';
 import { parseApiError } from '../../../utils/apiError';
 import { createCoordinatePasteHandler, parseCoord } from '../../../utils/coordinates';

@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import Layout from '../../components/Layout';
 import { mediaRecoveryAPI } from '../../api/mediaRecovery';
 import { parseApiError } from '../../utils/apiError';
-import { Alert, Button, ConfirmModal, EmptyState, PageContainer, PageHeader, SectionHeader, Spinner, Tabs } from '@aspectum/ui';
+import { Alert, Button, ConfirmModal, EmptyState, PageContainer, PageHeader, SectionHeader, Spinner, Tabs } from '@aspectum/admin-ui-web';
 
 const KIND_LABELS = {
   event_audio_guide_track: 'Опубликовано',

@@ -1,4 +1,4 @@
-import { FormLabel, MultiField } from '@aspectum/ui';
+import { FormLabel, MultiField } from '@aspectum/admin-ui-web';
 
 export default function MultiLangField({ label, value = {}, onChange, langs = [], multiline = false, rows = 3, required = false }) {
   const items = langs.map((code) => ({ id: code, label: code.toUpperCase() }));

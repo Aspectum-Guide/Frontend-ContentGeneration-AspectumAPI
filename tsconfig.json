@@ -18,9 +18,10 @@
     "noFallthroughCasesInSwitch": true,
     "paths": {
       "@/*": ["./src/*"],
-      "@aspectum/ui": ["./src/components/ui"],
-      "@aspectum/ui/*": ["./src/components/ui/*"]
+      "@aspectum/admin-ui-web": ["./packages/admin-ui-web/src/index.js"],
+      "@aspectum/admin-ui-web/theme.css": ["./packages/admin-ui-web/src/theme.css"],
+      "@aspectum/admin-ui-web/theme-cs.css": ["./packages/admin-ui-web/src/theme-cs.css"]
     }
   },
-  "include": ["src"]
+  "include": ["src", "packages/admin-ui-web/src"]
 }

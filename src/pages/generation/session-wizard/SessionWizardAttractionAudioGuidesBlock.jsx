@@ -1,9 +1,9 @@
 import { useEffect, useRef, useState } from 'react';
-import { FormLabel, Alert, Button, ConfirmModal, EmptyState, EntityDraftsPanel, FileButton, IconButton, LocaleEditor, Panel, SectionHeader, Select, SelectableCard, Spinner, Textarea, TextInput, Glyph } from '@aspectum/ui';
+import { FormLabel, Alert, Button, ConfirmModal, EmptyState, EntityDraftsPanel, FileButton, IconButton, LocaleEditor, Panel, SectionHeader, Select, SelectableCard, Spinner, Textarea, TextInput, Glyph } from '@aspectum/admin-ui-web';
 
 import { audioAPI } from '../../../api/generation';
 import AiGenerationModal from '../../../components/generation/AiGenerationModal.jsx';
-import { WizardActionFooter as WizardGenerationActionFooter } from '@aspectum/ui';
+import { WizardActionFooter as WizardGenerationActionFooter } from '@aspectum/admin-ui-web';
 import AiGenerationQualitySettings from '../../../components/generation/AiGenerationQualitySettings.jsx';
 
 import { getAttrName, normalizeId } from './sessionWizardShared.jsx';

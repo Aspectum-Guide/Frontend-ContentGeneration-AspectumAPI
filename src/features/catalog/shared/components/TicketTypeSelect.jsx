@@ -1,4 +1,4 @@
-import { Select } from '@aspectum/ui';
+import { Select } from '@aspectum/admin-ui-web';
 import { getTicketTypeLabel } from '../labels';
 
 /**

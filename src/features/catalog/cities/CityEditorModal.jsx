@@ -1,7 +1,7 @@
 import 'leaflet/dist/leaflet.css';
 import { useEffect, useRef, useState } from 'react';
 import CommonsImagePicker from '../../../components/generation/CommonsImagePicker';
-import { FormLabel, Alert, BusyOverlay, Button, Chip, Field, FileButton, FormActions, FormGrid, IconButton, LoadingOverlay, MediaPreview, Modal, Panel, Select, Spinner, Switch, Tabs, TextInput, Glyph } from '@aspectum/ui';
+import { FormLabel, Alert, BusyOverlay, Button, Chip, Field, FileButton, FormActions, FormGrid, IconButton, LoadingOverlay, MediaPreview, Modal, Panel, Select, Spinner, Switch, Tabs, TextInput, Glyph } from '@aspectum/admin-ui-web';
 import { createCoordinatePasteHandler, parseCoord } from '../../../utils/coordinates';
 import { buildLangOptions, getMultiLangValue } from '../shared/i18n';
 import { LangBlock, LangTabs } from '../shared/LangFields';

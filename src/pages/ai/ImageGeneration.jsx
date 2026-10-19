@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import Layout from '../../components/Layout';
 import { aiAPI } from '../../api/generation';
-import { Alert, Button, Field, PageHeader, Panel, SectionHeader, Spinner, TextInput, Glyph } from '@aspectum/ui';
+import { Alert, Button, Field, PageHeader, Panel, SectionHeader, Spinner, TextInput, Glyph } from '@aspectum/admin-ui-web';
 
 export default function ImageGeneration() {
   const [query, setQuery] = useState('');

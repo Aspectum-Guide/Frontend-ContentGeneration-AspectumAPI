@@ -1,4 +1,4 @@
-import { Alert } from '@aspectum/ui';
+import { Alert } from '@aspectum/admin-ui-web';
 
 const STATUS_LABELS = {
   reserved: 'забронировано',

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { bookingReferenceAPI, ticketTypesAPI } from '../../../api/booking';
-import { FormLabel, Alert, Button, Checkbox, EmptyState, Modal, Panel } from '@aspectum/ui';
+import { FormLabel, Alert, Button, Checkbox, EmptyState, Modal, Panel } from '@aspectum/admin-ui-web';
 import { parseApiError } from '../../../utils/apiError';
 import { normalizeListResponse } from '../shared/normalize';
 import { getEventLabel, getTicketTypeLabel } from '../shared/labels';

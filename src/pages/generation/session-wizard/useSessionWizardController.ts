@@ -12,7 +12,7 @@ import {
 } from '../../../api/generation';
 import { trackEvent } from '../../../utils/analytics';
 import { parseApiError } from '../../../utils/apiError';
-import { useToast } from '@aspectum/ui';
+import { useToast } from '@aspectum/admin-ui-web';
 import {
   normalizeDraftId,
   normalizeServerCityDraftsFromSessionData,
@@ -433,7 +433,10 @@ export function useSessionWizardController({
     requestedCityDraftIdRef.current = normalizeDraftId(routeDraftId || state?.cityDraftId);
   }, [location.search, location.state]);
 
-  // ─── Позиция визарда в URL: перезагрузка страницы возвращает на место ─────
+  // Позиция визарда пишется в URL, чтобы перезагрузка открыла тот же шаг.
+  // Обратно из URL шаг не читаем: начальное значение уже взято при маунте.
+  // Повторное чтение на каждый ререндер видело старый ?step= и снова
+  // запускало переход — на шагах 4→5 это крутило сохранение без остановки.
   useEffect(() => {
     const params = new URLSearchParams(location.search);
     const prevStep = params.get('step') || '';
@@ -568,16 +571,7 @@ export function useSessionWizardController({
     [localeData, defaultLocale, showNote, saveCurrentIlIfDirty, saveCitySilently, loadSession, setPreparingPublishStep]
   );
 
-  useEffect(() => {
-    if (!session?.id) return;
-    const params = new URLSearchParams(location.search);
-    if (!params.has('step')) return;
-    const n = parseInt(params.get('step')!, 10);
-    if (!Number.isFinite(n)) return;
-    void navigateToStep(n);
-  }, [session?.id, location.search, navigateToStep]);
-
-  useEffect(() => {
+    useEffect(() => {
     flushDirtyDraftEditorsRef.current = async () => {
       await saveCurrentIlIfDirty({ silent: true });
       await saveCurrentAttrIfDirty({ silent: true });

@@ -10,7 +10,7 @@ import { useNavigate } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { sessionsAPI } from '../../api/generation';
 import Layout from '../../components/Layout';
-import { Alert, AsyncErrorState, Button, Checkbox, DataTableSurface, IconButton, Panel, Spinner, TextInput, ConfirmModal as DefaultConfirmModal, InlineProgressBanner as DefaultInlineProgressBanner, SessionStatusBadge as DefaultStatusBadge, Toast as DefaultToast, useConfirmModal, useToast } from '@aspectum/ui';
+import { Alert, AsyncErrorState, Button, Checkbox, DataTableSurface, IconButton, Panel, Spinner, TextInput, ConfirmModal as DefaultConfirmModal, InlineProgressBanner as DefaultInlineProgressBanner, SessionStatusBadge as DefaultStatusBadge, Toast as DefaultToast, useConfirmModal, useToast } from '@aspectum/admin-ui-web';
 import DefaultSessionDeleteDialog from '../../components/generation/SessionDeleteDialog.jsx';
 import DefaultSessionCloseDialog from '../../components/generation/SessionCloseDialog.jsx';
 import { useLayoutActions } from '../../context/useLayoutActions';

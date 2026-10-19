@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { normalizeId } from './sessionWizardShared.jsx';
-import { FormLabel, Alert, Button, CheckboxTree, Chip, DropdownPanel, EmptyState, InlineState, SectionHeader, TextInput } from '@aspectum/ui';
+import { FormLabel, Alert, Button, CheckboxTree, Chip, DropdownPanel, EmptyState, InlineState, SectionHeader, TextInput } from '@aspectum/admin-ui-web';
 
 function getMultilangDisplay(value, fallback = '') {
   if (!value) return fallback;

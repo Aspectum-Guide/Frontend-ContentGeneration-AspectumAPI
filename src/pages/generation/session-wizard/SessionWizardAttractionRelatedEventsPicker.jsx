@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Chip, Field, InlineState, SearchSelect } from '@aspectum/ui';
+import { Chip, Field, InlineState, SearchSelect } from '@aspectum/admin-ui-web';
 import { eventsCatalogAPI } from '../../../features/catalog/events/api';
 import { useCatalogFilters } from '../../../features/catalog/core/useCatalogFilters';
 import {

@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { Ellipsis, RotateCw } from 'lucide-react';
-import { Button, DropdownPanel, IconButton } from './ui';
+import { Button, DropdownPanel, IconButton } from '@aspectum/admin-ui-web';
 import { orderActions } from './pageActions';
 
 // Page actions are registered by pages through LayoutActionsContext. Map their

@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { pricingRulesAPI } from '../../../api/booking';
 import Layout from '../../../components/Layout';
-import { Alert, Button, CheckboxField, ConfirmModal, DataTable, Field, FormActions, Modal, PageHeader, StatusBadge, TableRowActions, TextInput, ToggleGroup, formGridClassName } from '@aspectum/ui';
+import { Alert, Button, CheckboxField, ConfirmModal, DataTable, Field, FormActions, Modal, PageHeader, StatusBadge, TableRowActions, TextInput, ToggleGroup, formGridClassName } from '@aspectum/admin-ui-web';
 import { useLayoutActions } from '../../../context/useLayoutActions';
 import { parseApiError } from '../../../utils/apiError';
 import { useCatalogFilters } from '../core/useCatalogFilters';

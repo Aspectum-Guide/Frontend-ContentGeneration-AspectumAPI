@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
+import Layout from '../components/Layout';
 import { authAPI } from '../api/auth.ts';
 import { getThemeMode, setThemeMode } from '../theme/themeBootstrap';
-import { Alert, Button, ConfirmModal, EmptyState, PageContainer, PageHeader, Panel, SectionHeader, Spinner } from '@aspectum/ui';
+import { Alert, Button, ConfirmModal, EmptyState, PageContainer, PageHeader, Panel, SectionHeader, Spinner } from '@aspectum/admin-ui-web';
 
 const fromBase64Url = (value) => {
   const padded = value.replace(/-/g, '+').replace(/_/g, '/') + '='.repeat((4 - value.length % 4) % 4);
@@ -77,8 +78,8 @@ export default function AccountSettings() {
     }
   };
 
-  return <>
-    <PageContainer maxWidth="comfortable" centered className="p-4 md:p-8">
+  return <Layout>
+    <PageContainer maxWidth="comfortable" centered>
     <PageHeader
       title="Настройки аккаунта"
       description="Настройте внешний вид и безопасный вход в контент-админку."
@@ -129,5 +130,5 @@ export default function AccountSettings() {
       confirmLabel="Удалить"
       danger
     />
-  </>;
+  </Layout>;
 }

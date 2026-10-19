@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import Layout from '../../../components/Layout';
-import { Alert, CheckboxField, PageHeader, ConfirmModal, DataTable, Field, FormActions, Modal, StatusBadge, TableRowActions, TextInput, Glyph } from '@aspectum/ui';
+import { Alert, CheckboxField, PageHeader, ConfirmModal, DataTable, Field, FormActions, Modal, StatusBadge, TableRowActions, TextInput, Glyph } from '@aspectum/admin-ui-web';
 import { parseApiError } from '../../../utils/apiError';
 import { llmAPI } from '../../../api/llm';
 

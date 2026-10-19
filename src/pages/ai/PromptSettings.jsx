@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import Layout from '../../components/Layout';
-import { Alert, Button, EmptyState, PageContainer, PageHeader, Panel, SectionHeader, Spinner, StatusBadge, Textarea } from '@aspectum/ui';
+import { Alert, Button, EmptyState, PageContainer, PageHeader, Panel, SectionHeader, Spinner, StatusBadge, Textarea } from '@aspectum/admin-ui-web';
 import { aiAPI } from '../../api/generation';
 
 /**

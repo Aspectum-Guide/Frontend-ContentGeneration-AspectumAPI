@@ -1,4 +1,4 @@
-import { Button, Modal, RadioGroup, Spinner } from '@aspectum/ui';
+import { Button, Modal, RadioGroup, Spinner } from '@aspectum/admin-ui-web';
 
 const CLOSE_OPTIONS = [
   {

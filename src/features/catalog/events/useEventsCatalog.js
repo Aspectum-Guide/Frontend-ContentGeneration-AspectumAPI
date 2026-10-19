@@ -4,7 +4,7 @@ import { parseApiError } from '../../../utils/apiError';
 import { useCatalogFilters } from '../core/useCatalogFilters';
 import { buildLangOptions, pickPrimaryLangCode } from '../shared/i18n';
 import { normalizeListResponse } from '../shared/normalize';
-import { useToast } from '@aspectum/ui';
+import { useToast } from '@aspectum/admin-ui-web';
 import { createEmptyEvent, fromApiEventRow, mergeEventWithDetail, toApiEventPayload } from './adapters';
 import { eventsCatalogAPI } from './api';
 

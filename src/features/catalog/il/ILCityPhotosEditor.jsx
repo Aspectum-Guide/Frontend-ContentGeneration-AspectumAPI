@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Alert, Button, ConfirmModal, EmptyState, Field, FormGrid, MediaUploadField, Panel, TextInput } from '@aspectum/ui';
+import { Alert, Button, ConfirmModal, EmptyState, Field, FormGrid, MediaUploadField, Panel, TextInput } from '@aspectum/admin-ui-web';
 import { imagesAPI } from '../../../api/generation';
 import { parseApiError } from '../../../utils/apiError';
 import { createCoordinatePasteHandler, parseCoord } from '../../../utils/coordinates';

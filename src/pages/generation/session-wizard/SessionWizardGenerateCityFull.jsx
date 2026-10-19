@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { aiAPI, tasksAPI } from '../../../api/generation';
 import apiClient from '../../../api/client';
 import { pollGenerationTask } from '../../../utils/generationTaskPoll';
-import { FormLabel, Alert, Button, Checkbox, InlineState, Modal, Panel, ProgressBar, Textarea, TextInput, Glyph } from '@aspectum/ui';
+import { FormLabel, Alert, Button, Checkbox, InlineState, Modal, Panel, ProgressBar, Textarea, TextInput, Glyph } from '@aspectum/admin-ui-web';
 
 const SOURCE_GROUP_TITLES = { photo: 'Фото', facts: 'Фактура', discovery: 'Поиск мест' };
 const SOURCE_REGION_LABELS = { RU: 'RU', 'RU-SPB': 'СПб' };

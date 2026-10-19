@@ -13,7 +13,7 @@ import {
 } from './session-wizard/sessionWizardShared.jsx';
 import { useSessionWizardController } from './session-wizard/useSessionWizardController.ts';
 import { aiAPI } from '../../api/generation';
-import { FormLabel, Button, ConfirmModal as DefaultConfirmModal, DetailHeader, EmptyState, InlineAction, InlineProgressBanner as DefaultInlineProgressBanner, Modal, SessionStatusBadge as DefaultStatusBadge, Spinner, TextInput, Toast as DefaultToast, WizardStepButton, useConfirmModal } from '@aspectum/ui';
+import { FormLabel, Button, ConfirmModal as DefaultConfirmModal, DetailHeader, EmptyState, InlineAction, InlineProgressBanner as DefaultInlineProgressBanner, Modal, SessionStatusBadge as DefaultStatusBadge, Spinner, TextInput, Toast as DefaultToast, WizardStepButton, useConfirmModal } from '@aspectum/admin-ui-web';
 import DefaultSessionCloseDialog from '../../components/generation/SessionCloseDialog.jsx';
 import { sessionWizardStepLoaders } from './session-wizard/sessionWizardStepLoaders';
 import useUnsavedChangesWarning from './session-wizard/useUnsavedChangesWarning';

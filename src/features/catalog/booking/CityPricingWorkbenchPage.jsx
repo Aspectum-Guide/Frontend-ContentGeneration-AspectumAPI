@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { eventSlotAvailabilitiesAPI, eventTicketTypePricesAPI, ticketTypesAPI } from '../../../api/booking';
 import { citiesCatalogAPI } from '../cities/api';
 import Layout from '../../../components/Layout';
-import { FormLabel, Alert, BulkActionModal, Button, Checkbox, DataTableSurface, EmptyState, InlineState, PageHeader, Select, TextInput, formGridClassName } from '@aspectum/ui';
+import { FormLabel, Alert, BulkActionModal, Button, Checkbox, DataTableSurface, EmptyState, InlineState, PageHeader, Select, TextInput, formGridClassName } from '@aspectum/admin-ui-web';
 import { parseApiError } from '../../../utils/apiError';
 import { loadReferenceEventsForCity } from '../shared/bookingOptions';
 import TicketTypeSelect from '../shared/components/TicketTypeSelect';

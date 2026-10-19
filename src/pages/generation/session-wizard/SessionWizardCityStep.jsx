@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { contentAuthorsAPI } from '../../../api/generation';
 import { createCoordinatePasteHandler } from '../../../utils/coordinates';
 import { usePasteImageOnHover } from '../../../hooks/usePasteImageOnHover';
-import { FormLabel, Button, Chip, FileButton, LoadingOverlay, LocaleEditor, Panel, Select, Textarea, TextInput, Glyph } from '@aspectum/ui';
+import { FormLabel, Button, Chip, FileButton, LoadingOverlay, LocaleEditor, Panel, Select, Textarea, TextInput, Glyph } from '@aspectum/admin-ui-web';
 
 // ─── helpers ──────────────────────────────────────────────────────────────────
 

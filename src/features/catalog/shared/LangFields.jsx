@@ -1,4 +1,4 @@
-import { LocaleField, LocaleTabs } from '@aspectum/ui';
+import { LocaleField, LocaleTabs } from '@aspectum/admin-ui-web';
 import { getFilledLangCodes } from './i18n';
 import { useAppLanguages } from '../../../hooks/useAppLanguages';
 

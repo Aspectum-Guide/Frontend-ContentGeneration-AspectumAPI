@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { FormLabel, Button, Heading, RangeInput, Select, Switch, TextInput } from '@aspectum/ui';
+import { FormLabel, Button, Heading, RangeInput, Select, Switch, TextInput } from '@aspectum/admin-ui-web';
 
 import { ttsAPI } from '../../api/generation';
 

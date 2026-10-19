@@ -4,7 +4,7 @@ import TokenManager from '../utils/TokenManager';
 import { authAPI } from '../api/auth.ts';
 import { resolveNavScope } from '../config/nav';
 import { landingPath } from '../config/scope';
-import { Alert, Button, Field, PageHeader, Panel, TextInput } from '@aspectum/ui';
+import { Alert, Button, Field, PageHeader, Panel, TextInput } from '@aspectum/admin-ui-web';
 
 export default function TokenAuth() {
   const [login, setLogin] = useState('');

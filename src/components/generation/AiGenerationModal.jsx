@@ -1,4 +1,4 @@
-import { ProgressModal } from '@aspectum/ui';
+import { ProgressModal } from '@aspectum/admin-ui-web';
 
 export default function AiGenerationModal({
   open,

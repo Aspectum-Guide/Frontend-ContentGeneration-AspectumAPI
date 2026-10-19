@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Alert, Button, ConfirmModal, EmptyState, Field, FileButton, LoadingOverlay, Panel, TextInput } from '@aspectum/ui';
+import { Alert, Button, ConfirmModal, EmptyState, Field, FileButton, LoadingOverlay, Panel, TextInput } from '@aspectum/admin-ui-web';
 import { parseApiError } from '../../../utils/apiError';
 import { imagesAPI } from '../../../api/generation';
 import { buildLangOptions } from './i18n';

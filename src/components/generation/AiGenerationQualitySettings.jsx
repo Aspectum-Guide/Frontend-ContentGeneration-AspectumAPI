@@ -2,7 +2,7 @@ import { DEFAULT_GENERATION_MODE,
   GENERATION_MODE_OPTIONS,
   isDeepResearchMode,
 } from './generationUtils';
-import { FormLabel, Checkbox, RadioGroup } from '@aspectum/ui';
+import { FormLabel, Checkbox, RadioGroup } from '@aspectum/admin-ui-web';
 
 export default function AiGenerationQualitySettings({
   generationMode = DEFAULT_GENERATION_MODE,

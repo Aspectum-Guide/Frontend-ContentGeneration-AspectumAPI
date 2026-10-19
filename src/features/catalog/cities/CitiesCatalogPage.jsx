@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import Layout from '../../../components/Layout';
-import { Button, Checkbox, ConfirmModal, DataTable, Switch, TableRowActions, Toast } from '@aspectum/ui';
+import { Button, Checkbox, ConfirmModal, DataTable, Switch, TableRowActions, Toast } from '@aspectum/admin-ui-web';
 import { useLayoutActions } from '../../../context/useLayoutActions';
 import { iapAdminAPI } from '../../../api/generation';
 import { parseApiError } from '../../../utils/apiError';

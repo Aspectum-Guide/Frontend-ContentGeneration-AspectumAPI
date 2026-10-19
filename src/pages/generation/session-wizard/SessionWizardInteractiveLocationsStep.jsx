@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import 'leaflet/dist/leaflet.css';
 import { usePasteImageOnHover } from '../../../hooks/usePasteImageOnHover';
 import AiGenerationModal from '../../../components/generation/AiGenerationModal.jsx';
-import { FormLabel, WizardActionFooter as WizardGenerationActionFooter, formGridClassName, Glyph } from '@aspectum/ui';
+import { FormLabel, WizardActionFooter as WizardGenerationActionFooter, formGridClassName, Glyph } from '@aspectum/admin-ui-web';
 import AiGenerationQualitySettings from '../../../components/generation/AiGenerationQualitySettings.jsx';
 import AiGenerationDedupeToggle from '../../../components/generation/AiGenerationDedupeToggle.jsx';
 import AiGenerationCountField from '../../../components/generation/AiGenerationCountField.jsx';
@@ -10,7 +10,7 @@ import { getAttrName, getSessionEntityImagePreview, resolveSessionEntityImageOri
 import SessionWizardAttractionTagsPicker from './SessionWizardAttractionTagsPicker.jsx';
 import { createCoordinatePasteHandler } from '../../../utils/coordinates';
 import { useAppLanguages } from '../../../hooks/useAppLanguages';
-import { Alert, Button, EmptyState, FileButton, IconButton, LoadingOverlay, LocaleEditor, Panel, SectionHeader, Select, Spinner, Textarea, TextInput } from '@aspectum/ui';
+import { Alert, Button, EmptyState, FileButton, IconButton, LoadingOverlay, LocaleEditor, Panel, SectionHeader, Select, Spinner, Textarea, TextInput } from '@aspectum/admin-ui-web';
 
 const getCityDisplayName = (city) => {
   if (!city) return 'Без названия';

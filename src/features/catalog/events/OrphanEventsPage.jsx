@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import Layout from '../../../components/Layout';
-import { Alert, Button, ConfirmModal, DataTable, Modal, PageHeader, Select, Tabs, Toast, useToast } from '@aspectum/ui';
+import { Alert, Button, ConfirmModal, DataTable, Modal, PageHeader, Select, Tabs, Toast, useToast } from '@aspectum/admin-ui-web';
 import { citiesAPI } from '../../../api/generation';
 import { parseApiError } from '../../../utils/apiError';
 import { useCatalogFilters } from '../core/useCatalogFilters';

@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import Layout from '../../../components/Layout';
 import apiClient from '../../../api/client';
 import { imagesAPI } from './api';
-import { FormLabel, Alert, Button, Card, ConfirmModal, EmptyState, IconButton, InlineState, Modal, PageHeader, Spinner, TextInput, Glyph } from '@aspectum/ui';
+import { FormLabel, Alert, Button, Card, ConfirmModal, EmptyState, IconButton, InlineState, Modal, PageHeader, Spinner, TextInput, Glyph } from '@aspectum/admin-ui-web';
 
 const USAGE_KIND_LABELS = {
   city: 'Город',

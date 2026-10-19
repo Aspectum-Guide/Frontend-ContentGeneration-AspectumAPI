@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Layout from '../../../components/Layout';
-import { Alert, Button, ConfirmModal, DataTable, PageHeader, Select, Switch, TableRowActions, Toast, Glyph } from '@aspectum/ui';
+import { Alert, Button, ConfirmModal, DataTable, PageHeader, Select, Switch, TableRowActions, Toast, Glyph } from '@aspectum/admin-ui-web';
 import { useLayoutActions } from '../../../context/useLayoutActions';
 import { adminAPI } from '../../../api/generation';
 import { parseApiError } from '../../../utils/apiError';

@@ -1,5 +1,5 @@
 import { Component } from 'react';
-import { Button, ErrorState } from '@aspectum/ui';
+import { Button, ErrorState } from '@aspectum/admin-ui-web';
 import { reportError } from '../utils/errorReporting';
 import { isLazyChunkLoadError } from '../utils/lazyChunkRecovery';
 

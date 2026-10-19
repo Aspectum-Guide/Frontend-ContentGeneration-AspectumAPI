@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { activationCodesAPI, subscriptionTypesAPI } from '../../../api/subscription';
 import Layout from '../../../components/Layout';
-import { Select, Alert, BulkActionModal, CheckboxField, FormHint, PageHeader, ConfirmModal, DataTable, Field, FormActions, Modal, Panel, StatusBadge, TableRowActions, Textarea, TextInput, formGridClassName } from '@aspectum/ui';
+import { Select, Alert, BulkActionModal, CheckboxField, FormHint, PageHeader, ConfirmModal, DataTable, Field, FormActions, Modal, Panel, StatusBadge, TableRowActions, Textarea, TextInput, formGridClassName } from '@aspectum/admin-ui-web';
 import { useLayoutActions } from '../../../context/useLayoutActions';
 import { parseApiError } from '../../../utils/apiError';
 import { useCatalogCrud } from '../core/useCatalogCrud';

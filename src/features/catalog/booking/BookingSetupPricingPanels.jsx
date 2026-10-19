@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Alert, Button, DataTableSurface, EmptyState, Heading, Panel, Spinner, TextInput, Glyph } from '@aspectum/ui';
+import { Alert, Button, DataTableSurface, EmptyState, Heading, Panel, Spinner, TextInput, Glyph } from '@aspectum/admin-ui-web';
 import { getTicketTypeLabel } from '../shared/labels';
 import { formatSlotLabel, priceStatusClass } from './bookingSetupPricingHelpers';
 

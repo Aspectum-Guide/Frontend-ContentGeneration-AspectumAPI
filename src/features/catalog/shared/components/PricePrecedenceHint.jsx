@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom';
-import { Panel } from '@aspectum/ui';
+import { Panel } from '@aspectum/admin-ui-web';
 
 /**
  * Цена билета резолвится из трёх разных таблиц с приоритетом:

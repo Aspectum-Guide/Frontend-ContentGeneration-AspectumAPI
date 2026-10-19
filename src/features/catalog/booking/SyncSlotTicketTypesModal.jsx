@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { FormLabel, Alert, Button, Checkbox, Heading, InlineState, Modal } from '@aspectum/ui';
+import { FormLabel, Alert, Button, Checkbox, Heading, InlineState, Modal } from '@aspectum/admin-ui-web';
 import { eventSlotAvailabilitiesAPI } from '../../../api/booking';
 import { getTicketTypeLabel } from '../shared/labels';
 import { formatSlotLabel } from './bookingSetupPricingHelpers';

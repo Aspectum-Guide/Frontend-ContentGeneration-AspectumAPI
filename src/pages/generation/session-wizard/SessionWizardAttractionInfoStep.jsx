@@ -1,13 +1,13 @@
 import { useMemo, useState } from 'react';
 import AiGenerationModal from '../../../components/generation/AiGenerationModal.jsx';
-import { FormLabel, WizardActionFooter as WizardGenerationActionFooter, Glyph } from '@aspectum/ui';
+import { FormLabel, WizardActionFooter as WizardGenerationActionFooter, Glyph } from '@aspectum/admin-ui-web';
 import AiGenerationQualitySettings from '../../../components/generation/AiGenerationQualitySettings.jsx';
 import AiGenerationDedupeToggle from '../../../components/generation/AiGenerationDedupeToggle.jsx';
 import AiGenerationCountField from '../../../components/generation/AiGenerationCountField.jsx';
 import { getAttrName, normalizeId, filterPersistedSessionAttractions } from './sessionWizardShared.jsx';
 import UsefulInfoTextImportBox from './UsefulInfoTextImportBox.jsx';
 import { useAppLanguages } from '../../../hooks/useAppLanguages';
-import { Alert, Button, Checkbox, EmptyState, EntityDraftsPanel, IconButton, LocaleEditor, Panel, SectionHeader, Select, SelectableCard, Textarea, TextInput } from '@aspectum/ui';
+import { Alert, Button, Checkbox, EmptyState, EntityDraftsPanel, IconButton, LocaleEditor, Panel, SectionHeader, Select, SelectableCard, Textarea, TextInput } from '@aspectum/admin-ui-web';
 
 const getAttractionDisplayName = (attraction) => {
   if (!attraction) return 'Без названия';

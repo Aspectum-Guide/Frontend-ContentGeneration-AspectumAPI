@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { productAnalyticsAPI } from '../../../api/analytics';
 import Layout from '../../../components/Layout';
 import { parseApiError } from '../../../utils/apiError';
-import { TextInput, Select, Alert, DataTable, EmptyState, MetricCard, PageHeader, SectionHeader, Spinner } from '@aspectum/ui';
+import { TextInput, Select, Alert, DataTable, EmptyState, MetricCard, PageHeader, SectionHeader, Spinner } from '@aspectum/admin-ui-web';
 
 function toInputDate(d) {
   return d.toISOString().slice(0, 10);

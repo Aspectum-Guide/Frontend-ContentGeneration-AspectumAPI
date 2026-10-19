@@ -1,7 +1,7 @@
 import { Link } from 'react-router-dom';
-import { Heading, PageHeader, Panel, SectionHeader } from '@aspectum/ui';
+import { Heading, PageHeader, Panel, SectionHeader } from '@aspectum/admin-ui-web';
 import { ArrowRight } from 'lucide-react';
-import { renderIcon } from '@aspectum/ui';
+import { renderIcon } from '@aspectum/admin-ui-web';
 
 export function CatalogCard({ to, title, description, icon }) {
   return (

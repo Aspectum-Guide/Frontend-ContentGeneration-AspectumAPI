@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { eventSlotAvailabilitiesAPI, ticketPricesAPI } from '../../../api/booking';
 import Layout from '../../../components/Layout';
-import { FormLabel, Alert, BulkActionModal, Button, Checkbox, CheckboxField, ConfirmModal, DataTable, Field, FormActions, FormHint, InlineState, Modal, PageHeader, Panel, Select, StatusBadge, TableRowActions, Tabs, Textarea, TextInput, formGridClassName, Glyph } from '@aspectum/ui';
+import { FormLabel, Alert, BulkActionModal, Button, Checkbox, CheckboxField, ConfirmModal, DataTable, Field, FormActions, FormHint, InlineState, Modal, PageHeader, Panel, Select, StatusBadge, TableRowActions, Tabs, Textarea, TextInput, formGridClassName, Glyph } from '@aspectum/admin-ui-web';
 import { useLayoutActions } from '../../../context/useLayoutActions';
 import { parseApiError } from '../../../utils/apiError';
 import { useCatalogFilters } from '../core/useCatalogFilters';

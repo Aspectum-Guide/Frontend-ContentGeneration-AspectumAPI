@@ -4,7 +4,7 @@ import { useCatalogFilters } from '../core/useCatalogFilters';
 import { normalizeListResponse } from '../shared/normalize';
 import { buildLangOptions, getMultiLangValue, pickPrimaryLangCode } from '../shared/i18n';
 import { parseApiError } from '../../../utils/apiError';
-import { useToast } from '@aspectum/ui';
+import { useToast } from '@aspectum/admin-ui-web';
 import { citiesCatalogAPI } from './api';
 import { createEmptyCity, fromApiCity, mergeCityRowWithApiDetail, toApiCityCreatePayload, toApiCityUpdatePayload } from './adapters';
 

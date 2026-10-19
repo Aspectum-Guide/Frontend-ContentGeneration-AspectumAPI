@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { FormLabel, Alert, Button, ConfirmModal, EmptyState, Field, Panel, Switch, TextInput } from '@aspectum/ui';
+import { FormLabel, Alert, Button, ConfirmModal, EmptyState, Field, Panel, Switch, TextInput } from '@aspectum/admin-ui-web';
 import { parseApiError } from '../../../utils/apiError';
 import { buildLangOptions } from './i18n';
 import { LangBlock, LangTabs } from './LangFields';

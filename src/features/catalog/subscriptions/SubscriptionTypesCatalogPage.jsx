@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { citiesAPI, eventsAPI } from '../../../api/generation';
 import { subscriptionTypesAPI } from '../../../api/subscription';
 import Layout from '../../../components/Layout';
-import { Select, Alert, CheckboxField, PageHeader, ConfirmModal, DataTable, Field, FormActions, Modal, StatusBadge, TableRowActions, Textarea, TextInput } from '@aspectum/ui';
+import { Select, Alert, CheckboxField, PageHeader, ConfirmModal, DataTable, Field, FormActions, Modal, StatusBadge, TableRowActions, Textarea, TextInput } from '@aspectum/admin-ui-web';
 import { useLayoutActions } from '../../../context/useLayoutActions';
 import { parseApiError } from '../../../utils/apiError';
 import { getCityLabel, getEventLabel } from './subscriptionLabels';

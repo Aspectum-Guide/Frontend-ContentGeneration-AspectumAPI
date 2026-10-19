@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Button, ConfirmModal, EmptyState, Heading, IconButton, Sidebar, Spinner, Toast, TreeNav, useToast } from '@aspectum/ui';
+import { Button, ConfirmModal, EmptyState, Heading, IconButton, Sidebar, Spinner, Toast, TreeNav, useToast } from '@aspectum/admin-ui-web';
 import useSessionSidebarData from './useSessionSidebarData';
 import { ChevronDown, ChevronRight, RefreshCw, Trash2 } from 'lucide-react';
 

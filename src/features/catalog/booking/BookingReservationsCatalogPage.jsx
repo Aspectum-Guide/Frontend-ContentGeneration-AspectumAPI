@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { bookingReservationsAPI, eventSlotAvailabilitiesAPI } from '../../../api/booking';
 import Layout from '../../../components/Layout';
-import { Select, PageHeader, DataTable, Field, Modal, formGridClassName } from '@aspectum/ui';
+import { Select, PageHeader, DataTable, Field, Modal, formGridClassName } from '@aspectum/admin-ui-web';
 import { useLayoutActions } from '../../../context/useLayoutActions';
 import { parseApiError } from '../../../utils/apiError';
 import { useCatalogFilters } from '../core/useCatalogFilters';

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Button, EmptyState, Spinner } from '@aspectum/ui';
+import { Button, EmptyState, Spinner } from '@aspectum/admin-ui-web';
 import { Navigate } from 'react-router-dom';
 import TokenManager from '../utils/TokenManager';
 import { authAPI } from '../api/auth.ts';

@@ -1,6 +1,6 @@
 import { Link } from 'react-router-dom';
 import Layout from '../components/Layout';
-import { Button, HeroHeader } from '@aspectum/ui';
+import { Button, HeroHeader } from '@aspectum/admin-ui-web';
 
 export default function Home() {
   return (

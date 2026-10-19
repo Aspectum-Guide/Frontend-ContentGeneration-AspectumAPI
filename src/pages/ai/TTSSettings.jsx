@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import Layout from '../../components/Layout';
-import { Alert, Button, PageContainer, PageHeader, Panel, ProgressBar, SectionHeader, Spinner, TextInput, Glyph } from '@aspectum/ui';
+import { Alert, Button, PageContainer, PageHeader, Panel, ProgressBar, SectionHeader, Spinner, TextInput, Glyph } from '@aspectum/admin-ui-web';
 import { ttsAPI } from '../../api/generation';
 import AudioProcessingMixer from '../../components/tts/AudioProcessingMixer';
 

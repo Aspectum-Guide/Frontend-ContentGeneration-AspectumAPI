@@ -7,7 +7,7 @@ import {
   subscriptionUsersAdminAPI,
 } from '../../../api/subscription';
 import Layout from '../../../components/Layout';
-import { Alert, Button, CheckboxField, ConfirmModal, DataTable, DataTableSurface, Field, FormActions, Heading, Modal, PageContainer, PageHeader, Panel, RawJsonModal, SectionHeader, Select, StatusBadge, TableRowActions, TextInput } from '@aspectum/ui';
+import { Alert, Button, CheckboxField, ConfirmModal, DataTable, DataTableSurface, Field, FormActions, Heading, Modal, PageContainer, PageHeader, Panel, RawJsonModal, SectionHeader, Select, StatusBadge, TableRowActions, TextInput } from '@aspectum/admin-ui-web';
 import { useLayoutActions } from '../../../context/useLayoutActions';
 import { parseApiError } from '../../../utils/apiError';
 import { formatDateTime, getCityLabel } from './subscriptionLabels';

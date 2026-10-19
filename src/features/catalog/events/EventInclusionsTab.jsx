@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { Alert, Button, ConfirmModal, EmptyState, Heading, IconButton, Panel, Select, Glyph } from '@aspectum/ui';
+import { Alert, Button, ConfirmModal, EmptyState, Heading, IconButton, Panel, Select, Glyph } from '@aspectum/admin-ui-web';
 import { parseApiError } from '../../../utils/apiError';
 import { eventsCatalogAPI } from './api';
 import { LangBlock } from '../shared/LangFields';

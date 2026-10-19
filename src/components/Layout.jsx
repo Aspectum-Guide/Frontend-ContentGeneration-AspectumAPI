@@ -6,7 +6,7 @@ import { useLayoutActions } from '../context/useLayoutActions';
 import useTokenValidation from '../hooks/useTokenValidation';
 import TokenManager from '../utils/TokenManager';
 import { getWorkspace, setWorkspace, workspaceTitle } from '../utils/workspace';
-import { FormLabel, Button, Heading, Select, Sidebar, SidebarFooter, SidebarHeader, SidebarIconButton, SidebarOverlay } from './ui';
+import { FormLabel, Button, Heading, Select, Sidebar, SidebarFooter, SidebarHeader, SidebarIconButton, SidebarOverlay } from '@aspectum/admin-ui-web';
 import AppNav from './AppNav';
 import SessionsPanel from './SessionsPanel';
 import PageActionBar from './PageActionBar';
@@ -131,16 +131,6 @@ export default function Layout({ children, pageHeader = null, pageHeaderMode = '
     navigate('/token-auth');
   };
 
-  // Pages register actions that they usually also show in their own header; the bar only offers the rest.
-  const contentRef = useRef(null);
-  const pageButtonLabels = useVisibleButtonLabels(contentRef);
-  const barActions = formActions.filter((action) => !pageButtonLabels.has(normalizeLabel(action.label)));
-
-  const showSessionsPanel = hasSessionsPanel && !isMobile && sessionsPanelOpen;
-  const sidebarWidth = sidebarExpanded ? 'var(--aspectum-layout-sidebar-expanded)' : 'var(--aspectum-layout-sidebar-collapsed)';
-  const mainOffset = isMobile ? 0
-    : `calc(${sidebarWidth} + ${showSessionsPanel ? 'var(--aspectum-layout-sessions-panel)' : '0rem'})`;
-
   const routePageTitle = pageTitleFor(location.pathname);
   const mobilePageTitle = pageHeader?.mobileTitle || pageHeader?.title || routePageTitle;
   const shouldRenderPageHeader = !!pageHeader && (
@@ -156,6 +146,16 @@ export default function Layout({ children, pageHeader = null, pageHeaderMode = '
       || action.label === existing.label
     ))),
   ];
+
+  // Pages register actions that they usually also show in their own header; the bar only offers the rest.
+  const contentRef = useRef(null);
+  const pageButtonLabels = useVisibleButtonLabels(contentRef);
+  const barActions = formActions.filter((action) => !pageButtonLabels.has(normalizeLabel(action.label)));
+
+  const showSessionsPanel = hasSessionsPanel && !isMobile && sessionsPanelOpen;
+  const sidebarWidth = sidebarExpanded ? 'var(--aspectum-layout-sidebar-expanded)' : 'var(--aspectum-layout-sidebar-collapsed)';
+  const mainOffset = isMobile ? 0
+    : `calc(${sidebarWidth} + ${showSessionsPanel ? 'var(--aspectum-layout-sessions-panel)' : '0rem'})`;
 
   return (
     <div className="flex h-screen bg-aspectum-surface-muted">

@@ -1,4 +1,4 @@
-import { Alert, Button, Panel, SectionHeader, SessionStatusBadge as DefaultStatusBadge, Glyph } from '@aspectum/ui';
+import { Alert, Button, Panel, SectionHeader, SessionStatusBadge as DefaultStatusBadge, Glyph } from '@aspectum/admin-ui-web';
 
 const getCountLabel = (count, emptyLabel = '—') => {
   return count > 0 ? count : emptyLabel;

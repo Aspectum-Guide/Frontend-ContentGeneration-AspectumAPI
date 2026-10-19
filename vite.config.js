@@ -49,8 +49,6 @@ export default defineConfig(({ mode, command }) => {
     resolve: {
       alias: {
         '@': path.resolve(import.meta.dirname, './src'),
-        // Выносимый UI-пакет: сейчас локальный barrel, позже — npm-пакет.
-        '@aspectum/ui': path.resolve(import.meta.dirname, './src/components/ui'),
       },
     },
     server: {

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { iapPurchasesAdminAPI } from '../../../api/subscription';
 import Layout from '../../../components/Layout';
-import { Button, TextInput, Select, PageHeader, DataTable, RawJsonModal } from '@aspectum/ui';
+import { Button, TextInput, Select, PageHeader, DataTable, RawJsonModal } from '@aspectum/admin-ui-web';
 import { useLayoutActions } from '../../../context/useLayoutActions';
 import { parseApiError } from '../../../utils/apiError';
 import { formatDateTime } from './subscriptionLabels';

@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import Layout from '../../components/Layout';
 import { exportAPI } from '../../api/generation';
-import { Button, Alert, PageContainer, PageHeader, Panel, SectionHeader, Spinner } from '@aspectum/ui';
+import { Button, Alert, PageContainer, PageHeader, Panel, SectionHeader, Spinner } from '@aspectum/admin-ui-web';
 
 export default function ExportZip() {
   const [loading, setLoading] = useState(false);

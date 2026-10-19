@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { attractionCommerceAPI } from '../../../api/generation';
-import { Button, IconButton, Panel, TextInput } from '@aspectum/ui';
+import { Button, IconButton, Panel, TextInput } from '@aspectum/admin-ui-web';
 
 function CommerceItemRow({ label, isDragging, isDropTarget, onDragStart, onDragOver, onDragLeave, onDrop, onDragEnd, onDelete }) {
   return (

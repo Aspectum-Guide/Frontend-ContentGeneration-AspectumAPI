@@ -1,4 +1,4 @@
-import { Field, TextInput } from '@aspectum/ui';
+import { Field, TextInput } from '@aspectum/admin-ui-web';
 import { COUNT_LIMITS } from './generationUtils';
 
 export default function AiGenerationCountField({

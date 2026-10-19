@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { externalProductsAPI } from '../../../api/booking';
 import { citiesAPI } from '../../../api/generation';
 import Layout from '../../../components/Layout';
-import { Alert, Button, CalendarDayButton, Field, Heading, InlineState, PageHeader, Panel, SectionHeader, Select, StatusBadge, TextInput } from '@aspectum/ui';
+import { Alert, Button, CalendarDayButton, Field, Heading, InlineState, PageHeader, Panel, SectionHeader, Select, StatusBadge, TextInput } from '@aspectum/admin-ui-web';
 import { parseApiError } from '../../../utils/apiError';
 import { getMultiLangValue } from '../shared/i18n';
 import { normalizeListResponse } from '../shared/normalize';

@@ -19,7 +19,7 @@ import {
   SectionHeader,
   Select,
   Spinner,
-  Textarea, Glyph } from '@aspectum/ui';
+  Textarea, Glyph } from '@aspectum/admin-ui-web';
 import AiGenerationCountField from '../../components/generation/AiGenerationCountField.jsx';
 import { useAppLanguages } from '../../hooks/useAppLanguages';
 import {

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { attractionCommerceAPI, eventsAPI } from '../../../api/generation';
-import { Alert, Button, DropdownPanel, InlineState, Panel, SelectableCard, StatusBadge, TextInput } from '@aspectum/ui';
+import { Alert, Button, DropdownPanel, InlineState, Panel, SelectableCard, StatusBadge, TextInput } from '@aspectum/admin-ui-web';
 import { getMultiLangValue } from '../../../features/catalog/shared/i18n';
 import { parseApiError } from '../../../utils/apiError';
 

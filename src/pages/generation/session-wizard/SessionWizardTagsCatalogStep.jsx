@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { FormLabel, Alert, Button, Checkbox, ConfirmModal as DefaultConfirmModal, EmptyState, Field, FileButton, Heading, InlineState, Modal, MultiField, Panel, SectionHeader, Select, Tabs, TextInput, useConfirmModal, Glyph } from '@aspectum/ui';
+import { FormLabel, Alert, Button, Checkbox, ConfirmModal as DefaultConfirmModal, EmptyState, Field, FileButton, Heading, InlineState, Modal, MultiField, Panel, SectionHeader, Select, Tabs, TextInput, useConfirmModal, Glyph } from '@aspectum/admin-ui-web';
 import {
   DEFAULT_APP_LANGUAGES,
   ensureAppLanguages,

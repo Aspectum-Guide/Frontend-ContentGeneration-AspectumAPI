@@ -10,7 +10,7 @@ import TokenAuth from './pages/TokenAuth';
 import { registerAuthNavigate } from './utils/authRedirect';
 import { resolveNavScope } from './config/nav';
 import { filterRoutesByScope } from './config/scope';
-import { EmptyState, Spinner, UiProvider } from '@aspectum/ui';
+import { EmptyState, Spinner, UiProvider } from '@aspectum/admin-ui-web';
 
 const AISettings = lazy(() => import('./pages/ai/AISettings'));
 const PromptSettings = lazy(() => import('./pages/ai/PromptSettings'));

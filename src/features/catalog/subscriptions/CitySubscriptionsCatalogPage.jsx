@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { citySubscriptionsAPI } from '../../../api/subscription';
 import Layout from '../../../components/Layout';
-import { Button, DataTable, PageHeader, Select, StatusBadge } from '@aspectum/ui';
+import { Button, DataTable, PageHeader, Select, StatusBadge } from '@aspectum/admin-ui-web';
 import { useLayoutActions } from '../../../context/useLayoutActions';
 import { parseApiError } from '../../../utils/apiError';
 import { formatDateTime, getCityLabel } from './subscriptionLabels';

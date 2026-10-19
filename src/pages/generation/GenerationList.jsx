@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import Layout from '../../components/Layout';
-import { Button, ConfirmModal, DataTable, EmptyState, PageHeader, Panel, Spinner, Glyph } from '@aspectum/ui';
+import { Button, ConfirmModal, DataTable, EmptyState, PageHeader, Panel, Spinner, Glyph } from '@aspectum/admin-ui-web';
 import { sessionsAPI } from '../../api/generation';
 import { parseApiError } from '../../utils/apiError';
 

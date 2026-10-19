@@ -1,4 +1,4 @@
-import { FormLabel, Checkbox } from '@aspectum/ui';
+import { FormLabel, Checkbox } from '@aspectum/admin-ui-web';
 
 const HELPER_TEXT = {
   city_info: {
