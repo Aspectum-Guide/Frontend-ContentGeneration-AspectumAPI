@@ -52,7 +52,7 @@ export default function AppNav({ pathname, collapsed = false, extraItems = {}, g
   }, []);
 
   return (
-    <nav aria-label="Разделы" className={collapsed ? 'space-y-2' : 'space-y-1'}>
+    <nav aria-label="Разделы" className={collapsed ? 'space-y-2' : 'space-y-3'}>
       {navGroups.map((group) => {
         const dynamic = extraItems[group.id] || [];
         const items = [

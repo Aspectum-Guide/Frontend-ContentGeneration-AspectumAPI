@@ -22,9 +22,9 @@ export default function SidebarLink({
       aria-current={active ? 'page' : undefined}
       aria-label={collapsed ? label : undefined}
       title={collapsed ? label : undefined}
-      className={`flex items-center gap-2.5 rounded-aspectum-control py-2 text-sm font-medium transition-colors ${collapsed ? 'justify-center px-1' : 'px-3'} ${active ? 'bg-aspectum-primary-muted text-aspectum-primary-strong' : 'text-aspectum-text-strong hover:bg-aspectum-surface-subtle'} ${className}`.trim()}
+      className={`flex items-center gap-2.5 rounded-aspectum-control py-1.5 text-sm font-medium transition-colors ${collapsed ? 'justify-center px-1' : 'px-2'} ${active ? 'bg-aspectum-primary-muted text-aspectum-primary-strong' : 'text-aspectum-text hover:bg-aspectum-surface-subtle'} ${className}`.trim()}
     >
-      {Icon && <Icon className="size-4 shrink-0" aria-hidden="true" />}
+      {Icon && <Icon className={`size-4 shrink-0 ${active ? '' : 'text-aspectum-text-muted'}`} aria-hidden="true" />}
       {!collapsed && <span className="min-w-0 flex-1 truncate">{label}</span>}
       {badge && !collapsed && (
         <span className={`ml-auto shrink-0 rounded-aspectum-compact px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-aspectum-on-accent ${badgeClassName || 'bg-aspectum-primary'}`}>
