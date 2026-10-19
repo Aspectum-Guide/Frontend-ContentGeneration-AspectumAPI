@@ -1,4 +1,5 @@
 import Spinner from './Spinner';
+import { renderIcon } from './glyphIcons';
 
 const SIZES = {
   xs: 'text-xs',
@@ -32,7 +33,7 @@ export default function InlineState({
   className = '',
   ...props
 }) {
-  const resolvedIcon = loading ? <Spinner size={size === 'xs' ? 'xs' : 'sm'} decorative /> : icon;
+  const resolvedIcon = loading ? <Spinner size={size === 'xs' ? 'xs' : 'sm'} decorative /> : renderIcon(icon, 'size-4');
   return (
     <Component
       role={loading ? 'status' : undefined}

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { FormLabel, Alert, Button, Checkbox, ConfirmModal as DefaultConfirmModal, EmptyState, Field, FileButton, Heading, InlineState, Modal, MultiField, Panel, SectionHeader, Select, Tabs, TextInput, useConfirmModal } from '@aspectum/ui';
+import { FormLabel, Alert, Button, Checkbox, ConfirmModal as DefaultConfirmModal, EmptyState, Field, FileButton, Heading, InlineState, Modal, MultiField, Panel, SectionHeader, Select, Tabs, TextInput, useConfirmModal, Glyph } from '@aspectum/ui';
 import {
   DEFAULT_APP_LANGUAGES,
   ensureAppLanguages,
@@ -1463,7 +1463,7 @@ export default function SessionWizardTagsCatalogStep({
                           className="w-6"
                           aria-label={folded ? 'Развернуть' : 'Свернуть'}
                         >
-                          {folded ? '▸' : '▾'}
+                          {folded ? <Glyph name="▸" /> : <Glyph name="▾" />}
                         </Button>
                         <span className="flex-1 font-medium text-sm text-aspectum-text">
                           {folderTitle}

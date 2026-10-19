@@ -1,5 +1,5 @@
 import { useMemo, useRef, useState } from 'react';
-import { FormLabel, Alert, Button, ConfirmModal, EmptyState, FileButton, IconButton, LoadingOverlay, LocaleEditor, Panel, SectionHeader, Select, SelectableCard, Spinner, TextInput, Textarea } from '@aspectum/ui';
+import { FormLabel, Alert, Button, ConfirmModal, EmptyState, FileButton, IconButton, LoadingOverlay, LocaleEditor, Panel, SectionHeader, Select, SelectableCard, Spinner, TextInput, Textarea, Glyph } from '@aspectum/ui';
 
 import { normalizeId } from './sessionWizardShared.jsx';
 import { usePasteImageOnHover } from '../../../hooks/usePasteImageOnHover';
@@ -276,7 +276,7 @@ function AttractionFeedItemsPanel({
                       : 'text-aspectum-primary'
                   }
                 >
-                  {item.item_type === 'image' ? '🖼️' : '💬'}
+                  {item.item_type === 'image' ? <Glyph name="🖼" /> : <Glyph name="💬" />}
                 </span>
 
                 <span>{getFeedItemName(item)}</span>
@@ -532,7 +532,7 @@ function FeedBlockCard({
           </span>
           {bindingIncomplete && (
             <span className="px-1.5 py-0.5 rounded-aspectum-control bg-aspectum-warning-soft text-aspectum-warning font-medium shrink-0">
-              ⚠ не выбрана
+              <Glyph name="⚠" /> не выбрана
             </span>
           )}
         </div>
@@ -544,7 +544,7 @@ function FeedBlockCard({
         label="Удалить блок"
         variant="ghostDanger"
       >
-        ✕
+        <Glyph name="✕" />
       </IconButton>
     </Panel>
   );
@@ -901,7 +901,7 @@ export default function SessionWizardAttractionFeedStep({
 
           {isBindingIncomplete && (
             <Alert tone="warning" className="text-xs px-3 py-2">
-              ⚠ Выбран тип привязки, но достопримечательность не выбрана. Элемент сохранится без привязки.
+              <Glyph name="⚠" /> Выбран тип привязки, но достопримечательность не выбрана. Элемент сохранится без привязки.
             </Alert>
           )}
         </Panel>

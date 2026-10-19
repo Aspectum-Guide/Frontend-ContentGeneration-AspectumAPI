@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Button, ConfirmModal, EmptyState, Heading, IconButton, Sidebar, Spinner, Toast, TreeNav, useToast } from '@aspectum/ui';
 import useSessionSidebarData from './useSessionSidebarData';
+import { ChevronDown, ChevronRight, RefreshCw, Trash2 } from 'lucide-react';
 
 const getName = (item) => {
   if (!item?.name) return 'Без названия';
@@ -67,13 +68,13 @@ export default function SessionSidebar({ session, onCitySelect, selectedCityId, 
             <div className="border border-aspectum-border rounded-aspectum-compact">
               <div className={`p-3 cursor-pointer hover:bg-aspectum-surface-muted flex items-center justify-between ${state.selected ? 'bg-aspectum-primary-soft border-aspectum-focus' : ''}`} onClick={state.onSelect}>
                 <div className="flex-1"><div className="text-sm font-medium text-aspectum-text">{getName(item)}</div>{item.country && <div className="text-xs text-aspectum-text-muted">{item.country}</div>}</div>
-                {session?.content_type === 'city_with_attractions' && <IconButton label={state.expanded ? 'Свернуть город' : 'Развернуть город'} onClick={(event) => { event.stopPropagation(); toggleCity(item.id); }} className="ml-2">{state.expanded ? '▼' : '▶'}</IconButton>}
-                <Button type="button" onClick={(event) => { event.stopPropagation(); setDeleteTarget(item); }} variant="ghostDanger" size="sm" className="ml-2" title="Удалить город">🗑</Button>
+                {session?.content_type === 'city_with_attractions' && <IconButton label={state.expanded ? 'Свернуть город' : 'Развернуть город'} onClick={(event) => { event.stopPropagation(); toggleCity(item.id); }} className="ml-2">{state.expanded ? <ChevronDown className="size-4" aria-hidden="true" /> : <ChevronRight className="size-4" aria-hidden="true" />}</IconButton>}
+                <Button type="button" onClick={(event) => { event.stopPropagation(); setDeleteTarget(item); }} variant="ghostDanger" size="sm" className="ml-2" title="Удалить город" aria-label="Удалить город"><Trash2 className="size-4" aria-hidden="true" /></Button>
               </div>
             </div>
           )}
         />
-        <Button type="button" onClick={loadData} variant="outline" size="md" className="mt-4 w-full">🔄 Обновить список</Button>
+        <Button type="button" onClick={loadData} variant="outline" size="md" className="mt-4 w-full gap-2"><RefreshCw className="size-4" aria-hidden="true" /> Обновить список</Button>
       </div>
       <ConfirmModal
         open={!!deleteTarget}

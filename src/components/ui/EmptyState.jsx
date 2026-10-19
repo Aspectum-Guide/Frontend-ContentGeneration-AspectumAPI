@@ -1,3 +1,5 @@
+import { renderIcon } from './glyphIcons';
+
 export default function EmptyState({
   icon = '📄',
   title = 'Данных нет',
@@ -12,7 +14,7 @@ export default function EmptyState({
 
   return (
     <div className={`${spacingClass} text-center ${className}`.trim()}>
-      {icon ? <div className="mb-3 text-4xl">{icon}</div> : null}
+      {icon ? <div className="mb-3 flex justify-center text-4xl text-aspectum-text-disabled">{renderIcon(icon, 'size-10')}</div> : null}
       <p className={`text-sm font-medium ${titleTone}`}>{title}</p>
       {description && <p className="mt-1 text-xs text-aspectum-text-muted">{description}</p>}
       {actions ? <div className="mt-4 flex flex-wrap justify-center gap-3">{actions}</div> : null}

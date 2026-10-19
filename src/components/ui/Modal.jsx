@@ -5,6 +5,7 @@ import Button from './Button';
 import Spinner from './Spinner';
 import IconButton from './IconButton';
 import { isTopModal, registerModal, unregisterModal } from './modalStack';
+import { X } from 'lucide-react';
 
 const FOCUSABLE_SELECTOR = [
   'a[href]',
@@ -142,7 +143,7 @@ export default function Modal({
                 label="Закрыть"
                 className="ml-auto w-8 h-8"
               >
-                ✕
+                <X className="size-4" aria-hidden="true" />
               </IconButton>
             )}
           </div>

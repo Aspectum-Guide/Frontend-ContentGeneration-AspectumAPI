@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import Layout from '../../components/Layout';
-import { FormLabel, Checkbox, RadioGroup, Textarea, TextInput, Alert, Button, PageContainer, PageHeader, Panel } from '@aspectum/ui';
+import { FormLabel, Checkbox, RadioGroup, Textarea, TextInput, Alert, Button, PageContainer, PageHeader, Panel, Glyph } from '@aspectum/ui';
 import { sessionsAPI } from '../../api/generation';
 import { createSessionSchema } from '../../utils/validation';
 import { useAppLanguages } from '../../hooks/useAppLanguages';
@@ -102,7 +102,7 @@ export default function NewSession() {
             </FormLabel>
             {contentType === 'city_with_attractions' && (
               <p className="mt-2 text-sm text-aspectum-text-muted">
-                💡 При выборе города с достопримечательностями рекомендуется включить ИИ для лучшего результата
+                <Glyph name="💡" /> При выборе города с достопримечательностями рекомендуется включить ИИ для лучшего результата
               </p>
             )}
           </div>

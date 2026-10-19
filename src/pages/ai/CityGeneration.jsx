@@ -19,8 +19,7 @@ import {
   SectionHeader,
   Select,
   Spinner,
-  Textarea,
-} from '@aspectum/ui';
+  Textarea, Glyph } from '@aspectum/ui';
 import AiGenerationCountField from '../../components/generation/AiGenerationCountField.jsx';
 import { useAppLanguages } from '../../hooks/useAppLanguages';
 import {
@@ -361,7 +360,7 @@ export default function CityGeneration() {
                   {isRunning && (
                     <Spinner size="xs" className="w-2.5 h-2.5 border-2 border-current" />
                   )}
-                  {isDone ? '✅ Завершено' : isFailed ? '❌ Ошибка' : '⏳ Выполняется'}
+                  {isDone ? <><Glyph name="✅" /> Завершено</> : isFailed ? <><Glyph name="❌" /> Ошибка</> : <><Glyph name="⏳" /> Выполняется</>}
                 </span>
 
                 {progress != null && (
@@ -405,7 +404,7 @@ export default function CityGeneration() {
                       URL.revokeObjectURL(url);
                     }}
                   >
-                    ⬇ Скачать JSON
+                    <Glyph name="⬇" /> Скачать JSON
                   </Button>
                 )}
               />

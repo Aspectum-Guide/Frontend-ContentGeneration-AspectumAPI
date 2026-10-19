@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import Layout from '../../components/Layout';
-import { Alert, Button, PageContainer, PageHeader, Panel, ProgressBar, SectionHeader, Spinner, TextInput } from '@aspectum/ui';
+import { Alert, Button, PageContainer, PageHeader, Panel, ProgressBar, SectionHeader, Spinner, TextInput, Glyph } from '@aspectum/ui';
 import { ttsAPI } from '../../api/generation';
 import AudioProcessingMixer from '../../components/tts/AudioProcessingMixer';
 
@@ -65,7 +65,7 @@ function VoiceCard({ voice, isDefault, onPreview }) {
             size="sm"
             className="shrink-0"
           >
-            ▶ Слушать
+            <Glyph name="▶" /> Слушать
           </Button>
         )}
       </div>
@@ -171,7 +171,7 @@ export default function TTSSettings() {
           >
             {refreshing ? (
               <Spinner size="xs" className="w-3.5 h-3.5 border border-aspectum-border-disabled" />
-            ) : '↻'}
+            ) : <Glyph name="↻" />}
             Обновить кеш
           </Button>}
         />

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Layout from '../../../components/Layout';
-import { Alert, Button, ConfirmModal, DataTable, PageHeader, Select, Switch, TableRowActions, Toast } from '@aspectum/ui';
+import { Alert, Button, ConfirmModal, DataTable, PageHeader, Select, Switch, TableRowActions, Toast, Glyph } from '@aspectum/ui';
 import { useLayoutActions } from '../../../context/useLayoutActions';
 import { adminAPI } from '../../../api/generation';
 import { parseApiError } from '../../../utils/apiError';
@@ -203,12 +203,12 @@ export default function EventsCatalogPage() {
         <div className="mb-4 flex flex-col gap-1">
           {e.cityOptionsError && (
             <Alert tone="warning" className="text-sm px-3 py-2">
-              ⚠ {e.cityOptionsError} — фильтр по городу недоступен
+              <Glyph name="⚠" /> {e.cityOptionsError} — фильтр по городу недоступен
             </Alert>
           )}
           {e.filtersError && (
             <Alert tone="warning" className="text-sm px-3 py-2">
-              ⚠ {e.filtersError} — теги в форме недоступны
+              <Glyph name="⚠" /> {e.filtersError} — теги в форме недоступны
             </Alert>
           )}
         </div>

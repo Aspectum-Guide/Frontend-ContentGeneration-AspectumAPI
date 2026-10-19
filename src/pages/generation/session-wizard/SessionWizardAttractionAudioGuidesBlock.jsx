@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { FormLabel, Alert, Button, ConfirmModal, EmptyState, EntityDraftsPanel, FileButton, IconButton, LocaleEditor, Panel, SectionHeader, Select, SelectableCard, Spinner, Textarea, TextInput } from '@aspectum/ui';
+import { FormLabel, Alert, Button, ConfirmModal, EmptyState, EntityDraftsPanel, FileButton, IconButton, LocaleEditor, Panel, SectionHeader, Select, SelectableCard, Spinner, Textarea, TextInput, Glyph } from '@aspectum/ui';
 
 import { audioAPI } from '../../../api/generation';
 import AiGenerationModal from '../../../components/generation/AiGenerationModal.jsx';
@@ -290,7 +290,7 @@ function AttractionAudioTrackPreview({
                       variant="joinedGhost"
                       size="sm"
                     >
-                      {isRegenerating ? '…' : '↻'}
+                      {isRegenerating ? '…' : <Glyph name="↻" />}
                     </Button>
                   ) : null}
                 </div>
@@ -331,7 +331,7 @@ function AttractionAudioTrackPreview({
             download={downloadName}
             className="inline-flex items-center gap-1 text-xs font-medium text-aspectum-primary-hover hover:text-aspectum-primary-emphasis"
           >
-            ⬇ Скачать MP3
+            <Glyph name="⬇" /> Скачать MP3
           </a>
         </>
       ) : null}
@@ -658,7 +658,7 @@ export function TTSProviderSettingsPanel({
               variant="outline"
               size="sm"
             >
-              ▶ Прослушать
+              <Glyph name="▶" /> Прослушать
             </Button>
           </div>
         </>
@@ -1346,7 +1346,7 @@ export default function SessionWizardAttractionAudioGuidesBlock({
                   >
                     {buildingStressDictionary
                       ? 'Сбор...'
-                      : '📖 Собрать ударения города'}
+                      : <><Glyph name="📖" /> Собрать ударения города</>}
                   </Button>
                 ) : null}
                 <Select className="bg-aspectum-surface text-aspectum-purple-emphasis disabled:opacity-50" value={stressProvider} onChange={(e) => setStressProvider(e.target.value)} disabled={audioGuideStressBusyId != null} title="Провайдер ИИ для расстановки ударений">
@@ -1373,7 +1373,7 @@ export default function SessionWizardAttractionAudioGuidesBlock({
                 >
                   {audioGuideStressBusyId === 'all'
                     ? 'Расстановка...'
-                    : '↻ Расставить ударения во всех пунктах'}
+                    : <><Glyph name="↻" /> Расставить ударения во всех пунктах</>}
                 </Button>
               </div>
             </Panel>
@@ -1476,7 +1476,7 @@ export default function SessionWizardAttractionAudioGuidesBlock({
                             title="Расставить ударения на основе основного текста"
                             className="shrink-0"
                           >
-                            {stressBusy ? 'Расстановка...' : '↻ Расставить ударения'}
+                            {stressBusy ? 'Расстановка...' : <><Glyph name="↻" /> Расставить ударения</>}
                           </Button>
                         </div>
                         <Textarea className="bg-aspectum-violet/10 min-h-[72px]" value={stressValue} onChange={(e) => onSetAttractionAudioGuideStressText?.( currentAttractionAudioGuide, planLang, itemId, e.target.value, ) } rows={3} placeholder="Версия с ударениями (U+0301). Если пусто — озвучка возьмёт основной текст." />
@@ -1651,7 +1651,7 @@ export default function SessionWizardAttractionAudioGuidesBlock({
                   disabled={!canGenerateFullAudio}
                   title="Переозвучить все главы заново, даже если текст не менялся"
                 >
-                  ↻ Заново, без кэша
+                  <Glyph name="↻" /> Заново, без кэша
                 </Button>
               ) : null}
             </div>

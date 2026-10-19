@@ -1,5 +1,7 @@
 import { Link } from 'react-router-dom';
 import { Heading, PageHeader, Panel, SectionHeader } from '@aspectum/ui';
+import { ArrowRight } from 'lucide-react';
+import { renderIcon } from '@aspectum/ui';
 
 export function CatalogCard({ to, title, description, icon }) {
   return (
@@ -10,12 +12,12 @@ export function CatalogCard({ to, title, description, icon }) {
     >
       <div className="flex items-start gap-3">
         <div className="w-10 h-10 rounded-aspectum-control bg-aspectum-surface-muted border border-aspectum-border flex items-center justify-center text-xl">
-          {icon}
+          {renderIcon(icon, 'size-5 text-aspectum-text-subtle')}
         </div>
         <div className="min-w-0">
           <div className="flex items-center gap-2">
             <Heading level={2} size="sm" className="truncate group-hover:text-aspectum-primary-hover">{title}</Heading>
-            <span className="text-xs text-aspectum-text-disabled group-hover:text-aspectum-focus">→</span>
+            <ArrowRight className="size-3.5 text-aspectum-text-disabled group-hover:text-aspectum-focus" aria-hidden="true" />
           </div>
           <p className="text-sm text-aspectum-text-muted mt-1 line-clamp-2">
             {description}

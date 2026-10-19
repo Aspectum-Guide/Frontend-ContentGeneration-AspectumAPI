@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { audioQueueAPI } from '../../api/generation';
 import Layout from '../../components/Layout';
 import { parseApiError } from '../../utils/apiError';
+import { Glyph } from '@aspectum/ui';
 
 // Очередь пакетной озвучки по всем сессиям: что идёт, что ждёт и почему.
 // Сервер держит очередь сам; страница только показывает её состояние.
@@ -178,7 +179,7 @@ export default function AudioQueue() {
             onClick={() => load()}
             className="px-3 py-1.5 text-sm font-medium text-aspectum-text-strong bg-aspectum-surface border border-aspectum-border-strong rounded-md hover:bg-aspectum-surface-muted"
           >
-            ↻ Обновить
+            <Glyph name="↻" /> Обновить
           </button>
         </div>
       </div>

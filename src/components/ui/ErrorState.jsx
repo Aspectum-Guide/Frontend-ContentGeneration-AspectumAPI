@@ -1,3 +1,4 @@
+import { TriangleAlert } from 'lucide-react';
 import Panel from './Panel';
 
 /** Полноэкранное критическое состояние с диагностикой и действиями восстановления. */
@@ -5,7 +6,7 @@ export default function ErrorState({ title, description, details, detailsLabel =
   return (
     <div className="flex min-h-screen items-center justify-center bg-aspectum-surface-muted p-6">
       <Panel radius="modal" tone="critical" className="w-full max-w-md p-8 text-center shadow-aspectum-card">
-        <div className="mb-4 text-4xl" aria-hidden="true">⚠️</div>
+        <div className="mb-4 flex justify-center text-aspectum-warning" aria-hidden="true"><TriangleAlert className="size-10" /></div>
         <h1 className="mb-2 text-lg font-semibold text-aspectum-text">{title}</h1>
         {description ? <p className="mb-6 text-sm text-aspectum-text-muted">{description}</p> : null}
         {details ? (

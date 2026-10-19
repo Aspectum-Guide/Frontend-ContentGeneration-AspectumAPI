@@ -2,6 +2,7 @@ import { useRef } from 'react';
 import Button from './Button';
 import IconButton from './IconButton';
 import TabButton from './TabButton';
+import { Star } from 'lucide-react';
 
 function localeStatus(locale = {}) {
   const filled = [locale.name, locale.description, locale.country].filter((value) => (value || '').trim()).length;
@@ -54,11 +55,11 @@ export default function LocaleEditor({
             >
               <span className="text-base leading-none">{locale.flag || locale.code?.toUpperCase()}</span>
               <span>{locale.langName || locale.lang || key.toUpperCase()}</span>
-              {isDefault && <span className={`text-xs ${active ? 'text-aspectum-primary-soft' : 'text-aspectum-warning'}`}>★</span>}
+              {isDefault && <span className={`text-xs ${active ? 'text-aspectum-primary-soft' : 'text-aspectum-warning'}`}><Star className="size-3 fill-current" aria-hidden="true" /></span>}
               {showStatus && <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${statusColor} ${active ? 'opacity-80' : ''}`} />}
             </TabButton>
             {!locale.isDefault && onRemoveLocale && <IconButton label="Удалить язык" onClick={() => onRemoveLocale(key)} variant="ghostDanger" size="iconXs">×</IconButton>}
-            {!isDefault && onSetDefault && <IconButton label="Сделать основным" onClick={() => onSetDefault(key)} variant="ghostWarning" size="iconXs">★</IconButton>}
+            {!isDefault && onSetDefault && <IconButton label="Сделать основным" onClick={() => onSetDefault(key)} variant="ghostWarning" size="iconXs"><Star className="size-3" aria-hidden="true" /></IconButton>}
           </div>
         );
       })}

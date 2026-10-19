@@ -7,7 +7,7 @@ import { imagesAPI } from '../../api/generation';
  * Аналог cg-commons-picker.js из Django templates
  */
 const LIBRARY_TABS = [
-  { key: 'best', label: '★ Подбор' },
+  { key: 'best', label: 'Подбор' },
   { key: 'commons', label: 'WC' },
   { key: 'mkrf', label: 'Минкульт' },
   { key: 'openverse', label: 'Openverse' },

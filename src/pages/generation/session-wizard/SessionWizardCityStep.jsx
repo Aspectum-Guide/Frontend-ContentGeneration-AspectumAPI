@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { contentAuthorsAPI } from '../../../api/generation';
 import { createCoordinatePasteHandler } from '../../../utils/coordinates';
 import { usePasteImageOnHover } from '../../../hooks/usePasteImageOnHover';
-import { FormLabel, Button, Chip, FileButton, LoadingOverlay, LocaleEditor, Panel, Select, Textarea, TextInput } from '@aspectum/ui';
+import { FormLabel, Button, Chip, FileButton, LoadingOverlay, LocaleEditor, Panel, Select, Textarea, TextInput, Glyph } from '@aspectum/ui';
 
 // ─── helpers ──────────────────────────────────────────────────────────────────
 
@@ -14,20 +14,6 @@ function localeStatus(loc) {
 }
 
 // ─── sub-components ───────────────────────────────────────────────────────────
-
-function SectionCard({ title, children, action }) {
-  return (
-    <Panel className="overflow-hidden p-0">
-      {(title || action) && (
-        <div className="flex items-center justify-between px-4 py-2.5 border-b border-aspectum-border-subtle bg-aspectum-surface-muted">
-          {title && <span className="text-xs font-semibold text-aspectum-text-muted uppercase tracking-wide">{title}</span>}
-          {action}
-        </div>
-      )}
-      <div className="p-4">{children}</div>
-    </Panel>
-  );
-}
 
 function CoordinatesPanel({ lat, lon, savedLat, savedLon, setMapContainerRef, onLatChange, onLonChange, onRestoreSavedCoords }) {
   // Вставка пары "55.7558, 37.6173" в любое из полей заполняет оба
@@ -72,7 +58,7 @@ function PhotoPanel({
       <div
         {...photoPaste}
         title="Наведите и нажмите Ctrl+V, чтобы вставить фото из буфера"
-        className="relative aspect-[3/4] bg-aspectum-surface-subtle rounded-aspectum-card overflow-hidden border border-aspectum-border flex items-center justify-center">
+        className="relative aspect-square bg-aspectum-surface-subtle rounded-aspectum-card overflow-hidden border border-aspectum-border flex items-center justify-center">
         {imagePreview
           ? <img src={imagePreview} alt="Фото" className="w-full h-full object-cover" />
           : <span className="text-aspectum-text-disabled text-xs">Нет фото</span>
@@ -85,7 +71,7 @@ function PhotoPanel({
             size="sm"
             className="absolute top-2 left-2 shadow text-[10px]"
           >
-            ✕ Удалить
+            <Glyph name="✕" /> Удалить
           </Button>
         )}
         <Button
@@ -120,6 +106,7 @@ export default function SessionWizardCityStep({
   onSwitchLocale, onSetDefaultLocale, onAddLocale, onRemoveLocale,
   onUpdateLocaleField,
   onLatChange, onLonChange, onRestoreSavedCoords,
+  headerEnd = null,
   parentCityId, setParentCityId, referenceCities = [],
   authorIds = [], setAuthorIds,
   onGoToStep, saving,
@@ -158,10 +145,8 @@ export default function SessionWizardCityStep({
 
   return (
     <div className="space-y-4">
-
-      {/* Языки */}
-      <SectionCard title="Язык редактирования">
-        <div className="space-y-2">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="min-w-0 space-y-1">
           <LocaleEditor
             localeData={localeData}
             activeLocale={activeLocale}
@@ -180,18 +165,10 @@ export default function SessionWizardCityStep({
             </p>
           )}
         </div>
-      </SectionCard>
-      <SectionCard title="Спецгид">
-        <Select value={parentCityId || ''} onChange={(e) => setParentCityId(e.target.value)}>
-          <option value="">Обычный город</option>
-          {referenceCities.filter((city) => !city.parent_city).map((city) => <option key={city.id} value={city.id}>{city.name?.ru || city.name?.en || city.id}</option>)}
-        </Select>
-        <p className="mt-1 text-xs text-aspectum-text-muted">Выберите родительский город, если эта сессия создаёт спецгид.</p>
-        {parentCityId && <div className="mt-3 flex flex-wrap gap-2">{authors.map((author) => { const id = String(author.id); const active = authorIds.includes(id); return <Chip key={id} selected={active} onClick={() => setAuthorIds(active ? authorIds.filter((value) => value !== id) : [...authorIds, id])}>{author.name}{active ? ' ✓' : ''}</Chip>; })}</div>}
-      </SectionCard>
+        {headerEnd}
+      </div>
 
-      {/* Данные города + координаты */}
-      <SectionCard title={`Данные города · ${localeLabel}`}>
+      <Panel className="p-4">
         <div className="flex gap-5 items-start">
           <PhotoPanel
             imagePreview={imagePreview}
@@ -245,7 +222,29 @@ export default function SessionWizardCityStep({
             onRestoreSavedCoords={onRestoreSavedCoords}
           />
         </div>
-      </SectionCard>
+
+        <div className="mt-4 flex flex-wrap items-center gap-3 border-t border-aspectum-border-subtle pt-4">
+          <span className="text-xs font-semibold uppercase tracking-wide text-aspectum-text-muted">Спецгид</span>
+          <Select value={parentCityId || ''} onChange={(e) => setParentCityId(e.target.value)} className="max-w-xs">
+            <option value="">Обычный город</option>
+            {referenceCities.filter((city) => !city.parent_city).map((city) => <option key={city.id} value={city.id}>{city.name?.ru || city.name?.en || city.id}</option>)}
+          </Select>
+          <span className="text-xs text-aspectum-text-muted">Родительский город, если сессия — спецгид.</span>
+        </div>
+        {parentCityId && (
+          <div className="mt-3 flex flex-wrap gap-2">
+            {authors.map((author) => {
+              const id = String(author.id);
+              const active = authorIds.includes(id);
+              return (
+                <Chip key={id} selected={active} onClick={() => setAuthorIds(active ? authorIds.filter((value) => value !== id) : [...authorIds, id])}>
+                  {author.name}{active ? ' ✓' : ''}
+                </Chip>
+              );
+            })}
+          </div>
+        )}
+      </Panel>
 
       {/* Футер */}
       <div className="flex items-center justify-between pt-1">
@@ -257,7 +256,7 @@ export default function SessionWizardCityStep({
           )}
           {canProceed && incompleteLocales.length > 0 && (
             <p className="text-aspectum-warning">
-              ⚠ Не все языки заполнены: {incompleteLocales.join(', ')}
+              <Glyph name="⚠" /> Не все языки заполнены: {incompleteLocales.join(', ')}
             </p>
           )}
         </div>

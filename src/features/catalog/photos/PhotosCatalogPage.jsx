@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import Layout from '../../../components/Layout';
 import apiClient from '../../../api/client';
 import { imagesAPI } from './api';
-import { FormLabel, Alert, Button, Card, ConfirmModal, EmptyState, IconButton, InlineState, Modal, PageHeader, Spinner, TextInput } from '@aspectum/ui';
+import { FormLabel, Alert, Button, Card, ConfirmModal, EmptyState, IconButton, InlineState, Modal, PageHeader, Spinner, TextInput, Glyph } from '@aspectum/ui';
 
 const USAGE_KIND_LABELS = {
   city: 'Город',
@@ -190,7 +190,7 @@ export default function PhotosCatalog() {
       {actionError && (
         <Alert tone="error" className="mb-4 flex items-center justify-between">
           {actionError}
-          <IconButton label="Закрыть ошибку" onClick={() => setActionError(null)} variant="ghostDanger" className="ml-3 shrink-0">✕</IconButton>
+          <IconButton label="Закрыть ошибку" onClick={() => setActionError(null)} variant="ghostDanger" className="ml-3 shrink-0"><Glyph name="✕" /></IconButton>
         </Alert>
       )}
 
@@ -235,7 +235,7 @@ export default function PhotosCatalog() {
                     onClick={() => openEdit(img)}
                     label="Редактировать"
                   >
-                    ✏️
+                    <Glyph name="✏" />
                   </IconButton>
                   <IconButton
                     type="button"
@@ -243,7 +243,7 @@ export default function PhotosCatalog() {
                     onClick={() => setDeleteTarget(img)}
                     label="Удалить"
                   >
-                    🗑️
+                    <Glyph name="🗑" />
                   </IconButton>
                 </div>
               </div>

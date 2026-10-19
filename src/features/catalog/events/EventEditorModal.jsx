@@ -1,7 +1,7 @@
 import 'leaflet/dist/leaflet.css';
 import { useEffect, useRef, useState } from 'react';
 import EventMediaPanel from './EventMediaPanel';
-import { FormLabel, Alert, Chip, ConfirmModal, Field, FormActions, FormGrid, Modal, Panel, Select, Spinner, Switch, Tabs, TextInput } from '@aspectum/ui';
+import { FormLabel, Alert, Chip, ConfirmModal, Field, FormActions, FormGrid, Modal, Panel, Select, Spinner, Switch, Tabs, TextInput, Glyph } from '@aspectum/ui';
 import { createCoordinatePasteHandler, parseCoord } from '../../../utils/coordinates';
 import { buildLangOptions, getMultiLangValue } from '../shared/i18n';
 import { LangBlock, LangTabs } from '../shared/LangFields';
@@ -355,7 +355,7 @@ export default function EventEditorModal({
                         onClick={() => toggleTag(fid)}
                       >
                         {label}
-                        {selected && <span className="ml-0.5">✓</span>}
+                        {selected && <span className="ml-0.5"><Glyph name="✓" /></span>}
                       </Chip>
                     );
                   })}

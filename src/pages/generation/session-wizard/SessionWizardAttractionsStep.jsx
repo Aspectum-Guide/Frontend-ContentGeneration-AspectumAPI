@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import AiGenerationModal from '../../../components/generation/AiGenerationModal.jsx';
-import { FormLabel, WizardActionFooter as WizardGenerationActionFooter, formGridClassName } from '@aspectum/ui';
+import { FormLabel, WizardActionFooter as WizardGenerationActionFooter, formGridClassName, Glyph } from '@aspectum/ui';
 import AiGenerationQualitySettings from '../../../components/generation/AiGenerationQualitySettings.jsx';
 import AiGenerationDedupeToggle from '../../../components/generation/AiGenerationDedupeToggle.jsx';
 import AiGenerationCountField from '../../../components/generation/AiGenerationCountField.jsx';
@@ -1298,7 +1298,7 @@ export default function SessionWizardAttractionsStep({
                       variant="softIndigoStrong"
                       size="sm"
                     >
-                      {regenDetailLoading ? '↻ Генерирую…' : '↻ Перегенерировать ИИ'}
+                      {regenDetailLoading ? <><Glyph name="↻" /> Генерирую…</> : <><Glyph name="↻" /> Перегенерировать ИИ</>}
                     </Button>
                   </div>
                 )}

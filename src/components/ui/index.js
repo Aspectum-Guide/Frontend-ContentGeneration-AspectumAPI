@@ -22,6 +22,7 @@ export { default as AsyncErrorState } from './AsyncErrorState';
 export { default as EntityDraftsPanel } from './EntityDraftsPanel';
 export { default as ErrorState } from './ErrorState';
 export { default as EmptyState } from './EmptyState';
+export { renderIcon, glyphComponent, Glyph, GLYPH_ICONS } from './glyphIcons';
 export { default as FileButton } from './FileButton';
 export { default as FileDropzone } from './FileDropzone';
 export { default as FormHint } from './FormHint';

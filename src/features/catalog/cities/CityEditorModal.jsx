@@ -1,7 +1,7 @@
 import 'leaflet/dist/leaflet.css';
 import { useEffect, useRef, useState } from 'react';
 import CommonsImagePicker from '../../../components/generation/CommonsImagePicker';
-import { FormLabel, Alert, BusyOverlay, Button, Chip, Field, FileButton, FormActions, FormGrid, IconButton, LoadingOverlay, MediaPreview, Modal, Panel, Select, Spinner, Switch, Tabs, TextInput } from '@aspectum/ui';
+import { FormLabel, Alert, BusyOverlay, Button, Chip, Field, FileButton, FormActions, FormGrid, IconButton, LoadingOverlay, MediaPreview, Modal, Panel, Select, Spinner, Switch, Tabs, TextInput, Glyph } from '@aspectum/ui';
 import { createCoordinatePasteHandler, parseCoord } from '../../../utils/coordinates';
 import { buildLangOptions, getMultiLangValue } from '../shared/i18n';
 import { LangBlock, LangTabs } from '../shared/LangFields';
@@ -298,7 +298,7 @@ export default function CityEditorModal({
                           <Spinner size="xs" className="border border-aspectum-border-muted" />
                           Загрузка...
                         </span>
-                      ) : '📷 Загрузить фото'}
+                      ) : <><Glyph name="📷" /> Загрузить фото</>}
                     </FileButton>
                     <Button
                       type="button"
@@ -307,7 +307,7 @@ export default function CityEditorModal({
                       onClick={() => setCommonsModalOpen(true)}
                       disabled={imageUploading}
                     >
-                      🖼️ Выбрать из Wikimedia Commons
+                      <Glyph name="🖼" /> Выбрать из Wikimedia Commons
                     </Button>
                     {city?.image_id && (
                       <span className="px-2 py-2 text-xs text-aspectum-text-disabled font-mono">
@@ -377,7 +377,7 @@ export default function CityEditorModal({
                           >
                             {f.emoji && <span>{f.emoji}</span>}
                             {label}
-                            {selected && <span className="ml-0.5">✓</span>}
+                            {selected && <span className="ml-0.5"><Glyph name="✓" /></span>}
                           </Chip>
                         );
                       })}
@@ -517,7 +517,7 @@ export default function CityEditorModal({
                         <Spinner size="xs" className="border border-aspectum-focus" />
                         Синкаем...
                       </span>
-                    ) : '🔄 Синхронизировать с App Store / Google Play'}
+                    ) : <><Glyph name="🔄" /> Синхронизировать с App Store / Google Play</>}
                   </Button>
                 </div>
 

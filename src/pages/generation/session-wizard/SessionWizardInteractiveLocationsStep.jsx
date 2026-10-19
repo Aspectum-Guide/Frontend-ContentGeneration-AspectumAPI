@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import 'leaflet/dist/leaflet.css';
 import { usePasteImageOnHover } from '../../../hooks/usePasteImageOnHover';
 import AiGenerationModal from '../../../components/generation/AiGenerationModal.jsx';
-import { FormLabel, WizardActionFooter as WizardGenerationActionFooter, formGridClassName } from '@aspectum/ui';
+import { FormLabel, WizardActionFooter as WizardGenerationActionFooter, formGridClassName, Glyph } from '@aspectum/ui';
 import AiGenerationQualitySettings from '../../../components/generation/AiGenerationQualitySettings.jsx';
 import AiGenerationDedupeToggle from '../../../components/generation/AiGenerationDedupeToggle.jsx';
 import AiGenerationCountField from '../../../components/generation/AiGenerationCountField.jsx';
@@ -244,7 +244,7 @@ export function IlPhotoPanel({
           <div className="relative w-10 h-10 rounded-aspectum-control border border-aspectum-border bg-aspectum-surface-muted flex items-center justify-center shrink-0 overflow-hidden">
             {currentIl?.icon_url
               ? <img src={currentIl.icon_url} alt="Иконка на карте" className="w-full h-full object-contain" />
-              : <span className="text-base">📍</span>
+              : <span className="text-base"><Glyph name="📍" /></span>
             }
             {iconUploading && (
               <div className="absolute inset-0 bg-aspectum-overlay-medium flex items-center justify-center rounded-aspectum-control">

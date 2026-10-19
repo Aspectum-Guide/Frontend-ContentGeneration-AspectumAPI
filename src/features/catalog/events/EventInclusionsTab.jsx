@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { Alert, Button, ConfirmModal, EmptyState, Heading, IconButton, Panel, Select } from '@aspectum/ui';
+import { Alert, Button, ConfirmModal, EmptyState, Heading, IconButton, Panel, Select, Glyph } from '@aspectum/ui';
 import { parseApiError } from '../../../utils/apiError';
 import { eventsCatalogAPI } from './api';
 import { LangBlock } from '../shared/LangFields';
@@ -175,8 +175,8 @@ export default function EventInclusionsTab({ eventId, activeLang }) {
                               className="w-6 h-6 p-0 text-xs">↑</IconButton>
                             <IconButton label="Переместить ниже" type="button" onClick={() => move(item, 1, group)} disabled={i === group.length - 1}
                               className="w-6 h-6 p-0 text-xs">↓</IconButton>
-                            <Button type="button" variant="soft" size="sm" onClick={() => startEdit(item)}>✎</Button>
-                            <Button type="button" variant="softDanger" size="sm" onClick={() => setDeleteTarget(item)}>✕</Button>
+                            <Button type="button" variant="soft" size="sm" onClick={() => startEdit(item)}><Glyph name="✎" /></Button>
+                            <Button type="button" variant="softDanger" size="sm" onClick={() => setDeleteTarget(item)}><Glyph name="✕" /></Button>
                           </div>
                         </div>
                       )}

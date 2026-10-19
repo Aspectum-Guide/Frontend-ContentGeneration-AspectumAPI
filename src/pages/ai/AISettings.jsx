@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import Layout from '../../components/Layout';
 import apiClient from '../../api/client';
-import { FormLabel, Alert, Button, Checkbox, EmptyState, Heading, PageHeader, Panel, SectionHeader, Select, Spinner, TextInput } from '@aspectum/ui';
+import { FormLabel, Alert, Button, Checkbox, EmptyState, Heading, PageHeader, Panel, SectionHeader, Select, Spinner, TextInput, Glyph } from '@aspectum/ui';
 
 export default function AISettings() {
   const [settings, setSettings] = useState(null);
@@ -48,7 +48,7 @@ export default function AISettings() {
       };
 
       await apiClient.post('/generation/ai/settings/update/', updateData);
-      setSuccessMessage('✅ Настройки сохранены!');
+      setSuccessMessage('Настройки сохранены!');
       setTimeout(() => setSuccessMessage(''), 3000);
     } catch (err) {
       console.error('Error saving AI settings:', err);
@@ -81,7 +81,7 @@ export default function AISettings() {
             variant="primary" 
             onClick={loadSettings}
           >
-            ↻ Повторить
+            <Glyph name="↻" /> Повторить
           </Button>
         </Panel>
       </Layout>
@@ -159,8 +159,8 @@ export default function AISettings() {
               />
               <p className="text-xs text-aspectum-text-muted mt-1">
                 {settings.openai?.has_api_key
-                  ? '✅ API ключ сохранен'
-                  : '⚠️ API ключ не установлен'}
+                  ? <><Glyph name="✅" /> API ключ сохранен</>
+                  : <><Glyph name="⚠" /> API ключ не установлен</>}
               </p>
             </div>
           </div>
@@ -210,8 +210,8 @@ export default function AISettings() {
               </Select>
               <p className="text-xs text-aspectum-text-muted mt-1">
                 {settings.ollama?.available
-                  ? '✅ Ollama доступна'
-                  : '❌ Ollama не доступна'}
+                  ? <><Glyph name="✅" /> Ollama доступна</>
+                  : <><Glyph name="❌" /> Ollama не доступна</>}
               </p>
             </div>
 
@@ -286,9 +286,9 @@ export default function AISettings() {
 }
 
 const SOURCE_GROUPS = [
-  { key: 'photo', title: '📷 Фото' },
-  { key: 'facts', title: '📚 Фактура (гиды и описания)' },
-  { key: 'discovery', title: '🔎 Поиск достопримечательностей' },
+  { key: 'photo', title: 'Фото' },
+  { key: 'facts', title: 'Фактура (гиды и описания)' },
+  { key: 'discovery', title: 'Поиск достопримечательностей' },
 ];
 
 const REGION_LABELS = { RU: 'Россия', 'RU-SPB': 'Санкт-Петербург' };

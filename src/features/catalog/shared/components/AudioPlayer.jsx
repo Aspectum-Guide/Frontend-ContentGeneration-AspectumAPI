@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { Button } from '@aspectum/ui';
+import { Button, Glyph } from '@aspectum/ui';
 import { audioAPI } from '../../../../api/generation';
 
 export default function AudioPlayer({ audioId }) {
@@ -39,7 +39,7 @@ export default function AudioPlayer({ audioId }) {
         variant="soft"
         size="sm"
       >
-        {loading ? '⏳' : '▶ Слушать'}
+        {loading ? <Glyph name="⏳" /> : <><Glyph name="▶" /> Слушать</>}
       </Button>
     );
   }

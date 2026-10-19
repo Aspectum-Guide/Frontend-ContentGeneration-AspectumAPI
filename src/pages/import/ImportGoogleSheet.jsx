@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
 import Layout from '../../components/Layout';
 import { importAPI } from '../../api/generation';
-import { Alert, Button, Field, FileButton, PageContainer, PageHeader, Panel, SectionHeader, Spinner, TextInput } from '@aspectum/ui';
+import { Alert, Button, Field, FileButton, PageContainer, PageHeader, Panel, SectionHeader, Spinner, TextInput, Glyph } from '@aspectum/ui';
 
 export default function ImportGoogleSheet() {
   const [sheetUrl, setSheetUrl] = useState('');
@@ -101,7 +101,7 @@ export default function ImportGoogleSheet() {
                   {isRunning && (
                     <Spinner size="xs" className="w-3.5 h-3.5 border-2 border-current" />
                   )}
-                  {isDone ? '✅' : isFailed ? '❌' : ''}
+                  {isDone ? <Glyph name="✅" /> : isFailed ? <Glyph name="❌" /> : ''}
                   <span>
                     {status.message || status.status}
                     {status.imported_count != null && ` — загружено: ${status.imported_count}`}
@@ -183,7 +183,7 @@ function ImportZip() {
         accept=".zip"
         onChange={(e) => { setFile(e.target.files?.[0] || null); setError(null); setSuccess(null); }}
       >
-        📦 Выбрать ZIP
+        <Glyph name="📦" /> Выбрать ZIP
       </FileButton>
       {file && <p className="text-xs text-aspectum-text-muted">Выбран: {file.name}</p>}
       {error && <Alert tone="error">{error}</Alert>}
@@ -195,7 +195,7 @@ function ImportZip() {
         size="md"
         className="w-full"
       >
-        {loading ? 'Загрузка...' : '📁 Загрузить ZIP'}
+        {loading ? 'Загрузка...' : <><Glyph name="📁" /> Загрузить ZIP</>}
       </Button>
     </form>
   );

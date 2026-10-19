@@ -1,4 +1,4 @@
-import { Alert, Button, Panel, SectionHeader, SessionStatusBadge as DefaultStatusBadge } from '@aspectum/ui';
+import { Alert, Button, Panel, SectionHeader, SessionStatusBadge as DefaultStatusBadge, Glyph } from '@aspectum/ui';
 
 const getCountLabel = (count, emptyLabel = '—') => {
   return count > 0 ? count : emptyLabel;
@@ -183,7 +183,7 @@ export default function SessionWizardPublishStep({
           </Button>
 
           <Button type="button" variant="success" size="md" onClick={onPublish} disabled={publishing || !hasAnythingToPublish}>
-            {publishing ? 'Публикация...' : '✓ Опубликовать сессию'}
+            {publishing ? 'Публикация...' : <><Glyph name="✓" /> Опубликовать сессию</>}
           </Button>
         </div>
       </div>

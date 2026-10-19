@@ -319,7 +319,7 @@ export default function MyTasks() {
         )}
         secondaryActions={[{
           key: 'refresh',
-          label: '↻ Обновить',
+          label: 'Обновить',
           onClick: () => loadTasks(),
         }]}
       />

@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import Layout from '../../components/Layout';
-import { Button, ConfirmModal, DataTable, EmptyState, PageHeader, Panel, Spinner } from '@aspectum/ui';
+import { Button, ConfirmModal, DataTable, EmptyState, PageHeader, Panel, Spinner, Glyph } from '@aspectum/ui';
 import { sessionsAPI } from '../../api/generation';
 import { parseApiError } from '../../utils/apiError';
 
@@ -97,7 +97,7 @@ export default function GenerationList() {
 
         {sessions.length === 0 ? (
           <Panel className="p-12 text-center shadow-aspectum-card">
-            <div className="text-6xl mb-4">📋</div>
+            <div className="text-6xl mb-4"><Glyph name="📋" /></div>
             <p className="text-aspectum-text-subtle text-lg mb-6">Нет созданных сессий</p>
             <Button
               variant="primary"
@@ -145,9 +145,9 @@ export default function GenerationList() {
                 key: 'publicationStatus',
                 label: 'Статус публикации',
                 render: (_, row) => row.status === 'published' ? (
-                  <span className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-semibold bg-aspectum-positive-muted text-aspectum-positive-emphasis">✅ Опубликовано</span>
+                  <span className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-semibold bg-aspectum-positive-muted text-aspectum-positive-emphasis"><Glyph name="✅" /> Опубликовано</span>
                 ) : (
-                  <span className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-semibold bg-aspectum-surface-subtle text-aspectum-text-subtle">📝 Черновик</span>
+                  <span className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-semibold bg-aspectum-surface-subtle text-aspectum-text-subtle"><Glyph name="📝" /> Черновик</span>
                 ),
               },
               {
@@ -171,7 +171,7 @@ export default function GenerationList() {
                   className="inline-flex items-center justify-center w-9 h-9 rounded-aspectum-control text-aspectum-primary hover:bg-aspectum-primary-muted transition-colors font-medium"
                   title="Редактировать"
                 >
-                  ✏️
+                  <Glyph name="✏" />
                 </Link>
                 {session.status === 'draft' && (
                   <Button
@@ -181,7 +181,7 @@ export default function GenerationList() {
                     onClick={() => setDeleteTarget(session)}
                     title="Удалить"
                   >
-                    🗑️
+                    <Glyph name="🗑" />
                   </Button>
                 )}
               </>

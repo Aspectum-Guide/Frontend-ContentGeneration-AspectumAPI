@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import Layout from '../../components/Layout';
 import { aiAPI } from '../../api/generation';
-import { Alert, Button, Field, PageHeader, Panel, SectionHeader, Spinner, TextInput } from '@aspectum/ui';
+import { Alert, Button, Field, PageHeader, Panel, SectionHeader, Spinner, TextInput, Glyph } from '@aspectum/ui';
 
 export default function ImageGeneration() {
   const [query, setQuery] = useState('');
@@ -146,7 +146,7 @@ export default function ImageGeneration() {
 
       {!loading && images.length === 0 && (
         <Panel className="p-12 text-center">
-          <div className="text-5xl mb-4">🖼️</div>
+          <div className="text-5xl mb-4"><Glyph name="🖼" /></div>
           <p className="text-aspectum-text-muted">Введите запрос для поиска изображений</p>
           <p className="text-xs text-aspectum-text-disabled mt-2">
             Поиск выполняется в открытой базе Wikimedia Commons

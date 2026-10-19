@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { eventAudioGuidesAPI, audioAPI, eventsAPI } from './api';
 import Layout from '../../../components/Layout';
-import { FormLabel, Alert, Button, ConfirmModal, EmptyState, Field, FileButton, FormGrid, InlineState, Modal, PageHeader, Panel, Select, SelectableCard, Switch, TextInput } from '@aspectum/ui';
+import { FormLabel, Alert, Button, ConfirmModal, EmptyState, Field, FileButton, FormGrid, InlineState, Modal, PageHeader, Panel, Select, SelectableCard, Switch, TextInput, Glyph } from '@aspectum/ui';
 import { parseApiError } from '../../../utils/apiError';
 import AudioPlayer from '../shared/components/AudioPlayer';
 import { getMultiLangValue } from '../shared/i18n';
@@ -91,7 +91,7 @@ function TrackRow({ track, guideId, onUploaded, onDeleted }) {
               size="sm"
               disabled={deleting}
             >
-              ✕
+              <Glyph name="✕" />
             </Button>
           </div>
         </div>
@@ -161,7 +161,7 @@ function LangDot({ linked }) {
     <span className={`w-5 h-5 rounded-full border-2 flex items-center justify-center text-[9px] font-bold ${
       linked ? 'border-aspectum-positive-light bg-aspectum-positive-muted text-aspectum-positive-strong' : 'border-aspectum-border-strong bg-aspectum-surface text-aspectum-text-disabled'
     }`}>
-      {linked ? '✓' : '—'}
+      {linked ? <Glyph name="✓" /> : '—'}
     </span>
   );
 }
@@ -362,7 +362,7 @@ function CoverageSummary({ guides }) {
   const incomplete = langs.filter(([, s]) => s.ok < s.total);
 
   if (!incomplete.length) return (
-    <Alert tone="success" className="mb-4">✓ Все языки заполнены полностью</Alert>
+    <Alert tone="success" className="mb-4"><Glyph name="✓" /> Все языки заполнены полностью</Alert>
   );
 
   return (

@@ -4,7 +4,7 @@ import { ilCatalogAPI, imagesAPI } from './api';
 import ILCityPhotosEditor from './ILCityPhotosEditor';
 import { eventsCatalogAPI } from '../events/api';
 import Layout from '../../../components/Layout';
-import { FormLabel, Alert, Button, Chip, ConfirmModal, DataTable, EmptyState, Field, FileButton, FormGrid, IconButton, Modal, PageHeader, Panel, Select, Switch, TableRowActions, Tabs, TextInput } from '@aspectum/ui';
+import { FormLabel, Alert, Button, Chip, ConfirmModal, DataTable, EmptyState, Field, FileButton, FormGrid, IconButton, Modal, PageHeader, Panel, Select, Switch, TableRowActions, Tabs, TextInput, Glyph } from '@aspectum/ui';
 import { useLayoutActions } from '../../../context/useLayoutActions';
 import { parseApiError } from '../../../utils/apiError';
 import { createCoordinatePasteHandler, parseCoord } from '../../../utils/coordinates';
@@ -345,7 +345,7 @@ function ILEditorModal({ open, onClose, location, onSaved, cityOptions, tagOptio
                 <div className="w-16 h-16 rounded-aspectum-card border border-aspectum-border bg-aspectum-surface-muted flex items-center justify-center shrink-0 overflow-hidden">
                   {form.icon_url
                     ? <img src={form.icon_url} alt="" className="w-full h-full object-contain" />
-                    : <span className="text-2xl">📍</span>
+                    : <span className="text-2xl"><Glyph name="📍" /></span>
                   }
                 </div>
                 <div className="flex flex-col gap-2">
@@ -520,7 +520,7 @@ export default function InteractiveLocationsCatalogPage() {
             ? <img src={row.icon_url} alt="" className="w-10 h-10 rounded-aspectum-control object-contain shrink-0 bg-aspectum-surface-muted border border-aspectum-border-subtle p-1" />
             : row.image_url
               ? <img src={row.image_url} alt="" className="w-10 h-10 rounded-aspectum-control object-cover shrink-0" />
-              : <div className="w-10 h-10 rounded-aspectum-control bg-aspectum-surface-subtle flex items-center justify-center text-aspectum-text-faint shrink-0 text-lg">📍</div>
+              : <div className="w-10 h-10 rounded-aspectum-control bg-aspectum-surface-subtle flex items-center justify-center text-aspectum-text-faint shrink-0 text-lg"><Glyph name="📍" /></div>
           }
           <div className="min-w-0">
             <p className="text-sm font-medium text-aspectum-text truncate">{getMultiLangValue(v) || '—'}</p>

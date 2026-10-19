@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Alert, Button, DataTableSurface, EmptyState, Heading, Panel, Spinner, TextInput } from '@aspectum/ui';
+import { Alert, Button, DataTableSurface, EmptyState, Heading, Panel, Spinner, TextInput, Glyph } from '@aspectum/ui';
 import { getTicketTypeLabel } from '../shared/labels';
 import { formatSlotLabel, priceStatusClass } from './bookingSetupPricingHelpers';
 
@@ -20,7 +20,7 @@ export function ReadinessChecklist({ items, readyCount, totalCount, onAction }) 
         {items.map((item) => (
           <li key={item.id} className="flex items-start gap-2 text-sm">
             <span className={`mt-0.5 w-4 text-center ${item.ok ? 'text-aspectum-success' : 'text-aspectum-text-faint'}`}>
-              {item.loading ? '…' : item.ok ? '✓' : '○'}
+              {item.loading ? '…' : item.ok ? <Glyph name="✓" /> : '○'}
             </span>
             <div className="min-w-0 flex-1">
               <div className={item.ok ? 'text-aspectum-text-emphasis' : 'text-aspectum-text-strong'}>{item.label}</div>

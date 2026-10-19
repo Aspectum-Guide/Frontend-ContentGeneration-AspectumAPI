@@ -3,6 +3,7 @@ import Card from './Card';
 import EmptyState from './EmptyState';
 import { TextInput } from './FormField';
 import Spinner from './Spinner';
+import { ChevronLeft, ChevronRight } from 'lucide-react';
 
 /**
  * Универсальная таблица данных с пагинацией, поиском и действиями.
@@ -196,7 +197,7 @@ export default function DataTable({
             {(page - 1) * pageSize + 1}–{Math.min(page * pageSize, totalCount)} из {totalCount}
           </span>
           <div className="flex items-center gap-1">
-            <PageBtn disabled={page <= 1} onClick={() => onPage(page - 1)}>←</PageBtn>
+            <PageBtn label="Предыдущая страница" disabled={page <= 1} onClick={() => onPage(page - 1)}><ChevronLeft className="size-3.5" aria-hidden="true" /></PageBtn>
             {buildPageRange(page, totalPages).map((p, i) =>
               p === '...' ? (
                 <span key={`ellipsis-${i}`} className="px-2 text-aspectum-text-muted text-xs">…</span>
@@ -204,7 +205,7 @@ export default function DataTable({
                 <PageBtn key={p} active={p === page} onClick={() => onPage(p)}>{p}</PageBtn>
               )
             )}
-            <PageBtn disabled={page >= totalPages} onClick={() => onPage(page + 1)}>→</PageBtn>
+            <PageBtn label="Следующая страница" disabled={page >= totalPages} onClick={() => onPage(page + 1)}><ChevronRight className="size-3.5" aria-hidden="true" /></PageBtn>
           </div>
         </Card>
       )}
@@ -212,9 +213,12 @@ export default function DataTable({
   );
 }
 
-function PageBtn({ children, disabled, active, onClick }) {
+function PageBtn({ children, disabled, active, onClick, label }) {
   return (
     <button
+      type="button"
+      aria-label={label}
+      aria-current={active ? 'page' : undefined}
       disabled={disabled}
       onClick={onClick}
       className={`px-2.5 py-1 text-xs rounded border transition-colors ${

@@ -837,8 +837,8 @@ export default function TagsFilters() {
       <div className="mb-5">
         <Tabs
           items={[
-            { id: 'city', label: '🏙️ Теги городов' },
-            { id: 'event', label: '🎪 Теги событий' },
+            { id: 'city', label: 'Теги городов' },
+            { id: 'event', label: 'Теги событий' },
           ]}
           value={activeTab}
           onChange={setActiveTab}

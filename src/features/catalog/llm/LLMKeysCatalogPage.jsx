@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import Layout from '../../../components/Layout';
-import { Alert, CheckboxField, PageHeader, ConfirmModal, DataTable, Field, FormActions, Modal, StatusBadge, TableRowActions, TextInput } from '@aspectum/ui';
+import { Alert, CheckboxField, PageHeader, ConfirmModal, DataTable, Field, FormActions, Modal, StatusBadge, TableRowActions, TextInput, Glyph } from '@aspectum/ui';
 import { parseApiError } from '../../../utils/apiError';
 import { llmAPI } from '../../../api/llm';
 
@@ -68,9 +68,9 @@ export default function LLMKeysCatalogPage() {
         label: 'API Key',
         render: (hasKey) =>
           hasKey ? (
-            <span className="text-xs text-aspectum-positive-strong">✅ сохранён</span>
+            <span className="text-xs text-aspectum-positive-strong"><Glyph name="✅" /> сохранён</span>
           ) : (
-            <span className="text-xs text-aspectum-warning">⚠️ не задан</span>
+            <span className="text-xs text-aspectum-warning"><Glyph name="⚠" /> не задан</span>
           ),
       },
       {
@@ -230,7 +230,7 @@ export default function LLMKeysCatalogPage() {
               />
               {editingItem.id && (
                 <p className="text-xs text-aspectum-text-muted mt-1">
-                  {editingItem.has_api_key ? '✅ Ключ уже сохранён' : '⚠️ Ключ не задан'}
+                  {editingItem.has_api_key ? <><Glyph name="✅" /> Ключ уже сохранён</> : <><Glyph name="⚠" /> Ключ не задан</>}
                 </p>
               )}
             </Field>

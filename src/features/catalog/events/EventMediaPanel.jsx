@@ -1,6 +1,6 @@
 import { useRef, useState } from 'react';
 import CommonsImagePicker from '../../../components/generation/CommonsImagePicker';
-import { Alert, Button, ConfirmModal, EmptyState, Field, FileButton, IconButton, LoadingOverlay, MediaPreview, Panel, Select } from '@aspectum/ui';
+import { Alert, Button, ConfirmModal, EmptyState, Field, FileButton, IconButton, LoadingOverlay, MediaPreview, Panel, Select, Glyph } from '@aspectum/ui';
 import { audioAPI } from '../../../api/generation';
 import { parseApiError } from '../../../utils/apiError';
 import AudioPlayer from '../shared/components/AudioPlayer';
@@ -30,7 +30,7 @@ function ImageBlock({ label, url, onPick, onClear, disabled, hint }) {
         </div>
       )}
       <Button type="button" variant="soft" size="md" onClick={onPick} disabled={disabled}>
-        🖼️ Выбрать из Wikimedia Commons
+        <Glyph name="🖼" /> Выбрать из Wikimedia Commons
       </Button>
       {hint && <p className="text-xs text-aspectum-text-disabled">{hint}</p>}
     </div>

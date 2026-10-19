@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import AiGenerationModal from '../../../components/generation/AiGenerationModal.jsx';
-import { FormLabel, WizardActionFooter as WizardGenerationActionFooter } from '@aspectum/ui';
+import { FormLabel, WizardActionFooter as WizardGenerationActionFooter, Glyph } from '@aspectum/ui';
 import AiGenerationQualitySettings from '../../../components/generation/AiGenerationQualitySettings.jsx';
 import AiGenerationDedupeToggle from '../../../components/generation/AiGenerationDedupeToggle.jsx';
 import AiGenerationCountField from '../../../components/generation/AiGenerationCountField.jsx';
@@ -571,7 +571,7 @@ export default function SessionWizardAttractionInfoStep({
                         {getAttractionInfoBindingLabel(info, referenceAttractions, attractions)}
                         {isAttractionInfoBindingIncomplete(info) && (
                           <span className="px-1.5 py-0.5 rounded bg-aspectum-warning-muted text-aspectum-warning-strong font-medium shrink-0">
-                            ⚠ не выбрана
+                            <Glyph name="⚠" /> не выбрана
                           </span>
                         )}
                       </div>
@@ -734,7 +734,7 @@ export default function SessionWizardAttractionInfoStep({
 
           {isBindingIncomplete && (
             <p className="text-xs text-aspectum-warning-strong bg-aspectum-warning-soft border border-aspectum-warning-border rounded-aspectum-control px-3 py-2">
-              ⚠ Выбран тип привязки, но достопримечательность не выбрана. Информация сохранится без привязки.
+              <Glyph name="⚠" /> Выбран тип привязки, но достопримечательность не выбрана. Информация сохранится без привязки.
             </p>
           )}
         </Panel>

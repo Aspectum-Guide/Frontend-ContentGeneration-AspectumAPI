@@ -9,7 +9,7 @@ import {
   ticketTypesAPI,
 } from '../../../api/booking';
 import Layout from '../../../components/Layout';
-import { FormLabel, Alert, Button, Checkbox, ConfirmModal, DataTableSurface, EmptyState, Field, IconButton, InlineState, Modal, PageContainer, PageHeader, Panel, SectionHeader, SegmentedControl, Select, Switch, Textarea, TextInput, formGridClassName } from '@aspectum/ui';
+import { FormLabel, Alert, Button, Checkbox, ConfirmModal, DataTableSurface, EmptyState, Field, IconButton, InlineState, Modal, PageContainer, PageHeader, Panel, SectionHeader, SegmentedControl, Select, Switch, Textarea, TextInput, formGridClassName, Glyph } from '@aspectum/ui';
 import { parseApiError } from '../../../utils/apiError';
 import { useEventOptions } from '../shared/bookingOptions';
 import EventSelect from '../shared/components/EventSelect';
@@ -365,7 +365,7 @@ function SlotsManagerModal({ open, eventId, onClose, onChanged }) {
                               {isSaving ? '…' : 'OK'}
                             </Button>
                             <Button type="button" variant="secondary" size="sm" onClick={() => setEditingId(null)}>
-                              ✕
+                              <Glyph name="✕" />
                             </Button>
                           </>
                         ) : (
@@ -1108,7 +1108,7 @@ export default function BookingSetupWorkbenchPage() {
       const overlapCount = Array.isArray(res?.overlap_warnings) ? res.overlap_warnings.length : 0;
       setSlotOk(
         `Создано: ${res?.created_count ?? 0}, пропущено: ${res?.skipped_existing ?? 0}`
-        + (overlapCount ? ` · ⚠️ ${overlapCount} слот(ов) близко друг к другу (<30 мин)` : ''),
+        + (overlapCount ? ` · ${overlapCount} слот(ов) близко друг к другу (<30 мин)` : ''),
       );
       await loadSlots(eventId);
       await loadPricePreview(eventId, null, eventTicketTypes, { refetchSlots: true });
@@ -1301,7 +1301,7 @@ export default function BookingSetupWorkbenchPage() {
                           size="iconXs"
                           className="ml-0.5"
                         >
-                          ✎
+                          <Glyph name="✎" />
                         </IconButton>
                         <IconButton
                           label="Удалить тип билета"
@@ -1310,7 +1310,7 @@ export default function BookingSetupWorkbenchPage() {
                           variant="ghostDanger"
                           size="iconXs"
                         >
-                          ✕
+                          <Glyph name="✕" />
                         </IconButton>
                       </>
                     </div>
@@ -1487,7 +1487,7 @@ export default function BookingSetupWorkbenchPage() {
                                   onClick={() => saveRowPrice(id)}
                                   title="Сохранить базовую цену"
                                 >
-                                  {savingRowId === id ? '…' : '✓'}
+                                  {savingRowId === id ? '…' : <Glyph name="✓" />}
                                 </Button>
                               </td>
                             </tr>

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { eventSlotAvailabilitiesAPI, ticketPricesAPI } from '../../../api/booking';
 import Layout from '../../../components/Layout';
-import { FormLabel, Alert, BulkActionModal, Button, Checkbox, CheckboxField, ConfirmModal, DataTable, Field, FormActions, FormHint, InlineState, Modal, PageHeader, Panel, Select, StatusBadge, TableRowActions, Tabs, Textarea, TextInput, formGridClassName } from '@aspectum/ui';
+import { FormLabel, Alert, BulkActionModal, Button, Checkbox, CheckboxField, ConfirmModal, DataTable, Field, FormActions, FormHint, InlineState, Modal, PageHeader, Panel, Select, StatusBadge, TableRowActions, Tabs, Textarea, TextInput, formGridClassName, Glyph } from '@aspectum/ui';
 import { useLayoutActions } from '../../../context/useLayoutActions';
 import { parseApiError } from '../../../utils/apiError';
 import { useCatalogFilters } from '../core/useCatalogFilters';
@@ -1015,7 +1015,7 @@ export default function SlotAvailabilitiesCatalog() {
               {Array.isArray(result.overlap_warnings) && result.overlap_warnings.length ? (
                 <Alert tone="warning" className="mt-2 text-xs px-2 py-1.5">
                   <div className="font-medium">
-                    ⚠️ Слоты слишком близко друг к другу ({result.overlap_warnings.length}):
+                    <Glyph name="⚠" /> Слоты слишком близко друг к другу ({result.overlap_warnings.length}):
                   </div>
                   <div className="mt-1 space-y-0.5">
                     {result.overlap_warnings.slice(0, 5).map((w) => (
