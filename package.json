@@ -6,6 +6,8 @@
   "scripts": {
     "dev": "vite --host",
     "build": "vite build",
+    "build:studio": "node scripts/build-scope.mjs studio",
+    "build:catalog": "node scripts/build-scope.mjs catalog",
     "preview": "vite preview",
     "lint": "eslint . --ext js,jsx,ts,tsx",
     "test": "vitest run",

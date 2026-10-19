@@ -11,6 +11,8 @@
   .\scripts\deploy-studio.ps1                 # tests + build + deploy to new.studio
   .\scripts\deploy-studio.ps1 -SkipTests      # faster
   .\scripts\deploy-studio.ps1 -Rollback       # switch back to the previous release
+  .\scripts\deploy-studio.ps1 -Scope studio   # build only the studio (generation) or catalog area
+
   .\scripts\deploy-studio.ps1 -RemoteDir /opt/aspectum/admin-content-generation -Url https://admin.studio.aspectum-guide.ru -Force
 #>
 [CmdletBinding()]
@@ -18,6 +20,7 @@ param(
     [string]$SshHost = 'studio',
     [string]$RemoteDir = '/opt/aspectum/admin-new',
     [string]$Url = 'https://new.studio.aspectum-guide.com',
+    [ValidateSet('all', 'studio', 'catalog')][string]$Scope = 'all',
     [switch]$SkipTests,
     [switch]$SkipBuild,
     [switch]$Rollback,
@@ -63,7 +66,7 @@ try {
     $branch = (git rev-parse --abbrev-ref HEAD).Trim()
     $commit = (git rev-parse --short HEAD).Trim()
     $dirty = (git status --porcelain)
-    Write-Host "Deploying $branch @ $commit to ${SshHost}:$RemoteDir"
+    Write-Host "Deploying $branch @ $commit (scope: $Scope) to ${SshHost}:$RemoteDir"
     if ($dirty) { Write-Warning 'Working tree has uncommitted changes; they are included in the build.' }
 
     if (-not $SkipTests) {
@@ -76,8 +79,8 @@ try {
         # A VITE_API_URL baked into the bundle breaks every host but one; vite.config.js
         # already refuses to build with it, so just make sure it is not leaking from the shell.
         Remove-Item Env:VITE_API_URL -ErrorAction SilentlyContinue
-        npx vite build
-        Check 'vite build'
+        if ($Scope -eq 'all') { npx vite build } else { node scripts/build-scope.mjs $Scope }
+        Check 'build'
     }
     if (-not (Test-Path 'dist/index.html')) { throw 'dist/index.html is missing; run without -SkipBuild.' }
 

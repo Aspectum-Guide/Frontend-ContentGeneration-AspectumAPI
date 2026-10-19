@@ -8,6 +8,8 @@ import NotFound from './pages/NotFound';
 import Home from './pages/Home';
 import TokenAuth from './pages/TokenAuth';
 import { registerAuthNavigate } from './utils/authRedirect';
+import { resolveNavScope } from './config/nav';
+import { filterRoutesByScope } from './config/scope';
 import { EmptyState, Spinner, UiProvider } from '@aspectum/ui';
 
 const AISettings = lazy(() => import('./pages/ai/AISettings'));
@@ -59,7 +61,7 @@ const AudioQueue = lazy(() => import('./pages/tasks/AudioQueue'));
 const MediaRecovery = lazy(() => import('./pages/tasks/MediaRecovery'));
 const AccountSettings = lazy(() => import('./pages/AccountSettings'));
 
-export const routes = [
+const allRoutes = [
   {
     path: '/token-auth',
     element: <ErrorBoundary><TokenAuth /></ErrorBoundary>,
@@ -277,6 +279,9 @@ export const routes = [
     element: <NotFound />,
   },
 ];
+
+// VITE_NAV_SCOPE=studio|catalog builds only serve their own area (config/scope.js).
+export const routes = filterRoutesByScope(allRoutes, resolveNavScope());
 
 const router = createBrowserRouter(routes, {
   future: {

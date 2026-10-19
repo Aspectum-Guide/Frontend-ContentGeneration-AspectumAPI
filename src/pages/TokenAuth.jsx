@@ -2,6 +2,8 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import TokenManager from '../utils/TokenManager';
 import { authAPI } from '../api/auth.ts';
+import { resolveNavScope } from '../config/nav';
+import { landingPath } from '../config/scope';
 import { Alert, Button, Field, PageHeader, Panel, TextInput } from '@aspectum/ui';
 
 export default function TokenAuth() {
@@ -18,7 +20,7 @@ export default function TokenAuth() {
       const validation = TokenManager.validateToken(tokens.access);
       if (validation.isValid) {
         // Есть валидный токен, редирект на главную
-        navigate('/generation');
+        navigate(landingPath(resolveNavScope()));
       }
     }
   }, [navigate]);
@@ -63,7 +65,7 @@ export default function TokenAuth() {
       });
 
       console.log('✅ Токены сохранены успешно');
-      navigate('/generation');
+      navigate(landingPath(resolveNavScope()));
     } catch (err) {
       console.error('Ошибка при входе:', err);
       setError('Ошибка подключения к серверу. Проверьте данные и интернет');
@@ -121,7 +123,7 @@ export default function TokenAuth() {
       });
       const data = result.data;
       TokenManager.saveTokens({ access: data.access, refresh: data.refresh, expiresAt: Date.now() + 3600000 });
-      navigate('/generation');
+      navigate(landingPath(resolveNavScope()));
     } catch (err) {
       if (err?.name !== 'NotAllowedError') setError(err?.response?.data?.detail || 'Не удалось войти с passkey.');
     } finally {
