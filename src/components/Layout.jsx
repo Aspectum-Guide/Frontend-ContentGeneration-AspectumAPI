@@ -69,10 +69,17 @@ export default function Layout({ children, pageHeader = null, pageHeaderMode = '
   const { mobileActions } = useLayoutActions();
   const location = useLocation();
   const navigate = useNavigate();
-  const [sidebarExpanded, setSidebarExpanded] = useState(true);
   const hasSessionsPanel = getNavGroups().some((group) => group.id === 'sessions');
-  const [sessionsPanelOpen, setSessionsPanelOpen] = useState(
-    () => localStorage.getItem('sessionsPanelOpen') !== 'false'
+  // The sessions column is open by default only where there is room for it (>= 1280px);
+  // an explicit choice, remembered in localStorage, always wins.
+  const [sessionsPanelOpen, setSessionsPanelOpen] = useState(() => {
+    const stored = localStorage.getItem('sessionsPanelOpen');
+    return stored === null ? window.innerWidth >= 1280 : stored !== 'false';
+  });
+  // Nav + sessions + actions columns leave ~400-570px for content on a 1280-1440px laptop,
+  // so with the sessions column open the nav starts as the icon rail below 1536px.
+  const [sidebarExpanded, setSidebarExpanded] = useState(
+    () => !(hasSessionsPanel && sessionsPanelOpen && window.innerWidth < 1536)
   );
   const setSessionsPanel = (open) => {
     setSessionsPanelOpen(open);
