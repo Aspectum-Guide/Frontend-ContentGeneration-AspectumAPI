@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { PanelLeft } from 'lucide-react';
 import { workspacesAPI } from '../api/generation';
@@ -10,6 +10,7 @@ import { FormLabel, Button, Heading, Select, Sidebar, SidebarFooter, SidebarHead
 import AppNav from './AppNav';
 import SessionsPanel from './SessionsPanel';
 import PageActionBar from './PageActionBar';
+import useVisibleButtonLabels, { normalizeLabel } from './useVisibleButtonLabels';
 import { getNavGroups, pageTitleFor } from '../config/nav';
 
 /**
@@ -129,6 +130,11 @@ export default function Layout({ children, pageHeader = null, pageHeaderMode = '
     TokenManager.clearTokens();
     navigate('/token-auth');
   };
+
+  // Pages register actions that they usually also show in their own header; the bar only offers the rest.
+  const contentRef = useRef(null);
+  const pageButtonLabels = useVisibleButtonLabels(contentRef);
+  const barActions = formActions.filter((action) => !pageButtonLabels.has(normalizeLabel(action.label)));
 
   const showSessionsPanel = hasSessionsPanel && !isMobile && sessionsPanelOpen;
   const sidebarWidth = sidebarExpanded ? 'var(--aspectum-layout-sidebar-expanded)' : 'var(--aspectum-layout-sidebar-collapsed)';
@@ -272,11 +278,11 @@ export default function Layout({ children, pageHeader = null, pageHeaderMode = '
                 <div className="text-[11px] text-aspectum-text-muted truncate">{location.pathname}</div>
               </div>
             </div>
-            <PageActionBar actions={formActions} maxInline={1} sticky={false} className="mt-2" />
+            <PageActionBar actions={barActions} maxInline={1} sticky={false} className="mt-2" />
           </div>
         )}
-        {!isMobile && <PageActionBar actions={formActions} onRefresh={() => window.location.reload()} />}
-        <div className="px-[var(--aspectum-space-page-x)] py-[var(--aspectum-space-page-y)] md:px-[var(--aspectum-space-page-x-lg)]">
+        {!isMobile && <PageActionBar actions={barActions} onRefresh={() => window.location.reload()} />}
+        <div ref={contentRef} className="px-[var(--aspectum-space-page-x)] py-[var(--aspectum-space-page-y)] md:px-[var(--aspectum-space-page-x-lg)]">
           <div className="min-w-0">
             {shouldRenderPageHeader && (
               <div className="mb-4 md:mb-5">
