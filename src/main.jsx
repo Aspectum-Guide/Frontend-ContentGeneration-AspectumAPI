@@ -4,7 +4,9 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import App from './App.jsx'
 import { initErrorReporting } from './utils/errorReporting'
 import './index.css'
+import { applyTheme } from './theme/themeBootstrap'
 
+applyTheme()
 initErrorReporting()
 
 const queryClient = new QueryClient({

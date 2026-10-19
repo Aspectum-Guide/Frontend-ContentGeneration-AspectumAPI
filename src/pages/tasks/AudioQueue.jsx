@@ -16,13 +16,13 @@ const PERIODS = [
 ];
 
 const STATE_STYLES = {
-  running: { label: 'Озвучивается', className: 'bg-blue-100 text-blue-800' },
-  stalled: { label: 'Нет признаков жизни', className: 'bg-amber-100 text-amber-800' },
-  waiting_worker: { label: 'Ждёт свободный воркер', className: 'bg-purple-100 text-purple-800' },
-  queued: { label: 'В очереди', className: 'bg-gray-100 text-gray-700' },
-  completed: { label: 'Готово', className: 'bg-green-100 text-green-800' },
-  failed: { label: 'Ошибка', className: 'bg-red-100 text-red-800' },
-  cancelled: { label: 'Отменено', className: 'bg-gray-100 text-gray-500' },
+  running: { label: 'Озвучивается', className: 'bg-aspectum-primary-muted text-aspectum-primary-strong' },
+  stalled: { label: 'Нет признаков жизни', className: 'bg-aspectum-warning-muted text-aspectum-warning-emphasis' },
+  waiting_worker: { label: 'Ждёт свободный воркер', className: 'bg-aspectum-purple-muted text-aspectum-purple-emphasis' },
+  queued: { label: 'В очереди', className: 'bg-aspectum-surface-subtle text-aspectum-text-strong' },
+  completed: { label: 'Готово', className: 'bg-aspectum-positive-muted text-aspectum-positive-emphasis' },
+  failed: { label: 'Ошибка', className: 'bg-aspectum-danger-muted text-aspectum-danger-emphasis' },
+  cancelled: { label: 'Отменено', className: 'bg-aspectum-surface-subtle text-aspectum-text-muted' },
 };
 
 function formatDuration(seconds) {
@@ -75,25 +75,25 @@ function LanguageRow({ item, group, overview }) {
   const hint = stateHint(item, group, overview);
 
   return (
-    <div className="py-3 border-t border-gray-100 first:border-t-0">
+    <div className="py-3 border-t border-aspectum-border-subtle first:border-t-0">
       <div className="flex flex-wrap items-center gap-2">
-        <span className="w-10 font-mono text-sm font-semibold text-gray-900">
+        <span className="w-10 font-mono text-sm font-semibold text-aspectum-text">
           {(item.language_code || '??').toUpperCase()}
         </span>
         <span className={`px-2 py-0.5 rounded text-xs font-medium ${style.className}`}>
           {item.state === 'queued' ? `${style.label} · №${item.queue_position}` : style.label}
         </span>
         {item.total > 0 && (
-          <span className="text-sm text-gray-700">
+          <span className="text-sm text-aspectum-text-strong">
             {item.processed} из {item.total}
-            {item.failed > 0 && <span className="ml-1 text-red-600">· ошибок {item.failed}</span>}
+            {item.failed > 0 && <span className="ml-1 text-aspectum-danger">· ошибок {item.failed}</span>}
           </span>
         )}
-        {eta && <span className="text-sm text-gray-500">· осталось ≈ {eta}</span>}
+        {eta && <span className="text-sm text-aspectum-text-muted">· осталось ≈ {eta}</span>}
         {item.resume_attempts > 0 && (
-          <span className="text-xs text-amber-700">перезапусков: {item.resume_attempts}</span>
+          <span className="text-xs text-aspectum-warning-strong">перезапусков: {item.resume_attempts}</span>
         )}
-        <span className="ml-auto text-xs text-gray-400">
+        <span className="ml-auto text-xs text-aspectum-text-disabled">
           {item.completed_at
             ? `закончено ${formatTime(item.completed_at)}`
             : item.started_at
@@ -102,13 +102,13 @@ function LanguageRow({ item, group, overview }) {
         </span>
       </div>
       {item.total > 0 && item.state !== 'completed' && (
-        <div className="mt-2 ml-12 h-1.5 bg-gray-100 rounded">
-          <div className="h-1.5 bg-blue-500 rounded" style={{ width: `${percent}%` }} />
+        <div className="mt-2 ml-12 h-1.5 bg-aspectum-surface-subtle rounded">
+          <div className="h-1.5 bg-aspectum-primary-light rounded" style={{ width: `${percent}%` }} />
         </div>
       )}
-      {hint && <p className="mt-1 ml-12 text-xs text-gray-500">{hint}</p>}
+      {hint && <p className="mt-1 ml-12 text-xs text-aspectum-text-muted">{hint}</p>}
       {item.failed_guides.length > 0 && (
-        <details className="mt-1 ml-12 text-xs text-red-700">
+        <details className="mt-1 ml-12 text-xs text-aspectum-danger-strong">
           <summary className="cursor-pointer">
             Не озвучены ({item.failed_guides.length}) — запустите озвучку этих гидов ещё раз
           </summary>
@@ -156,10 +156,10 @@ export default function AudioQueue() {
     <Layout>
       <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Очередь озвучки</h1>
-          <p className="mt-1 text-sm text-gray-500">
+          <h1 className="text-2xl font-bold text-aspectum-text">Очередь озвучки</h1>
+          <p className="mt-1 text-sm text-aspectum-text-muted">
             Автообновление каждые {POLL_INTERVAL / 1000} сек.
-            {lastUpdated && <span className="ml-2 text-gray-400">· {lastUpdated.toLocaleTimeString('ru-RU')}</span>}
+            {lastUpdated && <span className="ml-2 text-aspectum-text-disabled">· {lastUpdated.toLocaleTimeString('ru-RU')}</span>}
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -168,7 +168,7 @@ export default function AudioQueue() {
               key={period.hours}
               type="button"
               onClick={() => setHours(period.hours)}
-              className={`px-3 py-1.5 rounded-md text-sm font-medium ${hours === period.hours ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}
+              className={`px-3 py-1.5 rounded-md text-sm font-medium ${hours === period.hours ? 'bg-aspectum-primary text-aspectum-on-accent' : 'bg-aspectum-surface-subtle text-aspectum-text-strong hover:bg-aspectum-border'}`}
             >
               {period.label}
             </button>
@@ -176,7 +176,7 @@ export default function AudioQueue() {
           <button
             type="button"
             onClick={() => load()}
-            className="px-3 py-1.5 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50"
+            className="px-3 py-1.5 text-sm font-medium text-aspectum-text-strong bg-aspectum-surface border border-aspectum-border-strong rounded-md hover:bg-aspectum-surface-muted"
           >
             ↻ Обновить
           </button>
@@ -184,7 +184,7 @@ export default function AudioQueue() {
       </div>
 
       {overview && (
-        <div className="mb-4 rounded-lg border border-blue-100 bg-blue-50 px-4 py-3 text-sm text-blue-900">
+        <div className="mb-4 rounded-lg border border-aspectum-primary-muted bg-aspectum-primary-soft px-4 py-3 text-sm text-aspectum-primary-emphasis">
           Очередь ведёт сервер, вкладку можно закрыть. В одной сессии одновременно озвучиваются
           не больше {overview.max_parallel_per_session} языков, остальные ждут и стартуют сами.
           Если озвучка замолкла дольше {overview.resume_after_minutes} мин, она перезапускается
@@ -192,30 +192,30 @@ export default function AudioQueue() {
         </div>
       )}
 
-      {error && <div className="mb-4 rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>}
-      {loading && !overview && <div className="text-sm text-gray-500">Загрузка…</div>}
+      {error && <div className="mb-4 rounded-lg bg-aspectum-danger-soft px-4 py-3 text-sm text-aspectum-danger-strong">{error}</div>}
+      {loading && !overview && <div className="text-sm text-aspectum-text-muted">Загрузка…</div>}
 
       {overview && sessions.length === 0 && (
-        <div className="rounded-lg border border-gray-200 bg-white px-4 py-6 text-center text-sm text-gray-500">
+        <div className="rounded-lg border border-aspectum-border bg-aspectum-surface px-4 py-6 text-center text-sm text-aspectum-text-muted">
           За выбранный период озвучки не было.
         </div>
       )}
 
       {overview && sessions.length > 0 && (
-        <p className="mb-2 text-sm text-gray-600">
+        <p className="mb-2 text-sm text-aspectum-text-subtle">
           {activeCount ? `Сейчас в работе сессий: ${activeCount}` : 'Сейчас ничего не озвучивается'}
         </p>
       )}
 
       <div className="space-y-4">
         {sessions.map((group) => (
-          <div key={group.session_id} className="rounded-lg border border-gray-200 bg-white px-4 py-3">
+          <div key={group.session_id} className="rounded-lg border border-aspectum-border bg-aspectum-surface px-4 py-3">
             <div className="mb-1 flex flex-wrap items-baseline gap-2">
-              <Link to={`/generation/${group.session_id}`} className="text-lg font-semibold text-blue-700 hover:underline">
+              <Link to={`/generation/${group.session_id}`} className="text-lg font-semibold text-aspectum-primary-strong hover:underline">
                 {group.place_name}
               </Link>
               {group.place_name !== group.session_name && (
-                <span className="text-sm text-gray-400">{group.session_name}</span>
+                <span className="text-sm text-aspectum-text-disabled">{group.session_name}</span>
               )}
             </div>
             {group.items.map((item) => (

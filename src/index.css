@@ -1,5 +1,6 @@
 @import "tailwindcss";
 @import "./components/ui/theme.css";
+@import "./components/ui/theme-cs.css";
 
 :root {
   font-family: Inter, system-ui, Avenir, Helvetica, Arial, sans-serif;
