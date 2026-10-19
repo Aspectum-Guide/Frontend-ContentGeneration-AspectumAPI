@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { Button, EmptyState, Spinner } from '@aspectum/ui';
 import { Navigate } from 'react-router-dom';
 import TokenManager from '../utils/TokenManager';
 import { authAPI } from '../api/auth.ts';
@@ -89,9 +90,7 @@ export default function ProtectedRoute({ children }) {
 
   if (gate === 'checking' || gate === 'staff-check') {
     return (
-      <div className="min-h-[30vh] flex items-center justify-center text-sm text-gray-500">
-        Проверка сессии…
-      </div>
+      <EmptyState icon={<Spinner size="md" />} title="Проверка сессии…" className="min-h-[30vh] flex flex-col items-center justify-center" />
     );
   }
 
@@ -107,18 +106,21 @@ export default function ProtectedRoute({ children }) {
   // упадут с 403.
   if (gate === 'not-staff') {
     return (
-      <div className="flex flex-col items-center justify-center min-h-screen gap-3 text-center px-4">
-        <p className="text-lg font-semibold text-gray-800">Доступ только для сотрудников</p>
-        <p className="text-sm text-gray-500 max-w-sm">
-          Этот аккаунт не имеет прав администратора. Войдите под учётной записью сотрудника.
-        </p>
-        <button
-          onClick={() => { TokenManager.clearTokens(); window.location.href = '/token-auth'; }}
-          className="px-4 py-2 text-sm text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors"
-        >
-          Выйти
-        </button>
-      </div>
+      <EmptyState
+        icon="🔒"
+        title="Доступ только для сотрудников"
+        description="Этот аккаунт не имеет прав администратора. Войдите под учётной записью сотрудника."
+        className="min-h-screen flex flex-col items-center justify-center px-4"
+        actions={(
+          <Button type="button"
+            onClick={() => { TokenManager.clearTokens(); window.location.href = '/token-auth'; }}
+            variant="primary"
+            size="md"
+          >
+            Выйти
+          </Button>
+        )}
+      />
     );
   }
 

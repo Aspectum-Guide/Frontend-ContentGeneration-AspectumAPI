@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Field, TextInput } from '../../../components/ui/FormField';
-import { ConfirmModal } from '../../../components/ui/Modal';
+import { Alert, Button, ConfirmModal, EmptyState, Field, FileButton, LoadingOverlay, Panel, TextInput } from '@aspectum/ui';
 import { parseApiError } from '../../../utils/apiError';
 import { imagesAPI } from '../../../api/generation';
 import { buildLangOptions } from './i18n';
@@ -14,7 +13,6 @@ export default function PublishedFeedEditor({ parentId, api, disabled = false })
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [savingId, setSavingId] = useState(null);
   const [uploadingId, setUploadingId] = useState(null);
-  const fileInputRef = useRef(null);
   const uploadTargetRef = useRef(null);
 
   const loadItems = useCallback(async () => {
@@ -71,10 +69,6 @@ export default function PublishedFeedEditor({ parentId, api, disabled = false })
     }
   };
 
-  const handleImagePick = (itemId) => {
-    uploadTargetRef.current = itemId;
-    fileInputRef.current?.click();
-  };
 
   const handleFileChange = async (e) => {
     const file = e.target.files?.[0];
@@ -112,7 +106,7 @@ export default function PublishedFeedEditor({ parentId, api, disabled = false })
 
   if (!parentId) {
     return (
-      <p className="text-sm text-gray-500">
+      <p className="text-sm text-aspectum-text-muted">
         Сначала сохраните событие, чтобы редактировать ленту.
       </p>
     );
@@ -120,23 +114,24 @@ export default function PublishedFeedEditor({ parentId, api, disabled = false })
 
   return (
     <div className="space-y-4">
-      <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={handleFileChange} />
-
-      {error && (
-        <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">{error}</div>
-      )}
+      {error && <Alert tone="error">{error}</Alert>}
 
       {loading ? (
-        <p className="text-sm text-gray-400">Загрузка ленты...</p>
+        <EmptyState icon={null} title="Загрузка ленты..." spacing="sm" />
       ) : items.length === 0 ? (
-        <p className="text-sm text-gray-500">Элементов ленты пока нет.</p>
+        <EmptyState
+          icon="📰"
+          title="Элементов ленты пока нет"
+          description="Добавьте текстовый или графический элемент."
+          className="py-5"
+        />
       ) : (
         items.map((item) => {
           const isImage = item.item_type === 'image' || item.type === 'image';
           const langOptions = !isImage ? buildLangOptions([item.text || {}]) : [];
           const busy = savingId === item.id || uploadingId === item.id;
           return (
-            <div key={item.id} className="p-4 border border-gray-200 rounded-xl space-y-3 bg-gray-50/50">
+            <Panel key={item.id} tone="muted" className="p-4 space-y-3">
               <div className="flex flex-wrap items-center gap-3 justify-between">
                 <Field label="Индекс" className="w-28">
                   <TextInput
@@ -150,34 +145,40 @@ export default function PublishedFeedEditor({ parentId, api, disabled = false })
                     }}
                   />
                 </Field>
-                <span className="text-xs font-medium uppercase tracking-wide text-gray-500">
+                <span className="text-xs font-medium uppercase tracking-wide text-aspectum-text-muted">
                   {isImage ? 'Изображение' : 'Текст'}
                 </span>
-                <button
+                <Button
                   type="button"
+                  variant="linkDanger"
+                  size="md"
                   disabled={disabled || busy}
                   onClick={() => setDeleteTarget(item)}
-                  className="ml-auto text-sm text-red-600 hover:text-red-700 disabled:opacity-50"
+                  className="ml-auto"
                 >
                   Удалить
-                </button>
+                </Button>
               </div>
 
               {isImage ? (
                 <div className="space-y-2">
-                  {item.image_url ? (
-                    <img src={item.image_url} alt="" className="max-h-48 rounded-lg border border-gray-200" />
-                  ) : (
-                    <p className="text-sm text-gray-400">Изображение не выбрано</p>
-                  )}
-                  <button
-                    type="button"
+                  <LoadingOverlay loading={busy} label="Загрузка изображения…">
+                    {item.image_url ? (
+                      <img src={item.image_url} alt="" className="max-h-48 rounded-aspectum-control border border-aspectum-border" />
+                    ) : (
+                      <p className="text-sm text-aspectum-text-disabled">Изображение не выбрано</p>
+                    )}
+                  </LoadingOverlay>
+                  <FileButton
+                    accept="image/*"
+                    onTrigger={() => { uploadTargetRef.current = item.id; }}
+                    onChange={handleFileChange}
+                    variant="soft"
+                    size="md"
                     disabled={disabled || busy}
-                    onClick={() => handleImagePick(item.id)}
-                    className="px-3 py-2 text-sm font-medium text-blue-700 bg-blue-50 rounded-lg hover:bg-blue-100 disabled:opacity-50"
                   >
                     {busy ? 'Загрузка...' : 'Загрузить изображение'}
-                  </button>
+                  </FileButton>
                 </div>
               ) : (
                 <>
@@ -199,32 +200,36 @@ export default function PublishedFeedEditor({ parentId, api, disabled = false })
                       setItems((prev) => prev.map((x) => (x.id === item.id ? { ...x, text } : x)));
                     }}
                   />
-                  <button
+                  <Button
                     type="button"
+                    variant="link"
+                    size="md"
                     disabled={disabled || busy}
                     onClick={() => patchItem(item.id, { item_type: 'text', text: item.text || {} })}
-                    className="text-sm text-blue-700 hover:text-blue-800 disabled:opacity-50"
                   >
                     {busy ? 'Сохранение...' : 'Сохранить текст'}
-                  </button>
+                  </Button>
                 </>
               )}
-            </div>
+            </Panel>
           );
         })
       )}
 
       <div className="flex flex-wrap gap-2">
-        <button
+        <Button
           type="button"
+          variant="soft"
+          size="md"
           disabled={disabled || savingId === 'new'}
           onClick={handleAddText}
-          className="px-3 py-2 text-sm font-medium text-blue-700 bg-blue-50 rounded-lg hover:bg-blue-100 disabled:opacity-50"
         >
           {savingId === 'new' ? 'Добавление...' : '+ Текстовый блок'}
-        </button>
-        <button
+        </Button>
+        <Button
           type="button"
+          variant="soft"
+          size="md"
           disabled={disabled || savingId === 'new'}
           onClick={async () => {
             if (!parentId || disabled) return;
@@ -239,10 +244,9 @@ export default function PublishedFeedEditor({ parentId, api, disabled = false })
               setSavingId(null);
             }
           }}
-          className="px-3 py-2 text-sm font-medium text-blue-700 bg-blue-50 rounded-lg hover:bg-blue-100 disabled:opacity-50"
         >
           + Блок с изображением
-        </button>
+        </Button>
       </div>
 
       <ConfirmModal

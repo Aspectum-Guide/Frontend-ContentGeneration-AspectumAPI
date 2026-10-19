@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { Field, TextInput } from '../../../components/ui/FormField';
-import { ConfirmModal } from '../../../components/ui/Modal';
+import { FormLabel, Alert, Button, ConfirmModal, EmptyState, Field, Panel, Switch, TextInput } from '@aspectum/ui';
 import { parseApiError } from '../../../utils/apiError';
 import { buildLangOptions } from './i18n';
 import { LangBlock, LangTabs } from './LangFields';
@@ -88,7 +87,7 @@ export default function InformationBlocksEditor({
 
   if (!parentId) {
     return (
-      <p className="text-sm text-gray-500">
+      <p className="text-sm text-aspectum-text-muted">
         Сначала сохраните объект, чтобы редактировать информационные блоки.
       </p>
     );
@@ -96,20 +95,23 @@ export default function InformationBlocksEditor({
 
   return (
     <div className="space-y-4">
-      {error && (
-        <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">{error}</div>
-      )}
+      {error && <Alert tone="error">{error}</Alert>}
 
       {loading ? (
-        <p className="text-sm text-gray-400">Загрузка блоков...</p>
+        <EmptyState icon={null} title="Загрузка блоков..." spacing="sm" />
       ) : items.length === 0 ? (
-        <p className="text-sm text-gray-500">Информационных блоков пока нет.</p>
+        <EmptyState
+          icon="ℹ️"
+          title="Информационных блоков пока нет"
+          description="Добавьте первый блок с дополнительной информацией."
+          className="py-5"
+        />
       ) : (
         items.map((item) => {
           const langOptions = buildLangOptions([item.name || {}, item.description || {}]);
           const busy = savingId === item.id;
           return (
-            <div key={item.id} className="p-4 border border-gray-200 rounded-xl space-y-3 bg-gray-50/50">
+            <Panel key={item.id} tone="muted" className="p-4 space-y-3">
               <div className="flex flex-wrap items-center gap-3 justify-between">
                 <Field label="Индекс" className="w-28">
                   <TextInput
@@ -124,22 +126,23 @@ export default function InformationBlocksEditor({
                   />
                 </Field>
                 {showVisibility && (
-                  <label className="flex items-center gap-2 text-sm text-gray-700">
-                    <input
-                      type="checkbox"
+                  <FormLabel  layout="row" size="sm" tone="strong">
+                    <Switch
                       checked={!!item.is_show}
                       disabled={disabled || busy}
-                      onChange={(e) => {
-                        const is_show = e.target.checked;
+                      aria-label="Показывать информационный блок"
+                      onChange={(is_show) => {
                         setItems((prev) => prev.map((x) => (x.id === item.id ? { ...x, is_show } : x)));
                         patchItem(item.id, { is_show });
                       }}
                     />
                     Показывать
-                  </label>
+                  </FormLabel>
                 )}
-                <button
+                <Button
                   type="button"
+                  variant="linkDanger"
+                  size="md"
                   disabled={disabled || busy}
                   onClick={() => patchItem(item.id, {
                     index: Number(item.index) || 0,
@@ -147,18 +150,19 @@ export default function InformationBlocksEditor({
                     description: item.description || {},
                     ...(showVisibility ? { is_show: !!item.is_show } : {}),
                   })}
-                  className="text-sm text-blue-700 hover:text-blue-800 disabled:opacity-50"
                 >
                   {busy ? 'Сохранение...' : 'Сохранить блок'}
-                </button>
-                <button
+                </Button>
+                <Button
                   type="button"
+                  variant="link"
+                  size="md"
                   disabled={disabled || busy}
                   onClick={() => setDeleteTarget(item)}
-                  className="ml-auto text-sm text-red-600 hover:text-red-700 disabled:opacity-50"
+                  className="ml-auto"
                 >
                   Удалить
-                </button>
+                </Button>
               </div>
 
               {langOptions.length > 0 && (
@@ -188,19 +192,20 @@ export default function InformationBlocksEditor({
                   setItems((prev) => prev.map((x) => (x.id === item.id ? { ...x, description } : x)));
                 }}
               />
-            </div>
+            </Panel>
           );
         })
       )}
 
-      <button
+      <Button
         type="button"
+        variant="soft"
+        size="md"
         disabled={disabled || savingId === 'new'}
         onClick={handleAdd}
-        className="px-3 py-2 text-sm font-medium text-blue-700 bg-blue-50 rounded-lg hover:bg-blue-100 disabled:opacity-50"
       >
         {savingId === 'new' ? 'Добавление...' : '+ Добавить блок'}
-      </button>
+      </Button>
 
       <ConfirmModal
         open={!!deleteTarget}

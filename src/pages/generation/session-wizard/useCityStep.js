@@ -17,18 +17,15 @@ import {
   unwrapCreatedFilter,
   upsertFlatFilterRow,
 } from '../../../features/catalog/shared/tagCatalog';
-import { clampGenerationCount } from '../../../components/generation/AiGenerationCountField.jsx';
-import { formatGenerationDedupeResultMessage } from '../../../components/generation/AiGenerationDedupeToggle.jsx';
 import {
+  clampGenerationCount,
+  formatGenerationDedupeResultMessage,
   DEFAULT_GENERATION_MODE,
   buildGenerationPayloadFields,
-} from '../../../components/generation/AiGenerationQualitySettings.jsx';
+} from '../../../components/generation/generationUtils';
 import {
   DEFAULT_LOCALE_DEFS,
-  getLocaleInfo,
   isLocaleCodeUsedAsCountry,
-  normalizeLocaleCountryForSave,
-  normalizeLocaleDescriptionForSave,
   normalizeId,
   normalizeTagIds,
 } from './sessionWizardShared.jsx';
@@ -39,415 +36,27 @@ import {
   TASK_NOT_FOUND_MESSAGE,
 } from '../../../utils/generationTaskPoll';
 import { parseUsefulInfoTextImport } from './usefulInfoTextImport';
-
-export const makeLocaleData = () => {
-  return Object.fromEntries(
-    DEFAULT_LOCALE_DEFS.map((locale) => [
-      locale.key,
-      {
-        code: locale.code,
-        lang: locale.lang,
-        langName: locale.langName,
-        isDefault: locale.isDefault,
-        name: '',
-        description: '',
-        country: '',
-      },
-    ])
-  );
-};
-
-const BACKEND_SUPPORTED_LOCALE_NAMES = {
-  it: ['итальянский', 'italian', 'it'],
-  en: ['английский', 'english', 'en'],
-  ru: ['русский', 'russian', 'ru'],
-  fr: ['французский', 'french', 'fr'],
-  de: ['немецкий', 'german', 'de'],
-  es: ['испанский', 'spanish', 'es'],
-};
-
-function normalizeLocaleName(value) {
-  return (value || '').toString().trim().toLowerCase();
-}
-
-function resolveBackendLanguageCode(langName) {
-  const normalized = normalizeLocaleName(langName);
-  if (!normalized) return '';
-
-  if (/^[a-z]{2}$/i.test(normalized) && BACKEND_SUPPORTED_LOCALE_NAMES[normalized]) {
-    return normalized;
-  }
-
-  for (const langCode in BACKEND_SUPPORTED_LOCALE_NAMES) {
-    if (BACKEND_SUPPORTED_LOCALE_NAMES[langCode].includes(normalized)) {
-      return langCode;
-    }
-  }
-
-  return '';
-}
-
-function parseMapCoord(value) {
-  if (value === null || value === undefined) return NaN;
-
-  return parseFloat(String(value).trim().replace(',', '.'));
-}
-
-function hasValidMapCoords(latValue, lonValue) {
-  const parsedLat = parseMapCoord(latValue);
-  const parsedLon = parseMapCoord(lonValue);
-
-  return (
-    Number.isFinite(parsedLat) &&
-    Number.isFinite(parsedLon) &&
-    parsedLat >= -90 &&
-    parsedLat <= 90 &&
-    parsedLon >= -180 &&
-    parsedLon <= 180
-  );
-}
-
-const buildCityStepPayload = ({
-  localeData,
-  defaultLocale,
-  lat,
-  lon,
-  cityTags,
-  imageId,
-  imageOriginalUrl,
-  parentCityId,
-  authorIds,
-  activeCityDraftId,
-  baseUpdatedAt,
-}) => {
-  const name = {};
-  const description = {};
-  const country = {};
-
-  Object.entries(localeData || {}).forEach(([, loc]) => {
-    if (!loc?.lang) return;
-    name[loc.lang] = loc.name != null ? String(loc.name).trim() : '';
-    description[loc.lang] = normalizeLocaleDescriptionForSave(loc.description);
-    country[loc.lang] = normalizeLocaleCountryForSave(loc.country, loc.code);
-  });
-
-  const draftId = normalizeDraftId(activeCityDraftId);
-
-  return {
-    name,
-    description,
-    country,
-    lat: lat ? parseFloat(lat) : null,
-    lon: lon ? parseFloat(lon) : null,
-    default_language: localeData?.[defaultLocale]?.lang || null,
-    tags: normalizeTagIds(cityTags),
-    image_id: imageId,
-    image_original_url: imageOriginalUrl || '',
-    parent_city: parentCityId || null,
-    author_ids: authorIds || [],
-    ...(draftId && draftId !== 'legacy' ? { draft_id: draftId } : {}),
-    // optimistic concurrency: версия драфта на момент загрузки формы —
-    // сейв поверх более свежих данных (их пишет генерация) бэкенд отклонит 409.
-    ...(baseUpdatedAt ? { base_updated_at: baseUpdatedAt } : {}),
-  };
-};
-
-function upsertCityDraft(drafts = [], draft) {
-  const draftId = normalizeDraftId(draft?.id);
-
-  if (!draftId) return drafts;
-
-  const next = drafts
-    .filter((item) => normalizeDraftId(item?.id) !== 'legacy')
-    .filter((item) => normalizeDraftId(item?.id) !== draftId);
-
-  return [...next, draft].sort((a, b) => {
-    const orderA = Number.isFinite(Number(a?.order)) ? Number(a.order) : 0;
-    const orderB = Number.isFinite(Number(b?.order)) ? Number(b.order) : 0;
-
-    if (orderA !== orderB) return orderA - orderB;
-
-    return String(a?.created_at || '').localeCompare(String(b?.created_at || ''));
-  });
-}
-
-function normalizeCityDraft(raw) {
-  if (!raw || typeof raw !== 'object') return null;
-  const id = normalizeDraftId(raw.id);
-  if (!id) return null;
-  const next = {
-    ...raw,
-    tags: normalizeTagIds(raw.tags ?? raw.city_tags ?? []),
-  };
-  delete next.isPending;
-  return next;
-}
-
-function parseCreatedCityDraftResponse(res) {
-  const d = res?.data;
-  if (!d || typeof d !== 'object') return null;
-  const nested =
-    d.draft ??
-    d.city_draft ??
-    (d.data && typeof d.data === 'object' && !Array.isArray(d.data) ? d.data : null);
-  if (nested) return nested;
-  if (
-    d.id != null &&
-    typeof d.name === 'object' &&
-    d.name !== null &&
-    !Array.isArray(d.name)
-  ) {
-    return d;
-  }
-  if (d.draft_id != null) {
-    return {
-      id: String(d.draft_id),
-      name: typeof d.name === 'object' && d.name ? d.name : {},
-      description: typeof d.description === 'object' && d.description ? d.description : {},
-      country: typeof d.country === 'object' && d.country ? d.country : {},
-      order: d.order ?? 0,
-      is_primary: Boolean(d.is_primary),
-    };
-  }
-  return null;
-}
-
-const getLocaleLang = (localeKey) => {
-  const locale = DEFAULT_LOCALE_DEFS.find((item) => item.key === localeKey);
-
-  return locale?.lang || localeKey?.split('-')?.[0] || 'ru';
-};
-
-function getMultilangKeys(...objects) {
-  const keys = new Set();
-
-  objects.forEach((obj) => {
-    if (!obj || typeof obj !== 'object' || Array.isArray(obj)) return;
-
-    Object.keys(obj).forEach((key) => {
-      const lang = String(key || '').trim().toLowerCase();
-
-      if (lang) {
-        keys.add(lang);
-      }
-    });
-  });
-
-  return Array.from(keys);
-}
-
-function sortLocaleSourceEntries(entries) {
-  if (!Array.isArray(entries) || entries.length <= 1) return entries;
-
-  const defaultLangOrder = DEFAULT_LOCALE_DEFS.map((locale) =>
-    locale.lang || locale.key?.split('-')?.[0]
-  ).filter(Boolean);
-
-  const langToPair = new Map();
-  for (const [key, loc] of entries) {
-    const lang = String(loc?.lang || key?.split('-')?.[0] || '')
-      .trim()
-      .toLowerCase();
-    if (!lang) continue;
-    if (!langToPair.has(lang)) {
-      langToPair.set(lang, [key, loc]);
-    }
-  }
-
-  const normalizedLangKeys = [...langToPair.keys()];
-
-  const orderedLangKeys = [
-    ...defaultLangOrder.filter((lang) => normalizedLangKeys.includes(lang)),
-    ...normalizedLangKeys.filter((lang) => !defaultLangOrder.includes(lang)),
-  ];
-
-  return orderedLangKeys.map((lang) => langToPair.get(lang));
-}
-
-function makeLocaleEntriesFromLangKeys(langKeys = []) {
-  const normalizedLangKeys = [
-    ...new Set(
-      langKeys
-        .map((lang) => String(lang || '').trim().toLowerCase())
-        .filter(Boolean)
-    ),
-  ];
-
-  const defaultLangOrder = DEFAULT_LOCALE_DEFS.map((locale) =>
-    locale.lang || locale.key?.split('-')?.[0]
-  ).filter(Boolean);
-
-  const orderedLangKeys = [
-    ...defaultLangOrder.filter((lang) => normalizedLangKeys.includes(lang)),
-    ...normalizedLangKeys.filter((lang) => !defaultLangOrder.includes(lang)),
-  ];
-
-  return orderedLangKeys.map((lang) => {
-    const matchedDef = DEFAULT_LOCALE_DEFS.find((locale) => locale.lang === lang);
-
-    if (matchedDef) {
-      return [
-        matchedDef.key,
-        {
-          lang: matchedDef.lang,
-          code: matchedDef.code,
-          langName: matchedDef.langName,
-          isDefault: Boolean(matchedDef.isDefault),
-        },
-      ];
-    }
-
-    const info = getLocaleInfo(lang);
-    const key = `${lang}-${info.code}`;
-
-    return [
-      key,
-      {
-        lang,
-        code: info.code,
-        langName: info.name,
-        isDefault: false,
-        isCustom: true,
-      },
-    ];
-  });
-}
-
-const normalizeCityInfo = (info = {}) => {
-  const cityId = info.city_id ?? info.city ?? null;
-  const sessionCityId = info.session_city_id ?? info.session_city ?? null;
-
-  let assignedCityType = info.assigned_city_type ?? 'none';
-
-  if (!info.assigned_city_type) {
-    if (cityId) {
-      assignedCityType = 'database';
-    } else if (sessionCityId) {
-      assignedCityType = 'draft';
-    }
-  }
-
-  return {
-    ...info,
-
-    id: info.id ?? null,
-
-    name: info.name ?? info.title ?? {},
-    description: info.description ?? {},
-
-    city: cityId,
-    city_id: cityId,
-
-    session_city: sessionCityId,
-    session_city_id: sessionCityId,
-
-    assigned_city_type: assignedCityType,
-    assigned_city_name: info.assigned_city_name ?? null,
-  };
-};
-
-const buildCityInfoPayload = (info, name, description) => {
-  const assignedType = info.assigned_city_type ?? 'none';
-
-  let city = null;
-  let sessionCity = null;
-
-  if (assignedType === 'database') {
-    city = info.city_id ?? info.city ?? null;
-  }
-
-  if (assignedType === 'draft') {
-    sessionCity = info.session_city_id ?? info.session_city ?? null;
-  }
-
-  return {
-    name: name ?? info.name ?? {},
-    description: description ?? info.description ?? {},
-
-    assigned_city_type: assignedType,
-
-    city,
-    city_id: city,
-
-    session_city: sessionCity,
-    session_city_id: sessionCity,
-  };
-};
-
-function collectCityInfoLocaleTexts(cityInfoLocaleData) {
-  const name = {};
-  const description = {};
-
-  Object.values(cityInfoLocaleData || {}).forEach((d) => {
-    if (!d?.lang) return;
-
-    if (d.name || d.description) {
-      name[d.lang] = d.name || '';
-      description[d.lang] = d.description || '';
-    }
-  });
-
-  return { name, description };
-}
-
-function buildCityInfoPersistSnapshot(info, cityInfoLocaleData) {
-  if (!info?.id) return null;
-
-  const { name, description } = collectCityInfoLocaleTexts(cityInfoLocaleData);
-
-  return JSON.stringify(
-    buildCityInfoPayload(normalizeCityInfo(info), name, description),
-  );
-}
-
-const makeEmptyLocaleObject = (sourceLocaleData = null) => {
-  const sourceEntries =
-    sourceLocaleData && Object.keys(sourceLocaleData).length > 0
-      ? Object.entries(sourceLocaleData).map(([key, loc]) => ({
-          key,
-          ...loc,
-        }))
-      : DEFAULT_LOCALE_DEFS;
-
-  return sourceEntries.reduce((acc, locale) => {
-    const lang =
-      locale.lang ||
-      locale.key?.split('-')?.[0] ||
-      'ru';
-
-    if (lang) {
-      acc[lang] = '';
-    }
-
-    return acc;
-  }, {});
-};
-
-const createEmptyCityInfo = ({
-  activeDraftId = null,
-  sourceLocaleData = null,
-} = {}) => {
-  const normalizedDraftId = normalizeDraftId(activeDraftId);
-  const shouldAttachToDraft =
-    normalizedDraftId && normalizedDraftId !== 'legacy';
-
-  return {
-    id: `city-info-${Date.now()}`,
-
-    name: makeEmptyLocaleObject(sourceLocaleData),
-    description: makeEmptyLocaleObject(sourceLocaleData),
-
-    assigned_city_type: shouldAttachToDraft ? 'draft' : 'none',
-
-    city: null,
-    city_id: null,
-
-    session_city: shouldAttachToDraft ? normalizedDraftId : null,
-    session_city_id: shouldAttachToDraft ? normalizedDraftId : null,
-
-    isNew: true,
-  };
-};
+import {
+  makeLocaleData,
+  resolveBackendLanguageCode,
+  parseMapCoord,
+  hasValidMapCoords,
+  buildCityStepPayload,
+  upsertCityDraft,
+  normalizeCityDraft,
+  parseCreatedCityDraftResponse,
+} from './cityStepCore.js';
+import {
+  getLocaleLang,
+  getMultilangKeys,
+  sortLocaleSourceEntries,
+  makeLocaleEntriesFromLangKeys,
+  normalizeCityInfo,
+  buildCityInfoPayload,
+  collectCityInfoLocaleTexts,
+  buildCityInfoPersistSnapshot,
+  createEmptyCityInfo,
+} from './cityInfoCore.js';
 
 export default function useCityStep(ctx) {
   const {
@@ -463,7 +72,6 @@ export default function useCityStep(ctx) {
     setDefaultLocale,
     cityDrafts,
     setCityDrafts,
-    activeCityDraftId,
     setActiveCityDraftId,
     activeCityDraftIdRef,
     referenceCities,
@@ -718,7 +326,7 @@ export default function useCityStep(ctx) {
     localeData,
     cityDrafts,
     referenceCities,
-    activeCityDraftId,
+    activeCityDraftIdRef,
   ]);
 
   const deferredCityInfoLocaleData = useDeferredValue(cityInfoLocaleData);
@@ -991,7 +599,7 @@ export default function useCityStep(ctx) {
         };
       });
     }
-  }, [setCityDrafts, setSession, setActiveCityDraftId, syncActiveDraftRoute]);
+  }, [setCityDrafts, setSession, setActiveCityDraftId, syncActiveDraftRoute, activeCityDraftIdRef]);
 
   const saveCityForStep1 = useCallback(async () => {
     if (!defaultLocale || !localeData[defaultLocale]) {
@@ -1073,7 +681,7 @@ export default function useCityStep(ctx) {
     } finally {
       setSaving(false);
     }
-  }, [sessionId, localeData, defaultLocale, lat, lon, cityTags, imageId, imageOriginalUrl, parentCityId, authorIds, showNote, loadSession, syncActiveDraftRoute, mergeCitySaveResponseIntoState, loadCityIntoForm, setActiveCityDraftId, sessionOpenedAtRef, firstCitySaveAtRef]);
+  }, [sessionId, localeData, defaultLocale, lat, lon, cityTags, imageId, imageOriginalUrl, parentCityId, authorIds, showNote, loadSession, syncActiveDraftRoute, mergeCitySaveResponseIntoState, loadCityIntoForm, setActiveCityDraftId, sessionOpenedAtRef, firstCitySaveAtRef, activeCityDraftIdRef, hasUnsavedChangesRef]);
 
   const waitForCityPersistenceIdle = useCallback(async () => {
     const deadline = Date.now() + 15000;
@@ -1123,13 +731,16 @@ export default function useCityStep(ctx) {
     cityTags,
     imageId,
     imageOriginalUrl,
+    parentCityId,
+    authorIds,
+    activeCityDraftIdRef,
     waitForCityPersistenceIdle,
     mergeCitySaveResponseIntoState,
   ]);
 
   useEffect(() => {
     if (currentStepRef.current !== 1 || !sessionId || !session || !defaultLocale) return;
-    if (!localeData[defaultLocale]) return;
+    if (!deferredLocaleData[defaultLocale]) return;
 
     // Программная загрузка формы (loadCityIntoForm) — не правка: без этого
     // каждое открытие формы рождало «пустой» автосейв, который и затирал
@@ -1141,7 +752,15 @@ export default function useCityStep(ctx) {
 
     // Свежий слепок формы — для немедленного flush при уходе со страницы.
     autosaveSnapshotRef.current = {
-      localeData, defaultLocale, lat, lon, cityTags, imageId, imageOriginalUrl, parentCityId, authorIds,
+      localeData: deferredLocaleData,
+      defaultLocale,
+      lat: deferredLat,
+      lon: deferredLon,
+      cityTags: deferredCityTags,
+      imageId,
+      imageOriginalUrl: deferredImageOriginalUrl,
+      parentCityId,
+      authorIds,
     };
 
     // Таймерного автосейва больше НЕТ (сейвы каждые 2.5с дёргали сервер и
@@ -1163,6 +782,10 @@ export default function useCityStep(ctx) {
     session,
     mergeCitySaveResponseIntoState,
     loadCityIntoForm,
+    parentCityId,
+    authorIds,
+    currentStepRef,
+    hasUnsavedChangesRef,
   ]);
 
   // Немедленный сейв несохранённых правок при уходе: debounce-таймер при
@@ -1207,7 +830,7 @@ export default function useCityStep(ctx) {
         .catch(() => { /* 409 = на сервере новее; сеть — правка уже в форме при возврате */ })
         .finally(() => setAutoSaving(false));
     }
-  }, [sessionId, mergeCitySaveResponseIntoState]);
+  }, [sessionId, mergeCitySaveResponseIntoState, activeCityDraftIdRef, hasUnsavedChangesRef]);
 
   // onBlur контейнера формы города: сохраняем, только когда фокус ушёл ЗА
   // пределы формы (перескок поле→поле сейв не дёргает).
@@ -1466,7 +1089,7 @@ export default function useCityStep(ctx) {
     setActiveCityDraftId(normalizedDraftId);
     syncActiveDraftRoute(normalizedDraftId);
     loadCityIntoForm(draft);
-  }, [cityDrafts, loadCityIntoForm, syncActiveDraftRoute, saveCitySilently, setActiveCityDraftId, hasUnsavedChangesRef]);
+  }, [cityDrafts, loadCityIntoForm, syncActiveDraftRoute, saveCitySilently, setActiveCityDraftId, hasUnsavedChangesRef, activeCityDraftIdRef]);
 
   const handleCreateDraft = useCallback(async () => {
     let newDraftId = null;
@@ -1528,6 +1151,7 @@ export default function useCityStep(ctx) {
     loadCityIntoForm,
     setCityDrafts,
     setActiveCityDraftId,
+    activeCityDraftIdRef,
   ]);
 
   const handleDeleteDraft = useCallback(async (draftId) => {
@@ -1625,6 +1249,7 @@ export default function useCityStep(ctx) {
     confirm,
     setCityDrafts,
     setActiveCityDraftId,
+    activeCityDraftIdRef,
   ]);
 
   const handlePhotoFile = useCallback(async (e) => {
@@ -1729,7 +1354,7 @@ export default function useCityStep(ctx) {
           : draft
       )
     );
-  }, [setCityDrafts]);
+  }, [setCityDrafts, activeCityDraftIdRef]);
 
   const toggleCityTag = useCallback((tagId) => {
     const normalizedTagId = String(tagId || '');
@@ -1863,7 +1488,7 @@ export default function useCityStep(ctx) {
         'error'
       );
     }
-  }, [sessionId, showNote, localeData, defaultLocale, setCityInfos, setCurrentCityInfo, setCityInfoActiveLocale]);
+  }, [sessionId, showNote, localeData, defaultLocale, setCityInfos, setCurrentCityInfo, setCityInfoActiveLocale, activeCityDraftIdRef]);
 
   const importCityInfoFromText = useCallback(async (langRaw = 'ru', rawText = '') => {
     const lang = String(langRaw || 'ru').split('-')[0].trim().toLowerCase() || 'ru';
@@ -1940,7 +1565,7 @@ export default function useCityStep(ctx) {
       );
       throw e;
     }
-  }, [sessionId, showNote, localeData, setSession]);
+  }, [sessionId, showNote, localeData, setSession, activeCityDraftIdRef]);
 
   const updateCurrentCityInfoPatch = useCallback((patch) => {
     setCurrentCityInfo((prev) => {
@@ -2117,6 +1742,7 @@ export default function useCityStep(ctx) {
     sessionId,
     deferredCurrentCityInfo,
     deferredCityInfoLocaleData,
+    showNote,
   ]);
 
   const openCityInfoDetail = useCallback(
@@ -2195,7 +1821,7 @@ export default function useCityStep(ctx) {
       collect(draft?.country) ||
       'ru'
     );
-  }, [localeData, activeLocale, cityDrafts]);
+  }, [localeData, activeLocale, cityDrafts, activeCityDraftIdRef]);
 
   const openCityInfoGenerateModal = useCallback(() => {
     cityInfoGenPollCancelledRef.current = false;
@@ -2328,6 +1954,8 @@ export default function useCityStep(ctx) {
     setCityInfoGenerationTaskId,
     setCityInfoGenerating,
     setCityInfoGenerationError,
+    activeCityDraftIdRef,
+    cityInfoGenerating,
   ]);
 
   const createCityFilterFolder = useCallback(async (payload) => {

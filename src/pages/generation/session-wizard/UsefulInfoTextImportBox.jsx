@@ -1,13 +1,6 @@
 import { useState } from 'react';
-
-const LANGUAGE_OPTIONS = [
-  { value: 'ru', label: 'Русский (ru)' },
-  { value: 'en', label: 'English (en)' },
-  { value: 'it', label: 'Italiano (it)' },
-  { value: 'fr', label: 'Français (fr)' },
-  { value: 'de', label: 'Deutsch (de)' },
-  { value: 'es', label: 'Español (es)' },
-];
+import { Alert, Button, Panel, Select, Textarea } from '@aspectum/ui';
+import { useAppLanguages } from '../../../hooks/useAppLanguages';
 
 export default function UsefulInfoTextImportBox({
   title = 'Вставить готовую полезную информацию',
@@ -20,6 +13,11 @@ export default function UsefulInfoTextImportBox({
   disabled = false,
   onImport,
 }) {
+  const { languages: appLanguages } = useAppLanguages();
+  const languageOptions = appLanguages.map((language) => ({
+    value: language.code,
+    label: `${language.label || language.name || language.code} (${language.code})`,
+  }));
   const [text, setText] = useState('');
   const [language, setLanguage] = useState(defaultLanguage || 'ru');
   const [busy, setBusy] = useState(false);
@@ -49,50 +47,40 @@ export default function UsefulInfoTextImportBox({
   };
 
   return (
-    <div className="rounded-lg border border-gray-200 bg-white p-3 space-y-3">
+    <Panel className="p-3 space-y-3">
       <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
         <div>
-          <p className="text-sm font-medium text-gray-800">{title}</p>
-          <p className="mt-0.5 text-[11px] leading-snug text-gray-500">
+          <p className="text-sm font-medium text-aspectum-text-emphasis">{title}</p>
+          <p className="mt-0.5 text-[11px] leading-snug text-aspectum-text-muted">
             {description}
           </p>
         </div>
 
-        <select
-          value={language}
-          onChange={(e) => setLanguage(e.target.value)}
-          disabled={disabled || busy}
-          className="w-full sm:w-44 px-2.5 py-1.5 border border-gray-300 rounded-lg text-xs bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
-        >
-          {LANGUAGE_OPTIONS.map((option) => (
+        <Select className="sm:w-44 bg-aspectum-surface disabled:bg-aspectum-surface-subtle" value={language} onChange={(e) => setLanguage(e.target.value)} disabled={disabled || busy}>
+          {languageOptions.map((option) => (
             <option key={option.value} value={option.value}>
               {option.label}
             </option>
           ))}
-        </select>
+        </Select>
       </div>
 
-      <textarea
-        rows={5}
-        value={text}
-        onChange={(e) => setText(e.target.value)}
-        disabled={disabled || busy}
-        placeholder={placeholder}
-        className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 resize-y"
-      />
+      <Textarea className="disabled:bg-aspectum-surface-subtle" rows={5} value={text} onChange={(e) => setText(e.target.value)} disabled={disabled || busy} placeholder={placeholder} />
 
       {error ? (
-        <p className="text-xs text-red-600">{error}</p>
+        <Alert tone="error" className="text-xs">{error}</Alert>
       ) : null}
 
-      <button
+      <Button
         type="button"
         onClick={handleImport}
         disabled={disabled || busy || !text.trim()}
-        className="w-fit px-3 py-1.5 text-xs font-medium text-blue-700 bg-blue-100 border border-blue-200 rounded-lg hover:bg-blue-200 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+        variant="softStrong"
+        size="sm"
+        className="w-fit"
       >
         {busy ? 'Создание...' : buttonLabel}
-      </button>
-    </div>
+      </Button>
+    </Panel>
   );
 }

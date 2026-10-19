@@ -1,20 +1,13 @@
 import { useCallback, useEffect, useState } from 'react';
 import { eventTicketTypePricesAPI } from '../../../api/booking';
 import Layout from '../../../components/Layout';
-import DataTable from '../../../components/ui/DataTable';
-import { Field, FormActions, TextInput } from '../../../components/ui/FormField';
-import Modal, { ConfirmModal } from '../../../components/ui/Modal';
+import { Alert, CheckboxField, PageHeader, ConfirmModal, DataTable, Field, FormActions, Modal, StatusBadge, TableRowActions, TextInput, formGridClassName } from '@aspectum/ui';
 import { useLayoutActions } from '../../../context/useLayoutActions';
 import { parseApiError } from '../../../utils/apiError';
 import { useCatalogFilters } from '../core/useCatalogFilters';
 import { useEventOptions, useTicketTypeOptions } from '../shared/bookingOptions';
-import ActiveCheckboxField from '../shared/components/ActiveCheckboxField';
-import CatalogPageHeader from '../shared/components/CatalogPageHeader';
 import EventSelect from '../shared/components/EventSelect';
-import FormErrorAlert from '../shared/components/FormErrorAlert';
 import PricePrecedenceHint from '../shared/components/PricePrecedenceHint';
-import StatusBadge from '../shared/components/StatusBadge';
-import TableRowActions from '../shared/components/TableRowActions';
 import TicketTypeSelect from '../shared/components/TicketTypeSelect';
 import { DEFAULT_CURRENCY, normalizeCurrency } from '../shared/currencies';
 import { getEventLabelById, getTicketTypeLabel } from '../shared/labels';
@@ -129,16 +122,16 @@ export default function BasePricesCatalogPage() {
   const columns = [
     {
       key: 'event', label: 'Событие',
-      render: (v) => <span className="text-sm text-gray-700">{eventLabel(v)}</span>,
+      render: (v) => <span className="text-sm text-aspectum-text-strong">{eventLabel(v)}</span>,
     },
     {
       key: 'ticket_type', label: 'Тип билета',
-      render: (v) => <span className="text-sm text-gray-700">{ttLabel(v)}</span>,
+      render: (v) => <span className="text-sm text-aspectum-text-strong">{ttLabel(v)}</span>,
     },
     {
       key: 'base_price', label: 'Базовая цена',
       render: (v, row) => (
-        <span className="font-medium text-gray-900">{v} <span className="text-xs text-gray-400">{row.currency}</span></span>
+        <span className="font-medium text-aspectum-text">{v} <span className="text-xs text-aspectum-text-disabled">{row.currency}</span></span>
       ),
     },
     {
@@ -149,7 +142,7 @@ export default function BasePricesCatalogPage() {
 
   return (
     <Layout>
-      <CatalogPageHeader
+      <PageHeader
         title="Базовые цены"
         description="Цена по умолчанию для пары событие + тип билета (используется ценовым движком как fallback)"
         createLabel="Создать базовую цену"
@@ -177,7 +170,7 @@ export default function BasePricesCatalogPage() {
             options={eventOptions}
             disabled={eventsLoading}
             placeholder={eventsLoading ? 'Загрузка…' : 'Все события'}
-            className={`px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none ${eventsLoading ? 'opacity-60 cursor-wait' : ''}`}
+            className={eventsLoading ? 'opacity-60 cursor-wait' : undefined}
           />
         )}
         actions={(row) => (
@@ -196,7 +189,7 @@ export default function BasePricesCatalogPage() {
       >
         {editing && (
           <form onSubmit={handleSave} className="space-y-4">
-            <FormErrorAlert message={saveError} />
+            <Alert tone="error">{saveError}</Alert>
 
             <Field label="Событие" required>
               <EventSelect
@@ -220,7 +213,7 @@ export default function BasePricesCatalogPage() {
               />
             </Field>
 
-            <div className="grid grid-cols-2 gap-3">
+            <div className={formGridClassName({ responsive: false })}>
               <Field label="Базовая цена" required>
                 <TextInput
                   type="number" step="0.01" min={0}
@@ -239,7 +232,7 @@ export default function BasePricesCatalogPage() {
               </Field>
             </div>
 
-            <ActiveCheckboxField
+            <CheckboxField
               checked={editing.is_active}
               onChange={(v) => setEditing((p) => ({ ...p, is_active: v }))}
             />

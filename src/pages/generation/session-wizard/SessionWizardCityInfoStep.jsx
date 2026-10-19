@@ -1,19 +1,13 @@
 import { useMemo } from 'react';
-import AiGenerationModal, { WizardGenerationActionFooter } from '../../../components/generation/AiGenerationModal.jsx';
+import AiGenerationModal from '../../../components/generation/AiGenerationModal.jsx';
+import { FormLabel, WizardActionFooter as WizardGenerationActionFooter } from '@aspectum/ui';
 import AiGenerationQualitySettings from '../../../components/generation/AiGenerationQualitySettings.jsx';
 import AiGenerationDedupeToggle from '../../../components/generation/AiGenerationDedupeToggle.jsx';
 import AiGenerationCountField from '../../../components/generation/AiGenerationCountField.jsx';
-import { getFlag, normalizeId } from './sessionWizardShared.jsx';
+import { normalizeId } from './sessionWizardShared.jsx';
 import UsefulInfoTextImportBox from './UsefulInfoTextImportBox.jsx';
-
-const AI_GENERATION_LANG_OPTIONS = [
-  { value: 'ru', label: 'Русский (ru)' },
-  { value: 'en', label: 'English (en)' },
-  { value: 'it', label: 'Italiano (it)' },
-  { value: 'fr', label: 'Français (fr)' },
-  { value: 'de', label: 'Deutsch (de)' },
-  { value: 'es', label: 'Español (es)' },
-];
+import { useAppLanguages } from '../../../hooks/useAppLanguages';
+import { Alert, Button, EmptyState, EntityDraftsPanel, IconButton, LocaleEditor, Panel, SectionHeader, Select, SelectableCard, Spinner, Textarea, TextInput } from '@aspectum/ui';
 
 const getInfoName = (info) => {
   if (!info) return '(без названия)';
@@ -126,67 +120,47 @@ function CityInfoDraftsPanel({
   const currentCityInfoId = normalizeId(currentCityInfo?.id);
 
   return (
-    <div className="p-3 border border-gray-200 rounded-xl bg-gray-50">
-      <div className="flex items-center justify-between mb-2">
-        <p className="text-sm font-medium text-gray-800">
-          Черновики полезной информации в сессии
-        </p>
-
-        <div className="flex items-center gap-2">
+    <EntityDraftsPanel
+      title="Черновики полезной информации в сессии"
+      items={cityInfos}
+      emptyText="Пока нет полезной информации"
+      actions={(
+        <>
           {showGenerateButton && (
-            <button
-              type="button"
-              onClick={onOpenCityInfoGenerateModal}
-              className="px-2.5 py-1 text-xs font-medium text-blue-700 bg-blue-100 rounded-md hover:bg-blue-200 transition-colors"
-            >
+            <Button type="button" onClick={onOpenCityInfoGenerateModal} variant="softStrong" size="sm">
               Сгенерировать
-            </button>
+            </Button>
           )}
-
-          <button
-            type="button"
-            onClick={onAddCityInfo}
-            className="px-2.5 py-1 text-xs font-medium text-blue-700 bg-blue-100 rounded-md hover:bg-blue-200 transition-colors"
-          >
+          <Button type="button" onClick={onAddCityInfo} variant="softStrong" size="sm">
             + Добавить
-          </button>
-        </div>
-      </div>
-
-      <div className="flex flex-wrap gap-2">
-        {cityInfos.length === 0 ? (
-          <span className="text-xs text-gray-500">
-            Пока нет полезной информации
-          </span>
-        ) : (
-          cityInfos.map((info, index) => {
-            const infoId = normalizeId(info.id);
-            const isActive = infoId === currentCityInfoId;
-
-            return (
-              <button
+          </Button>
+        </>
+      )}
+      renderItem={(info, index) => {
+        const infoId = normalizeId(info.id);
+        const isActive = infoId === currentCityInfoId;
+        return (
+              <SelectableCard
                 key={info.id}
-                type="button"
-                onClick={() => {
+                onSelect={() => {
                   if (!isActive) {
                     onSelectCityInfo(info.id);
                   }
                 }}
-                className={`flex items-center gap-1 px-2 py-1 rounded-lg border text-xs transition-colors ${
+                ariaLabel={getInfoName(info)}
+                className={`flex items-center gap-1 px-2 py-1 rounded-aspectum-control border text-xs transition-colors ${
                   isActive
-                    ? 'bg-blue-50 border-blue-300 text-blue-700 font-medium'
-                    : 'bg-white border-gray-200 text-gray-700 hover:border-blue-300 hover:bg-blue-50'
+                    ? 'bg-aspectum-primary-soft border-aspectum-primary-border-strong text-aspectum-primary-hover font-medium'
+                    : 'bg-aspectum-surface border-aspectum-border text-aspectum-text-strong hover:border-aspectum-primary-border-strong hover:bg-aspectum-primary-soft'
                 }`}
                 title={getInfoName(info)}
               >
-                <span className="text-gray-400">{index + 1}.</span>
+                <span className="text-aspectum-text-disabled">{index + 1}.</span>
                 <span>{getInfoName(info)}</span>
-              </button>
-            );
-          })
-        )}
-      </div>
-    </div>
+              </SelectableCard>
+        );
+      }}
+    />
   );
 }
 
@@ -236,6 +210,8 @@ export default function SessionWizardCityInfoStep({
   onAiGenerationModeChange,
   onAiUseWebSearchChange,
 }) {
+  const { languages: appLanguages } = useAppLanguages();
+  const aiGenerationLangOptions = appLanguages.map((language) => ({ value: language.code, label: `${language.label || language.name || language.code} (${language.code})` }));
   const currentLocale = cityInfoLocaleData[cityInfoActiveLocale] || {};
 
   const showGenerateButton = Boolean(scopedToCityDraftId);
@@ -281,66 +257,56 @@ export default function SessionWizardCityInfoStep({
         busy={cityInfoGenerating}
         footer={(
           <WizardGenerationActionFooter>
-            <button
+            <Button
               type="button"
+              variant="outline"
+              size="md"
               onClick={() => onCloseCityInfoGenerateModal?.()}
               disabled={cityInfoGenerating}
-              className="px-4 py-2 text-sm font-medium text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50"
             >
               Отмена
-            </button>
-            <button
+            </Button>
+            <Button
               type="button"
+              variant="primary"
+              size="md"
               onClick={() => onGenerateCityInfoFromPrompt?.()}
               disabled={cityInfoGenerating}
-              className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-50"
             >
               Сгенерировать
-            </button>
+            </Button>
           </WizardGenerationActionFooter>
         )}
       >
-        <h2
-          id="city-info-gen-title"
-          className="text-lg font-semibold text-gray-900"
-        >
-          Сгенерировать полезную информацию о городе
-        </h2>
+        <SectionHeader headingId="city-info-gen-title" title="Сгенерировать полезную информацию о городе" />
 
         {activeCityDraftDisplayName ? (
-          <p className="text-sm text-gray-600">
+          <p className="text-sm text-aspectum-text-subtle">
             Город:{' '}
             <span className="font-medium">
               {activeCityDraftDisplayName}
             </span>
           </p>
         ) : (
-          <p className="text-sm text-amber-700 bg-amber-50 border border-amber-200 rounded-lg p-3">
-            Город не выбран. Информация будет создана без привязки.
-          </p>
+          <Alert tone="warning">Город не выбран. Информация будет создана без привязки.
+          </Alert>
         )}
 
         <div>
-          <label
+          <FormLabel
             htmlFor="city-info-gen-lang"
-            className="block text-sm font-medium text-gray-700 mb-1"
+             layout="block" size="sm" weight="medium" tone="strong" spacing="xs"
           >
             Язык
-          </label>
+          </FormLabel>
 
-          <select
-            id="city-info-gen-lang"
-            value={cityInfoGenerationLang || 'ru'}
-            onChange={(e) => onCityInfoGenerationLangChange?.(e.target.value)}
-            disabled={cityInfoGenerating}
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
-          >
-            {AI_GENERATION_LANG_OPTIONS.map((opt) => (
+          <Select className="disabled:bg-aspectum-surface-subtle" id="city-info-gen-lang" value={cityInfoGenerationLang || 'ru'} onChange={(e) => onCityInfoGenerationLangChange?.(e.target.value)} disabled={cityInfoGenerating}>
+            {aiGenerationLangOptions.map((opt) => (
               <option key={opt.value} value={opt.value}>
                 {opt.label}
               </option>
             ))}
-          </select>
+          </Select>
         </div>
 
         <div>
@@ -355,9 +321,7 @@ export default function SessionWizardCityInfoStep({
         </div>
 
         {cityInfoGenerationError && (
-          <div className="text-sm text-red-700 bg-red-50 border border-red-200 rounded-lg p-3">
-            {cityInfoGenerationError}
-          </div>
+          <Alert tone="error">{cityInfoGenerationError}</Alert>
         )}
 
         <AiGenerationQualitySettings
@@ -377,58 +341,36 @@ export default function SessionWizardCityInfoStep({
         />
 
         <div>
-          <label
+          <FormLabel
             htmlFor="city-info-gen-prompt"
-            className="block text-sm font-medium text-gray-700 mb-1"
+             layout="block" size="sm" weight="medium" tone="strong" spacing="xs"
           >
             Дополнительный промпт
-          </label>
+          </FormLabel>
 
-          <textarea
-            id="city-info-gen-prompt"
-            rows={4}
-            value={cityInfoGeneratePrompt}
-            onChange={(e) => onCityInfoGeneratePromptChange?.(e.target.value)}
-            disabled={cityInfoGenerating}
-            placeholder="Например: для туристов, с акцентом на транспорт и безопасность"
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 resize-none"
-          />
+          <Textarea className="disabled:bg-aspectum-surface-subtle" id="city-info-gen-prompt" rows={4} value={cityInfoGeneratePrompt} onChange={(e) => onCityInfoGeneratePromptChange?.(e.target.value)} disabled={cityInfoGenerating} placeholder="Например: для туристов, с акцентом на транспорт и безопасность" />
         </div>
       </AiGenerationModal>
 
       {!currentCityInfo ? (
         <div className="space-y-4">
-          <div className="flex items-center justify-between gap-3">
-            <div>
-              <h2 className="text-lg font-semibold text-gray-900">
-                Полезная информация о городе
-              </h2>
-
-              <p className="text-sm text-gray-500">
-                Добавьте полезные блоки о городе и при необходимости привяжите их к городу
-              </p>
-            </div>
-
-            <div className="flex items-center gap-2 shrink-0">
+          <SectionHeader
+            title="Полезная информация о городе"
+            description="Добавьте полезные блоки о городе и при необходимости привяжите их к городу"
+            actions={
+              <>
               {showGenerateButton && (
-                <button
-                  type="button"
-                  onClick={onOpenCityInfoGenerateModal}
-                  className="px-3 py-1.5 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors"
-                >
+                <Button type="button" variant="primary" size="md" onClick={onOpenCityInfoGenerateModal}>
                   Сгенерировать
-                </button>
+                </Button>
               )}
 
-              <button
-                type="button"
-                onClick={onAddCityInfo}
-                className="px-3 py-1.5 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors"
-              >
+              <Button type="button" variant="primary" size="md" onClick={onAddCityInfo}>
                 + Добавить
-              </button>
-            </div>
-          </div>
+              </Button>
+              </>
+            }
+          />
 
           <UsefulInfoTextImportBox
             title="Вставить готовую полезную информацию о городе"
@@ -440,34 +382,33 @@ export default function SessionWizardCityInfoStep({
           />
 
           {cityInfos.length === 0 ? (
-            <div className="text-center py-10 text-gray-400 border border-dashed border-gray-200 rounded-xl bg-gray-50">
-              <div className="text-3xl mb-2">ℹ️</div>
-
-              <p className="text-sm">
-                {scopedToCityDraftId
-                  ? 'Для этого города пока нет полезной информации.'
-                  : 'Нет полезной информации. Нажмите «+ Добавить»'}
-              </p>
-            </div>
+            <EmptyState
+              icon="ℹ️"
+              title={scopedToCityDraftId
+                ? 'Для этого города пока нет полезной информации.'
+                : 'Нет полезной информации'}
+              description={scopedToCityDraftId ? 'Добавьте первый блок.' : 'Нажмите «+ Добавить», чтобы начать.'}
+              className="py-10"
+            />
           ) : (
             <div className="space-y-2">
               {cityInfos.map((info, idx) => (
                 <div
                   key={info.id}
                   onClick={() => onOpenCityInfoDetail?.(info.id)}
-                  className="flex items-center justify-between p-3 bg-white border border-gray-200 rounded-lg hover:border-blue-300 hover:bg-blue-50 cursor-pointer transition-colors"
+                  className="flex items-center justify-between p-3 bg-aspectum-surface border border-aspectum-border rounded-aspectum-control hover:border-aspectum-primary-border-strong hover:bg-aspectum-primary-soft cursor-pointer transition-colors"
                 >
                   <div className="flex items-center gap-3 min-w-0">
-                    <span className="w-6 h-6 flex items-center justify-center rounded-full bg-gray-100 text-xs font-medium text-gray-600 shrink-0">
+                    <span className="w-6 h-6 flex items-center justify-center rounded-full bg-aspectum-surface-subtle text-xs font-medium text-aspectum-text-subtle shrink-0">
                       {idx + 1}
                     </span>
 
                     <div className="min-w-0">
-                      <div className="text-sm font-medium text-gray-900 truncate">
+                      <div className="text-sm font-medium text-aspectum-text truncate">
                         {getInfoName(info)}
                       </div>
 
-                      <div className="text-xs text-gray-500">
+                      <div className="text-xs text-aspectum-text-muted">
                         {getCityInfoBindingLabel(
                           info,
                           referenceCities,
@@ -477,7 +418,7 @@ export default function SessionWizardCityInfoStep({
                     </div>
                   </div>
 
-                  <span className="text-xs text-blue-600 font-medium shrink-0">
+                  <span className="text-xs text-aspectum-primary font-medium shrink-0">
                     Открыть →
                   </span>
                 </div>
@@ -487,46 +428,42 @@ export default function SessionWizardCityInfoStep({
 
           {!embedded && (
             <div className="flex justify-between pt-2">
-              <button
-                type="button"
-                onClick={() => onGoToStep?.(1)}
-                className="px-4 py-2 text-sm text-gray-600 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
-              >
+              <Button type="button" variant="outline" size="md" onClick={() => onGoToStep?.(1)}>
                 ← Назад
-              </button>
+              </Button>
 
-              <button
-                type="button"
-                onClick={() => onGoToStep?.(2)}
-                className="px-5 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors"
-              >
+              <Button type="button" variant="primary" size="md" onClick={() => onGoToStep?.(2)}>
                 Далее: Теги →
-              </button>
+              </Button>
             </div>
           )}
         </div>
       ) : (
         <div className="space-y-4">
           <div className="flex items-center gap-3">
-            <button
+            <IconButton
+              label="Вернуться к списку полезной информации"
               type="button"
               onClick={() => onSetCurrentCityInfo?.(null)}
-              className="w-8 h-8 flex items-center justify-center border border-gray-300 rounded-lg text-gray-500 hover:bg-gray-50 transition-colors"
+              variant="outline"
+              className="w-8 h-8"
             >
               ←
-            </button>
+            </IconButton>
 
-            <span className="text-base font-semibold text-gray-900">
+            <span className="text-base font-semibold text-aspectum-text">
               {getInfoName(currentCityInfo)}
             </span>
 
-            <button
+            <Button
               type="button"
+              variant="softDanger"
+              size="sm"
               onClick={onDeleteCurrentCityInfo}
-              className="ml-auto px-3 py-1 text-xs font-medium text-red-600 bg-red-50 rounded-lg hover:bg-red-100 transition-colors"
+              className="ml-auto"
             >
               Удалить
-            </button>
+            </Button>
           </div>
 
           <CityInfoDraftsPanel
@@ -538,97 +475,41 @@ export default function SessionWizardCityInfoStep({
             showGenerateButton={showGenerateButton}
           />
 
-          <div className="flex items-center gap-1 flex-wrap">
-            {Object.entries(cityInfoLocaleData || {}).map(([key, loc]) => {
-              const isActive = key === cityInfoActiveLocale;
-
-              return (
-                <button
-                  key={key}
-                  type="button"
-                  onClick={() => onSetCityInfoActiveLocale?.(key)}
-                  className={`flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium border transition-all ${
-                    isActive
-                      ? 'bg-blue-600 text-white border-blue-600'
-                      : 'bg-white text-gray-600 border-gray-300 hover:border-blue-400'
-                  }`}
-                >
-                  <span>{getFlag(loc.code)}</span>
-                  <span>{loc.langName}</span>
-                </button>
-              );
-            })}
-          </div>
+          <LocaleEditor
+            localeData={cityInfoLocaleData}
+            activeLocale={cityInfoActiveLocale}
+            onSwitch={onSetCityInfoActiveLocale}
+          />
 
           <main className="space-y-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <FormLabel  layout="block" size="sm" weight="medium" tone="strong" spacing="xs">
                 Название ({currentLocale.lang?.toUpperCase() || 'RU'})
-              </label>
+              </FormLabel>
 
-              <input
-                type="text"
-                value={currentLocale.name || ''}
-                onChange={(e) =>
-                  onUpdateCityInfoLocaleField?.('name', e.target.value)
-                }
-                placeholder="Например: Транспорт, Безопасность, Когда лучше ехать"
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
+              <TextInput type="text" value={currentLocale.name || ''} onChange={(e) => onUpdateCityInfoLocaleField?.('name', e.target.value) } placeholder="Например: Транспорт, Безопасность, Когда лучше ехать" />
             </div>
 
-            <div className="p-3 border border-gray-200 rounded-lg bg-gray-50 space-y-3">
+            <Panel tone="muted" className="p-3 space-y-3">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <FormLabel  layout="block" size="sm" weight="medium" tone="strong" spacing="xs">
                   Привязка к городу
-                </label>
+                </FormLabel>
 
-                <select
-                  value={assignedCityType}
-                  onChange={(e) => {
-                    const type = e.target.value;
-
-                    updateCityInfoPatch({
-                      assigned_city_type: type,
-
-                      city: null,
-                      city_id: null,
-
-                      session_city: null,
-                      session_city_id: null,
-                    });
-                  }}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-                >
+                <Select className="bg-aspectum-surface" value={assignedCityType} onChange={(e) => { const type = e.target.value; updateCityInfoPatch({ assigned_city_type: type, city: null, city_id: null, session_city: null, session_city_id: null, }); }}>
                   <option value="none">Без города</option>
                   <option value="database">Город из базы</option>
                   <option value="draft">Город из сессии</option>
-                </select>
+                </Select>
               </div>
 
               {assignedCityType === 'database' && (
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                  <FormLabel  layout="block" size="sm" weight="medium" tone="strong" spacing="xs">
                     Город из базы
-                  </label>
+                  </FormLabel>
 
-                  <select
-                    value={selectedDatabaseCityId}
-                    onChange={(e) => {
-                      const cityId = e.target.value || null;
-
-                      updateCityInfoPatch({
-                        assigned_city_type: 'database',
-
-                        city: cityId,
-                        city_id: cityId,
-
-                        session_city: null,
-                        session_city_id: null,
-                      });
-                    }}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  >
+                  <Select className="bg-aspectum-surface" value={selectedDatabaseCityId} onChange={(e) => { const cityId = e.target.value || null; updateCityInfoPatch({ assigned_city_type: 'database', city: cityId, city_id: cityId, session_city: null, session_city_id: null, }); }}>
                     <option value="">Выберите город из базы</option>
 
                     {referenceCities.map((city) => (
@@ -636,10 +517,10 @@ export default function SessionWizardCityInfoStep({
                         {getCityDisplayName(city)}
                       </option>
                     ))}
-                  </select>
+                  </Select>
 
                   {referenceCities.length === 0 && (
-                    <p className="mt-1 text-xs text-amber-600">
+                    <p className="mt-1 text-xs text-aspectum-warning">
                       Список городов из базы не загружен.
                     </p>
                   )}
@@ -648,27 +529,11 @@ export default function SessionWizardCityInfoStep({
 
               {assignedCityType === 'draft' && (
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                  <FormLabel  layout="block" size="sm" weight="medium" tone="strong" spacing="xs">
                     Город из сессии
-                  </label>
+                  </FormLabel>
 
-                  <select
-                    value={selectedDraftCityId}
-                    onChange={(e) => {
-                      const draftId = e.target.value || null;
-
-                      updateCityInfoPatch({
-                        assigned_city_type: 'draft',
-
-                        session_city: draftId,
-                        session_city_id: draftId,
-
-                        city: null,
-                        city_id: null,
-                      });
-                    }}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  >
+                  <Select className="bg-aspectum-surface" value={selectedDraftCityId} onChange={(e) => { const draftId = e.target.value || null; updateCityInfoPatch({ assigned_city_type: 'draft', session_city: draftId, session_city_id: draftId, city: null, city_id: null, }); }}>
                     <option value="">Выберите город</option>
 
                     {cityDrafts.map((draft) => (
@@ -676,37 +541,29 @@ export default function SessionWizardCityInfoStep({
                         {getDraftCityDisplayName(draft)}
                       </option>
                     ))}
-                  </select>
+                  </Select>
 
                   {cityDrafts.length === 0 && (
-                    <p className="mt-1 text-xs text-amber-600">
+                    <p className="mt-1 text-xs text-aspectum-warning">
                       В текущей сессии пока нет городов.
                     </p>
                   )}
                 </div>
               )}
-            </div>
+            </Panel>
 
             <div>
               <div className="flex items-center gap-2 mb-1">
-                <label className="text-sm font-medium text-gray-700">
+                <FormLabel  size="sm" weight="medium" tone="strong">
                   Описание
-                </label>
+                </FormLabel>
 
-                <span className="px-1.5 py-0.5 bg-blue-100 text-blue-700 text-xs rounded font-mono">
+                <span className="px-1.5 py-0.5 bg-aspectum-primary-muted text-aspectum-primary-hover text-xs rounded font-mono">
                   {currentLocale.lang?.toUpperCase() || 'RU'}
                 </span>
               </div>
 
-              <textarea
-                value={currentLocale.description || ''}
-                onChange={(e) =>
-                  onUpdateCityInfoLocaleField?.('description', e.target.value)
-                }
-                rows={embedded ? 5 : 7}
-                placeholder="Описание полезной информации для пользователя..."
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
-              />
+              <Textarea value={currentLocale.description || ''} onChange={(e) => onUpdateCityInfoLocaleField?.('description', e.target.value) } rows={embedded ? 5 : 7} placeholder="Описание полезной информации для пользователя..." />
             </div>
 
             <div className="flex items-center justify-end gap-3">
@@ -714,13 +571,13 @@ export default function SessionWizardCityInfoStep({
                 <div
                   className={`flex items-center gap-1.5 text-xs transition-opacity ${
                     cityInfoAutoSaved && !cityInfoAutoSaving
-                      ? 'text-emerald-600'
-                      : 'text-gray-400'
+                      ? 'text-aspectum-success'
+                      : 'text-aspectum-text-disabled'
                   }`}
                 >
                   {cityInfoAutoSaving ? (
                     <>
-                      <span className="inline-block w-3 h-3 border-2 border-gray-300 border-t-transparent rounded-full animate-spin" />
+                      <Spinner size="xs" className="border-2 border-aspectum-border-strong" />
                       <span>Сохранение...</span>
                     </>
                   ) : (
@@ -743,14 +600,15 @@ export default function SessionWizardCityInfoStep({
                   )}
                 </div>
               )}
-              <button
+              <Button
                 type="button"
+                variant="primary"
+                size="md"
                 onClick={onSaveCurrentCityInfo}
                 disabled={cityInfoSaving}
-                className="px-5 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors"
               >
                 {cityInfoSaving ? 'Сохранение...' : 'Сохранить'}
-              </button>
+              </Button>
             </div>
           </main>
         </div>

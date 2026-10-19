@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { Field, Select, TextInput } from '../../../components/ui/FormField';
-import { ConfirmModal } from '../../../components/ui/Modal';
+import { FormLabel, Alert, Button, Checkbox, ConfirmModal, EmptyState, Field, FormGrid, IconButton, Panel, Select, TextInput } from '@aspectum/ui';
 import { parseApiError } from '../../../utils/apiError';
 import { eventsCatalogAPI } from './api';
 import { LangBlock } from '../shared/LangFields';
@@ -141,7 +140,7 @@ export default function EventItineraryTab({ eventId, activeLang }) {
   };
 
   const renderFields = (draft, setDraft) => (
-    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+    <FormGrid>
       <LangBlock
         label="Название"
         value={draft.name || {}}
@@ -172,81 +171,81 @@ export default function EventItineraryTab({ eventId, activeLang }) {
           {ADMISSION_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
         </Select>
       </Field>
-      <label className="flex items-center gap-2 text-sm text-gray-700 md:col-span-2">
-        <input
-          type="checkbox"
+      <FormLabel  layout="row" size="sm" tone="strong" className="md:col-span-2">
+        <Checkbox
           checked={!!draft.is_pass_by}
           onChange={(e) => setDraft((p) => ({ ...p, is_pass_by: e.target.checked }))}
         />
         Проходной пункт (без номера, &laquo;Pass By&raquo;)
-      </label>
-    </div>
+      </FormLabel>
+    </FormGrid>
   );
 
   if (!activeLang) {
-    return <p className="text-sm text-gray-400">Сначала укажите название события хотя бы на одном языке.</p>;
+    return <p className="text-sm text-aspectum-text-disabled">Сначала укажите название события хотя бы на одном языке.</p>;
   }
 
   return (
     <div className="space-y-3">
-      {error && <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">{error}</div>}
+      {error && <Alert tone="error">{error}</Alert>}
 
       {loading ? (
-        <div className="text-sm text-gray-400">Загрузка...</div>
+        <EmptyState icon={null} title="Загрузка..." spacing="sm" />
       ) : (
         <div className="space-y-2">
           {steps.length === 0 && !addOpen && (
-            <p className="text-sm text-gray-400">Шагов маршрута пока нет.</p>
+            <EmptyState
+              icon="🧭"
+              title="Шагов маршрута пока нет"
+              description="Добавьте первый пункт маршрута, чтобы собрать itinerary события."
+              className="py-5"
+            />
           )}
 
           {steps.map((step, i) => (
-            <div key={step.id} className="border border-gray-200 rounded-xl p-3">
+            <div key={step.id} className="border border-aspectum-border rounded-aspectum-card p-3">
               {editingId === step.id ? (
                 <div className="space-y-3">
                   {renderFields(editDraft, setEditDraft)}
-                  {saveError && <p className="text-xs text-red-600">{saveError}</p>}
+                  {saveError && <p className="text-xs text-aspectum-danger">{saveError}</p>}
                   <div className="flex gap-2">
-                    <button type="button" onClick={saveEdit} disabled={saving}
-                      className="px-3 py-1.5 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-50">
+                    <Button type="button" variant="primary" size="md" onClick={saveEdit} disabled={saving}>
                       {saving ? 'Сохранение...' : 'Сохранить'}
-                    </button>
-                    <button type="button" onClick={cancelEdit}
-                      className="px-3 py-1.5 text-sm font-medium text-gray-600 bg-gray-100 rounded-lg hover:bg-gray-200">
+                    </Button>
+                    <Button type="button" variant="secondary" size="md" onClick={cancelEdit}>
                       Отмена
-                    </button>
+                    </Button>
                   </div>
                 </div>
               ) : (
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
-                    <div className="flex items-center gap-2 text-sm font-medium text-gray-800">
+                    <div className="flex items-center gap-2 text-sm font-medium text-aspectum-text-emphasis">
                       {step.is_pass_by ? (
-                        <span className="text-xs text-gray-400 uppercase">Pass by</span>
+                        <span className="text-xs text-aspectum-text-disabled uppercase">Pass by</span>
                       ) : (
-                        <span className="w-5 h-5 rounded-full bg-blue-600 text-white text-xs flex items-center justify-center shrink-0">
+                        <span className="w-5 h-5 rounded-full bg-aspectum-primary text-aspectum-on-accent text-xs flex items-center justify-center shrink-0">
                           {steps.slice(0, i + 1).filter((s) => !s.is_pass_by).length}
                         </span>
                       )}
                       <span className="truncate">{step.name?.[activeLang] || '(без названия)'}</span>
                     </div>
                     {step.description?.[activeLang] && (
-                      <p className="text-xs text-gray-500 mt-0.5 line-clamp-2">{step.description[activeLang]}</p>
+                      <p className="text-xs text-aspectum-text-muted mt-0.5 line-clamp-2">{step.description[activeLang]}</p>
                     )}
-                    <p className="text-xs text-gray-400 mt-1">
+                    <p className="text-xs text-aspectum-text-disabled mt-1">
                       {step.duration_minutes ? `${step.duration_minutes} минут` : null}
                       {step.duration_minutes && step.admission_status ? ' • ' : null}
                       {ADMISSION_OPTIONS.find((o) => o.value === step.admission_status)?.label || null}
                     </p>
                   </div>
                   <div className="flex items-center gap-1 shrink-0">
-                    <button type="button" onClick={() => move(step, -1)} disabled={i === 0}
-                      className="w-7 h-7 text-gray-500 hover:text-gray-800 disabled:opacity-30" title="Выше">↑</button>
-                    <button type="button" onClick={() => move(step, 1)} disabled={i === steps.length - 1}
-                      className="w-7 h-7 text-gray-500 hover:text-gray-800 disabled:opacity-30" title="Ниже">↓</button>
-                    <button type="button" onClick={() => startEdit(step)}
-                      className="px-2 py-1 text-xs font-medium text-blue-700 bg-blue-50 rounded-lg hover:bg-blue-100">Изменить</button>
-                    <button type="button" onClick={() => setDeleteTarget(step)}
-                      className="px-2 py-1 text-xs font-medium text-red-700 bg-red-50 rounded-lg hover:bg-red-100">Удалить</button>
+                    <IconButton label="Переместить выше" type="button" onClick={() => move(step, -1)} disabled={i === 0}
+                      className="w-7 h-7 p-0">↑</IconButton>
+                    <IconButton label="Переместить ниже" type="button" onClick={() => move(step, 1)} disabled={i === steps.length - 1}
+                      className="w-7 h-7 p-0">↓</IconButton>
+                    <Button type="button" variant="soft" size="sm" onClick={() => startEdit(step)}>Изменить</Button>
+                    <Button type="button" variant="softDanger" size="sm" onClick={() => setDeleteTarget(step)}>Удалить</Button>
                   </div>
                 </div>
               )}
@@ -256,25 +255,27 @@ export default function EventItineraryTab({ eventId, activeLang }) {
       )}
 
       {addOpen ? (
-        <div className="border border-dashed border-blue-300 rounded-xl p-3 space-y-3 bg-blue-50/30">
+        <Panel tone="info" className="border-dashed p-3 space-y-3">
           {renderFields(addDraft, setAddDraft)}
-          {saveError && <p className="text-xs text-red-600">{saveError}</p>}
+          {saveError && <p className="text-xs text-aspectum-danger">{saveError}</p>}
           <div className="flex gap-2">
-            <button type="button" onClick={submitAdd} disabled={saving}
-              className="px-3 py-1.5 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-50">
+            <Button type="button" variant="primary" size="md" onClick={submitAdd} disabled={saving}>
               {saving ? 'Добавление...' : 'Добавить шаг'}
-            </button>
-            <button type="button" onClick={() => { setAddOpen(false); setAddDraft(emptyStep()); setSaveError(null); }}
-              className="px-3 py-1.5 text-sm font-medium text-gray-600 bg-gray-100 rounded-lg hover:bg-gray-200">
+            </Button>
+            <Button
+              type="button"
+              variant="secondary"
+              size="md"
+              onClick={() => { setAddOpen(false); setAddDraft(emptyStep()); setSaveError(null); }}
+            >
               Отмена
-            </button>
+            </Button>
           </div>
-        </div>
+        </Panel>
       ) : (
-        <button type="button" onClick={() => setAddOpen(true)}
-          className="px-3 py-2 text-sm font-medium text-blue-700 bg-blue-50 rounded-lg hover:bg-blue-100">
+        <Button type="button" variant="soft" size="md" onClick={() => setAddOpen(true)}>
           + Добавить шаг маршрута
-        </button>
+        </Button>
       )}
 
       <ConfirmModal

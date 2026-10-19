@@ -1,9 +1,8 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import Layout from '../../../components/Layout';
-import DataTable from '../../../components/ui/DataTable';
+import { Select, PageHeader, DataTable, Panel } from '@aspectum/ui';
 import { parseApiError } from '../../../utils/apiError';
 import { llmAPI } from '../../../api/llm';
-import CatalogPageHeader from '../shared/components/CatalogPageHeader';
 
 const PAGE_SIZES = [10, 20, 50];
 
@@ -86,8 +85,8 @@ export default function LLMUsageCatalogPage() {
         key: 'model',
         label: 'Модель',
         render: (value, row) => (
-          <span className="text-sm font-medium text-gray-900">
-            <span className="text-gray-500 font-normal">{row.provider}/</span>
+          <span className="text-sm font-medium text-aspectum-text">
+            <span className="text-aspectum-text-muted font-normal">{row.provider}/</span>
             {value || '—'}
           </span>
         ),
@@ -95,17 +94,17 @@ export default function LLMUsageCatalogPage() {
       {
         key: 'tokens',
         label: 'Токены',
-        render: (v) => <span className="text-sm text-gray-700">{v ?? 0}</span>,
+        render: (v) => <span className="text-sm text-aspectum-text-strong">{v ?? 0}</span>,
       },
       {
         key: 'requests',
         label: 'Запросы',
-        render: (v) => <span className="text-sm text-gray-700">{v ?? 0}</span>,
+        render: (v) => <span className="text-sm text-aspectum-text-strong">{v ?? 0}</span>,
       },
       {
         key: 'cost_usd',
         label: 'Стоимость (USD)',
-        render: (v) => <span className="text-sm text-gray-700 font-mono">{v ?? '0'}</span>,
+        render: (v) => <span className="text-sm text-aspectum-text-strong font-mono">{v ?? '0'}</span>,
       },
     ],
     []
@@ -113,61 +112,53 @@ export default function LLMUsageCatalogPage() {
 
   return (
     <Layout>
-      <CatalogPageHeader
+      <PageHeader
         title="Использование моделей (LLMAPI)"
         description="Показывает tokens/requests и стоимость по моделям за последние N дней."
       />
 
       {/* Controls */}
-      <div className="mb-4 rounded-2xl border border-gray-200 bg-white p-4 md:p-5">
+      <Panel className="mb-4 p-4 md:p-5">
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
           <div className="flex items-center gap-3">
-            <span className="text-sm text-gray-500">Период:</span>
-            <select
-              value={days}
-              onChange={(e) => setDays(Number(e.target.value))}
-              className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none"
-            >
+            <span className="text-sm text-aspectum-text-muted">Период:</span>
+            <Select value={days} onChange={(e) => setDays(Number(e.target.value))}>
               {[7, 30, 90].map((d) => (
                 <option key={d} value={d}>
                   {d} дней
                 </option>
               ))}
-            </select>
+            </Select>
           </div>
           <div className="flex items-center gap-3">
-            <span className="text-sm text-gray-500">Провайдер:</span>
-            <select
-              value={providerFilter}
-              onChange={(e) => setProviderFilter(e.target.value)}
-              className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none"
-            >
+            <span className="text-sm text-aspectum-text-muted">Провайдер:</span>
+            <Select value={providerFilter} onChange={(e) => setProviderFilter(e.target.value)}>
               <option value="">Все</option>
               {providerOptions.map((p) => (
                 <option key={p} value={p}>
                   {p}
                 </option>
               ))}
-            </select>
+            </Select>
           </div>
         </div>
 
         {/* Summary */}
         <div className="mt-4 grid grid-cols-1 md:grid-cols-3 gap-3">
-          <div className="rounded-xl border border-gray-200 bg-gray-50 p-4">
-            <div className="text-xs uppercase tracking-wide text-gray-500 font-semibold">Всего cost</div>
-            <div className="text-lg font-bold text-gray-900 mt-1 font-mono">{summary?.total_cost_usd ?? (loading ? '—' : '0')}</div>
-          </div>
-          <div className="rounded-xl border border-gray-200 bg-gray-50 p-4">
-            <div className="text-xs uppercase tracking-wide text-gray-500 font-semibold">Всего tokens</div>
-            <div className="text-lg font-bold text-gray-900 mt-1">{summary?.total_tokens ?? (loading ? '—' : 0)}</div>
-          </div>
-          <div className="rounded-xl border border-gray-200 bg-gray-50 p-4">
-            <div className="text-xs uppercase tracking-wide text-gray-500 font-semibold">Всего requests</div>
-            <div className="text-lg font-bold text-gray-900 mt-1">{summary?.total_requests ?? (loading ? '—' : 0)}</div>
-          </div>
+          <Panel tone="muted" className="p-4">
+            <div className="text-xs uppercase tracking-wide text-aspectum-text-muted font-semibold">Всего cost</div>
+            <div className="text-lg font-bold text-aspectum-text mt-1 font-mono">{summary?.total_cost_usd ?? (loading ? '—' : '0')}</div>
+          </Panel>
+          <Panel tone="muted" className="p-4">
+            <div className="text-xs uppercase tracking-wide text-aspectum-text-muted font-semibold">Всего tokens</div>
+            <div className="text-lg font-bold text-aspectum-text mt-1">{summary?.total_tokens ?? (loading ? '—' : 0)}</div>
+          </Panel>
+          <Panel tone="muted" className="p-4">
+            <div className="text-xs uppercase tracking-wide text-aspectum-text-muted font-semibold">Всего requests</div>
+            <div className="text-lg font-bold text-aspectum-text mt-1">{summary?.total_requests ?? (loading ? '—' : 0)}</div>
+          </Panel>
         </div>
-      </div>
+      </Panel>
 
       <DataTable
         columns={columns}
@@ -188,4 +179,3 @@ export default function LLMUsageCatalogPage() {
     </Layout>
   );
 }
-

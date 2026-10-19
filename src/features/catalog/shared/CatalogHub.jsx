@@ -1,63 +1,54 @@
 import { Link } from 'react-router-dom';
+import { Heading, PageHeader, Panel, SectionHeader } from '@aspectum/ui';
 
 export function CatalogCard({ to, title, description, icon }) {
   return (
-    <Link
+    <Panel
+      as={Link}
       to={to}
-      className="group block rounded-xl border border-gray-200 bg-white p-4 hover:shadow-md hover:border-blue-200 transition-all"
+      className="group block p-4 hover:shadow-aspectum-raised hover:border-aspectum-primary-border transition-all"
     >
       <div className="flex items-start gap-3">
-        <div className="w-10 h-10 rounded-lg bg-gray-50 border border-gray-200 flex items-center justify-center text-xl">
+        <div className="w-10 h-10 rounded-aspectum-control bg-aspectum-surface-muted border border-aspectum-border flex items-center justify-center text-xl">
           {icon}
         </div>
         <div className="min-w-0">
           <div className="flex items-center gap-2">
-            <h2 className="text-base font-semibold text-gray-900 group-hover:text-blue-700 truncate">
-              {title}
-            </h2>
-            <span className="text-xs text-gray-400 group-hover:text-blue-500">→</span>
+            <Heading level={2} size="sm" className="truncate group-hover:text-aspectum-primary-hover">{title}</Heading>
+            <span className="text-xs text-aspectum-text-disabled group-hover:text-aspectum-focus">→</span>
           </div>
-          <p className="text-sm text-gray-500 mt-1 line-clamp-2">
+          <p className="text-sm text-aspectum-text-muted mt-1 line-clamp-2">
             {description}
           </p>
-          <p className="text-xs text-gray-300 mt-2 font-mono truncate">
+          <p className="text-xs text-aspectum-text-faint mt-2 font-mono truncate">
             {to}
           </p>
         </div>
       </div>
-    </Link>
+    </Panel>
   );
 }
 
 export function CatalogSection({ section }) {
   return (
-    <section className="rounded-2xl border border-gray-200 bg-white p-4 md:p-5">
-      <div className="mb-4 flex items-start justify-between gap-3">
-        <div>
-          <h2 className="text-lg font-semibold text-gray-900">{section.title}</h2>
-          <p className="mt-1 text-sm text-gray-500">{section.description}</p>
-        </div>
-        <span className={`shrink-0 rounded-md px-2 py-1 text-[11px] font-semibold tracking-wide ${section.badgeClass}`}>
-          {section.badge}
-        </span>
-      </div>
+    <Panel as="section" className="p-4 md:p-5">
+      <SectionHeader className="mb-4" title={section.title} description={section.description} actions={<span className={`rounded-aspectum-compact px-2 py-1 text-[11px] font-semibold tracking-wide ${section.badgeClass}`}>{section.badge}</span>} />
 
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
         {section.items.map((item) => (
           <CatalogCard key={item.to} {...item} />
         ))}
       </div>
-    </section>
+    </Panel>
   );
 }
 
 export function CatalogHubPage({ title, subtitle, sections }) {
   return (
     <>
-      <div className="mb-6 rounded-2xl border border-gray-200 bg-white p-4 md:p-5">
-        <h1 className="text-2xl font-bold text-gray-900">{title}</h1>
-        {subtitle ? <p className="mt-1 text-sm text-gray-500">{subtitle}</p> : null}
-      </div>
+      <Panel className="mb-6 p-4 md:p-5">
+        <PageHeader title={title} description={subtitle} spacing="none" />
+      </Panel>
 
       <div className="space-y-4">
         {sections.map((section) => (

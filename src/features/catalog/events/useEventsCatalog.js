@@ -4,7 +4,7 @@ import { parseApiError } from '../../../utils/apiError';
 import { useCatalogFilters } from '../core/useCatalogFilters';
 import { buildLangOptions, pickPrimaryLangCode } from '../shared/i18n';
 import { normalizeListResponse } from '../shared/normalize';
-import { useToast } from '../../../components/ui/Toast';
+import { useToast } from '@aspectum/ui';
 import { createEmptyEvent, fromApiEventRow, mergeEventWithDetail, toApiEventPayload } from './adapters';
 import { eventsCatalogAPI } from './api';
 
@@ -190,7 +190,7 @@ export function useEventsCatalog() {
     } finally {
       setSaving(false);
     }
-  }, [editingEvent, loadEvents, page, debouncedSearch, cityFilter]);
+  }, [editingEvent, loadEvents, page, debouncedSearch, cityFilter, showToast]);
 
   const [togglingIds, setTogglingIds] = useState(new Set());
 
@@ -298,4 +298,3 @@ export function useEventsCatalog() {
     openTags,
   };
 }
-

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { authAPI } from '../api/auth.ts';
-import Button from '../components/ui/Button';
+import { Alert, Button, ConfirmModal, EmptyState, PageContainer, PageHeader, Panel, SectionHeader, Spinner } from '@aspectum/ui';
 
 const fromBase64Url = (value) => {
   const padded = value.replace(/-/g, '+').replace(/_/g, '/') + '='.repeat((4 - value.length % 4) % 4);
@@ -19,6 +19,7 @@ export default function AccountSettings() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
+  const [passkeyToRemove, setPasskeyToRemove] = useState(null);
 
   const load = async () => {
     try {
@@ -63,19 +64,50 @@ export default function AccountSettings() {
     } finally { setSaving(false); }
   };
 
-  const removePasskey = async (id) => {
-    if (!window.confirm('Удалить этот passkey? Вход с этого устройства больше не будет доступен.')) return;
-    try { await authAPI.deletePasskey(id); setPasskeys((items) => items.filter((item) => item.id !== id)); }
-    catch (err) { setError(err?.response?.data?.detail || 'Не удалось удалить passkey.'); }
+  const removePasskey = async () => {
+    if (!passkeyToRemove) return;
+    try {
+      await authAPI.deletePasskey(passkeyToRemove.id);
+      setPasskeys((items) => items.filter((item) => item.id !== passkeyToRemove.id));
+      setPasskeyToRemove(null);
+    } catch (err) {
+      throw new Error(err?.response?.data?.detail || 'Не удалось удалить passkey.');
+    }
   };
 
-  return <div className="max-w-3xl mx-auto p-4 md:p-8">
-    <h1 className="text-2xl font-bold text-gray-900">Настройки аккаунта</h1>
-    <p className="mt-2 text-sm text-gray-600">Управляйте безопасным входом в контент-админку.</p>
-    <section className="mt-6 bg-white border border-gray-200 rounded-xl p-5 shadow-sm">
-      <div className="flex flex-wrap justify-between items-start gap-4"><div><h2 className="font-semibold text-gray-900">Passkeys</h2><p className="mt-1 text-sm text-gray-500">Вход по Face ID, Touch ID, PIN устройства или ключу безопасности — без пароля.</p></div><Button type="button" onClick={addPasskey} disabled={saving}>{saving ? 'Добавляем…' : 'Добавить passkey'}</Button></div>
-      {error && <p className="mt-4 text-sm text-red-700 bg-red-50 border border-red-200 rounded-lg p-3">{error}</p>}
-      {loading ? <p className="mt-5 text-sm text-gray-500">Загрузка…</p> : passkeys.length === 0 ? <p className="mt-5 text-sm text-gray-500">Passkeys ещё не добавлены. Пароль остаётся способом восстановления доступа.</p> : <ul className="mt-5 divide-y divide-gray-100 border-t border-b border-gray-100">{passkeys.map((item) => <li className="py-3 flex justify-between items-center gap-4" key={item.id}><div><p className="text-sm font-medium text-gray-800">{item.name}</p><p className="text-xs text-gray-500">Добавлен {new Date(item.created_at).toLocaleDateString('ru-RU')}{item.last_used_at ? ` · использован ${new Date(item.last_used_at).toLocaleDateString('ru-RU')}` : ''}</p></div><button className="text-sm text-red-600 hover:text-red-800" onClick={() => removePasskey(item.id)}>Удалить</button></li>)}</ul>}
-    </section>
-  </div>;
+  return <>
+    <PageContainer maxWidth="comfortable" centered className="p-4 md:p-8">
+    <PageHeader
+      title="Настройки аккаунта"
+      description="Управляйте безопасным входом в контент-админку."
+    />
+    <Panel className="p-5 shadow-aspectum-card">
+      <SectionHeader
+        title="Passkeys"
+        description="Вход по Face ID, Touch ID, PIN устройства или ключу безопасности — без пароля."
+        size="sm"
+        actions={<Button type="button" onClick={addPasskey} disabled={saving}>{saving ? 'Добавляем…' : 'Добавить passkey'}</Button>}
+      />
+      {error && <Alert tone="error">{error}</Alert>}
+      {loading ? (
+        <EmptyState icon={<Spinner size="sm" />} title="Загрузка…" spacing="md" className="mt-5" />
+      ) : passkeys.length === 0 ? (
+        <EmptyState icon="🔑" title="Passkeys ещё не добавлены" description="Пароль остаётся способом восстановления доступа." spacing="md" className="mt-5" />
+      ) : (
+        <ul className="mt-5 divide-y divide-aspectum-border-subtle border-t border-b border-aspectum-border-subtle">
+          {passkeys.map((item) => <li className="py-3 flex justify-between items-center gap-4" key={item.id}><div><p className="text-sm font-medium text-aspectum-text-emphasis">{item.name}</p><p className="text-xs text-aspectum-text-muted">Добавлен {new Date(item.created_at).toLocaleDateString('ru-RU')}{item.last_used_at ? ` · использован ${new Date(item.last_used_at).toLocaleDateString('ru-RU')}` : ''}</p></div><Button type="button" variant="danger" size="sm" onClick={() => setPasskeyToRemove(item)}>Удалить</Button></li>)}
+        </ul>
+      )}
+    </Panel>
+    </PageContainer>
+    <ConfirmModal
+      open={!!passkeyToRemove}
+      onClose={() => setPasskeyToRemove(null)}
+      onConfirm={removePasskey}
+      title="Удалить passkey?"
+      message="Вход с этого устройства больше не будет доступен."
+      confirmLabel="Удалить"
+      danger
+    />
+  </>;
 }

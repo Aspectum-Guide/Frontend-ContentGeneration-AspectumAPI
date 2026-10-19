@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
 import { contentAuthorsAPI } from '../../../api/generation';
-import { getFlag } from './sessionWizardShared.jsx';
 import { createCoordinatePasteHandler } from '../../../utils/coordinates';
 import { usePasteImageOnHover } from '../../../hooks/usePasteImageOnHover';
+import { FormLabel, Button, Chip, FileButton, LoadingOverlay, LocaleEditor, Panel, Select, Textarea, TextInput } from '@aspectum/ui';
 
 // ─── helpers ──────────────────────────────────────────────────────────────────
 
@@ -17,86 +17,15 @@ function localeStatus(loc) {
 
 function SectionCard({ title, children, action }) {
   return (
-    <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+    <Panel className="overflow-hidden p-0">
       {(title || action) && (
-        <div className="flex items-center justify-between px-4 py-2.5 border-b border-gray-100 bg-gray-50">
-          {title && <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide">{title}</span>}
+        <div className="flex items-center justify-between px-4 py-2.5 border-b border-aspectum-border-subtle bg-aspectum-surface-muted">
+          {title && <span className="text-xs font-semibold text-aspectum-text-muted uppercase tracking-wide">{title}</span>}
           {action}
         </div>
       )}
       <div className="p-4">{children}</div>
-    </div>
-  );
-}
-
-function LocalePills({ localeData, activeLocale, defaultLocale, onSwitch, onSetDefault, onAddLocale, onRemoveLocale }) {
-  return (
-    <div className="flex items-center gap-1.5 flex-wrap">
-      {Object.entries(localeData).map(([key, loc]) => {
-        const isActive = key === activeLocale;
-        const isDefault = key === defaultLocale;
-        const status = localeStatus(loc);
-
-        const statusColor = status === 'complete'
-          ? 'bg-emerald-500'
-          : status === 'partial'
-            ? 'bg-amber-400'
-            : 'bg-red-400';
-
-        return (
-          <div key={key} className="flex items-center gap-0.5">
-            <button
-              type="button"
-              onClick={() => onSwitch(key)}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium border transition-all ${
-                isActive
-                  ? 'bg-blue-600 text-white border-blue-600 shadow-sm'
-                  : 'bg-white text-gray-600 border-gray-200 hover:border-blue-400 hover:text-blue-600'
-              }`}
-            >
-              <span className="text-base leading-none">{getFlag(loc.code)}</span>
-              <span>{loc.langName || (loc.lang || key).toUpperCase()}</span>
-              {isDefault && (
-                <span className={`text-xs ${isActive ? 'text-blue-200' : 'text-yellow-500'}`}>★</span>
-              )}
-              {/* Индикатор заполненности */}
-              <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${statusColor} ${isActive ? 'opacity-80' : ''}`} />
-            </button>
-
-            {!loc.isDefault && (
-              <button
-                type="button"
-                title="Удалить язык"
-                onClick={() => onRemoveLocale(key)}
-                className="w-5 h-5 flex items-center justify-center text-gray-300 hover:text-red-400 transition-colors text-sm"
-              >
-                ×
-              </button>
-            )}
-
-            {!isDefault && (
-              <button
-                type="button"
-                title="Сделать основным"
-                onClick={() => onSetDefault(key)}
-                className="w-5 h-5 flex items-center justify-center text-gray-300 hover:text-yellow-400 transition-colors text-sm"
-              >
-                ★
-              </button>
-            )}
-          </div>
-        );
-      })}
-
-      <button
-        type="button"
-        onClick={onAddLocale}
-        title="Добавить язык"
-        className="w-8 h-8 rounded-lg border-2 border-dashed border-gray-200 text-gray-400 hover:border-blue-400 hover:text-blue-500 flex items-center justify-center transition-colors text-lg font-light"
-      >
-        +
-      </button>
-    </div>
+    </Panel>
   );
 }
 
@@ -109,33 +38,23 @@ function CoordinatesPanel({ lat, lon, savedLat, savedLon, setMapContainerRef, on
 
   return (
     <div className="w-56 shrink-0 space-y-2">
-      <div className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Координаты</div>
-      <div ref={setMapContainerRef} className="w-full h-44 rounded-xl border border-gray-200 overflow-hidden z-0" />
+      <div className="text-xs font-semibold text-aspectum-text-muted uppercase tracking-wide">Координаты</div>
+      <div ref={setMapContainerRef} className="w-full h-44 rounded-aspectum-card border border-aspectum-border overflow-hidden z-0" />
       <div className="grid grid-cols-2 gap-1.5">
-        <input
-          type="number" step="0.000001" value={lat}
-          onChange={(e) => onLatChange(e.target.value)}
-          onPaste={handleCoordPaste}
-          placeholder="Широта"
-          className="w-full px-2 py-1.5 border border-gray-200 rounded-lg text-xs focus:outline-none focus:ring-1 focus:ring-blue-400"
-        />
-        <input
-          type="number" step="0.000001" value={lon}
-          onChange={(e) => onLonChange(e.target.value)}
-          onPaste={handleCoordPaste}
-          placeholder="Долгота"
-          className="w-full px-2 py-1.5 border border-gray-200 rounded-lg text-xs focus:outline-none focus:ring-1 focus:ring-blue-400"
-        />
+        <TextInput type="number" step="0.000001" value={lat} onChange={(e) => onLatChange(e.target.value)} onPaste={handleCoordPaste} placeholder="Широта" />
+        <TextInput type="number" step="0.000001" value={lon} onChange={(e) => onLonChange(e.target.value)} onPaste={handleCoordPaste} placeholder="Долгота" />
       </div>
-      <button
+      <Button
         type="button"
+        variant="outline"
+        size="sm"
         onClick={onRestoreSavedCoords}
         disabled={savedLat == null || savedLon == null}
-        className="w-full px-2 py-1.5 text-xs text-gray-500 border border-gray-200 rounded-lg hover:bg-gray-50 disabled:opacity-40 transition-colors"
+        className="w-full"
       >
         Вернуть сохранённые
-      </button>
-      <p className="text-[10px] text-gray-400 text-center">кликните по карте для выбора</p>
+      </Button>
+      <p className="text-[10px] text-aspectum-text-disabled text-center">кликните по карте для выбора</p>
     </div>
   );
 }
@@ -153,49 +72,38 @@ function PhotoPanel({
       <div
         {...photoPaste}
         title="Наведите и нажмите Ctrl+V, чтобы вставить фото из буфера"
-        className="relative aspect-[3/4] bg-gray-100 rounded-xl overflow-hidden border border-gray-200 flex items-center justify-center">
+        className="relative aspect-[3/4] bg-aspectum-surface-subtle rounded-aspectum-card overflow-hidden border border-aspectum-border flex items-center justify-center">
         {imagePreview
           ? <img src={imagePreview} alt="Фото" className="w-full h-full object-cover" />
-          : <span className="text-gray-400 text-xs">Нет фото</span>
+          : <span className="text-aspectum-text-disabled text-xs">Нет фото</span>
         }
-        {photoUploading && (
-          <div className="absolute inset-0 bg-black/40 flex items-center justify-center">
-            <div className="animate-spin w-5 h-5 border-2 border-white border-t-transparent rounded-full" />
-          </div>
-        )}
+        <LoadingOverlay loading={photoUploading} label="Загрузка фото…" className="absolute inset-0" />
         {imagePreview && onPhotoDelete && (
-          <button
+          <Button
             type="button" onClick={onPhotoDelete}
-            className="absolute top-2 left-2 px-1.5 py-0.5 text-[10px] bg-red-600 text-white rounded hover:bg-red-700 shadow transition-colors"
+            variant="danger"
+            size="sm"
+            className="absolute top-2 left-2 shadow text-[10px]"
           >
             ✕ Удалить
-          </button>
+          </Button>
         )}
-        <button
+        <Button
           type="button" onClick={onOpenCommonsModal}
-          className="absolute top-2 right-2 px-1.5 py-0.5 text-[10px] bg-purple-600 text-white rounded hover:bg-purple-700 shadow transition-colors"
+          variant="purple"
+          size="sm"
+          className="absolute top-2 right-2 shadow text-[10px]"
         >
           ⊞ Библиотека
-        </button>
+        </Button>
       </div>
 
-      <label className="block w-full text-center text-xs text-blue-600 bg-blue-50 border border-blue-200 rounded-lg py-1.5 cursor-pointer hover:bg-blue-100 transition-colors">
+      <FileButton inputRef={photoFileRef} accept="image/*" variant="soft" size="md" onChange={onPhotoFileChange} className="w-full">
         + Добавить фото
-        <input ref={photoFileRef} type="file" accept="image/*" className="hidden" onChange={onPhotoFileChange} />
-      </label>
+      </FileButton>
 
-      <input
-        type="url" value={imageOriginalUrl || ''}
-        onChange={(e) => onImageOriginalUrlChange(e.target.value)}
-        placeholder="URL источника"
-        className="w-full px-2 py-1.5 text-xs border border-gray-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-blue-400"
-      />
-      <input
-        type="text" value={imageCopyright || ''}
-        onChange={(e) => onImageCopyrightChange(e.target.value)}
-        placeholder="© Автор / Источник"
-        className="w-full px-2 py-1.5 text-xs border border-gray-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-blue-400"
-      />
+      <TextInput type="url" value={imageOriginalUrl || ''} onChange={(e) => onImageOriginalUrlChange(e.target.value)} placeholder="URL источника" />
+      <TextInput type="text" value={imageCopyright || ''} onChange={(e) => onImageCopyrightChange(e.target.value)} placeholder="© Автор / Источник" />
     </div>
   );
 }
@@ -254,7 +162,7 @@ export default function SessionWizardCityStep({
       {/* Языки */}
       <SectionCard title="Язык редактирования">
         <div className="space-y-2">
-          <LocalePills
+          <LocaleEditor
             localeData={localeData}
             activeLocale={activeLocale}
             defaultLocale={defaultLocale}
@@ -264,7 +172,7 @@ export default function SessionWizardCityStep({
             onRemoveLocale={onRemoveLocale}
           />
           {currentStatus !== 'complete' && (
-            <p className={`text-xs ${currentStatus === 'empty' ? 'text-red-500' : 'text-amber-600'}`}>
+            <p className={`text-xs ${currentStatus === 'empty' ? 'text-aspectum-danger-subtle' : 'text-aspectum-warning'}`}>
               {currentStatus === 'empty'
                 ? `Для ${localeLabel} не заполнено ни одно поле`
                 : `Для ${localeLabel} заполнено не всё — проверьте название, страну и описание`
@@ -274,12 +182,12 @@ export default function SessionWizardCityStep({
         </div>
       </SectionCard>
       <SectionCard title="Спецгид">
-        <select value={parentCityId || ''} onChange={(e) => setParentCityId(e.target.value)} className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm">
+        <Select value={parentCityId || ''} onChange={(e) => setParentCityId(e.target.value)}>
           <option value="">Обычный город</option>
           {referenceCities.filter((city) => !city.parent_city).map((city) => <option key={city.id} value={city.id}>{city.name?.ru || city.name?.en || city.id}</option>)}
-        </select>
-        <p className="mt-1 text-xs text-gray-500">Выберите родительский город, если эта сессия создаёт спецгид.</p>
-        {parentCityId && <div className="mt-3 flex flex-wrap gap-2">{authors.map((author) => { const id = String(author.id); const active = authorIds.includes(id); return <button key={id} type="button" onClick={() => setAuthorIds(active ? authorIds.filter((value) => value !== id) : [...authorIds, id])} className={`rounded-full border px-3 py-1 text-xs ${active ? 'border-blue-600 bg-blue-600 text-white' : 'border-gray-300 bg-white'}`}>{author.name}{active ? ' ✓' : ''}</button>; })}</div>}
+        </Select>
+        <p className="mt-1 text-xs text-aspectum-text-muted">Выберите родительский город, если эта сессия создаёт спецгид.</p>
+        {parentCityId && <div className="mt-3 flex flex-wrap gap-2">{authors.map((author) => { const id = String(author.id); const active = authorIds.includes(id); return <Chip key={id} selected={active} onClick={() => setAuthorIds(active ? authorIds.filter((value) => value !== id) : [...authorIds, id])}>{author.name}{active ? ' ✓' : ''}</Chip>; })}</div>}
       </SectionCard>
 
       {/* Данные города + координаты */}
@@ -301,42 +209,30 @@ export default function SessionWizardCityStep({
           <div className="flex-1 min-w-0 space-y-4">
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Название <span className="text-red-500">*</span>
-                </label>
-                <input
+                <FormLabel  layout="block" size="sm" weight="medium" tone="strong" spacing="xs">
+                  Название <span className="text-aspectum-danger-subtle">*</span>
+                </FormLabel>
+                <TextInput
+                  className={
+                    showValidation && activeLocale === defaultLocale && !(currentLocale.name || '').trim()
+                      ? 'border-aspectum-danger-border-strong bg-aspectum-danger-soft'
+                      : ''
+                  }
                   type="text"
                   value={currentLocale.name || ''}
                   onChange={(e) => onUpdateLocaleField('name', e.target.value)}
                   placeholder="Например, Москва"
-                  className={`w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 ${
-                    showValidation && activeLocale === defaultLocale && !(currentLocale.name || '').trim()
-                      ? 'border-red-300 bg-red-50'
-                      : 'border-gray-200'
-                  }`}
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Страна</label>
-                <input
-                  type="text"
-                  value={currentLocale.country || ''}
-                  onChange={(e) => onUpdateLocaleField('country', e.target.value)}
-                  placeholder="Россия"
-                  className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
+                <FormLabel  layout="block" size="sm" weight="medium" tone="strong" spacing="xs">Страна</FormLabel>
+                <TextInput type="text" value={currentLocale.country || ''} onChange={(e) => onUpdateLocaleField('country', e.target.value)} placeholder="Россия" />
               </div>
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Описание</label>
-              <textarea
-                value={currentLocale.description || ''}
-                onChange={(e) => onUpdateLocaleField('description', e.target.value)}
-                rows={5}
-                placeholder={`Описание города на ${currentLocale.langName || localeLabel}`}
-                className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
-              />
+              <FormLabel  layout="block" size="sm" weight="medium" tone="strong" spacing="xs">Описание</FormLabel>
+              <Textarea value={currentLocale.description || ''} onChange={(e) => onUpdateLocaleField('description', e.target.value)} rows={5} placeholder={`Описание города на ${currentLocale.langName || localeLabel}`} />
             </div>
           </div>
 
@@ -355,29 +251,26 @@ export default function SessionWizardCityStep({
       <div className="flex items-center justify-between pt-1">
         <div className="text-sm">
           {showValidation && !canProceed && (
-            <p className="text-red-600">
+            <p className="text-aspectum-danger">
               Заполните название для основного языка ({(localeData[defaultLocale]?.lang || defaultLocale || '').toUpperCase()})
             </p>
           )}
           {canProceed && incompleteLocales.length > 0 && (
-            <p className="text-amber-600">
+            <p className="text-aspectum-warning">
               ⚠ Не все языки заполнены: {incompleteLocales.join(', ')}
             </p>
           )}
         </div>
 
-        <button
+        <Button
           type="button"
+          variant={canProceed ? 'primary' : 'danger'}
+          size="md"
           onClick={handleNext}
           disabled={saving}
-          className={`px-6 py-2 text-sm font-semibold rounded-lg transition-colors disabled:opacity-50 ${
-            canProceed
-              ? 'bg-blue-600 text-white hover:bg-blue-700'
-              : 'bg-red-500 text-white hover:bg-red-600'
-          }`}
         >
           {saving ? 'Сохранение...' : 'Далее: Теги →'}
-        </button>
+        </Button>
       </div>
     </div>
   );

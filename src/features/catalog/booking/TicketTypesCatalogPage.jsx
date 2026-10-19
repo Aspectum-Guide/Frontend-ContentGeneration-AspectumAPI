@@ -1,25 +1,19 @@
 import { useCallback, useEffect, useState } from 'react';
 import { ticketTypesAPI } from '../../../api/booking';
 import Layout from '../../../components/Layout';
-import DataTable from '../../../components/ui/DataTable';
+import { Alert, Button, CheckboxField, ConfirmModal, DataTable, Field, FormActions, Modal, PageHeader, Panel, Select, StatusBadge, TableRowActions, TextInput, formGridClassName } from '@aspectum/ui';
 import AssignTicketTypeModal from './AssignTicketTypeModal';
-import { Field, FormActions, TextInput } from '../../../components/ui/FormField';
-import Modal, { ConfirmModal } from '../../../components/ui/Modal';
 import { useLayoutActions } from '../../../context/useLayoutActions';
 import { parseApiError } from '../../../utils/apiError';
 import { useCatalogCrud } from '../core/useCatalogCrud';
 import { useCatalogFilters } from '../core/useCatalogFilters';
 import { useCatalogResource } from '../core/useCatalogResource';
 import { useEventOptions } from '../shared/bookingOptions';
-import ActiveCheckboxField from '../shared/components/ActiveCheckboxField';
 import BlockingReservationsList from '../shared/components/BlockingReservationsList';
-import CatalogPageHeader from '../shared/components/CatalogPageHeader';
 import EventSelect from '../shared/components/EventSelect';
-import FormErrorAlert from '../shared/components/FormErrorAlert';
-import StatusBadge from '../shared/components/StatusBadge';
-import TableRowActions from '../shared/components/TableRowActions';
 import { buildLangOptions, getMultiLangValue, pickPrimaryLangCode } from '../shared/i18n';
 import { getEventLabelById, getTicketTypeLabel } from '../shared/labels';
+import { useAppLanguages } from '../../../hooks/useAppLanguages';
 import { LangBlock, LangTabs } from '../shared/LangFields';
 
 const PAGE_SIZE = 20;
@@ -67,6 +61,7 @@ function mapEditToPayload(item) {
 }
 
 export default function TicketTypesCatalog() {
+  const { languages: appLanguages } = useAppLanguages();
   const { setMobileActions } = useLayoutActions();
   const { page, setPage, search, setSearch, debouncedSearch } = useCatalogFilters();
 
@@ -88,11 +83,12 @@ export default function TicketTypesCatalog() {
   const [forceDeleteTarget, setForceDeleteTarget] = useState(null);
   const [forceDeleteError, setForceDeleteError] = useState('');
 
+  const loadTicketTypes = resource.load;
   const reload = useCallback(async (pageNum) => {
     const isActiveParam =
       statusFilter === 'active' ? 'true' : statusFilter === 'inactive' ? 'false' : undefined;
 
-    await resource.load(
+    await loadTicketTypes(
       {
         page: pageNum,
         page_size: PAGE_SIZE,
@@ -103,7 +99,7 @@ export default function TicketTypesCatalog() {
       },
       (err) => parseApiError(err, 'Ошибка загрузки типов билетов')
     );
-  }, [resource.load, eventFilter, statusFilter, debouncedSearch, ordering]);
+  }, [loadTicketTypes, eventFilter, statusFilter, debouncedSearch, ordering]);
 
   const crud = useCatalogCrud({
     createEmpty: createEmptyTicketType,
@@ -176,14 +172,14 @@ export default function TicketTypesCatalog() {
       label: 'Тип билета',
       render: (value, row) => (
         <div>
-          <div className="text-sm font-medium text-gray-900">
+          <div className="text-sm font-medium text-aspectum-text">
             {getTicketTypeLabel(row) || value || '—'}
           </div>
           {row.code ? (
-            <div className="text-xs text-gray-400 mt-0.5 font-mono">{row.code}</div>
+            <div className="text-xs text-aspectum-text-disabled mt-0.5 font-mono">{row.code}</div>
           ) : null}
           {row.description ? (
-            <div className="text-xs text-gray-500 mt-0.5 line-clamp-2">
+            <div className="text-xs text-aspectum-text-muted mt-0.5 line-clamp-2">
               {getMultiLangValue(row.description) || (typeof row.description === 'string' ? row.description : '')}
             </div>
           ) : null}
@@ -194,19 +190,19 @@ export default function TicketTypesCatalog() {
       key: 'event',
       label: 'Событие',
       render: (eventId) => (
-        <span className="text-sm text-gray-700">{getEventLabelById(eventOptions, eventId) || eventId || '—'}</span>
+        <span className="text-sm text-aspectum-text-strong">{getEventLabelById(eventOptions, eventId) || eventId || '—'}</span>
       ),
     },
     {
       key: 'code',
       label: 'Код',
-      className: 'text-sm text-gray-600 font-mono',
+      className: 'text-sm text-aspectum-text-subtle font-mono',
       render: (value) => <span>{value || '—'}</span>,
     },
     {
       key: 'sort_order',
       label: 'Порядок',
-      className: 'text-sm text-gray-700',
+      className: 'text-sm text-aspectum-text-strong',
       render: (value) => <span>{Number.isFinite(value) ? value : 0}</span>,
     },
     {
@@ -218,7 +214,7 @@ export default function TicketTypesCatalog() {
 
   return (
     <Layout>
-      <CatalogPageHeader
+      <PageHeader
         title="Справочник типов билетов"
         description="Управление типами билетов для событий"
         createLabel="Создать тип билета"
@@ -248,40 +244,28 @@ export default function TicketTypesCatalog() {
               options={eventOptions}
               disabled={eventsLoading}
               placeholder={eventsLoading ? 'Загрузка событий…' : 'Все события'}
-              className={`px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none ${eventsLoading ? 'opacity-60 cursor-wait' : ''}`}
+              className={eventsLoading ? 'opacity-60 cursor-wait' : undefined}
             />
 
-            <select
-              value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value)}
-              className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none"
-            >
+            <Select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
               <option value="">Любой статус</option>
               <option value="active">Активные</option>
               <option value="inactive">Отключенные</option>
-            </select>
+            </Select>
 
-            <select
-              value={ordering}
-              onChange={(e) => setOrdering(e.target.value)}
-              className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none"
-            >
+            <Select value={ordering} onChange={(e) => setOrdering(e.target.value)}>
               <option value="sort_order">Сортировка: порядок ↑</option>
               <option value="-sort_order">Сортировка: порядок ↓</option>
               <option value="code">Сортировка: код А-Я</option>
               <option value="-code">Сортировка: код Я-А</option>
-            </select>
+            </Select>
           </>
         )}
         actions={(row) => (
           <div className="flex items-center gap-1">
-            <button
-              onClick={() => setAssignTarget(row)}
-              title="Назначить ивентам"
-              className="px-2 py-1.5 text-xs font-medium text-purple-600 bg-purple-50 rounded-md hover:bg-purple-100 transition-colors"
-            >
+            <Button type="button" variant="softPurple" size="sm" onClick={() => setAssignTarget(row)} title="Назначить ивентам">
               Ивенты
-            </button>
+            </Button>
             <TableRowActions
               onEdit={() => openEdit(row)}
               onDelete={() => crud.askDelete(row)}
@@ -300,9 +284,9 @@ export default function TicketTypesCatalog() {
       >
         {editingType && (
           <form onSubmit={crud.save} className="space-y-4">
-            <FormErrorAlert message={saveError} />
+            <Alert tone="error">{saveError}</Alert>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <div className={formGridClassName()}>
               <Field
                 label="Событие"
                 hint="Пусто — глобальный тип, переиспользуемый на всех событиях по коду. Выберите событие только если тип нужен именно для него."
@@ -348,11 +332,14 @@ export default function TicketTypesCatalog() {
             {(() => {
               const nameVal = typeof editingType?.name === 'object' ? editingType.name : {};
               const descVal = typeof editingType?.description === 'object' ? editingType.description : {};
-              const langOptions = buildLangOptions([nameVal, descVal], ['ru', 'en', 'it']);
+              const langOptions = buildLangOptions(
+                [nameVal, descVal],
+                appLanguages.map((language) => language.code),
+              );
               return (
                 <div className="space-y-3">
-                  <div className="p-3 bg-gray-50 rounded-xl border border-gray-200">
-                    <p className="text-xs font-medium text-gray-500 mb-2 uppercase tracking-wide">Переводы</p>
+                  <Panel tone="muted" className="p-3">
+                    <p className="text-xs font-medium text-aspectum-text-muted mb-2 uppercase tracking-wide">Переводы</p>
                     <LangTabs
                       active={activeLang}
                       onSwitch={setActiveLang}
@@ -375,7 +362,7 @@ export default function TicketTypesCatalog() {
                         });
                       }}
                     />
-                  </div>
+                  </Panel>
                   <LangBlock
                     label="Название"
                     value={nameVal}
@@ -395,7 +382,7 @@ export default function TicketTypesCatalog() {
               );
             })()}
 
-            <ActiveCheckboxField
+            <CheckboxField
               checked={editingType.is_active}
               onChange={(next) => setEditingType((prev) => ({ ...prev, is_active: next }))}
               text="Активный тип билета"
@@ -422,16 +409,18 @@ export default function TicketTypesCatalog() {
       >
         <BlockingReservationsList details={deleteErrorDetails} />
         {deleteErrorDetails?.blocking_count ? (
-          <button
+          <Button
             type="button"
+            variant="linkDanger"
+            size="sm"
             onClick={() => {
               setForceDeleteError('');
               setForceDeleteTarget(deleteTarget);
             }}
-            className="mt-2 text-xs text-red-700 underline hover:no-underline"
+            className="mt-2"
           >
             Удалить принудительно вместе с этими бронированиями
-          </button>
+          </Button>
         ) : null}
       </ConfirmModal>
 

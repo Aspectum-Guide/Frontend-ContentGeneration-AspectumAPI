@@ -1,11 +1,9 @@
 import { useCallback, useEffect, useState } from 'react';
 import { codeUsageLogsAPI } from '../../../api/subscription';
 import Layout from '../../../components/Layout';
-import DataTable from '../../../components/ui/DataTable';
+import { Select, PageHeader, DataTable, StatusBadge } from '@aspectum/ui';
 import { useLayoutActions } from '../../../context/useLayoutActions';
 import { parseApiError } from '../../../utils/apiError';
-import CatalogPageHeader from '../shared/components/CatalogPageHeader';
-import StatusBadge from '../shared/components/StatusBadge';
 import { formatDateTime } from './subscriptionLabels';
 
 const PAGE_SIZE = 20;
@@ -70,17 +68,17 @@ export default function CodeUsageLogsCatalogPage() {
     {
       key: 'used_at',
       label: 'Когда',
-      render: (v) => <span className="text-sm text-gray-700">{formatDateTime(v)}</span>,
+      render: (v) => <span className="text-sm text-aspectum-text-strong">{formatDateTime(v)}</span>,
     },
     {
       key: 'activation_code_value',
       label: 'Код',
-      render: (v) => <span className="font-mono text-xs text-gray-800">{v || '—'}</span>,
+      render: (v) => <span className="font-mono text-xs text-aspectum-text-emphasis">{v || '—'}</span>,
     },
     {
       key: 'subscription_type_name',
       label: 'Тип подписки',
-      render: (v) => <span className="text-sm text-gray-700">{v || '—'}</span>,
+      render: (v) => <span className="text-sm text-aspectum-text-strong">{v || '—'}</span>,
     },
     {
       key: 'success',
@@ -97,18 +95,18 @@ export default function CodeUsageLogsCatalogPage() {
     {
       key: 'user_info',
       label: 'Пользователь / контекст',
-      render: (v) => <span className="text-xs text-gray-600 break-all">{v || '—'}</span>,
+      render: (v) => <span className="text-xs text-aspectum-text-subtle break-all">{v || '—'}</span>,
     },
     {
       key: 'notes',
       label: 'Заметки',
-      render: (v) => <span className="text-xs text-gray-600">{v || '—'}</span>,
+      render: (v) => <span className="text-xs text-aspectum-text-subtle">{v || '—'}</span>,
     },
   ];
 
   return (
     <Layout>
-      <CatalogPageHeader
+      <PageHeader
         title="Логи активации кодов"
         description="Read-only журнал использования activation codes. Заменяет Django admin → Code usage logs."
       />
@@ -129,15 +127,11 @@ export default function CodeUsageLogsCatalogPage() {
         pageSize={PAGE_SIZE}
         onPage={setPage}
         filters={(
-          <select
-            value={successFilter}
-            onChange={(e) => setSuccessFilter(e.target.value)}
-            className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none"
-          >
+          <Select value={successFilter} onChange={(e) => setSuccessFilter(e.target.value)}>
             <option value="">Любой результат</option>
             <option value="success">Только успешные</option>
             <option value="failed">Только ошибки</option>
-          </select>
+          </Select>
         )}
       />
     </Layout>

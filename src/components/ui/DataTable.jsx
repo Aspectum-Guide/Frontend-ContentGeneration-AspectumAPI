@@ -1,3 +1,9 @@
+import Alert from './Alert';
+import Card from './Card';
+import EmptyState from './EmptyState';
+import { TextInput } from './FormField';
+import Spinner from './Spinner';
+
 /**
  * Универсальная таблица данных с пагинацией, поиском и действиями.
  *
@@ -56,8 +62,8 @@ export default function DataTable({
       {(title || headerRight) && (
         <div className="mb-4 flex items-start justify-between gap-3">
           <div>
-            {title && <h2 className="text-xl font-bold text-gray-900">{title}</h2>}
-            {subtitle && <p className="text-sm text-gray-500 mt-0.5">{subtitle}</p>}
+            {title && <h2 className="text-xl font-bold text-aspectum-text">{title}</h2>}
+            {subtitle && <p className="text-sm text-aspectum-text-muted mt-0.5">{subtitle}</p>}
           </div>
           {headerRight && <div className="shrink-0">{headerRight}</div>}
         </div>
@@ -67,12 +73,12 @@ export default function DataTable({
       {(onSearch || filters) && (
         <div className="mb-3 flex flex-wrap gap-2">
           {onSearch && (
-            <input
+            <TextInput
               type="text"
               value={search ?? ''}
               onChange={(e) => onSearch(e.target.value)}
               placeholder={searchPlaceholder}
-              className="flex-1 min-w-[200px] px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
+              className="flex-1 min-w-[200px]"
             />
           )}
           {filters}
@@ -81,48 +87,47 @@ export default function DataTable({
 
       {/* Ошибка */}
       {error && (
-        <div className="mb-3 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">
-          {error}
-        </div>
+        <Alert tone="error" className="mb-3">{error}</Alert>
       )}
 
       {/* Таблица */}
       {loading ? (
-        <div className="bg-white rounded-xl border border-gray-200 p-12 flex items-center justify-center">
-          <div className="flex items-center gap-2 text-gray-500 text-sm">
-            <span className="animate-spin inline-block w-4 h-4 border-2 border-gray-400 border-t-transparent rounded-full" />
+        <Card className="p-12 flex items-center justify-center">
+          <div className="flex items-center gap-2 text-aspectum-text-muted text-sm">
+            <Spinner />
             Загрузка...
           </div>
-        </div>
+        </Card>
       ) : rows.length === 0 ? (
         isFiltered ? (
-          <div className="bg-white rounded-xl border border-gray-200 p-12 text-center">
-            <div className="text-4xl mb-3">🔍</div>
-            <p className="text-gray-700 text-sm font-medium">Ничего не найдено</p>
-            <p className="text-gray-400 text-xs mt-1">Попробуйте изменить фильтры или поисковый запрос</p>
-          </div>
+          <Card>
+            <EmptyState
+              icon="🔍"
+              title="Ничего не найдено"
+              description="Попробуйте изменить фильтры или поисковый запрос"
+            />
+          </Card>
         ) : (
-          <div className="bg-white rounded-xl border border-gray-200 p-12 text-center">
-            <div className="text-5xl mb-3">{emptyIcon}</div>
-            <p className="text-gray-500 text-sm">{emptyText}</p>
-          </div>
+          <Card>
+            <EmptyState icon={emptyIcon} title={emptyText} />
+          </Card>
         )
       ) : (
         <>
           <div className="md:hidden space-y-3">
             {rows.map((row, idx) => (
-              <div
+              <Card
                 key={row.id ?? idx}
-                className={`bg-white rounded-xl border border-gray-200 p-3 ${onRowClick ? 'cursor-pointer' : ''}`}
+                className={`p-3 ${onRowClick ? 'cursor-pointer' : ''}`}
                 onClick={onRowClick ? () => onRowClick(row) : undefined}
               >
                 <div className="space-y-2">
                   {columns.map((col, cidx) => (
                     <div key={col.key} className="grid grid-cols-[110px_1fr] gap-2 items-start">
-                      <div className="text-[11px] uppercase tracking-wide text-gray-400 font-semibold pt-0.5">
+                      <div className="text-[11px] uppercase tracking-wide text-aspectum-text-muted font-semibold pt-0.5">
                         {col.label}
                       </div>
-                      <div className={`text-sm text-gray-800 min-w-0 ${cidx === 0 ? 'font-medium text-gray-900' : ''}`}>
+                      <div className={`text-sm text-aspectum-text min-w-0 ${cidx === 0 ? 'font-medium' : ''}`}>
                         {col.render ? col.render(row[col.key], row) : (row[col.key] ?? '—')}
                       </div>
                     </div>
@@ -130,21 +135,21 @@ export default function DataTable({
                 </div>
                 {actions && (
                   <div
-                    className="mt-3 pt-3 border-t border-gray-100 flex flex-wrap gap-2"
+                    className="mt-3 pt-3 border-t border-aspectum-border flex flex-wrap gap-2"
                     onClick={(e) => e.stopPropagation()}
                   >
                     {actions(row)}
                   </div>
                 )}
-              </div>
+              </Card>
             ))}
           </div>
 
-          <div className="hidden md:block bg-white rounded-xl border border-gray-200 overflow-hidden">
+          <Card className="hidden md:block overflow-hidden">
             <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
-                <tr className="bg-gray-50 border-b border-gray-200 text-xs text-gray-500 uppercase tracking-wide">
+                <tr className="bg-aspectum-surface-muted border-b border-aspectum-border text-xs text-aspectum-text-muted uppercase tracking-wide">
                   {columns.map((col) => (
                     <th
                       key={col.key}
@@ -158,11 +163,11 @@ export default function DataTable({
                   )}
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-100">
+              <tbody className="divide-y divide-aspectum-border">
                 {rows.map((row, idx) => (
                   <tr
                     key={row.id ?? idx}
-                    className={`hover:bg-gray-50 transition-colors ${onRowClick ? 'cursor-pointer' : ''}`}
+                    className={`hover:bg-aspectum-surface-muted transition-colors ${onRowClick ? 'cursor-pointer' : ''}`}
                     onClick={onRowClick ? () => onRowClick(row) : undefined}
                   >
                     {columns.map((col) => (
@@ -180,29 +185,28 @@ export default function DataTable({
               </tbody>
             </table>
             </div>
-
-          </div>
+          </Card>
         </>
       )}
 
       {/* Пагинация */}
       {showPagination && !loading && rows.length > 0 && (
-        <div className="mt-3 flex flex-wrap items-center justify-between gap-2 px-4 py-3 border border-gray-200 rounded-xl bg-white">
-          <span className="text-xs text-gray-500">
+        <Card className="mt-3 flex flex-wrap items-center justify-between gap-2 px-4 py-3">
+          <span className="text-xs text-aspectum-text-muted">
             {(page - 1) * pageSize + 1}–{Math.min(page * pageSize, totalCount)} из {totalCount}
           </span>
           <div className="flex items-center gap-1">
             <PageBtn disabled={page <= 1} onClick={() => onPage(page - 1)}>←</PageBtn>
             {buildPageRange(page, totalPages).map((p, i) =>
               p === '...' ? (
-                <span key={`ellipsis-${i}`} className="px-2 text-gray-400 text-xs">…</span>
+                <span key={`ellipsis-${i}`} className="px-2 text-aspectum-text-muted text-xs">…</span>
               ) : (
                 <PageBtn key={p} active={p === page} onClick={() => onPage(p)}>{p}</PageBtn>
               )
             )}
             <PageBtn disabled={page >= totalPages} onClick={() => onPage(page + 1)}>→</PageBtn>
           </div>
-        </div>
+        </Card>
       )}
     </div>
   );
@@ -215,8 +219,8 @@ function PageBtn({ children, disabled, active, onClick }) {
       onClick={onClick}
       className={`px-2.5 py-1 text-xs rounded border transition-colors ${
         active
-          ? 'bg-blue-600 text-white border-blue-600'
-          : 'border-gray-300 text-gray-600 hover:bg-gray-100 disabled:opacity-40 disabled:cursor-not-allowed'
+          ? 'bg-aspectum-primary text-aspectum-on-accent border-aspectum-primary'
+          : 'border-aspectum-border text-aspectum-text-muted hover:bg-aspectum-surface-muted disabled:opacity-40 disabled:cursor-not-allowed'
       }`}
     >
       {children}

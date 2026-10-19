@@ -1,5 +1,19 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
 import ModalPortal from './ModalPortal';
+import Alert from './Alert';
+import Button from './Button';
+import Spinner from './Spinner';
+import IconButton from './IconButton';
+import { isTopModal, registerModal, unregisterModal } from './modalStack';
+
+const FOCUSABLE_SELECTOR = [
+  'a[href]',
+  'button:not([disabled])',
+  'input:not([disabled])',
+  'select:not([disabled])',
+  'textarea:not([disabled])',
+  '[tabindex]:not([tabindex="-1"])',
+].join(',');
 
 /**
  * Универсальный модальный диалог.
@@ -8,17 +22,87 @@ import ModalPortal from './ModalPortal';
  *   open      — boolean
  *   onClose   — () => void
  *   title     — string
+ *   description — string | ReactNode (подзаголовок в шапке)
  *   children  — ReactNode
  *   size      — 'sm' | 'md' | 'ml' | 'lg' | 'xl'  (default 'md')
  *   footer    — ReactNode  (если задан — рендерится под children)
+ *   toolbar   — ReactNode  (закреплённая область между шапкой и прокручиваемым телом)
+ *   bodyRef   — ref прокручиваемого тела, например для infinite scroll
+ *   bodyClassName — классы тела; при передаче заменяют стандартные padding-классы
  */
-export default function Modal({ open, onClose, title, children, size = 'md', footer, priority = false }) {
+export default function Modal({
+  open,
+  onClose,
+  title,
+  description,
+  children,
+  size = 'md',
+  footer,
+  toolbar,
+  bodyRef,
+  bodyClassName,
+  panelClassName = '',
+  footerClassName = '',
+  ariaLabelledBy,
+  ariaLabel,
+  priority = false,
+}) {
+  const panelRef = useRef(null);
+  const modalTokenRef = useRef(Symbol('modal'));
+  const onCloseRef = useRef(onClose);
+  onCloseRef.current = onClose;
+  const generatedTitleId = useId();
+  const generatedDescriptionId = useId();
+  const effectiveLabelledBy = ariaLabelledBy || (title ? generatedTitleId : undefined);
+
   useEffect(() => {
     if (!open) return;
-    const handler = (e) => { if (e.key === 'Escape') onClose?.(); };
+    const token = modalTokenRef.current;
+    const previouslyFocused = document.activeElement;
+    registerModal(token);
+
+    const panel = panelRef.current;
+    if (panel && !panel.contains(document.activeElement)) {
+      const initialTarget = panel.querySelector('[autofocus]') || panel.querySelector(FOCUSABLE_SELECTOR) || panel;
+      initialTarget.focus();
+    }
+
+    const handler = (event) => {
+      if (!isTopModal(token)) return;
+      if (event.key === 'Escape') {
+        if (onCloseRef.current) {
+          event.preventDefault();
+          onCloseRef.current();
+        }
+        return;
+      }
+      if (event.key !== 'Tab' || !panel) return;
+      const focusable = Array.from(panel.querySelectorAll(FOCUSABLE_SELECTOR));
+      if (focusable.length === 0) {
+        event.preventDefault();
+        panel.focus();
+        return;
+      }
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      const active = document.activeElement;
+      if (event.shiftKey && (active === first || !panel.contains(active))) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && (active === last || !panel.contains(active))) {
+        event.preventDefault();
+        first.focus();
+      }
+    };
     document.addEventListener('keydown', handler);
-    return () => document.removeEventListener('keydown', handler);
-  }, [open, onClose]);
+    return () => {
+      document.removeEventListener('keydown', handler);
+      unregisterModal(token);
+      if (previouslyFocused instanceof HTMLElement && previouslyFocused.isConnected) {
+        previouslyFocused.focus();
+      }
+    };
+  }, [open]);
 
   if (!open) return null;
 
@@ -34,29 +118,47 @@ export default function Modal({ open, onClose, title, children, size = 'md', foo
 
   return (
     <ModalPortal open={open} onClose={onClose} zIndex={overlayZ}>
-      <div className={`relative w-full ${maxW} mx-auto bg-white rounded-2xl shadow-2xl flex flex-col max-h-[min(90dvh,90vh)] min-w-0`}>
-        {(title || onClose) && (
-          <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 shrink-0">
-            {title && (
-              <h2 className="text-base font-semibold text-gray-900">{title}</h2>
+      <div
+        ref={panelRef}
+        role="dialog"
+        aria-modal="true"
+        aria-label={ariaLabel}
+        aria-labelledby={ariaLabel ? undefined : effectiveLabelledBy}
+        aria-describedby={description ? generatedDescriptionId : undefined}
+        tabIndex={-1}
+        className={`relative w-full ${maxW} mx-auto bg-aspectum-surface rounded-aspectum-modal shadow-aspectum-modal flex flex-col max-h-[min(90dvh,90vh)] min-w-0 ${panelClassName}`.trim()}
+      >
+        {(title || description || onClose) && (
+          <div className="flex items-center justify-between px-6 py-4 border-b border-aspectum-border shrink-0">
+            {(title || description) && (
+              <div className="min-w-0">
+                {title && <h2 id={generatedTitleId} className="text-base font-semibold text-aspectum-text">{title}</h2>}
+                {description && <div id={generatedDescriptionId} className="mt-1 text-sm text-aspectum-text-muted">{description}</div>}
+              </div>
             )}
             {onClose && (
-              <button
-                type="button"
+              <IconButton
                 onClick={onClose}
-                aria-label="Закрыть"
-                className="ml-auto text-gray-400 hover:text-gray-600 transition-colors w-8 h-8 flex items-center justify-center rounded-lg hover:bg-gray-100"
+                label="Закрыть"
+                className="ml-auto w-8 h-8"
               >
                 ✕
-              </button>
+              </IconButton>
             )}
           </div>
         )}
 
-        <div className="flex-1 overflow-y-auto overflow-x-hidden px-6 py-4 min-w-0">{children}</div>
+        {toolbar && <div className="shrink-0">{toolbar}</div>}
+
+        <div
+          ref={bodyRef}
+          className={`flex-1 overflow-y-auto overflow-x-hidden min-w-0 ${bodyClassName || 'px-6 py-4'}`}
+        >
+          {children}
+        </div>
 
         {footer && (
-          <div className="shrink-0 px-6 py-4 border-t border-gray-100 bg-gray-50 rounded-b-2xl flex gap-3">
+          <div className={`shrink-0 px-6 py-4 border-t border-aspectum-border bg-aspectum-surface-muted rounded-b-aspectum-modal flex gap-3 ${footerClassName}`.trim()}>
             {footer}
           </div>
         )}
@@ -104,36 +206,34 @@ export function ConfirmModal({
   return (
     <Modal open={open} onClose={busy ? undefined : onClose} title={title} size="sm" priority>
       {message && (
-        <p className="text-sm text-gray-600 whitespace-pre-line">{message}</p>
+        <p className="text-sm text-aspectum-text-muted whitespace-pre-line">{message}</p>
       )}
-      {internalError && (
-        <p className="mt-2 text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">{internalError}</p>
-      )}
+      {internalError && <Alert tone="error" className="mt-2">{internalError}</Alert>}
       {children}
       <div className="flex gap-3 mt-4">
-        <button
+        <Button
           onClick={handleConfirm}
           disabled={busy}
-          className={`flex-1 py-2 text-sm font-medium rounded-lg transition-colors disabled:opacity-50 ${
-            danger
-              ? 'bg-red-600 text-white hover:bg-red-700'
-              : 'bg-blue-600 text-white hover:bg-blue-700'
-          }`}
+          variant={danger ? 'danger' : 'primary'}
+          size="md"
+          className="flex-1"
         >
           {busy ? (
             <span className="flex items-center justify-center gap-2">
-              <span className="animate-spin w-3 h-3 border-2 border-white border-t-transparent rounded-full inline-block" />
+              <Spinner size="sm" className="border-aspectum-on-accent" />
               Подождите...
             </span>
           ) : confirmLabel}
-        </button>
-        <button
+        </Button>
+        <Button
           onClick={onClose}
           disabled={busy}
-          className="flex-1 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors disabled:opacity-50"
+          variant="secondary"
+          size="md"
+          className="flex-1"
         >
           {cancelLabel}
-        </button>
+        </Button>
       </div>
     </Modal>
   );

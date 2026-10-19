@@ -1,11 +1,9 @@
 import { useCallback, useEffect, useState } from 'react';
 import { iapPurchasesAdminAPI } from '../../../api/subscription';
 import Layout from '../../../components/Layout';
-import DataTable from '../../../components/ui/DataTable';
+import { Button, TextInput, Select, PageHeader, DataTable, RawJsonModal } from '@aspectum/ui';
 import { useLayoutActions } from '../../../context/useLayoutActions';
 import { parseApiError } from '../../../utils/apiError';
-import CatalogPageHeader from '../shared/components/CatalogPageHeader';
-import RawJsonModal from '../shared/components/RawJsonModal';
 import { formatDateTime } from './subscriptionLabels';
 
 const PAGE_SIZE = 20;
@@ -93,44 +91,35 @@ export default function IAPPurchasesCatalogPage() {
     {
       key: 'user_email',
       label: 'Пользователь',
-      render: (v) => <span className="text-sm text-gray-800">{v || '—'}</span>,
+      render: (v) => <span className="text-sm text-aspectum-text-emphasis">{v || '—'}</span>,
     },
     {
       key: 'product_id',
       label: 'Product ID',
-      render: (v) => <span className="text-sm font-mono text-gray-800">{v}</span>,
+      render: (v) => <span className="text-sm font-mono text-aspectum-text-emphasis">{v}</span>,
     },
     {
       key: 'platform',
       label: 'Платформа',
-      render: (v) => <span className="text-sm text-gray-700">{v}</span>,
+      render: (v) => <span className="text-sm text-aspectum-text-strong">{v}</span>,
     },
     {
       key: 'status',
       label: 'Статус',
       render: (v, row) => (
-        <select
-          className="text-sm border border-gray-200 rounded-lg px-2 py-1"
-          value={v}
-          disabled={savingId === row.id}
-          onChange={(e) => void handleUpdate(row, { status: e.target.value })}
+        <Select value={v} disabled={savingId === row.id} onChange={(e) => void handleUpdate(row, { status: e.target.value })}
         >
           <option value="active">active</option>
           <option value="expired">expired</option>
           <option value="refunded">refunded</option>
-        </select>
+        </Select>
       ),
     },
     {
       key: 'expires_at',
       label: 'Истекает',
       render: (v, row) => (
-        <input
-          type="datetime-local"
-          className="text-sm border border-gray-200 rounded-lg px-2 py-1"
-          defaultValue={v ? new Date(v).toISOString().slice(0, 16) : ''}
-          disabled={savingId === row.id}
-          onBlur={(e) => {
+        <TextInput type="datetime-local" defaultValue={v ? new Date(v).toISOString().slice(0, 16) : ''} disabled={savingId === row.id} onBlur={(e) => {
             const next = e.target.value ? new Date(e.target.value).toISOString() : null;
             const prev = v ? new Date(v).toISOString() : null;
             if (next !== prev) {
@@ -143,27 +132,28 @@ export default function IAPPurchasesCatalogPage() {
     {
       key: 'purchased_at',
       label: 'Куплено',
-      render: (v) => <span className="text-sm text-gray-600">{formatDateTime(v)}</span>,
+      render: (v) => <span className="text-sm text-aspectum-text-subtle">{formatDateTime(v)}</span>,
     },
     {
       key: 'raw_response',
       label: 'Raw',
       render: (_, row) => (
-        <button
+        <Button
           type="button"
           onClick={() => openRawResponse(row)}
           disabled={rawLoading}
-          className="px-2 py-1 text-xs text-blue-600 bg-blue-50 rounded-md hover:bg-blue-100 disabled:opacity-50"
+          variant="soft"
+          size="sm"
         >
           JSON
-        </button>
+        </Button>
       ),
     },
   ];
 
   return (
     <Layout>
-      <CatalogPageHeader
+      <PageHeader
         title="IAP покупки"
         description="Store purchases (Apple/Google). Правка status/expires_at для support и premium entitlement."
       />
@@ -184,16 +174,12 @@ export default function IAPPurchasesCatalogPage() {
         pageSize={PAGE_SIZE}
         onPage={setPage}
         filters={(
-          <select
-            value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value)}
-            className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none"
-          >
+          <Select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
             <option value="">Любой статус</option>
             <option value="active">active</option>
             <option value="expired">expired</option>
             <option value="refunded">refunded</option>
-          </select>
+          </Select>
         )}
       />
 

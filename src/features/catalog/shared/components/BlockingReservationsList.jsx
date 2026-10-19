@@ -1,3 +1,5 @@
+import { Alert } from '@aspectum/ui';
+
 const STATUS_LABELS = {
   reserved: 'забронировано',
   cancelled: 'отменено',
@@ -21,25 +23,25 @@ export default function BlockingReservationsList({ details }) {
   if (!count) return null;
 
   return (
-    <div className="mt-2 rounded-lg border border-amber-200 bg-amber-50 p-2.5 text-xs text-gray-700">
-      <div className="font-medium text-amber-800">
+    <Alert tone="warning" className="mt-2 p-2.5 text-xs">
+      <div className="font-medium text-aspectum-warning-emphasis">
         Связанных бронирований: {count}
         {objects.length < count ? ` (показаны первые ${objects.length})` : ''}
       </div>
-      <div className="mt-1.5 max-h-40 overflow-y-auto divide-y divide-amber-100">
+      <div className="mt-1.5 max-h-40 overflow-y-auto divide-y divide-aspectum-warning-muted">
         {objects.map((row) => (
           <div key={row.id} className="py-1 flex flex-wrap items-baseline gap-x-2">
-            <span className="font-mono text-gray-500">{String(row.id).slice(0, 8)}</span>
-            <span className="text-gray-700">{STATUS_LABELS[row.status] || row.status || '—'}</span>
-            {row.qty != null && <span className="text-gray-500">× {row.qty}</span>}
-            {formatMoney(row) && <span className="text-gray-500">{formatMoney(row)}</span>}
-            {row.guest_email && <span className="text-gray-400">{row.guest_email}</span>}
+            <span className="font-mono text-aspectum-text-muted">{String(row.id).slice(0, 8)}</span>
+            <span className="text-aspectum-text-strong">{STATUS_LABELS[row.status] || row.status || '—'}</span>
+            {row.qty != null && <span className="text-aspectum-text-muted">× {row.qty}</span>}
+            {formatMoney(row) && <span className="text-aspectum-text-muted">{formatMoney(row)}</span>}
+            {row.guest_email && <span className="text-aspectum-text-disabled">{row.guest_email}</span>}
             {row.created_at && (
-              <span className="text-gray-400">{new Date(row.created_at).toLocaleDateString()}</span>
+              <span className="text-aspectum-text-disabled">{new Date(row.created_at).toLocaleDateString()}</span>
             )}
           </div>
         ))}
       </div>
-    </div>
+    </Alert>
   );
 }

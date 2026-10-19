@@ -5,6 +5,7 @@ import { useLayoutActions } from '../context/useLayoutActions';
 import useTokenValidation from '../hooks/useTokenValidation';
 import TokenManager from '../utils/TokenManager';
 import { getWorkspace, setWorkspace, workspaceTitle } from '../utils/workspace';
+import { FormLabel, Button, Heading, IconButton, Panel, Select, Sidebar, SidebarActions, SidebarFooter, SidebarHeader, SidebarIconButton, SidebarNav, SidebarOverlay } from './ui';
 
 /**
  * Переключатель рабочего пространства (Россия / Европа / …). Сужает списки
@@ -36,7 +37,7 @@ function WorkspaceSwitcher({ compact }) {
   if (compact) {
     return (
       <div
-        className="mx-auto rounded-md bg-gray-100 px-1.5 py-0.5 text-[11px] font-semibold text-gray-700"
+        className="mx-auto rounded-aspectum-control bg-aspectum-surface-muted px-1.5 py-0.5 text-[11px] font-semibold text-aspectum-text"
         title={`Пространство: ${active ? workspaceTitle(active) : 'все'}`}
       >
         {active ? workspaceTitle(active).slice(0, 3) : 'Все'}
@@ -44,19 +45,19 @@ function WorkspaceSwitcher({ compact }) {
     );
   }
   return (
-    <label className="flex flex-col gap-1">
-      <span className="text-[11px] font-medium uppercase tracking-wide text-gray-500">Пространство</span>
-      <select
+    <FormLabel  layout="stack">
+      <span className="text-[11px] font-medium uppercase tracking-wide text-aspectum-text-muted">Пространство</span>
+      <Select
         value={current}
         onChange={onChange}
-        className="w-full rounded-lg border border-gray-300 bg-white px-2 py-1.5 text-sm text-gray-900 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+        className="w-full rounded-aspectum-control border border-aspectum-border bg-aspectum-surface px-2 py-1.5 text-sm text-aspectum-text focus:border-aspectum-primary focus:outline-none focus:ring-1 focus:ring-aspectum-primary"
       >
         <option value="">Все пространства</option>
         {items.map((w) => (
           <option key={w.code} value={w.code}>{workspaceTitle(w)}</option>
         ))}
-      </select>
-    </label>
+      </Select>
+    </FormLabel>
   );
 }
 
@@ -138,7 +139,7 @@ export default function Layout({ children, pageHeader = null, pageHeaderMode = '
           label: s.name || s.uuid?.slice(0, 12) + '…',
           to: `/generation/${s.id}`,
           badge: s.status === 'in_progress' ? 'Active' : null,
-          badgeColor: 'bg-orange-500',
+          badgeColor: 'bg-aspectum-orange-subtle',
         })),
         { label: 'Все сессии', to: '/generation' },
         { label: 'Загрузить из файла', to: '/generation/upload' },
@@ -270,114 +271,80 @@ export default function Layout({ children, pageHeader = null, pageHeaderMode = '
     ))),
   ];
 
-  const getPageHeaderActionClass = (variant) => {
-    if (variant === 'danger') {
-      return 'bg-red-600 text-white hover:bg-red-700 disabled:opacity-60';
-    }
-    if (variant === 'secondary') {
-      return 'bg-gray-100 text-gray-700 hover:bg-gray-200 disabled:opacity-60';
-    }
-    return 'bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-60';
-  };
-
   const SidebarContent = () => (
-    <nav className="space-y-4">
-      {sidebarSections.map((section) => (
-        <div key={section.title}>
-          <p className={`pb-2 text-xs font-semibold uppercase tracking-wide text-gray-400 ${sidebarExpanded ? 'px-3' : 'px-1 text-center'
-            }`}>
-            {sidebarExpanded ? section.title : section.title.charAt(0)}
-          </p>
-          <div className="space-y-0.5">
-            {section.items.map((item) => {
-              const isActive = location.pathname === item.to
-                || (item.to !== '/' && location.pathname.startsWith(item.to) && item.to.length > 1
-                  && !(item.to === '/catalog/events' && location.pathname.startsWith('/catalog/events/orphans')));
+    <SidebarNav
+      sections={sidebarSections}
+      expanded={sidebarExpanded}
+      renderItem={(item, section) => {
+        const isActive = location.pathname === item.to
+          || (item.to !== '/' && location.pathname.startsWith(item.to) && item.to.length > 1
+            && !(item.to === '/catalog/events' && location.pathname.startsWith('/catalog/events/orphans')));
 
-              return (
-                <Link
-                  key={`${section.title}-${item.label}`}
-                  to={item.to}
-                  title={!sidebarExpanded ? item.label : ''}
-                  className={`flex items-center justify-between rounded-lg text-sm font-medium transition-colors ${sidebarExpanded ? 'px-3' : 'px-1 justify-center'
-                    } py-2 ${isActive
-                      ? 'bg-blue-100 text-blue-700'
-                      : 'text-gray-700 hover:bg-gray-100'
-                    }`}
-                >
-                  <span className={`truncate ${!sidebarExpanded && 'hidden'}`}>{item.label}</span>
-                  {item.badge && sidebarExpanded && (
-                    <span className={`ml-2 shrink-0 inline-flex items-center rounded-md px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-white ${item.badgeColor || 'bg-blue-600'}`}>
-                      {item.badge}
-                    </span>
-                  )}
-                </Link>
-              );
-            })}
-          </div>
-        </div>
-      ))}
-    </nav>
+        return (
+          <Link
+            key={`${section.title}-${item.label}`}
+            to={item.to}
+            title={!sidebarExpanded ? item.label : ''}
+            className={`flex items-center justify-between rounded-aspectum-control text-sm font-medium transition-colors ${sidebarExpanded ? 'px-3' : 'px-1 justify-center'} py-2 ${isActive ? 'bg-aspectum-primary-muted text-aspectum-primary-hover' : 'text-aspectum-text-strong hover:bg-aspectum-surface-subtle'}`}
+          >
+            <span className={`truncate ${!sidebarExpanded && 'hidden'}`}>{item.label}</span>
+            {item.badge && sidebarExpanded && (
+              <span className={`ml-2 shrink-0 inline-flex items-center rounded-aspectum-compact px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-aspectum-on-accent ${item.badgeColor || 'bg-aspectum-primary'}`}>
+                {item.badge}
+              </span>
+            )}
+          </Link>
+        );
+      }}
+    />
   );
 
   return (
-    <div className="flex h-screen bg-gray-50">
+    <div className="flex h-screen bg-aspectum-surface-muted">
       {isMobile && mobileSidebarOpen && (
-        <button
-          type="button"
-          className="fixed inset-0 z-30 bg-black/40"
+        <SidebarOverlay
           onClick={() => setMobileSidebarOpen(false)}
-          aria-label="Закрыть меню"
         />
       )}
 
       {isMobile && mobileActionsOpen && (
-        <button
-          type="button"
-          className="fixed inset-0 z-30 bg-black/40"
-          onClick={() => setMobileActionsOpen(false)}
-          aria-label="Закрыть панель действий"
-        />
+        <SidebarOverlay onClick={() => setMobileActionsOpen(false)} label="Закрыть панель действий" />
       )}
 
       {/* Left Sidebar */}
-      <aside className={`fixed inset-y-0 left-0 bg-white border-r border-gray-200 shadow-sm transition-all duration-300 flex flex-col z-40 ${isMobile
-        ? `w-72 max-w-[85vw] transform ${mobileSidebarOpen ? 'translate-x-0' : '-translate-x-full'}`
-        : sidebarExpanded ? 'w-64' : 'w-20'
+      <Sidebar expanded={sidebarExpanded || isMobile} label="Основная навигация" className={`fixed inset-y-0 bg-aspectum-surface border-aspectum-border shadow-aspectum-card transition-all duration-300 flex flex-col z-40 ${isMobile
+        ? `w-[var(--aspectum-layout-sidebar-mobile)] max-w-[85vw] transform ${mobileSidebarOpen ? 'translate-x-0' : '-translate-x-full'}`
+        : sidebarExpanded ? 'w-[var(--aspectum-layout-sidebar-expanded)]' : 'w-[var(--aspectum-layout-sidebar-collapsed)]'
         }`}>
         {/* Sidebar Header with User Info */}
-        <div className="border-b border-gray-200 p-3 flex flex-col gap-3">
+        <SidebarHeader>
           <div className="flex items-center justify-between gap-2">
             {(sidebarExpanded || isMobile) && (
               <div className="truncate">
-                <p className="text-sm font-bold text-gray-900 truncate">{user?.username || 'User'}</p>
-                <p className="text-xs text-gray-500 truncate">{user?.email || ''}</p>
+                <p className="text-sm font-bold text-aspectum-text truncate">{user?.username || 'User'}</p>
+                <p className="text-xs text-aspectum-text-muted truncate">{user?.email || ''}</p>
               </div>
             )}
             {isMobile ? (
-              <button
-                onClick={() => setMobileSidebarOpen(false)}
-                className="p-1.5 hover:bg-gray-100 rounded-lg text-gray-500 transition-colors shrink-0"
-                title="Закрыть меню"
-              >
+              <SidebarIconButton label="Закрыть меню" onClick={() => setMobileSidebarOpen(false)}>
                 <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                 </svg>
-              </button>
+              </SidebarIconButton>
             ) : (
-              <button
-                onClick={() => setSidebarExpanded(!sidebarExpanded)}
-                className="p-1.5 hover:bg-gray-100 rounded-lg text-gray-500 transition-colors shrink-0"
+              <SidebarIconButton
+                label={sidebarExpanded ? 'Свернуть меню' : 'Развернуть меню'}
                 title={sidebarExpanded ? 'Collapse' : 'Expand'}
+                onClick={() => setSidebarExpanded(!sidebarExpanded)}
               >
                 <svg className={`w-5 h-5 transition-transform ${sidebarExpanded ? 'rotate-0' : 'rotate-180'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
                 </svg>
-              </button>
+              </SidebarIconButton>
             )}
           </div>
           <WorkspaceSwitcher compact={!sidebarExpanded && !isMobile} />
-        </div>
+        </SidebarHeader>
 
         {/* Navigation */}
         <div className="flex-1 overflow-y-auto p-3">
@@ -385,18 +352,18 @@ export default function Layout({ children, pageHeader = null, pageHeaderMode = '
         </div>
 
         {/* User Actions */}
-        <div className="border-t border-gray-200 p-3 space-y-2">
+        <SidebarFooter>
           <Link
             to="/account/settings"
-            className={`w-full flex items-center justify-center gap-2 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-100 transition-colors py-2 ${(sidebarExpanded || isMobile) ? 'px-3' : 'px-1'}`}
+            className={`w-full flex items-center justify-center gap-2 rounded-aspectum-control text-sm font-medium text-aspectum-text hover:bg-aspectum-surface-muted transition-colors py-2 ${(sidebarExpanded || isMobile) ? 'px-3' : 'px-1'}`}
             title={(!sidebarExpanded && !isMobile) ? 'Настройки аккаунта' : ''}
           >
             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15.5A3.5 3.5 0 1 0 12 8a3.5 3.5 0 0 0 0 7.5ZM19.4 15a1.7 1.7 0 0 0 .34 1.88l.06.06-2.12 2.12-.06-.06a1.7 1.7 0 0 0-1.88-.34 1.7 1.7 0 0 0-1.03 1.56V20.3h-3v-.08A1.7 1.7 0 0 0 10.68 18.66a1.7 1.7 0 0 0-1.88.34l-.06.06-2.12-2.12.06-.06A1.7 1.7 0 0 0 7.02 15a1.7 1.7 0 0 0-1.56-1.03h-.08v-3h.08A1.7 1.7 0 0 0 7.02 9.94a1.7 1.7 0 0 0-.34-1.88l-.06-.06 2.12-2.12.06.06a1.7 1.7 0 0 0 1.88.34 1.7 1.7 0 0 0 1.03-1.56v-.08h3v.08a1.7 1.7 0 0 0 1.03 1.56 1.7 1.7 0 0 0 1.88-.34l.06-.06L19.8 8l-.06.06a1.7 1.7 0 0 0-.34 1.88 1.7 1.7 0 0 0 1.56 1.03h.08v3h-.08A1.7 1.7 0 0 0 19.4 15Z" /></svg>
             {(sidebarExpanded || isMobile) && 'Настройки аккаунта'}
           </Link>
-          <button
+          <Button
             onClick={handleLogout}
-            className={`w-full flex items-center justify-center gap-2 rounded-lg text-sm font-medium text-red-600 hover:bg-red-50 transition-colors py-2 ${(sidebarExpanded || isMobile) ? 'px-3' : 'px-1'
+            className={`w-full flex items-center justify-center gap-2 rounded-aspectum-control text-sm font-medium text-aspectum-danger hover:bg-aspectum-danger-soft transition-colors py-2 ${(sidebarExpanded || isMobile) ? 'px-3' : 'px-1'
               }`}
             title={(!sidebarExpanded && !isMobile) ? 'Logout' : ''}
           >
@@ -404,124 +371,94 @@ export default function Layout({ children, pageHeader = null, pageHeaderMode = '
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
             </svg>
             {(sidebarExpanded || isMobile) && 'Выход'}
-          </button>
+          </Button>
 
           {/* Build version */}
           {(sidebarExpanded || isMobile) && (
-            <div className="text-center text-[10px] text-gray-400 pt-1">
+            <div className="text-center text-[10px] text-aspectum-text-muted pt-1">
               rev {__APP_VERSION__} · {__APP_BUILD_DATE__}
             </div>
           )}
-        </div>
-      </aside>
+        </SidebarFooter>
+      </Sidebar>
 
       {isMobile && (
-        <aside className={`fixed inset-y-0 right-0 z-40 w-72 max-w-[85vw] bg-white border-l border-gray-200 shadow-xl transform transition-transform duration-300 ${mobileActionsOpen ? 'translate-x-0' : 'translate-x-full'}`}>
+        <Sidebar
+          side="right"
+          mobile
+          expanded={mobileActionsOpen}
+          label="Панель действий"
+          className={`fixed inset-y-0 z-40 w-[var(--aspectum-layout-sidebar-mobile)] max-w-[85vw] bg-aspectum-surface border-aspectum-border shadow-aspectum-modal transform transition-transform duration-300 ${mobileActionsOpen ? 'translate-x-0' : 'translate-x-full'}`}
+        >
           <div className="h-full flex flex-col">
-            <div className="border-b border-gray-200 p-4 flex items-start justify-between gap-3">
+            <div className="border-b border-aspectum-border p-4 flex items-start justify-between gap-3">
               <div>
-                <p className="text-sm font-semibold text-gray-900">Кнопки формы</p>
-                <p className="text-xs text-gray-500 mt-0.5">{mobilePageTitle}</p>
+                <p className="text-sm font-semibold text-aspectum-text">Кнопки формы</p>
+                <p className="text-xs text-aspectum-text-muted mt-0.5">{mobilePageTitle}</p>
               </div>
-              <button
-                type="button"
+              <IconButton
                 onClick={() => setMobileActionsOpen(false)}
-                className="p-1.5 hover:bg-gray-100 rounded-lg text-gray-500"
-                aria-label="Закрыть панель действий"
+                label="Закрыть панель действий"
+                variant="ghost"
               >
                 <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                 </svg>
-              </button>
+              </IconButton>
             </div>
 
             <div className="flex-1 overflow-y-auto p-4">
-              <div className="text-xs uppercase tracking-wide text-gray-400 mb-2">Кнопки формы</div>
-              <div className="space-y-2">
-                {mobileActions.length > 0 ? mobileActions.map((action, index) => (
-                  <button
-                    key={action.id || `${action.label}-${index}`}
-                    type="button"
-                    disabled={!!action.disabled}
-                    onClick={() => {
-                      setMobileActionsOpen(false);
-                      action.onClick?.();
-                    }}
-                    className={`w-full px-3 py-2 rounded-lg text-left text-sm font-medium transition-colors disabled:opacity-50 ${action.variant === 'danger'
-                      ? 'bg-red-50 text-red-700 hover:bg-red-100'
-                      : action.variant === 'primary'
-                        ? 'bg-blue-600 text-white hover:bg-blue-700'
-                        : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                      }`}
-                  >
-                    {action.label}
-                  </button>
-                )) : (
-                  <div className="text-sm text-gray-500 border border-dashed border-gray-300 rounded-lg p-3">
-                    Для этой страницы дополнительных кнопок пока нет.
-                  </div>
-                )}
-              </div>
+              <div className="text-xs uppercase tracking-wide text-aspectum-text-muted mb-2">Кнопки формы</div>
+              <SidebarActions
+                actions={mobileActions}
+                emptyText="Для этой страницы дополнительных кнопок пока нет."
+                onAction={(action) => {
+                  setMobileActionsOpen(false);
+                  action.onClick?.();
+                }}
+                onRefresh={mobileActions.length === 0 ? () => window.location.reload() : undefined}
+              />
 
-              {mobileActions.length === 0 && (
-                <div className="mt-4 pt-4 border-t border-gray-100 space-y-2">
-                  <button
-                    type="button"
-                    onClick={() => window.location.reload()}
-                    className="w-full px-3 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 text-left"
-                  >
-                    Обновить страницу
-                  </button>
-                </div>
-              )}
             </div>
           </div>
-        </aside>
+        </Sidebar>
       )}
 
       {/* Main Content */}
-      <main className={`flex-1 overflow-auto transition-all duration-300 ${isMobile ? 'ml-0' : sidebarExpanded ? 'ml-64' : 'ml-20'
+      <main className={`flex-1 overflow-auto transition-all duration-300 ${isMobile ? 'ml-0' : sidebarExpanded ? 'ml-[var(--aspectum-layout-sidebar-expanded)]' : 'ml-[var(--aspectum-layout-sidebar-collapsed)]'
         }`}>
         {isMobile && (
-          <div className="sticky top-0 z-20 bg-gray-50/95 backdrop-blur border-b border-gray-200 px-4 py-3">
+          <div className="sticky top-0 z-20 bg-aspectum-surface-muted/95 backdrop-blur border-b border-aspectum-border px-4 py-3">
             <div className="flex items-center justify-between gap-2">
-              <button
-                type="button"
-                onClick={() => setMobileSidebarOpen(true)}
-                className="inline-flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-700"
-              >
+              <Button type="button" variant="outline" size="md" onClick={() => setMobileSidebarOpen(true)} className="gap-2">
                 <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
                 </svg>
                 Меню
-              </button>
+              </Button>
 
               <div className="min-w-0 flex-1 text-center px-2">
-                <div className="text-sm font-semibold text-gray-900 truncate">{mobilePageTitle}</div>
-                <div className="text-[11px] text-gray-500 truncate">{location.pathname}</div>
+                <div className="text-sm font-semibold text-aspectum-text truncate">{mobilePageTitle}</div>
+                <div className="text-[11px] text-aspectum-text-muted truncate">{location.pathname}</div>
               </div>
 
-              <button
-                type="button"
-                onClick={() => setMobileActionsOpen(true)}
-                className="inline-flex items-center gap-1 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-700"
-              >
+              <Button type="button" variant="outline" size="md" onClick={() => setMobileActionsOpen(true)} className="gap-1">
                 <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 12h.01M12 12h.01M19 12h.01" />
                 </svg>
                 Действия
-              </button>
+              </Button>
             </div>
           </div>
         )}
-        <div className="p-4 md:p-6">
-          <div className="flex items-start gap-6">
+        <div className="px-[var(--aspectum-space-page-x)] py-[var(--aspectum-space-page-y)] md:px-[var(--aspectum-space-page-x-lg)]">
+          <div className="flex items-start gap-[var(--aspectum-space-layout-gap)]">
             <div className="min-w-0 flex-1">
               {shouldRenderPageHeader && (
                 <div className="mb-4 md:mb-5">
-                  <h1 className="text-2xl font-bold text-gray-900">{pageHeader.title}</h1>
+                  <Heading level={1} size="lg" weight="bold">{pageHeader.title}</Heading>
                   {pageHeader.description && (
-                    <p className="mt-0.5 text-sm text-gray-500">{pageHeader.description}</p>
+                    <p className="mt-0.5 text-sm text-aspectum-text-muted">{pageHeader.description}</p>
                   )}
                 </div>
               )}
@@ -531,70 +468,51 @@ export default function Layout({ children, pageHeader = null, pageHeaderMode = '
             {!isMobile && (
               <aside className="hidden lg:block shrink-0">
                 {rightPanelOpen ? (
-                  <div className="w-64 sticky top-6 rounded-xl border border-gray-200 bg-white overflow-hidden">
-                    <div className="flex items-center justify-between px-3 py-2 border-b border-gray-100">
-                      <span className="text-xs uppercase tracking-wide font-semibold text-gray-400">
+                  <Panel as="div" className="w-[var(--aspectum-layout-actions-panel)] sticky top-6 shadow-aspectum-card overflow-hidden">
+                    <div className="flex items-center justify-between px-3 py-2 border-b border-aspectum-border">
+                      <span className="text-xs uppercase tracking-wide font-semibold text-aspectum-text-muted">
                         Действия
                       </span>
-                      <button
+                      <IconButton
                         type="button"
                         onClick={() => {
                           setRightPanelOpen(false);
                           localStorage.setItem('rightPanelOpen', 'false');
                         }}
-                        title="Скрыть панель"
-                        className="p-1 rounded hover:bg-gray-100 text-gray-400 hover:text-gray-600 transition-colors"
+                        label="Скрыть панель"
                       >
                         <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                           <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
                         </svg>
-                      </button>
+                      </IconButton>
                     </div>
-                    <div className="p-3 space-y-2">
-                      {formActions.length > 0 ? formActions.map((action, index) => (
-                        <button
-                          key={action.id || `${action.label}-${index}`}
-                          type="button"
-                          onClick={action.onClick}
-                          disabled={!!action.disabled}
-                          className={`w-full px-3 py-2 rounded-lg text-left text-sm font-medium transition-colors disabled:opacity-50 ${getPageHeaderActionClass(action.variant)}`}
-                        >
-                          {action.label}
-                        </button>
-                      )) : (
-                        <div className="text-sm text-gray-400 border border-dashed border-gray-200 rounded-lg p-3">
-                          Нет действий для этой страницы
-                        </div>
-                      )}
+                    <div className="p-3">
+                      <SidebarActions
+                        actions={formActions}
+                        onAction={(action) => action.onClick?.()}
+                        onRefresh={() => window.location.reload()}
+                      />
                     </div>
-                    <div className="px-3 pb-3 pt-1 border-t border-gray-100 space-y-2">
-                      <button
-                        type="button"
-                        onClick={() => window.location.reload()}
-                        className="w-full px-3 py-2 text-sm font-medium text-gray-600 bg-gray-50 rounded-lg hover:bg-gray-100 text-left transition-colors"
-                      >
-                        Обновить страницу
-                      </button>
-                    </div>
-                  </div>
+                  </Panel>
                 ) : (
                   <div className="sticky top-6">
-                    <button
+                    <Button
                       type="button"
                       onClick={() => {
                         setRightPanelOpen(true);
                         localStorage.setItem('rightPanelOpen', 'true');
                       }}
                       title="Показать панель действий"
-                      className="flex flex-col items-center gap-1.5 px-2 py-3 rounded-xl border border-gray-200 bg-white hover:bg-gray-50 text-gray-400 hover:text-gray-600 transition-colors"
+                      variant="outline"
+                      size="sidebarRail"
                     >
                       <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                         <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
                       </svg>
                       {formActions.length > 0 && (
-                        <span className="w-1.5 h-1.5 rounded-full bg-blue-500" title={`${formActions.length} действий`} />
+                        <span className="w-1.5 h-1.5 rounded-full bg-aspectum-primary" title={`${formActions.length} действий`} />
                       )}
-                    </button>
+                    </Button>
                   </div>
                 )}
               </aside>

@@ -1,7 +1,8 @@
+import { Select } from '@aspectum/ui';
 import { getEventLabel } from '../labels';
 
 /**
- * Standard `<select>` of events for booking catalog forms.
+ * Standard select of events for booking catalog forms.
  * Use `placeholder` to override the empty-option label.
  */
 export default function EventSelect({
@@ -11,7 +12,7 @@ export default function EventSelect({
   disabled = false,
   required = false,
   placeholder = 'Выберите событие',
-  className,
+  className = '',
   ariaLabel,
 }) {
   const list = options || [];
@@ -23,16 +24,13 @@ export default function EventSelect({
   const hasValueOption = !value || list.some((ev) => String(ev.id) === String(value));
 
   return (
-    <select
+    <Select
       value={value || ''}
       onChange={(e) => onChange?.(e.target.value)}
       disabled={disabled}
       required={required}
       aria-label={ariaLabel}
-      className={
-        className ||
-        'w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none'
-      }
+      className={className}
     >
       <option value="">{placeholder}</option>
       {!hasValueOption ? <option value={value}>{value}</option> : null}
@@ -41,6 +39,6 @@ export default function EventSelect({
           {getEventLabel(ev) || ev.id}
         </option>
       ))}
-    </select>
+    </Select>
   );
 }

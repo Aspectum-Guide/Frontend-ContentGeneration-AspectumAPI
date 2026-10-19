@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { aiAPI, tasksAPI } from '../../../api/generation';
 import apiClient from '../../../api/client';
 import { pollGenerationTask } from '../../../utils/generationTaskPoll';
+import { FormLabel, Alert, Button, Checkbox, Heading, InlineState, Panel, ProgressBar, Textarea, TextInput } from '@aspectum/ui';
 
 const SOURCE_GROUP_TITLES = { photo: '📷 Фото', facts: '📚 Фактура', discovery: '🔎 Поиск мест' };
 const SOURCE_REGION_LABELS = { RU: 'RU', 'RU-SPB': 'СПб' };
@@ -59,58 +60,58 @@ function SourcesDropdown({ disabled }) {
 
   return (
     <div className="relative" ref={boxRef}>
-      <button
-        type="button"
+      <Button
         disabled={disabled}
         onClick={() => setOpen((v) => !v)}
-        className="rounded border border-gray-300 bg-white px-2 py-0.5 text-xs text-gray-700 hover:border-indigo-400 disabled:cursor-not-allowed disabled:opacity-60"
+        variant="outline"
+        size="sm"
         title="Какие источники конвейер использует для фото, фактов и поиска мест. Глобальные переключатели (те же, что в «Настройки ИИ»)"
       >
         Источники{offCount ? ` (выкл: ${offCount})` : ''} ▾
-      </button>
+      </Button>
       {open && (
-        <div className="absolute left-0 top-full z-20 mt-1 max-h-72 w-80 overflow-y-auto rounded-md border border-gray-200 bg-white p-2 shadow-lg">
-          <p className="mb-1.5 text-[10px] leading-snug text-gray-400">
+        <div className="absolute left-0 top-full z-20 mt-1 max-h-72 w-80 overflow-y-auto rounded-aspectum-compact border border-aspectum-border bg-aspectum-surface p-2 shadow-aspectum-elevated">
+          <p className="mb-1.5 text-[10px] leading-snug text-aspectum-text-disabled">
             Глобальные переключатели — действуют на все генерации, региональные
             источники сами включаются только в своих городах.
           </p>
-          {sources === null && <p className="text-xs text-gray-500">Загрузка…</p>}
+          {sources === null && <InlineState loading size="xs">Загрузка…</InlineState>}
           {['photo', 'facts', 'discovery'].map((g) => {
             const items = (sources || []).filter((s) => s.group === g);
             if (!items.length) return null;
             return (
               <div key={g} className="mb-2 last:mb-0">
-                <div className="mb-0.5 text-[10px] font-semibold uppercase tracking-wide text-gray-400">
+                <div className="mb-0.5 text-[10px] font-semibold uppercase tracking-wide text-aspectum-text-disabled">
                   {SOURCE_GROUP_TITLES[g] || g}
                 </div>
                 {items.map((s) => {
                   const checked = s.operator_toggle ?? s.default_on;
                   const rowDisabled = !s.env_ok || busyKey === s.key;
                   return (
-                    <label
+                    <FormLabel
                       key={s.key}
                       title={s.description + (s.env_ok ? '' : ` — нужен ключ: ${(s.requires_env || []).join(', ')}`)}
                       className={`flex items-center gap-1.5 rounded px-1 py-0.5 text-xs ${
-                        rowDisabled ? 'text-gray-400' : 'cursor-pointer text-gray-800 hover:bg-indigo-50'
+                        rowDisabled ? 'text-aspectum-text-disabled' : 'cursor-pointer text-aspectum-text-emphasis hover:bg-aspectum-indigo-soft'
                       }`}
                     >
-                      <input
-                        type="checkbox"
+                      <Checkbox
                         checked={checked && s.env_ok}
                         disabled={rowDisabled}
                         onChange={(e) => setToggle(s.key, e.target.checked)}
                       />
                       <span className="min-w-0 flex-1 truncate">{s.title}</span>
                       {s.regions.map((r) => (
-                        <span key={r} className="rounded bg-amber-50 px-1 text-[10px] text-amber-700">
+                        <span key={r} className="rounded bg-aspectum-warning-soft px-1 text-[10px] text-aspectum-warning-strong">
                           {SOURCE_REGION_LABELS[r] || r}
                         </span>
                       ))}
-                      {!s.env_ok && <span className="text-[10px] text-red-400">нет ключа</span>}
+                      {!s.env_ok && <span className="text-[10px] text-aspectum-danger-light">нет ключа</span>}
                       {s.operator_toggle != null && s.env_ok && (
-                        <button
+                        <Button
                           type="button"
-                          className="rounded bg-gray-100 px-1 text-[10px] text-gray-500 hover:bg-gray-200"
+                          variant="ghost"
+                          size="xxs"
                           title="Сбросить к состоянию по умолчанию"
                           onClick={(e) => {
                             e.preventDefault();
@@ -118,9 +119,9 @@ function SourcesDropdown({ disabled }) {
                           }}
                         >
                           сброс
-                        </button>
+                        </Button>
                       )}
-                    </label>
+                    </FormLabel>
                   );
                 })}
               </div>
@@ -328,13 +329,13 @@ export default function SessionWizardGenerateCityFull({ sessionId, defaultLang =
   const issues = task?.result_data?.issues || [];
 
   return (
-    <div className="rounded-lg border border-indigo-200 bg-indigo-50/50 p-4">
+    <Panel tone="accentIndigo" className="p-4">
       <div className="flex items-center justify-between gap-3">
         <div>
-          <h3 className="text-sm font-semibold text-indigo-900">
+          <Heading level={3} size="xs" tone="indigo">
             ⚡ Сгенерировать город целиком
-          </h3>
-          <p className="mt-0.5 text-xs text-indigo-700/80">
+          </Heading>
+          <p className="mt-0.5 text-xs text-aspectum-indigo-strong/80">
             Одно действие: research → база города → полезная инфа +
             достопримечательности → теги/координаты/описания → интерактивные
             локации → текст аудиогида → фото → перевод. Объём система подбирает сама.
@@ -344,74 +345,62 @@ export default function SessionWizardGenerateCityFull({ sessionId, defaultLang =
       </div>
 
       <div className="mt-3 space-y-3">
-        <textarea
-          value={prompt}
-          onChange={(e) => setPrompt(e.target.value)}
-          disabled={running}
-          rows={2}
-          placeholder="Напр.: Суздаль, Владимирская область, Россия — исторический туристический город"
-          className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-indigo-400 focus:outline-none focus:ring-1 focus:ring-indigo-400 disabled:bg-gray-100"
-        />
+        <Textarea className="disabled:bg-aspectum-surface-subtle" value={prompt} onChange={(e) => setPrompt(e.target.value)} disabled={running} rows={2} placeholder="Напр.: Суздаль, Владимирская область, Россия — исторический туристический город" />
 
         <div className="flex flex-wrap items-center gap-3">
-          <label className="flex items-center gap-1.5 text-xs text-gray-700"
+          <FormLabel  layout="rowTight" size="xs" tone="strong"
             title="Максимум основных локаций в итоге. Система собирает полный пул и берёт лучшие по значимости — может выдать меньше, если значимого мало. Пусто — авто (до 70; больше 70 включает многораундовый поиск)">
             Макс. ОЛ
-            <input type="number" min="1" max="150" value={attractionsMax} disabled={running}
-              onChange={(e) => setAttractionsMax(e.target.value)}
-              placeholder="авто"
-              className="w-16 rounded border border-gray-300 px-1.5 py-0.5 text-xs disabled:bg-gray-100" />
-          </label>
-          <label className="flex items-center gap-1.5 text-xs text-gray-700"
+            <TextInput className="w-16 disabled:bg-aspectum-surface-subtle" type="number" min="1" max="150" value={attractionsMax} disabled={running} onChange={(e) => setAttractionsMax(e.target.value)} placeholder="авто" />
+          </FormLabel>
+          <FormLabel  layout="rowTight" size="xs" tone="strong"
             title="Максимум интерактивных локаций (точек на карте). Пусто — авто">
             Макс. ИЛ
-            <input type="number" min="1" max="300" value={ilMax} disabled={running}
-              onChange={(e) => setIlMax(e.target.value)}
-              placeholder="авто"
-              className="w-16 rounded border border-gray-300 px-1.5 py-0.5 text-xs disabled:bg-gray-100" />
-          </label>
-          <label className="flex items-center gap-1.5 text-xs text-gray-700"
+            <TextInput className="w-16 disabled:bg-aspectum-surface-subtle" type="number" min="1" max="300" value={ilMax} disabled={running} onChange={(e) => setIlMax(e.target.value)} placeholder="авто" />
+          </FormLabel>
+          <FormLabel  layout="rowTight" size="xs" tone="strong"
             title="Отладка: не больше 15 основных локаций и 30 ИЛ — быстро и дёшево">
-            <input type="checkbox" checked={testMode} disabled={running}
+            <Checkbox checked={testMode} disabled={running}
               onChange={(e) => setTestMode(e.target.checked)} />
             Тест-режим (15/30)
-          </label>
-          <label className="flex items-center gap-1.5 text-xs text-gray-700"
+          </FormLabel>
+          <FormLabel  layout="rowTight" size="xs" tone="strong"
             title="Генерировать иконки для НОВЫХ фильтров через gpt-image-2. Дорого (~$0.1+ за иконку) — включайте в случае крайней лени; иначе иконки ставятся руками">
-            <input type="checkbox" checked={genIcons} disabled={running}
+            <Checkbox checked={genIcons} disabled={running}
               onChange={(e) => setGenIcons(e.target.checked)} />
-            Иконки фильтров <span className="text-amber-600">($)</span>
-          </label>
+            Иконки фильтров <span className="text-aspectum-warning">($)</span>
+          </FormLabel>
           <SourcesDropdown disabled={running} />
 
           {running ? (
-            <button
+            <Button
               type="button"
+              variant="danger"
+              size="md"
               onClick={stop}
               disabled={stopping}
-              className="ml-auto rounded-md bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-60"
+              className="ml-auto"
             >
               {stopping ? 'Останавливаем…' : '⏹ Стоп'}
-            </button>
+            </Button>
           ) : (
-            <button
+            <Button
               type="button"
               onClick={start}
               disabled={!prompt.trim()}
-              className="ml-auto rounded-md bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-50"
+              variant="indigo"
+              size="md"
+              className="ml-auto"
             >
               Запустить
-            </button>
+            </Button>
           )}
         </div>
 
         {running && (
           <div className="space-y-1.5">
-            <div className="h-2 w-full overflow-hidden rounded-full bg-indigo-100">
-              <div className="h-full rounded-full bg-indigo-500 transition-all duration-500"
-                style={{ width: `${progress}%` }} />
-            </div>
-            <div className="flex justify-between text-xs text-indigo-800">
+            <ProgressBar value={progress} tone="indigo" track="indigo" transition="slow" label="Прогресс полной генерации города" />
+            <div className="flex justify-between text-xs text-aspectum-indigo-emphasis">
               <span>{stopping ? 'Останавливаем…' : (task?.current_step || 'Запуск…')}</span>
               <span>
                 {summary?.children_done != null && summary?.children_total
@@ -425,7 +414,7 @@ export default function SessionWizardGenerateCityFull({ sessionId, defaultLang =
 
         {/* Расход по всей сессии — под полосой, не пропадает после завершения. */}
         {cost && cost.total_usd != null && (cost.total_usd > 0 || running) && (
-          <div className="flex items-center justify-between rounded-md border border-amber-200 bg-amber-50 px-3 py-1.5 text-xs text-amber-900">
+          <Alert tone="warning" className="flex items-center justify-between px-3 py-1.5 text-xs">
             <span>
               💰 Расход сессии: <b>${Number(cost.total_usd).toFixed(4)}</b>
               {cost.total_tokens
@@ -433,12 +422,12 @@ export default function SessionWizardGenerateCityFull({ sessionId, defaultLang =
                 : ''}
               {cost.calls ? ` · ${cost.calls} вызовов` : ''}
             </span>
-            {running && <span className="text-amber-600">считаем…</span>}
-          </div>
+            {running && <span className="text-aspectum-warning">считаем…</span>}
+          </Alert>
         )}
 
         {doneSummary && !running && (
-          <div className="rounded-md border border-green-200 bg-green-50 px-3 py-2 text-xs text-green-800">
+          <Alert tone="success" className="px-3 py-2 text-xs">
             Готово. Шагов: {doneSummary.children_done ?? '—'}/{doneSummary.children_total ?? '—'}
             {doneSummary.children_failed ? `, с ошибками: ${doneSummary.children_failed}` : ''}.
             {doneSummary.cost && doneSummary.cost.total_usd != null && (
@@ -448,41 +437,37 @@ export default function SessionWizardGenerateCityFull({ sessionId, defaultLang =
                   : ''}.</>
             )}
             {' '}Данные обновлены ниже.
-          </div>
+          </Alert>
         )}
 
         {(() => {
           const list = running ? issues : (doneSummary?.issues || []);
           if (!list.length) return null;
           return (
-            <details className="rounded-md border border-orange-200 bg-orange-50 px-3 py-2 text-xs text-orange-900">
+            <Panel as="details" tone="accentOrange" className="rounded-aspectum-compact px-3 py-2 text-xs text-aspectum-orange-emphasis">
               <summary className="cursor-pointer font-medium">
                 ⚠ Журнал генерации ({list.length})
               </summary>
               <ul className="mt-1.5 space-y-0.5">
                 {list.map((it, i) => (
                   <li key={i}>
-                    <span className="text-orange-500">{it.at}</span>{' '}
+                    <span className="text-aspectum-orange-subtle">{it.at}</span>{' '}
                     <b>{it.stage}:</b> {it.message}
                   </li>
                 ))}
               </ul>
-            </details>
+            </Panel>
           );
         })()}
 
         {notice && !running && (
-          <div className="rounded-md border border-gray-300 bg-gray-50 px-3 py-2 text-xs text-gray-700">
-            {notice}
-          </div>
+          <Alert tone="info" className="px-3 py-2 text-xs">{notice}</Alert>
         )}
 
         {error && (
-          <div className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">
-            {error}
-          </div>
+          <Alert tone="error">{error}</Alert>
         )}
       </div>
-    </div>
+    </Panel>
   );
 }

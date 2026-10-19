@@ -1,17 +1,16 @@
 import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { TextInput } from '../../../components/ui/FormField';
-import Spinner from '../shared/components/Spinner';
+import { Alert, Button, DataTableSurface, EmptyState, Heading, Panel, Spinner, TextInput } from '@aspectum/ui';
 import { getTicketTypeLabel } from '../shared/labels';
 import { formatSlotLabel, priceStatusClass } from './bookingSetupPricingHelpers';
 
 export function ReadinessChecklist({ items, readyCount, totalCount, onAction }) {
   return (
-    <div className="mt-4 rounded-xl border border-gray-200 bg-gray-50/80 p-3">
+    <Panel tone="muted" className="mt-4 p-3">
       <div className="flex items-center justify-between gap-2 mb-2">
-        <h3 className="text-sm font-semibold text-gray-800">Готово к продаже</h3>
+        <Heading level={3} size="xs" tone="emphasis">Готово к продаже</Heading>
         <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${
-          readyCount === totalCount ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'
+          readyCount === totalCount ? 'bg-aspectum-success-muted text-aspectum-success-emphasis' : 'bg-aspectum-warning-muted text-aspectum-warning-emphasis'
         }`}
         >
           {readyCount}/{totalCount}
@@ -20,31 +19,33 @@ export function ReadinessChecklist({ items, readyCount, totalCount, onAction }) 
       <ul className="space-y-1.5">
         {items.map((item) => (
           <li key={item.id} className="flex items-start gap-2 text-sm">
-            <span className={`mt-0.5 w-4 text-center ${item.ok ? 'text-emerald-600' : 'text-gray-300'}`}>
+            <span className={`mt-0.5 w-4 text-center ${item.ok ? 'text-aspectum-success' : 'text-aspectum-text-faint'}`}>
               {item.loading ? '…' : item.ok ? '✓' : '○'}
             </span>
             <div className="min-w-0 flex-1">
-              <div className={item.ok ? 'text-gray-800' : 'text-gray-700'}>{item.label}</div>
-              <div className="text-xs text-gray-500">{item.hint}</div>
+              <div className={item.ok ? 'text-aspectum-text-emphasis' : 'text-aspectum-text-strong'}>{item.label}</div>
+              <div className="text-xs text-aspectum-text-muted">{item.hint}</div>
               {item.link && (
-                <Link to={item.link} className="text-xs text-blue-600 hover:underline">
+                <Link to={item.link} className="text-xs text-aspectum-primary hover:underline">
                   {item.linkLabel}
                 </Link>
               )}
               {item.actionLabel && onAction && (
-                <button
+                <Button
                   type="button"
                   onClick={() => onAction(item.actionId, item)}
-                  className="block text-xs text-blue-600 hover:underline"
+                  variant="link"
+                  size="sm"
+                  className="block"
                 >
                   {item.actionLabel}
-                </button>
+                </Button>
               )}
             </div>
           </li>
         ))}
       </ul>
-    </div>
+    </Panel>
   );
 }
 
@@ -60,30 +61,30 @@ export function PriceStatusBadge({ status }) {
 export function PricePreviewPanel({ preview, loading, error }) {
   if (loading) {
     return (
-      <div className="flex items-center gap-2 text-xs text-gray-500 rounded-lg bg-gray-50 px-3 py-2">
-        <Spinner />
+      <Panel tone="muted" className="flex items-center gap-2 text-xs px-3 py-2">
+        <Spinner className="border-aspectum-focus" />
         Превью цен для ближайшего слота…
-      </div>
+      </Panel>
     );
   }
   if (error) {
-    return <p className="text-xs text-amber-700 bg-amber-50 rounded-lg px-3 py-2">{error}</p>;
+    return <Alert tone="warning" className="text-xs">{error}</Alert>;
   }
   if (!preview?.prices?.length) return null;
   return (
-    <div className="rounded-lg border border-blue-100 bg-blue-50/50 px-3 py-2 text-xs text-gray-700">
-      <div className="font-medium text-gray-800 mb-1">
+    <Panel tone="info" className="px-3 py-2 text-xs">
+      <div className="font-medium text-aspectum-text-emphasis mb-1">
         Превью для слота {formatSlotLabel(preview.slotDatetime)}
       </div>
       <div className="flex flex-wrap gap-2">
         {preview.prices.map((p) => (
-          <span key={p.ticket_type_id} className="px-2 py-0.5 rounded bg-white border border-gray-200">
+          <span key={p.ticket_type_id} className="px-2 py-0.5 rounded bg-aspectum-surface border border-aspectum-border">
             {p.code || p.ticket_type_id}: {p.unit_price} {p.currency}
-            <span className="text-gray-400 ml-1">({p.price_source})</span>
+            <span className="text-aspectum-text-disabled ml-1">({p.price_source})</span>
           </span>
         ))}
       </div>
-    </div>
+    </Panel>
   );
 }
 
@@ -105,28 +106,30 @@ export function SlotPriceOverrideMatrix({
   if (!ticketTypes?.length) return null;
 
   return (
-    <div className="rounded-xl border border-dashed border-gray-300">
-      <button
+    <Panel tone="muted" className="border-dashed">
+      <Button
         type="button"
         onClick={() => setOpen((v) => !v)}
-        className="w-full flex items-center justify-between px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
+        variant="ghost"
+        size="md"
+        className="w-full justify-between"
       >
         <span className="font-medium">Расширенно: цены по слотам</span>
-        <span className="text-xs text-gray-400">{open ? 'Скрыть' : 'Показать'}</span>
-      </button>
+        <span className="text-xs text-aspectum-text-disabled">{open ? 'Скрыть' : 'Показать'}</span>
+      </Button>
       {open && (
         <div className="px-3 pb-3 space-y-2">
-          <p className="text-xs text-gray-500">
+          <p className="text-xs text-aspectum-text-muted">
             Переопределение на конкретном слоте перебивает базовую цену и правила. Пустая ячейка — действует базовая.
           </p>
           {!visibleSlots.length ? (
-            <p className="text-sm text-gray-400">Нет открытых слотов для матрицы</p>
+            <EmptyState title="Нет открытых слотов для матрицы" className="py-4" />
           ) : (
-            <div className="overflow-x-auto rounded-lg border border-gray-200">
+            <DataTableSurface className="rounded-aspectum-control">
               <table className="w-full text-xs">
-                <thead className="bg-gray-50 text-gray-500">
+                <thead className="bg-aspectum-surface-muted text-aspectum-text-muted">
                   <tr>
-                    <th className="px-2 py-1.5 text-left sticky left-0 bg-gray-50">Слот</th>
+                    <th className="px-2 py-1.5 text-left sticky left-0 bg-aspectum-surface-muted">Слот</th>
                     {ticketTypes.map((tt) => (
                       <th key={tt.id} className="px-2 py-1.5 text-center min-w-[88px]">
                         {getTicketTypeLabel(tt)}
@@ -134,10 +137,10 @@ export function SlotPriceOverrideMatrix({
                     ))}
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-gray-100">
+                <tbody className="divide-y divide-aspectum-border-subtle">
                   {visibleSlots.map((slot) => (
                     <tr key={slot.id}>
-                      <td className="px-2 py-1.5 text-gray-600 whitespace-nowrap sticky left-0 bg-white">
+                      <td className="px-2 py-1.5 text-aspectum-text-subtle whitespace-nowrap sticky left-0 bg-aspectum-surface">
                         {formatSlotLabel(slot.slot_datetime)}
                       </td>
                       {ticketTypes.map((tt) => {
@@ -166,11 +169,11 @@ export function SlotPriceOverrideMatrix({
                   ))}
                 </tbody>
               </table>
-            </div>
+            </DataTableSurface>
           )}
         </div>
       )}
-    </div>
+    </Panel>
   );
 }
 

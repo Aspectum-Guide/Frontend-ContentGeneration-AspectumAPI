@@ -363,6 +363,5 @@ export const filterCityInfosForActiveDraft = (
   );
 };
 
-export { SessionStatusBadge as StatusBadge } from '../../../components/ui/StatusBadge.jsx';
 
 /** Shared AI generation modal layout: `components/generation/AiGenerationModal.jsx` */

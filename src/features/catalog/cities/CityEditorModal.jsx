@@ -1,8 +1,7 @@
 import 'leaflet/dist/leaflet.css';
 import { useEffect, useRef, useState } from 'react';
 import CommonsImagePicker from '../../../components/generation/CommonsImagePicker';
-import { Field, FormActions, TextInput } from '../../../components/ui/FormField';
-import Modal from '../../../components/ui/Modal';
+import { FormLabel, Alert, BusyOverlay, Button, Chip, Field, FileButton, FormActions, FormGrid, IconButton, LoadingOverlay, MediaPreview, Modal, Panel, Select, Spinner, Switch, Tabs, TextInput } from '@aspectum/ui';
 import { createCoordinatePasteHandler, parseCoord } from '../../../utils/coordinates';
 import { buildLangOptions, getMultiLangValue } from '../shared/i18n';
 import { LangBlock, LangTabs } from '../shared/LangFields';
@@ -34,12 +33,12 @@ const IAP_STATUS_LABELS = {
 };
 
 function IapStatusBadge({ status }) {
-  const color = status === 'error' ? 'bg-red-50 text-red-700 border-red-200'
-    : (status === 'approved' || status === 'active') ? 'bg-green-50 text-green-700 border-green-200'
-    : status === 'pending_review' ? 'bg-yellow-50 text-yellow-700 border-yellow-200'
-    : 'bg-gray-50 text-gray-600 border-gray-200';
+  const color = status === 'error' ? 'bg-aspectum-danger-soft text-aspectum-danger-strong border-aspectum-danger-border'
+    : (status === 'approved' || status === 'active') ? 'bg-aspectum-positive-soft text-aspectum-positive-strong border-aspectum-positive-border'
+    : status === 'pending_review' ? 'bg-aspectum-caution-soft text-aspectum-caution-strong border-aspectum-caution-border'
+    : 'bg-aspectum-surface-muted text-aspectum-text-subtle border-aspectum-border';
   return (
-    <span className={`inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium border ${color}`}>
+    <span className={`inline-flex items-center px-2 py-0.5 rounded-aspectum-compact text-xs font-medium border ${color}`}>
       {IAP_STATUS_LABELS[status] || status || '—'}
     </span>
   );
@@ -188,32 +187,23 @@ export default function CityEditorModal({
         {city && (
           <form onSubmit={onSave} className="space-y-5">
             {saveError && (
-              <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">
-                {saveError}
-              </div>
+              <Alert tone="error">{saveError}</Alert>
             )}
 
-            <div className="flex flex-wrap gap-2 border-b border-gray-200 pb-3">
-              {CITY_EDIT_TABS.map((tab) => (
-                <button
-                  key={tab.key}
-                  type="button"
-                  onClick={() => setActiveTab(tab.key)}
-                  className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
-                    activeTab === tab.key ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                  }`}
-                >
-                  {tab.label}
-                </button>
-              ))}
+            <div className="border-b border-aspectum-border pb-3">
+              <Tabs
+                items={CITY_EDIT_TABS.map(({ key, label }) => ({ id: key, label }))}
+                value={activeTab}
+                onChange={setActiveTab}
+              />
             </div>
 
             {activeTab === 'content' && (
               <div className="space-y-5">
                 {langOptions.length > 0 ? (
                   <>
-                    <div className="p-3 bg-gray-50 rounded-xl border border-gray-200">
-                      <p className="text-xs font-medium text-gray-500 mb-2 uppercase tracking-wide">Активный язык</p>
+                    <Panel tone="muted" className="p-3">
+                      <p className="text-xs font-medium text-aspectum-text-muted mb-2 uppercase tracking-wide">Активный язык</p>
                       <LangTabs
                         active={activeLang}
                         onSwitch={setActiveLang}
@@ -239,7 +229,7 @@ export default function CityEditorModal({
                           });
                         }}
                       />
-                    </div>
+                    </Panel>
 
                     <LangBlock
                       label="Название"
@@ -266,9 +256,9 @@ export default function CityEditorModal({
                     />
                   </>
                 ) : (
-                  <div className="p-3 bg-yellow-50 border border-yellow-200 rounded-lg text-sm text-yellow-800">
+                  <Alert tone="warning">
                     Для этого города бэкенд не прислал переводы. Языки отображаются строго из JSON-ключей ответа.
-                  </div>
+                  </Alert>
                 )}
               </div>
             )}
@@ -277,53 +267,50 @@ export default function CityEditorModal({
               <Field label="Обложка города">
                 <div className="space-y-3 overflow-hidden">
                   {city?.image_url ? (
-                    <div className="relative w-full h-[240px] md:h-[300px] rounded-xl overflow-hidden border border-gray-200 bg-gray-100">
-                      <img src={city.image_url} alt="Обложка города" className="w-full h-full object-contain" />
-                      <button
-                        type="button"
+                    <LoadingOverlay loading={imageUploading} label="Загрузка обложки…">
+                      <MediaPreview src={city.image_url} alt="Обложка города" fit="contain" className="h-[240px] w-full md:h-[300px]">
+                      <IconButton
+                        label="Убрать изображение города"
                         onClick={() => setCity((p) => ({ ...p, image_id: null, image_url: null }))}
-                        className="absolute top-2 right-2 w-7 h-7 bg-black/60 text-white rounded-full text-sm flex items-center justify-center hover:bg-black/80"
+                        variant="overlay"
+                        size="iconOverlay"
+                        className="absolute top-2 right-2"
                       >
                         ×
-                      </button>
-                    </div>
+                      </IconButton>
+                      </MediaPreview>
+                    </LoadingOverlay>
                   ) : (
-                    <div className="w-full h-[240px] md:h-[300px] rounded-xl border border-dashed border-gray-300 bg-gray-50 flex items-center justify-center text-sm text-gray-400">
-                      Обложка не выбрана
-                    </div>
+                    <MediaPreview placeholder="Обложка не выбрана" className="h-[240px] w-full md:h-[300px]" />
                   )}
 
                   <div className="flex flex-wrap gap-2 items-center">
-                    <input
-                      ref={imageInputRef}
-                      type="file"
+                    <FileButton
+                      inputRef={imageInputRef}
                       accept="image/*"
                       onChange={onImageUpload}
-                      className="hidden"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => imageInputRef.current?.click()}
+                      variant="secondary"
+                      size="md"
                       disabled={imageUploading}
-                      className="px-3 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 disabled:opacity-50 transition-colors"
                     >
                       {imageUploading ? (
                         <span className="flex items-center gap-1.5">
-                          <span className="animate-spin w-3 h-3 border border-gray-500 border-t-transparent rounded-full inline-block" />
+                          <Spinner size="xs" className="border border-aspectum-border-muted" />
                           Загрузка...
                         </span>
                       ) : '📷 Загрузить фото'}
-                    </button>
-                    <button
+                    </FileButton>
+                    <Button
                       type="button"
+                      variant="soft"
+                      size="md"
                       onClick={() => setCommonsModalOpen(true)}
                       disabled={imageUploading}
-                      className="px-3 py-2 text-sm font-medium text-blue-700 bg-blue-50 rounded-lg hover:bg-blue-100 disabled:opacity-50 transition-colors"
                     >
                       🖼️ Выбрать из Wikimedia Commons
-                    </button>
+                    </Button>
                     {city?.image_id && (
-                      <span className="px-2 py-2 text-xs text-gray-400 font-mono">
+                      <span className="px-2 py-2 text-xs text-aspectum-text-disabled font-mono">
                         ID: {String(city.image_id).slice(0, 8)}…
                       </span>
                     )}
@@ -342,7 +329,7 @@ export default function CityEditorModal({
 
             {activeTab === 'geo' && (
               <div className="space-y-4">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <FormGrid>
                   <Field label="Широта (lat)">
                     <TextInput
                       type="number"
@@ -367,39 +354,35 @@ export default function CityEditorModal({
                       placeholder="37.6173"
                     />
                   </Field>
-                </div>
+                </FormGrid>
 
                 <div>
-                  <div className="text-xs text-gray-500 mb-2">Карта города (кликните, чтобы выставить координаты)</div>
-                  <div ref={cityMapElRef} className="w-full h-72 rounded-xl border border-gray-200 overflow-hidden" />
+                  <div className="text-xs text-aspectum-text-muted mb-2">Карта города (кликните, чтобы выставить координаты)</div>
+                  <div ref={cityMapElRef} className="w-full h-72 rounded-aspectum-card border border-aspectum-border overflow-hidden" />
                 </div>
 
                 {allFilters?.length > 0 && (
                   <Field label="Теги города">
-                    <div className="flex flex-wrap gap-2 max-h-48 overflow-y-auto p-2 border border-gray-200 rounded-lg bg-gray-50">
+                    <div className="flex flex-wrap gap-2 max-h-48 overflow-y-auto p-2 border border-aspectum-border rounded-aspectum-control bg-aspectum-surface-muted">
                       {allFilters.map((f) => {
                         const fid = String(f.id);
                         const selected = (city?.city_filter_ids || []).includes(fid);
                         const label = getMultiLangValue(f.name) || f.display_name || fid;
                         return (
-                          <button
+                          <Chip
                             key={fid}
-                            type="button"
+                            selected={selected}
+                            variant="primary"
                             onClick={() => toggleFilter(fid)}
-                            className={`flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium border transition-all ${
-                              selected
-                                ? 'bg-blue-600 text-white border-blue-600'
-                                : 'bg-white text-gray-600 border-gray-300 hover:border-blue-400 hover:text-blue-600'
-                            }`}
                           >
                             {f.emoji && <span>{f.emoji}</span>}
                             {label}
                             {selected && <span className="ml-0.5">✓</span>}
-                          </button>
+                          </Chip>
                         );
                       })}
                     </div>
-                    <p className="mt-1 text-xs text-gray-400">
+                    <p className="mt-1 text-xs text-aspectum-text-disabled">
                       Выбрано: {(city?.city_filter_ids || []).length} тегов
                     </p>
                   </Field>
@@ -420,21 +403,16 @@ export default function CityEditorModal({
               <div className="space-y-4">
                 <Field label="Видимость">
                   <div className="flex items-center h-full pt-1">
-                    <label className="flex items-center gap-2 cursor-pointer select-none">
-                      <button
-                        type="button"
-                        role="switch"
-                        aria-checked={!!city?.is_show}
+                    <FormLabel  layout="row" interactive unselectable>
+                      <Switch
+                        checked={!!city?.is_show}
                         aria-label="Видимость города"
-                        onClick={() => setCity((p) => ({ ...p, is_show: !p.is_show }))}
-                        className={`relative w-10 h-5 rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-offset-1 focus:ring-blue-500 ${city?.is_show ? 'bg-blue-600' : 'bg-gray-300'}`}
-                      >
-                        <span className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-all ${city?.is_show ? 'left-5' : 'left-0.5'}`} />
-                      </button>
-                      <span className="text-sm text-gray-700">
+                        onChange={(next) => setCity((p) => ({ ...p, is_show: next }))}
+                      />
+                      <span className="text-sm text-aspectum-text-strong">
                         {city?.is_show ? 'Показывается в приложении' : 'Скрыт'}
                       </span>
-                    </label>
+                    </FormLabel>
                   </div>
                 </Field>
 
@@ -442,14 +420,13 @@ export default function CityEditorModal({
                   label="Родительский город (Спец. гид)"
                   hint="Если выбрано — этот город скрыт с карты и из «ближайших городов»/«ближайших эвентов», но показывается в блоке «Гиды от партнеров» на странице выбранного родительского города."
                 >
-                  <select
+                  <Select
                     value={city?.parent_city || ''}
                     onChange={(e) => setCity((p) => ({
                       ...p,
                       parent_city: e.target.value,
                       author_ids: e.target.value ? p.author_ids : [],
                     }))}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none"
                   >
                     <option value="">Не привязан</option>
                     {(allCities || [])
@@ -459,27 +436,27 @@ export default function CityEditorModal({
                           {getMultiLangValue(c.name) || c.id}
                         </option>
                       ))}
-                  </select>
+                  </Select>
                 </Field>
 
                 {city?.parent_city && (
                   <Field label="Авторы спецгида" hint="Можно выбрать нескольких авторов из справочника.">
                     {authors.length === 0 ? (
-                      <p className="text-sm text-gray-400">Сначала добавьте автора в разделе «Контент → Авторы».</p>
+                      <p className="text-sm text-aspectum-text-disabled">Сначала добавьте автора в разделе «Контент → Авторы».</p>
                     ) : (
-                      <div className="flex flex-wrap gap-2 rounded-lg border border-gray-200 bg-gray-50 p-2">
+                      <div className="flex flex-wrap gap-2 rounded-aspectum-control border border-aspectum-border bg-aspectum-surface-muted p-2">
                         {authors.map((author) => {
                           const id = String(author.id);
                           const selected = (city?.author_ids || []).includes(id);
                           return (
-                            <button key={id} type="button" onClick={() => setCity((p) => ({
+                            <Chip key={id} selected={selected} onClick={() => setCity((p) => ({
                               ...p,
                               author_ids: selected
                                 ? (p.author_ids || []).filter((value) => value !== id)
                                 : [...(p.author_ids || []), id],
-                            }))} className={`rounded-full border px-3 py-1.5 text-xs font-medium ${selected ? 'border-blue-600 bg-blue-600 text-white' : 'border-gray-300 bg-white text-gray-700 hover:border-blue-400'}`}>
+                            }))}>
                               {author.name}{selected ? ' ✓' : ''}
-                            </button>
+                            </Chip>
                           );
                         })}
                       </div>
@@ -487,7 +464,7 @@ export default function CityEditorModal({
                   </Field>
                 )}
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <FormGrid>
                   <Field
                     label="IAP SKU"
                     hint={!city?.iap_sku ? 'Пусто — SKU ещё не сгенерирован для этого города' : undefined}
@@ -508,52 +485,53 @@ export default function CityEditorModal({
                       placeholder="2.99"
                     />
                   </Field>
-                </div>
+                </FormGrid>
 
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-3 p-3 bg-gray-50 rounded-xl border border-gray-200">
+                <Panel tone="muted" className="grid grid-cols-1 md:grid-cols-3 gap-3 p-3">
                   <div>
-                    <p className="text-xs text-gray-500 mb-1">Apple</p>
+                    <p className="text-xs text-aspectum-text-muted mb-1">Apple</p>
                     <IapStatusBadge status={city?.iap_apple_status} />
                   </div>
                   <div>
-                    <p className="text-xs text-gray-500 mb-1">Google</p>
+                    <p className="text-xs text-aspectum-text-muted mb-1">Google</p>
                     <IapStatusBadge status={city?.iap_google_status} />
                   </div>
                   <div>
-                    <p className="text-xs text-gray-500 mb-1">Синк</p>
-                    <p className="text-sm text-gray-700">
+                    <p className="text-xs text-aspectum-text-muted mb-1">Синк</p>
+                    <p className="text-sm text-aspectum-text-strong">
                       {city?.iap_synced_at ? new Date(city.iap_synced_at).toLocaleString('ru-RU') : 'Ещё не синкался'}
                     </p>
                   </div>
-                </div>
+                </Panel>
 
                 <div className="flex items-center gap-3">
-                  <button
+                  <Button
                     type="button"
+                    variant="soft"
+                    size="md"
                     onClick={syncIap}
                     disabled={syncingIap}
-                    className="px-3 py-2 text-sm font-medium text-blue-700 bg-blue-50 rounded-lg hover:bg-blue-100 disabled:opacity-50 transition-colors"
                   >
                     {syncingIap ? (
                       <span className="flex items-center gap-1.5">
-                        <span className="animate-spin w-3 h-3 border border-blue-500 border-t-transparent rounded-full inline-block" />
+                        <Spinner size="xs" className="border border-aspectum-focus" />
                         Синкаем...
                       </span>
                     ) : '🔄 Синхронизировать с App Store / Google Play'}
-                  </button>
+                  </Button>
                 </div>
 
                 {syncIapNote && (
-                  <div className={`p-3 rounded-lg text-sm border ${
+                  <div className={`p-3 rounded-aspectum-control text-sm border ${
                     syncIapNote.type === 'error'
-                      ? 'bg-red-50 border-red-200 text-red-700'
-                      : 'bg-green-50 border-green-200 text-green-700'
+                      ? 'bg-aspectum-danger-soft border-aspectum-danger-border text-aspectum-danger-strong'
+                      : 'bg-aspectum-positive-soft border-aspectum-positive-border text-aspectum-positive-strong'
                   }`}>
                     {syncIapNote.text}
                   </div>
                 )}
 
-                <p className="text-xs text-gray-400">
+                <p className="text-xs text-aspectum-text-disabled">
                   Изменение цены и SKU применится после сохранения города. Синхронизация с App Store / Google Play
                   запускается отдельно — статусы выше могут не обновиться сразу после нажатия.
                 </p>
@@ -577,14 +555,7 @@ export default function CityEditorModal({
         defaultQuery={getMultiLangValue(city?.name || '')}
       />
 
-      {preparing && (
-        <div className="fixed inset-0 z-[70] bg-white/75 backdrop-blur-sm flex items-center justify-center">
-          <div className="px-4 py-3 rounded-xl border border-gray-200 bg-white shadow-sm flex items-center gap-2 text-sm text-gray-700">
-            <span className="animate-spin w-4 h-4 border-2 border-blue-500 border-t-transparent rounded-full inline-block" />
-            Загружаем данные города...
-          </div>
-        </div>
-      )}
+      <BusyOverlay open={preparing} label="Загружаем данные города..." priority />
     </>
   );
 }

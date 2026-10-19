@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { bookingReferenceAPI, ticketTypesAPI } from '../../../api/booking';
-import Modal from '../../../components/ui/Modal';
+import { FormLabel, Alert, Button, Checkbox, EmptyState, Modal, Panel } from '@aspectum/ui';
 import { parseApiError } from '../../../utils/apiError';
 import { normalizeListResponse } from '../shared/normalize';
 import { getEventLabel, getTicketTypeLabel } from '../shared/labels';
@@ -121,22 +121,19 @@ export default function AssignTicketTypeModal({ open, ticketType, onClose, onDon
     return (
       <Modal open={open} onClose={onClose} title={`«${typeName}» — глобальный тип`} size="md">
         <div className="space-y-4">
-          <p className="text-sm text-gray-700">
+          <p className="text-sm text-aspectum-text-strong">
             Этот тип билета глобальный (не привязан к событию) — он уже
             автоматически доступен на всех событиях по коду «{ticketType?.code || '—'}».
             Отдельное назначение по событиям не требуется.
           </p>
-          <p className="text-xs text-gray-500">
+          <p className="text-xs text-aspectum-text-muted">
             Если нужен тип билета именно для одного события, создайте новый
             в «Справочнике типов билетов» и укажите для него событие.
           </p>
           <div className="flex justify-end pt-1">
-            <button
-              onClick={onClose}
-              className="px-4 py-2 text-sm text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors"
-            >
+            <Button type="button" variant="primary" size="md" onClick={onClose}>
               Понятно
-            </button>
+            </Button>
           </div>
         </div>
       </Modal>
@@ -151,74 +148,66 @@ export default function AssignTicketTypeModal({ open, ticketType, onClose, onDon
       size="md"
     >
       {loading ? (
-        <div className="py-8 text-center text-sm text-gray-400">Загрузка ивентов...</div>
+        <EmptyState icon={null} title="Загрузка ивентов..." spacing="md" />
       ) : (
         <div className="space-y-4">
           {error && (
-            <div className="text-sm text-red-600 bg-red-50 rounded-lg px-3 py-2">{error}</div>
+            <Alert tone="error">{error}</Alert>
           )}
 
-          <p className="text-xs text-amber-700 bg-amber-50 rounded-lg px-3 py-2">
+          <Alert tone="warning" className="text-xs">
             Это событийный тип билета (устаревшая модель) — назначение
             создаёт отдельные копии по каждому событию вместо переиспользования
             одного типа. Для новых типов рекомендуется оставлять поле
             «Событие» пустым в «Справочнике типов билетов» — тогда тип станет
             глобальным и будет виден всем событиям без клонирования.
-          </p>
+          </Alert>
 
           {events.length === 0 ? (
-            <div className="py-6 text-center text-sm text-gray-400">
-              Нет ивентов с включённым букингом.<br />
-              <span className="text-xs">Включите «В сторе» в каталоге событий.</span>
-            </div>
+            <EmptyState
+              title="Нет ивентов с включённым букингом"
+              description="Включите «В сторе» в каталоге событий."
+              className="py-6"
+            />
           ) : (
             <>
-              <p className="text-xs text-gray-500">
+              <p className="text-xs text-aspectum-text-muted">
                 Тип билета будет создан для отмеченных ивентов с теми же именем, кодом и описанием.
               </p>
-              <div className="max-h-72 overflow-y-auto divide-y divide-gray-100 border border-gray-200 rounded-lg">
+              <Panel tone="muted" className="max-h-72 overflow-y-auto p-0 divide-y divide-aspectum-border-subtle">
                 {events.map((ev) => {
                   const evId = String(ev.id);
                   const isChecked = selected.has(evId);
                   return (
-                    <label
+                    <FormLabel
                       key={evId}
-                      className="flex items-center gap-3 px-3 py-2.5 cursor-pointer hover:bg-gray-50"
+                       interactive  layout="rowLoose" className="px-3 py-2.5 hover:bg-aspectum-surface-muted"
                     >
-                      <input
-                        type="checkbox"
+                      <Checkbox
                         checked={isChecked}
                         onChange={() => toggle(evId)}
-                        className="w-4 h-4 rounded border-gray-300 text-blue-600"
+                        className="w-4 h-4 rounded border-aspectum-border-strong text-aspectum-primary"
                       />
-                      <span className="text-sm text-gray-800 flex-1">
+                      <span className="text-sm text-aspectum-text-emphasis flex-1">
                         {getEventLabel(ev) || ev.id}
                       </span>
-                    </label>
+                    </FormLabel>
                   );
                 })}
-              </div>
-              <div className="text-xs text-gray-400">
+              </Panel>
+              <div className="text-xs text-aspectum-text-disabled">
                 Отмечено: {selected.size} из {events.length}
               </div>
             </>
           )}
 
           <div className="flex justify-end gap-2 pt-1">
-            <button
-              onClick={onClose}
-              disabled={saving}
-              className="px-4 py-2 text-sm text-gray-600 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
-            >
+            <Button type="button" variant="secondary" size="md" onClick={onClose} disabled={saving}>
               Отмена
-            </button>
-            <button
-              onClick={handleSave}
-              disabled={saving || loading || events.length === 0}
-              className="px-4 py-2 text-sm text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors"
-            >
+            </Button>
+            <Button type="button" variant="primary" size="md" onClick={handleSave} disabled={saving || loading || events.length === 0}>
               {saving ? 'Сохранение...' : 'Сохранить'}
-            </button>
+            </Button>
           </div>
         </div>
       )}

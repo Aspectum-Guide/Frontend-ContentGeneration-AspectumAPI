@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Field, TextInput } from '../../../components/ui/FormField';
+import { Chip, Field, InlineState, SearchSelect } from '@aspectum/ui';
 import { eventsCatalogAPI } from '../../../features/catalog/events/api';
 import { useCatalogFilters } from '../../../features/catalog/core/useCatalogFilters';
 import {
@@ -99,90 +99,50 @@ export default function SessionWizardAttractionRelatedEventsPicker({
     setSearch('');
   };
 
-  const hasResults = sessionResults.length > 0 || catalogResults.length > 0;
+  const searchOptions = [
+    ...sessionResults.map((row) => ({ ...row, __kind: 'session' })),
+    ...catalogResults.map((row) => ({ ...row, __kind: 'published' })),
+  ];
 
   return (
     <Field label="Связанные события («Связанное»)">
       <div className="flex flex-wrap gap-2 mb-2">
         {(relatedEvents || []).length === 0 && (
-          <p className="text-xs text-gray-400">Ничего не привязано</p>
+          <InlineState size="xs" tone="disabled">Ничего не привязано</InlineState>
         )}
         {(relatedEvents || []).map((ev) => (
-          <span
+          <Chip
             key={ev.id}
-            className="flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-purple-50 text-purple-700 border border-purple-200"
+            variant="purple"
+            removable
+            onRemove={() => onRemove?.(ev.id)}
           >
             {getDisplayTitle(ev)}
             {ev.kind === 'session' && (
-              <span className="text-purple-400">· в сессии</span>
+              <span className="text-aspectum-purple-light">· в сессии</span>
             )}
-            <button
-              type="button"
-              onClick={() => onRemove?.(ev.id)}
-              className="ml-0.5 text-purple-400 hover:text-purple-700"
-              aria-label="Убрать связь"
-            >
-              ×
-            </button>
-          </span>
+          </Chip>
         ))}
       </div>
 
-      <TextInput
+      <SearchSelect
         value={search}
-        onChange={(e) => setSearch(e.target.value)}
+        onChange={setSearch}
         placeholder="Поиск события для связи..."
+        options={searchOptions}
+        loading={catalogLoading}
+        emptyText="Ничего не найдено"
+        onSelect={(row) => handlePick(row, row.__kind)}
+        renderOption={(row) => (
+          <>
+            <span className="flex flex-col min-w-0">
+              <span className="text-[10px] font-semibold text-aspectum-text-disabled">{row.__kind === 'session' ? 'В этой сессии' : 'Существующие'}</span>
+              <span className="truncate">{row.__kind === 'session' ? getAttrName(row) : getDisplayTitle(row)}</span>
+            </span>
+            {row.city_display_name && <span className="text-xs text-aspectum-text-disabled shrink-0">{row.city_display_name}</span>}
+          </>
+        )}
       />
-
-      {search.trim() && (
-        <div className="mt-1 max-h-56 overflow-y-auto border border-gray-200 rounded-lg bg-white">
-          {catalogLoading && !hasResults && (
-            <p className="p-2 text-xs text-gray-400">Поиск...</p>
-          )}
-          {!catalogLoading && !hasResults && (
-            <p className="p-2 text-xs text-gray-400">Ничего не найдено</p>
-          )}
-
-          {sessionResults.length > 0 && (
-            <div className="border-b border-gray-100 last:border-b-0">
-              <div className="px-3 py-1.5 text-xs font-semibold text-gray-500 bg-gray-50 sticky top-0">
-                В этой сессии
-              </div>
-              {sessionResults.map((row) => (
-                <button
-                  key={row.id}
-                  type="button"
-                  onClick={() => handlePick(row, 'session')}
-                  className="w-full flex items-center justify-between gap-2 px-3 py-2 text-left text-sm hover:bg-purple-50 border-b border-gray-100 last:border-0"
-                >
-                  <span className="truncate">{getAttrName(row)}</span>
-                </button>
-              ))}
-            </div>
-          )}
-
-          {catalogResults.length > 0 && (
-            <div className="border-b border-gray-100 last:border-b-0">
-              <div className="px-3 py-1.5 text-xs font-semibold text-gray-500 bg-gray-50 sticky top-0">
-                Существующие
-              </div>
-              {catalogResults.map((row) => (
-                <button
-                  key={row.id}
-                  type="button"
-                  onClick={() => handlePick(row, 'published')}
-                  className="w-full flex items-center justify-between gap-2 px-3 py-2 text-left text-sm hover:bg-purple-50 border-b border-gray-100 last:border-0"
-                >
-                  <span className="truncate">{getDisplayTitle(row)}</span>
-                  {row.city_display_name && (
-                    <span className="text-xs text-gray-400 shrink-0">{row.city_display_name}</span>
-                  )}
-                </button>
-              ))}
-            </div>
-          )}
-        </div>
-      )}
     </Field>
   );
 }

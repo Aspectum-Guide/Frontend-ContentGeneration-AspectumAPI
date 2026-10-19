@@ -1,15 +1,8 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import Layout from '../../../components/Layout';
-import DataTable from '../../../components/ui/DataTable';
-import Modal, { ConfirmModal } from '../../../components/ui/Modal';
-import { Field, FormActions, TextInput } from '../../../components/ui/FormField';
+import { Alert, CheckboxField, PageHeader, ConfirmModal, DataTable, Field, FormActions, Modal, StatusBadge, TableRowActions, TextInput } from '@aspectum/ui';
 import { parseApiError } from '../../../utils/apiError';
 import { llmAPI } from '../../../api/llm';
-import ActiveCheckboxField from '../shared/components/ActiveCheckboxField';
-import FormErrorAlert from '../shared/components/FormErrorAlert';
-import TableRowActions from '../shared/components/TableRowActions';
-import StatusBadge from '../shared/components/StatusBadge';
-import CatalogPageHeader from '../shared/components/CatalogPageHeader';
 
 const PAGE_SIZE = 50;
 
@@ -63,27 +56,27 @@ export default function LLMKeysCatalogPage() {
       {
         key: 'provider',
         label: 'Провайдер',
-        render: (value) => <span className="text-sm font-medium text-gray-900">{value || '—'}</span>,
+        render: (value) => <span className="text-sm font-medium text-aspectum-text">{value || '—'}</span>,
       },
       {
         key: 'name',
         label: 'Название',
-        render: (value) => <span className="text-sm text-gray-700">{value || '—'}</span>,
+        render: (value) => <span className="text-sm text-aspectum-text-strong">{value || '—'}</span>,
       },
       {
         key: 'has_api_key',
         label: 'API Key',
         render: (hasKey) =>
           hasKey ? (
-            <span className="text-xs text-green-700">✅ сохранён</span>
+            <span className="text-xs text-aspectum-positive-strong">✅ сохранён</span>
           ) : (
-            <span className="text-xs text-amber-600">⚠️ не задан</span>
+            <span className="text-xs text-aspectum-warning">⚠️ не задан</span>
           ),
       },
       {
         key: 'base_url',
         label: 'Base URL',
-        render: (value) => <span className="text-sm text-gray-700 font-mono">{value || '—'}</span>,
+        render: (value) => <span className="text-sm text-aspectum-text-strong font-mono">{value || '—'}</span>,
       },
       {
         key: 'is_active',
@@ -93,12 +86,12 @@ export default function LLMKeysCatalogPage() {
       {
         key: 'rate_limit_tpm',
         label: 'TPM',
-        render: (v) => <span className="text-sm text-gray-700">{v ?? 0}</span>,
+        render: (v) => <span className="text-sm text-aspectum-text-strong">{v ?? 0}</span>,
       },
       {
         key: 'rate_limit_rpm',
         label: 'RPM',
-        render: (v) => <span className="text-sm text-gray-700">{v ?? 0}</span>,
+        render: (v) => <span className="text-sm text-aspectum-text-strong">{v ?? 0}</span>,
       },
     ],
     []
@@ -160,7 +153,7 @@ export default function LLMKeysCatalogPage() {
 
   return (
     <Layout>
-      <CatalogPageHeader
+      <PageHeader
         title="Ключи LLM API"
         description="Список provider keys. Сами значения ключей не отображаются — только статус наличия."
         createLabel="Создать ключ"
@@ -198,7 +191,7 @@ export default function LLMKeysCatalogPage() {
       >
         {editingItem && (
           <form onSubmit={handleSave} className="space-y-4">
-            <FormErrorAlert message={saveError} />
+            <Alert tone="error">{saveError}</Alert>
 
             <Field label="Провайдер" required>
               <TextInput
@@ -236,13 +229,13 @@ export default function LLMKeysCatalogPage() {
                 placeholder={editingItem.id ? 'Оставьте пустым, чтобы не менять' : 'Введите новый key'}
               />
               {editingItem.id && (
-                <p className="text-xs text-gray-500 mt-1">
+                <p className="text-xs text-aspectum-text-muted mt-1">
                   {editingItem.has_api_key ? '✅ Ключ уже сохранён' : '⚠️ Ключ не задан'}
                 </p>
               )}
             </Field>
 
-            <ActiveCheckboxField
+            <CheckboxField
               label="Активен"
               checked={editingItem.is_active}
               onChange={(next) => setEditingItem((prev) => ({ ...prev, is_active: next }))}
@@ -297,4 +290,3 @@ export default function LLMKeysCatalogPage() {
     </Layout>
   );
 }
-

@@ -68,6 +68,7 @@ src/
 │   └── Home.jsx
 ├── components/
 │   ├── ui/                # Modal/ConfirmModal, FormField, DataTable, Toast — общий дизайн-кит
+│   │                      # визуал ещё разъехался по className — план: docs/VISUAL_UNIFY_PLAN.md
 │   ├── generation/         # CommonsImagePicker и др., специфичные для визарда
 │   ├── ErrorBoundary.jsx
 │   ├── ProtectedRoute.jsx  # staff-гейт через /auth/me

@@ -1,7 +1,8 @@
+import { Select } from '@aspectum/ui';
 import { getTicketTypeLabel } from '../labels';
 
 /**
- * Standard `<select>` of ticket types for booking catalog forms.
+ * Standard select of ticket types for booking catalog forms.
  * Pass `multiple` to render a multi-select bound to an array of ids.
  */
 export default function TicketTypeSelect({
@@ -11,14 +12,14 @@ export default function TicketTypeSelect({
   disabled = false,
   required = false,
   placeholder = 'Выберите тип билета',
-  className,
+  className = '',
   ariaLabel,
   multiple = false,
   size,
 }) {
   if (multiple) {
     return (
-      <select
+      <Select
         multiple
         value={Array.isArray(value) ? value : []}
         onChange={(e) => {
@@ -28,31 +29,25 @@ export default function TicketTypeSelect({
         disabled={disabled}
         aria-label={ariaLabel}
         size={size}
-        className={
-          className ||
-          'w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none'
-        }
+        className={className}
       >
         {(options || []).map((tt) => (
           <option key={tt.id} value={tt.id}>
             {getTicketTypeLabel(tt) || tt.id}
           </option>
         ))}
-      </select>
+      </Select>
     );
   }
 
   return (
-    <select
+    <Select
       value={value || ''}
       onChange={(e) => onChange?.(e.target.value)}
       disabled={disabled}
       required={required}
       aria-label={ariaLabel}
-      className={
-        className ||
-        'w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none'
-      }
+      className={className}
     >
       <option value="">{placeholder}</option>
       {(options || []).map((tt) => (
@@ -60,6 +55,6 @@ export default function TicketTypeSelect({
           {getTicketTypeLabel(tt) || tt.id}
         </option>
       ))}
-    </select>
+    </Select>
   );
 }

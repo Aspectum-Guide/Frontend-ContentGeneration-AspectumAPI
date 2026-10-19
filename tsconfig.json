@@ -15,7 +15,12 @@
     "noImplicitAny": false,
     "noUnusedLocals": false,
     "noUnusedParameters": false,
-    "noFallthroughCasesInSwitch": true
+    "noFallthroughCasesInSwitch": true,
+    "paths": {
+      "@/*": ["./src/*"],
+      "@aspectum/ui": ["./src/components/ui"],
+      "@aspectum/ui/*": ["./src/components/ui/*"]
+    }
   },
   "include": ["src"]
 }

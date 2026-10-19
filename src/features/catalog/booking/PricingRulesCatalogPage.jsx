@@ -2,20 +2,13 @@ import { useCallback, useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { pricingRulesAPI } from '../../../api/booking';
 import Layout from '../../../components/Layout';
-import DataTable from '../../../components/ui/DataTable';
-import { Field, FormActions, TextInput } from '../../../components/ui/FormField';
-import Modal, { ConfirmModal } from '../../../components/ui/Modal';
+import { Alert, Button, CheckboxField, ConfirmModal, DataTable, Field, FormActions, Modal, PageHeader, StatusBadge, TableRowActions, TextInput, ToggleGroup, formGridClassName } from '@aspectum/ui';
 import { useLayoutActions } from '../../../context/useLayoutActions';
 import { parseApiError } from '../../../utils/apiError';
 import { useCatalogFilters } from '../core/useCatalogFilters';
 import { useEventOptions, useTicketTypeOptions } from '../shared/bookingOptions';
-import ActiveCheckboxField from '../shared/components/ActiveCheckboxField';
-import CatalogPageHeader from '../shared/components/CatalogPageHeader';
 import EventSelect from '../shared/components/EventSelect';
-import FormErrorAlert from '../shared/components/FormErrorAlert';
 import PricePrecedenceHint from '../shared/components/PricePrecedenceHint';
-import StatusBadge from '../shared/components/StatusBadge';
-import TableRowActions from '../shared/components/TableRowActions';
 import TicketTypeSelect from '../shared/components/TicketTypeSelect';
 import { DEFAULT_CURRENCY, normalizeCurrency } from '../shared/currencies';
 import { getEventLabelById } from '../shared/labels';
@@ -176,21 +169,21 @@ export default function PricingRulesCatalogPage() {
   const columns = [
     {
       key: 'event', label: 'Событие',
-      render: (v) => <span className="text-sm text-gray-700">{eventLabel(v)}</span>,
+      render: (v) => <span className="text-sm text-aspectum-text-strong">{eventLabel(v)}</span>,
     },
     {
       key: 'price', label: 'Цена',
       render: (v, row) => (
-        <span className="font-medium text-gray-900">{v} <span className="text-xs text-gray-400">{row.currency}</span></span>
+        <span className="font-medium text-aspectum-text">{v} <span className="text-xs text-aspectum-text-disabled">{row.currency}</span></span>
       ),
     },
     {
       key: 'weekdays_mask', label: 'Дни',
-      render: (v) => <span className="text-xs text-gray-600">{maskToLabels(v)}</span>,
+      render: (v) => <span className="text-xs text-aspectum-text-subtle">{maskToLabels(v)}</span>,
     },
     {
       key: 'priority', label: 'Приоритет',
-      render: (v) => <span className="text-sm text-gray-600">{v ?? 0}</span>,
+      render: (v) => <span className="text-sm text-aspectum-text-subtle">{v ?? 0}</span>,
     },
     {
       key: 'is_active', label: 'Статус',
@@ -200,7 +193,7 @@ export default function PricingRulesCatalogPage() {
 
   return (
     <Layout>
-      <CatalogPageHeader
+      <PageHeader
         title="Правила ценообразования"
         description="Цены по условиям: дни недели, даты, время. Приоритет — выше число → правило главнее."
         createLabel="Создать правило"
@@ -228,7 +221,7 @@ export default function PricingRulesCatalogPage() {
             options={eventOptions}
             disabled={eventsLoading}
             placeholder={eventsLoading ? 'Загрузка…' : 'Все события'}
-            className={`px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none ${eventsLoading ? 'opacity-60 cursor-wait' : ''}`}
+            className={eventsLoading ? 'opacity-60 cursor-wait' : undefined}
           />
         )}
         actions={(row) => (
@@ -244,9 +237,9 @@ export default function PricingRulesCatalogPage() {
       >
         {editing && (
           <form onSubmit={handleSave} className="space-y-4">
-            <FormErrorAlert message={saveError} />
+            <Alert tone="error">{saveError}</Alert>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <div className={formGridClassName()}>
               <Field label="Событие" required>
                 <EventSelect
                   value={editing.event}
@@ -299,33 +292,31 @@ export default function PricingRulesCatalogPage() {
             {/* Дни недели */}
             <Field label="Дни недели" hint="Пусто = любой день">
               <div className="flex gap-1 flex-wrap">
-                {WEEKDAYS.map((d) => {
-                  const active = editing.weekdays_mask != null && !!(editing.weekdays_mask & (1 << d.bit));
-                  return (
-                    <button
-                      key={d.bit}
-                      type="button"
-                      onClick={() => toggleWeekday(d.bit)}
-                      className={`px-2.5 py-1 rounded-md text-xs font-medium transition-colors ${active ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}
-                    >
-                      {d.label}
-                    </button>
-                  );
-                })}
+                <ToggleGroup
+                ariaLabel="Дни недели"
+                items={WEEKDAYS.map((d) => ({ id: d.bit, label: d.label }))}
+                value={WEEKDAYS.filter((d) => editing.weekdays_mask != null && !!(editing.weekdays_mask & (1 << d.bit))).map((d) => d.bit)}
+                onChange={(next) => {
+                  const previous = WEEKDAYS.filter((d) => editing.weekdays_mask != null && !!(editing.weekdays_mask & (1 << d.bit))).map((d) => d.bit);
+                  const changed = next.find((bit) => !previous.includes(bit)) ?? previous.find((bit) => !next.includes(bit));
+                  if (changed != null) toggleWeekday(changed);
+                }}
+                />
                 {editing.weekdays_mask != null && (
-                  <button
+                  <Button
                     type="button"
                     onClick={() => setEditing((p) => ({ ...p, weekdays_mask: null }))}
-                    className="px-2.5 py-1 rounded-md text-xs text-gray-400 hover:text-red-500 transition-colors"
+                    variant="ghostDanger"
+                    size="sm"
                   >
                     сбросить
-                  </button>
+                  </Button>
                 )}
               </div>
             </Field>
 
             {/* Даты */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+            <div className={formGridClassName({ columns: 3 })}>
               <Field label="Конкретная дата">
                 <TextInput
                   type="date"
@@ -350,7 +341,7 @@ export default function PricingRulesCatalogPage() {
             </div>
 
             {/* Время */}
-            <div className="grid grid-cols-2 gap-3">
+            <div className={formGridClassName({ responsive: false })}>
               <Field label="Время от">
                 <TextInput
                   type="time"
@@ -367,7 +358,7 @@ export default function PricingRulesCatalogPage() {
               </Field>
             </div>
 
-            <ActiveCheckboxField
+            <CheckboxField
               checked={editing.is_active}
               onChange={(v) => setEditing((p) => ({ ...p, is_active: v }))}
             />

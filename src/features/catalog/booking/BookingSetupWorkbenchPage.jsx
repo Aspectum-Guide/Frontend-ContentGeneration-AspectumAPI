@@ -9,15 +9,13 @@ import {
   ticketTypesAPI,
 } from '../../../api/booking';
 import Layout from '../../../components/Layout';
-import Modal, { ConfirmModal } from '../../../components/ui/Modal';
-import { Field, TextInput } from '../../../components/ui/FormField';
+import { FormLabel, Alert, Button, Checkbox, ConfirmModal, DataTableSurface, EmptyState, Field, IconButton, InlineState, Modal, PageContainer, PageHeader, Panel, SectionHeader, SegmentedControl, Select, Switch, Textarea, TextInput, formGridClassName } from '@aspectum/ui';
 import { parseApiError } from '../../../utils/apiError';
 import { useEventOptions } from '../shared/bookingOptions';
 import EventSelect from '../shared/components/EventSelect';
 import { DEFAULT_CURRENCY, normalizeCurrency } from '../shared/currencies';
 import { getTicketTypeLabel, filterTicketTypesForEvent, resolveTicketTypeEventId } from '../shared/labels';
 import { normalizeListResponse } from '../shared/normalize';
-import Spinner from '../shared/components/Spinner';
 import {
   buildFromInterval,
   buildFromList,
@@ -47,27 +45,28 @@ import {
 
 function SectionCard({ title, badge, children, action }) {
   return (
-    <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-      <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100">
-        <div className="flex items-center gap-2">
-          <h2 className="text-sm font-semibold text-gray-800">{title}</h2>
-          {badge != null && (
-            <span className="px-1.5 py-0.5 rounded-full bg-gray-100 text-gray-500 text-xs font-medium">{badge}</span>
-          )}
-        </div>
+    <Panel className="overflow-hidden p-0">
+      <div className="flex items-center justify-between px-4 py-3 border-b border-aspectum-border-subtle">
+        <SectionHeader
+          title={title}
+          size="xs"
+          aside={badge != null ? (
+            <span className="px-1.5 py-0.5 rounded-full bg-aspectum-surface-subtle text-aspectum-text-muted text-xs font-medium">{badge}</span>
+          ) : null}
+        />
         {action}
       </div>
       <div className="p-4">{children}</div>
-    </div>
+    </Panel>
   );
 }
 
 function Err({ msg }) {
-  return msg ? <p className="text-xs text-red-600 bg-red-50 rounded px-2 py-1 mt-1">{msg}</p> : null;
+  return msg ? <Alert tone="error" className="text-xs mt-1 px-2 py-1">{msg}</Alert> : null;
 }
 
 function Ok({ msg }) {
-  return msg ? <p className="text-xs text-emerald-700 bg-emerald-50 rounded px-2 py-1 mt-1">{msg}</p> : null;
+  return msg ? <p className="text-xs text-aspectum-success-strong bg-aspectum-success-soft rounded px-2 py-1 mt-1">{msg}</p> : null;
 }
 
 /** Подставляет цены из базовых и уже назначенных на слоты (не затирает ручной ввод). */
@@ -167,9 +166,11 @@ function SlotsManagerModal({ open, eventId, onClose, onChanged }) {
       setLoading(false);
     }
   }, [eventId, dateFrom, dateTo]);
+  const loadSlotsRef = useRef(loadSlots);
+  loadSlotsRef.current = loadSlots;
 
   useEffect(() => {
-    if (open) { setPage(1); setEditingId(null); setRowError({}); setSelectedIds(new Set()); setBulkError(''); loadSlots(1, dateFrom, dateTo); }
+    if (open) { setPage(1); setEditingId(null); setRowError({}); setSelectedIds(new Set()); setBulkError(''); loadSlotsRef.current(1); }
   }, [open, eventId]);
 
   const handleToggle = async (slot) => {
@@ -265,56 +266,46 @@ function SlotsManagerModal({ open, eventId, onClose, onChanged }) {
         {/* Filters */}
         <div className="flex flex-wrap gap-3 mb-4">
           <div className="flex items-center gap-2">
-            <label className="text-xs text-gray-500">С</label>
-            <input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)}
-              className="px-2 py-1.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none" />
+            <FormLabel  size="xs" tone="muted">С</FormLabel>
+            <TextInput type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} />
           </div>
           <div className="flex items-center gap-2">
-            <label className="text-xs text-gray-500">По</label>
-            <input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)}
-              className="px-2 py-1.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none" />
+            <FormLabel  size="xs" tone="muted">По</FormLabel>
+            <TextInput type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} />
           </div>
-          <button onClick={() => loadSlots(1, dateFrom, dateTo)}
-            className="px-3 py-1.5 text-xs font-medium text-blue-600 bg-blue-50 rounded-lg hover:bg-blue-100 transition-colors">
+          <Button type="button" variant="soft" size="sm" onClick={() => loadSlots(1, dateFrom, dateTo)}>
             Применить
-          </button>
+          </Button>
           {(dateFrom || dateTo) && (
-            <button onClick={() => { setDateFrom(''); setDateTo(''); loadSlots(1, '', ''); }}
-              className="px-3 py-1.5 text-xs text-gray-400 hover:text-gray-600 transition-colors">
+            <Button type="button" variant="ghost" size="sm" onClick={() => { setDateFrom(''); setDateTo(''); loadSlots(1, '', ''); }}>
               Сбросить
-            </button>
+            </Button>
           )}
         </div>
 
         {/* Bulk action bar */}
         {selectedIds.size > 0 && (
-          <div className="flex flex-wrap items-center gap-3 mb-3 px-3 py-2 bg-blue-50 border border-blue-200 rounded-xl text-sm">
-            <span className="text-blue-700 font-medium">{selectedIds.size} выбрано</span>
-            <input type="number" min={0} placeholder="Мест" value={bulkForm.available_seats}
-              onChange={(e) => setBulkForm((p) => ({ ...p, available_seats: e.target.value }))}
-              className="w-24 px-2 py-1 border border-blue-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
-            <input type="number" min={0} placeholder="Закрытие (мин)" value={bulkForm.booking_closes_minutes_before}
-              onChange={(e) => setBulkForm((p) => ({ ...p, booking_closes_minutes_before: e.target.value }))}
-              className="w-36 px-2 py-1 border border-blue-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
-            <button onClick={handleBulkSave} disabled={bulkSaving}
-              className="px-3 py-1 text-xs text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors">
+          <Panel tone="info" className="flex flex-wrap items-center gap-3 mb-3 px-3 py-2 text-sm">
+            <span className="text-aspectum-primary-hover font-medium">{selectedIds.size} выбрано</span>
+            <TextInput className="w-24" type="number" min={0} placeholder="Мест" value={bulkForm.available_seats} onChange={(e) => setBulkForm((p) => ({ ...p, available_seats: e.target.value }))} />
+            <TextInput className="w-36" type="number" min={0} placeholder="Закрытие (мин)" value={bulkForm.booking_closes_minutes_before} onChange={(e) => setBulkForm((p) => ({ ...p, booking_closes_minutes_before: e.target.value }))} />
+            <Button type="button" variant="primary" size="sm" onClick={handleBulkSave} disabled={bulkSaving}>
               {bulkSaving ? '…' : 'Применить'}
-            </button>
-            <button onClick={() => setSelectedIds(new Set())}
-              className="px-2 py-1 text-xs text-gray-500 hover:text-gray-700 transition-colors">Сбросить</button>
-            {bulkError && <span className="text-xs text-red-600">{bulkError}</span>}
-          </div>
+              </Button>
+            <Button type="button" variant="ghost" size="sm" onClick={() => setSelectedIds(new Set())}>Сбросить</Button>
+            {bulkError && <span className="text-xs text-aspectum-danger">{bulkError}</span>}
+          </Panel>
         )}
 
         {/* Table */}
-        <div className="overflow-x-auto rounded-xl border border-gray-200">
+        <DataTableSurface className="rounded-aspectum-card">
           <table className="w-full text-sm">
-            <thead className="bg-gray-50 text-xs text-gray-500 uppercase">
+            <thead className="bg-aspectum-surface-muted text-xs text-aspectum-text-muted uppercase">
               <tr>
                 <th className="px-3 py-2 text-center w-8">
-                  <input type="checkbox" checked={slots.length > 0 && selectedIds.size === slots.length}
+                <Checkbox checked={slots.length > 0 && selectedIds.size === slots.length}
                     onChange={toggleSelectAll}
-                    className="rounded border-gray-300 text-blue-600 focus:ring-blue-500" />
+                    className="rounded border-aspectum-border-strong text-aspectum-primary focus:ring-aspectum-focus" />
                 </th>
                 <th className="px-3 py-2 text-left">Дата и время</th>
                 <th className="px-3 py-2 text-right">Мест</th>
@@ -323,76 +314,68 @@ function SlotsManagerModal({ open, eventId, onClose, onChanged }) {
                 <th className="px-3 py-2 text-right"></th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-100">
+            <tbody className="divide-y divide-aspectum-border-subtle">
               {loading ? (
-                <tr><td colSpan={5} className="px-3 py-6 text-center text-gray-400">
-                  <Spinner /> Загрузка...
-                </td></tr>
+                <tr><InlineState as="td" colSpan={5} loading align="center" tone="disabled" className="px-3 py-6">Загрузка...</InlineState></tr>
               ) : slots.length === 0 ? (
-                <tr><td colSpan={5} className="px-3 py-6 text-center text-gray-400 text-sm">Слотов не найдено</td></tr>
+                <tr><td colSpan={5} className="px-3 py-6 text-center text-aspectum-text-disabled text-sm">Слотов не найдено</td></tr>
               ) : slots.map((slot) => {
                 const isEditing = editingId === slot.id;
                 const isSaving = saving === slot.id;
                 const err = rowError[slot.id];
                 return (
-                  <tr key={slot.id} className={`hover:bg-gray-50 ${!slot.is_active ? 'opacity-50' : ''} ${selectedIds.has(slot.id) ? 'bg-blue-50' : ''}`}>
+                  <tr key={slot.id} className={`hover:bg-aspectum-surface-muted ${!slot.is_active ? 'opacity-50' : ''} ${selectedIds.has(slot.id) ? 'bg-aspectum-primary-soft' : ''}`}>
                     <td className="px-3 py-2 text-center">
-                      <input type="checkbox" checked={selectedIds.has(slot.id)}
+                      <Checkbox checked={selectedIds.has(slot.id)}
                         onChange={() => toggleSelect(slot.id)}
-                        className="rounded border-gray-300 text-blue-600 focus:ring-blue-500" />
+                        className="rounded border-aspectum-border-strong text-aspectum-primary focus:ring-aspectum-focus" />
                     </td>
-                    <td className="px-3 py-2 font-mono text-xs text-gray-700 whitespace-nowrap">
+                    <td className="px-3 py-2 font-mono text-xs text-aspectum-text-strong whitespace-nowrap">
                       {isEditing
-                        ? <input type="datetime-local" value={editForm.slot_datetime ?? ''}
-                            onChange={(e) => setEditForm((p) => ({ ...p, slot_datetime: e.target.value }))}
-                            className="px-2 py-1 border border-blue-300 rounded text-xs focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                        ? <TextInput type="datetime-local" value={editForm.slot_datetime ?? ''} onChange={(e) => setEditForm((p) => ({ ...p, slot_datetime: e.target.value }))} />
                         : fmtSlot(slot.slot_datetime)
                       }
                     </td>
                     <td className="px-3 py-2 text-right">
                       {isEditing
-                        ? <input type="number" min={0} value={editForm.available_seats} onChange={(e) => setEditForm((p) => ({ ...p, available_seats: e.target.value }))}
-                            className="w-20 px-2 py-1 border border-blue-300 rounded text-sm text-right focus:outline-none focus:ring-2 focus:ring-blue-500" />
-                        : <span className="text-gray-700">{slot.available_seats}</span>
+                        ? <TextInput className="w-20 text-right" type="number" min={0} value={editForm.available_seats} onChange={(e) => setEditForm((p) => ({ ...p, available_seats: e.target.value }))} />
+                        : <span className="text-aspectum-text-strong">{slot.available_seats}</span>
                       }
                     </td>
                     <td className="px-3 py-2 text-right">
                       {isEditing
-                        ? <input type="number" min={0} value={editForm.booking_closes_minutes_before} onChange={(e) => setEditForm((p) => ({ ...p, booking_closes_minutes_before: e.target.value }))}
-                            className="w-20 px-2 py-1 border border-blue-300 rounded text-sm text-right focus:outline-none focus:ring-2 focus:ring-blue-500" />
-                        : <span className="text-gray-700">{slot.booking_closes_minutes_before}</span>
+                        ? <TextInput className="w-20 text-right" type="number" min={0} value={editForm.booking_closes_minutes_before} onChange={(e) => setEditForm((p) => ({ ...p, booking_closes_minutes_before: e.target.value }))} />
+                        : <span className="text-aspectum-text-strong">{slot.booking_closes_minutes_before}</span>
                       }
                     </td>
                     <td className="px-3 py-2 text-center">
-                      <button onClick={() => handleToggle(slot)} disabled={isSaving}
-                        className={`relative w-8 h-4 rounded-full transition-colors focus:outline-none disabled:opacity-50 ${slot.is_active ? 'bg-green-500' : 'bg-gray-300'}`}>
-                        <span className={`absolute top-0.5 w-3 h-3 bg-white rounded-full shadow transition-all ${slot.is_active ? 'left-4' : 'left-0.5'}`} />
-                      </button>
+                      <Switch
+                        checked={Boolean(slot.is_active)}
+                        disabled={isSaving}
+                        aria-label={slot.is_active ? 'Деактивировать слот' : 'Активировать слот'}
+                        onChange={() => handleToggle(slot)}
+                      />
                     </td>
                     <td className="px-3 py-2 text-right">
                       <div className="flex items-center justify-end gap-1">
-                        {err && <span className="text-xs text-red-500 mr-1">{err}</span>}
+                        {err && <span className="text-xs text-aspectum-danger-subtle mr-1">{err}</span>}
                         {isEditing ? (
                           <>
-                            <button onClick={() => handleSaveEdit(slot)} disabled={isSaving}
-                              className="px-2 py-1 text-xs text-white bg-blue-600 rounded hover:bg-blue-700 disabled:opacity-50 transition-colors">
+                            <Button type="button" variant="primary" size="sm" onClick={() => handleSaveEdit(slot)} disabled={isSaving}>
                               {isSaving ? '…' : 'OK'}
-                            </button>
-                            <button onClick={() => setEditingId(null)}
-                              className="px-2 py-1 text-xs text-gray-500 bg-gray-100 rounded hover:bg-gray-200 transition-colors">
+                            </Button>
+                            <Button type="button" variant="secondary" size="sm" onClick={() => setEditingId(null)}>
                               ✕
-                            </button>
+                            </Button>
                           </>
                         ) : (
                           <>
-                            <button onClick={() => openEdit(slot)} disabled={!!saving}
-                              className="px-2 py-1 text-xs text-blue-600 bg-blue-50 rounded hover:bg-blue-100 disabled:opacity-40 transition-colors">
+                            <Button type="button" variant="soft" size="sm" onClick={() => openEdit(slot)} disabled={!!saving}>
                               Ред.
-                            </button>
-                            <button onClick={() => setDeleteTarget(slot)} disabled={!!saving}
-                              className="px-2 py-1 text-xs text-red-500 bg-red-50 rounded hover:bg-red-100 disabled:opacity-40 transition-colors">
+                            </Button>
+                            <Button type="button" variant="softDanger" size="sm" onClick={() => setDeleteTarget(slot)} disabled={!!saving}>
                               Удалить
-                            </button>
+                            </Button>
                           </>
                         )}
                       </div>
@@ -402,17 +385,15 @@ function SlotsManagerModal({ open, eventId, onClose, onChanged }) {
               })}
             </tbody>
           </table>
-        </div>
+        </DataTableSurface>
 
         {/* Pagination */}
         {totalPages > 1 && (
-          <div className="flex items-center justify-between mt-3 text-sm text-gray-500">
+          <div className="flex items-center justify-between mt-3 text-sm text-aspectum-text-muted">
             <span>Страница {page} из {totalPages} · всего {total}</span>
             <div className="flex gap-1">
-              <button onClick={() => loadSlots(page - 1)} disabled={page <= 1 || loading}
-                className="px-3 py-1 rounded-md bg-gray-100 hover:bg-gray-200 disabled:opacity-40 transition-colors">←</button>
-              <button onClick={() => loadSlots(page + 1)} disabled={page >= totalPages || loading}
-                className="px-3 py-1 rounded-md bg-gray-100 hover:bg-gray-200 disabled:opacity-40 transition-colors">→</button>
+              <Button type="button" variant="secondary" size="sm" onClick={() => loadSlots(page - 1)} disabled={page <= 1 || loading}>←</Button>
+              <Button type="button" variant="secondary" size="sm" onClick={() => loadSlots(page + 1)} disabled={page >= totalPages || loading}>→</Button>
             </div>
           </div>
         )}
@@ -471,6 +452,7 @@ export default function BookingSetupWorkbenchPage() {
   const [ttError, setTtError] = useState('');
   const [ttOk, setTtOk] = useState('');
   const [editingTt, setEditingTt] = useState(null); // tt object being edited
+  const [deleteTtTarget, setDeleteTtTarget] = useState(null);
   const [editTtForm, setEditTtForm] = useState({ name_ru: '', code: '', sort_order: 0 });
   const [editTtSaving, setEditTtSaving] = useState(false);
   const [editTtError, setEditTtError] = useState('');
@@ -789,7 +771,7 @@ export default function BookingSetupWorkbenchPage() {
   }, [eventId, loadAll]);
   useEffect(() => {
     if (eventTicketTypes.length) loadPricingData(eventId, eventTicketTypes, priceCurrency);
-  }, [eventTicketTypes, eventId, loadPricingData]);
+  }, [eventTicketTypes, eventId, loadPricingData, priceCurrency]);
   useEffect(() => {
     if (eventId && eventTicketTypes.length) {
       loadPricePreview(eventId, allActiveSlots, eventTicketTypes);
@@ -1066,10 +1048,11 @@ export default function BookingSetupWorkbenchPage() {
     finally { setTtSaving(false); }
   };
 
-  const handleDeleteTt = async (tt) => {
-    if (!confirm(`Удалить тип «${getTicketTypeLabel(tt)}»?`)) return;
+  const handleDeleteTt = async () => {
+    if (!deleteTtTarget) return;
     try {
-      await ticketTypesAPI.delete(tt.id);
+      await ticketTypesAPI.delete(deleteTtTarget.id);
+      setDeleteTtTarget(null);
       await loadTicketTypes(eventId);
     } catch (err) { setTtError(parseApiError(err, 'Ошибка удаления типа билета')); setShowTtForm(true); }
   };
@@ -1214,29 +1197,25 @@ export default function BookingSetupWorkbenchPage() {
 
   return (
     <Layout>
-      <div className="space-y-4 max-w-4xl">
+      <PageContainer maxWidth="wide" spacing="md">
 
         {/* Event selector */}
-        <div className="bg-white rounded-xl border border-gray-200 p-4">
-          <h1 className="text-xl font-bold text-gray-900 mb-3">Настройка продаж</h1>
+        <Panel className="p-4">
+          <PageHeader title="Настройка продаж" titleSize="compact" spacing="sm" />
           {eventsError && (
             <div className="mb-3 flex items-center gap-2">
               <Err msg={eventsError} />
-              <button onClick={reloadEvents} className="text-xs text-blue-600 hover:underline">Повторить</button>
+              <Button type="button" variant="link" size="sm" onClick={reloadEvents}>Повторить</Button>
             </div>
           )}
           <div className="mb-3">
             <Field label="Город">
-              <select
-                value={cityFilter}
-                onChange={(e) => setCityFilter(e.target.value)}
-                className="w-full md:w-96 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none"
-              >
+              <Select className="md:w-96" value={cityFilter} onChange={(e) => setCityFilter(e.target.value)}>
                 <option value="">— Все города —</option>
                 {cityOptions.map((city) => (
                   <option key={city.id} value={city.id}>{city.label}</option>
                 ))}
-              </select>
+              </Select>
             </Field>
           </div>
           <EventSelect
@@ -1245,29 +1224,29 @@ export default function BookingSetupWorkbenchPage() {
             options={filteredEventOptions}
             disabled={eventsLoading}
             placeholder={eventsLoading ? 'Загрузка…' : (cityFilter ? '— Выберите событие в городе —' : '— Выберите событие —')}
-            className={`w-full md:w-96 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none ${eventsLoading ? 'opacity-60 cursor-wait' : ''}`}
+            className={`md:w-96 ${eventsLoading ? 'opacity-60 cursor-wait' : ''}`}
           />
 
           {eventId && (
             <div className="mt-3 flex flex-wrap gap-3 text-sm">
-              <span className="px-3 py-1 bg-blue-50 text-blue-700 rounded-full">
+              <span className="px-3 py-1 bg-aspectum-primary-soft text-aspectum-primary-hover rounded-full">
                 {ttLoading ? '…' : eventTicketTypes.length} типов билетов
               </span>
-              <span className="px-3 py-1 bg-amber-50 text-amber-700 rounded-full">
+              <span className="px-3 py-1 bg-aspectum-warning-soft text-aspectum-warning-strong rounded-full">
                 {basePricesLoading
                   ? '…'
                   : `${savedBaseForUsed}/${usedTicketTypeIdsInOpenSlots.size || '?'}`} в БД
               </span>
-              <span className="px-3 py-1 bg-purple-50 text-purple-700 rounded-full">
+              <span className="px-3 py-1 bg-aspectum-purple-soft text-aspectum-purple-strong rounded-full">
                 {slotsLoading ? '…' : `${openSlots.length} откр. слотов`}
               </span>
               {dirtyPriceCount > 0 && (
-                <span className="px-3 py-1 bg-sky-50 text-sky-700 rounded-full">
+                <span className="px-3 py-1 bg-aspectum-info-soft text-aspectum-info-strong rounded-full">
                   {dirtyPriceCount} черновик(ов)
                 </span>
               )}
               {allPricesSaved && (
-                <span className="px-3 py-1 bg-emerald-50 text-emerald-700 rounded-full">цены в БД</span>
+                <span className="px-3 py-1 bg-aspectum-success-soft text-aspectum-success-strong rounded-full">цены в БД</span>
               )}
             </div>
           )}
@@ -1282,10 +1261,10 @@ export default function BookingSetupWorkbenchPage() {
               }}
             />
           )}
-        </div>
+        </Panel>
 
         {!eventId && (
-          <div className="text-sm text-gray-400 text-center py-8">Выберите событие чтобы начать настройку</div>
+          <EmptyState icon={null} title="Выберите событие, чтобы начать настройку" spacing="md" />
         )}
 
         {eventId && (
@@ -1295,47 +1274,49 @@ export default function BookingSetupWorkbenchPage() {
               title="Типы билетов"
               badge={eventTicketTypes.length}
               action={
-                <button
-                  onClick={() => setShowTtForm((v) => !v)}
-                  className="px-3 py-1 text-xs font-medium text-blue-600 bg-blue-50 rounded-md hover:bg-blue-100 transition-colors"
-                >
+                <Button type="button" variant="soft" size="sm" onClick={() => setShowTtForm((v) => !v)}>
                   {showTtForm ? 'Скрыть' : '+ Добавить'}
-                </button>
+                </Button>
               }
             >
               {ttLoading ? (
-                <div className="flex items-center gap-2 text-sm text-gray-400"><Spinner /> Загрузка...</div>
+                <InlineState loading tone="disabled">Загрузка...</InlineState>
               ) : ttLoadError ? (
                 <div className="flex items-center gap-2">
                   <Err msg={ttLoadError} />
-                  <button onClick={() => loadTicketTypes(eventId)} className="text-xs text-blue-600 hover:underline">Повторить</button>
+                  <Button type="button" variant="link" size="sm" onClick={() => loadTicketTypes(eventId)}>Повторить</Button>
                 </div>
               ) : (
                 <div className="flex flex-wrap gap-2">
                   {eventTicketTypes.map((tt) => (
-                    <div key={tt.id} className="flex items-center gap-1.5 px-3 py-1.5 bg-gray-100 rounded-lg text-sm">
-                      <span className="font-medium text-gray-800">{getTicketTypeLabel(tt)}</span>
-                      {tt.code && <span className="font-mono text-xs text-gray-400">({tt.code})</span>}
+                    <div key={tt.id} className="flex items-center gap-1.5 px-3 py-1.5 bg-aspectum-surface-subtle rounded-aspectum-control text-sm">
+                      <span className="font-medium text-aspectum-text-emphasis">{getTicketTypeLabel(tt)}</span>
+                      {tt.code && <span className="font-mono text-xs text-aspectum-text-disabled">({tt.code})</span>}
                       <>
-                        <button
+                        <IconButton
+                          label="Редактировать тип билета"
+                          type="button"
                           onClick={() => openEditTt(tt)}
-                          className="text-gray-300 hover:text-blue-500 transition-colors ml-0.5 text-xs"
-                          title="Редактировать"
+                          variant="ghostPrimary"
+                          size="iconXs"
+                          className="ml-0.5"
                         >
                           ✎
-                        </button>
-                        <button
-                          onClick={() => handleDeleteTt(tt)}
-                          className="text-gray-300 hover:text-red-500 transition-colors text-xs"
-                          title="Удалить"
+                        </IconButton>
+                        <IconButton
+                          label="Удалить тип билета"
+                          type="button"
+                          onClick={() => setDeleteTtTarget(tt)}
+                          variant="ghostDanger"
+                          size="iconXs"
                         >
                           ✕
-                        </button>
+                        </IconButton>
                       </>
                     </div>
                   ))}
                   {!eventTicketTypes.length && (
-                    <p className="text-sm text-gray-400">
+                    <p className="text-sm text-aspectum-text-disabled">
                       Типы не найдены для этого события. Если раньше был авто-purge — проверьте глобальный каталог в админке или создайте тип вручную.
                     </p>
                   )}
@@ -1343,7 +1324,7 @@ export default function BookingSetupWorkbenchPage() {
               )}
 
               {showTtForm && (
-                <form onSubmit={handleCreateTt} className="mt-4 pt-4 border-t border-gray-100 grid grid-cols-1 md:grid-cols-4 gap-3">
+                <form onSubmit={handleCreateTt} className="mt-4 pt-4 border-t border-aspectum-border-subtle grid grid-cols-1 md:grid-cols-4 gap-3">
                   <Field label="Название (RU)" required>
                     <TextInput value={ttForm.name_ru} onChange={(e) => setTtForm((p) => ({ ...p, name_ru: e.target.value }))} placeholder="Взрослый" required />
                   </Field>
@@ -1357,9 +1338,9 @@ export default function BookingSetupWorkbenchPage() {
                     <TextInput type="number" min={0} value={ttForm.sort_order} onChange={(e) => setTtForm((p) => ({ ...p, sort_order: +e.target.value || 0 }))} />
                   </Field>
                   <div className="md:col-span-4 flex items-center gap-3">
-                    <button type="submit" disabled={ttSaving} className="px-4 py-2 text-sm text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors">
+                    <Button type="submit" variant="primary" size="md" disabled={ttSaving}>
                       {ttSaving ? 'Создание…' : 'Создать тип'}
-                    </button>
+                    </Button>
                     <Err msg={ttError} />
                     <Ok msg={ttOk} />
                   </div>
@@ -1373,13 +1354,13 @@ export default function BookingSetupWorkbenchPage() {
               badge={usedTicketTypeIdsInOpenSlots.size ? `${savedBaseForUsed}/${usedTicketTypeIdsInOpenSlots.size}` : '…'}
             >
               <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
-                <p className="text-xs text-gray-500">
+                <p className="text-xs text-aspectum-text-muted">
                   Базовая цена действует на все слоты. Правила и цены на слоте перебивают базовую.
                 </p>
                 {eventId && (
                   <Link
                     to={`/catalog/pricing-rules${eventId ? `?event=${eventId}` : ''}`}
-                    className="text-xs text-blue-600 hover:underline whitespace-nowrap"
+                    className="text-xs text-aspectum-primary hover:underline whitespace-nowrap"
                   >
                     {pricingRulesLoading
                       ? 'Правила…'
@@ -1397,9 +1378,9 @@ export default function BookingSetupWorkbenchPage() {
               />
 
               {basePricesLoading ? (
-                <div className="flex items-center gap-2 text-sm text-gray-400 mt-3"><Spinner /> Загрузка цен...</div>
+                <InlineState loading tone="disabled" className="mt-3">Загрузка цен...</InlineState>
               ) : !eventTicketTypes.length ? (
-                <p className="text-sm text-gray-400 mt-3">Добавьте типы билетов, чтобы настроить цены</p>
+                <p className="text-sm text-aspectum-text-disabled mt-3">Добавьте типы билетов, чтобы настроить цены</p>
               ) : (
                 <form id="price-form" onSubmit={handleSaveAllPrices} className="space-y-4 mt-3">
                   <div className="flex flex-wrap items-end gap-3">
@@ -1439,21 +1420,23 @@ export default function BookingSetupWorkbenchPage() {
                               }
                             }}
                           />
-                          <button
+                          <Button
                             type="button"
+                            variant="secondary"
+                            size="sm"
                             onClick={() => applyUniformPrice(uniformPrice)}
-                            className="px-3 py-2 text-xs font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 whitespace-nowrap"
+                            className="whitespace-nowrap"
                           >
                             Применить
-                          </button>
+                          </Button>
                         </div>
                       </Field>
                     </div>
                   </div>
 
-                  <div className="overflow-x-auto rounded-xl border border-gray-200">
+                  <DataTableSurface className="rounded-aspectum-card">
                     <table className="w-full text-sm">
-                      <thead className="bg-gray-50 text-xs text-gray-500 uppercase">
+                      <thead className="bg-aspectum-surface-muted text-xs text-aspectum-text-muted uppercase">
                         <tr>
                           <th className="px-3 py-2 text-left">Тип билета</th>
                           <th className="px-3 py-2 text-right w-36">Цена</th>
@@ -1461,7 +1444,7 @@ export default function BookingSetupWorkbenchPage() {
                           <th className="px-3 py-2 text-right w-20" />
                         </tr>
                       </thead>
-                      <tbody className="divide-y divide-gray-100">
+                      <tbody className="divide-y divide-aspectum-border-subtle">
                         {eventTicketTypes.map((tt) => {
                           const id = String(tt.id);
                           const row = priceByType[id] || {};
@@ -1475,10 +1458,10 @@ export default function BookingSetupWorkbenchPage() {
                             slotOnlyCount: countSlotOnlyPrices(slotPricesList, id, !!savedBase),
                           });
                           return (
-                            <tr key={id} className={`hover:bg-gray-50 ${isDirty ? 'bg-sky-50/40' : ''}`}>
+                            <tr key={id} className={`hover:bg-aspectum-surface-muted ${isDirty ? 'bg-aspectum-info-soft/40' : ''}`}>
                               <td className="px-3 py-2">
-                                <div className="font-medium text-gray-800">{getTicketTypeLabel(tt)}</div>
-                                {tt.code && <div className="text-xs text-gray-400 font-mono">{tt.code}</div>}
+                                <div className="font-medium text-aspectum-text-emphasis">{getTicketTypeLabel(tt)}</div>
+                                {tt.code && <div className="text-xs text-aspectum-text-disabled font-mono">{tt.code}</div>}
                               </td>
                               <td className="px-3 py-2">
                                 <TextInput
@@ -1496,22 +1479,23 @@ export default function BookingSetupWorkbenchPage() {
                                 <PriceStatusBadge status={status} />
                               </td>
                               <td className="px-3 py-2 text-right">
-                                <button
+                                <Button
                                   type="button"
+                                  variant="link"
+                                  size="sm"
                                   disabled={savingRowId === id || !isDirty}
                                   onClick={() => saveRowPrice(id)}
-                                  className="text-xs text-blue-600 hover:underline disabled:opacity-40 disabled:no-underline"
                                   title="Сохранить базовую цену"
                                 >
                                   {savingRowId === id ? '…' : '✓'}
-                                </button>
+                                </Button>
                               </td>
                             </tr>
                           );
                         })}
                       </tbody>
                     </table>
-                  </div>
+                  </DataTableSurface>
 
                   <SlotPriceOverrideMatrix
                     slots={openSlots}
@@ -1523,35 +1507,36 @@ export default function BookingSetupWorkbenchPage() {
                     savingKey={matrixSavingKey}
                   />
 
-                  <label className="flex items-start gap-2 text-sm text-gray-600 cursor-pointer">
-                    <input
-                      type="checkbox"
+                  <FormLabel  size="sm" tone="subtle" interactive  layout="start">
+                    <Checkbox
                       checked={assignSlotPrices}
                       onChange={(e) => setAssignSlotPrices(e.target.checked)}
-                      className="mt-0.5 rounded border-gray-300 text-blue-600"
+                      className="mt-0.5 rounded border-aspectum-border-strong text-aspectum-primary"
                     />
                     <span>
                       При «Сохранить все» — дополнительно зафиксировать на каждом слоте
-                      <span className="block text-xs text-gray-400">Обычно не нужно: базовой цены достаточно</span>
+                      <span className="block text-xs text-aspectum-text-disabled">Обычно не нужно: базовой цены достаточно</span>
                     </span>
-                  </label>
+                  </FormLabel>
 
                   <div className="flex flex-wrap items-center gap-3">
-                    <button
+                    <Button
                       type="button"
+                      variant="soft"
+                      size="md"
                       onClick={handleSaveChangedPrices}
                       disabled={priceSaving || dirtyPriceCount === 0}
-                      className="px-4 py-2.5 text-sm font-medium text-blue-700 bg-blue-50 rounded-lg hover:bg-blue-100 disabled:opacity-50 transition-colors"
                     >
                       {priceSaving ? 'Сохранение…' : `Сохранить изменённые (${dirtyPriceCount})`}
-                    </button>
-                    <button
+                    </Button>
+                    <Button
                       type="submit"
+                      variant="primary"
+                      size="md"
                       disabled={priceSaving || !eventTicketTypes.length}
-                      className="px-5 py-2.5 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors"
                     >
                       {priceSaving ? 'Сохранение…' : 'Сохранить все типы'}
-                    </button>
+                    </Button>
                     <Err msg={priceError} />
                     <Ok msg={priceOk} />
                   </div>
@@ -1566,50 +1551,44 @@ export default function BookingSetupWorkbenchPage() {
               action={
                 <div className="flex gap-2">
                   {slotsTotal > 0 && (
-                    <button
-                      onClick={() => setShowSlotsManager(true)}
-                      className="px-3 py-1 text-xs font-medium text-gray-600 bg-gray-100 rounded-md hover:bg-gray-200 transition-colors"
-                    >
+                    <Button type="button" variant="secondary" size="sm" onClick={() => setShowSlotsManager(true)}>
                       Управлять
-                    </button>
+                    </Button>
                   )}
-                  <button
-                    onClick={() => setShowSlotForm((v) => !v)}
-                    className="px-3 py-1 text-xs font-medium text-purple-600 bg-purple-50 rounded-md hover:bg-purple-100 transition-colors"
-                  >
+                  <Button type="button" variant="softPurple" size="sm" onClick={() => setShowSlotForm((v) => !v)}>
                     {showSlotForm ? 'Скрыть' : '+ Добавить'}
-                  </button>
+                  </Button>
                 </div>
               }
             >
               {slotsLoading ? (
-                <div className="flex items-center gap-2 text-sm text-gray-400"><Spinner /> Загрузка...</div>
+                <InlineState loading tone="disabled">Загрузка...</InlineState>
               ) : recentSlots.length ? (
                 <div className="space-y-1">
                   {recentSlots.map((s) => (
-                    <div key={s.id} className="text-sm text-gray-600">
+                    <div key={s.id} className="text-sm text-aspectum-text-subtle">
                       {new Date(s.slot_datetime).toLocaleString('ru-RU', { day: '2-digit', month: '2-digit', year: '2-digit', hour: '2-digit', minute: '2-digit' })}
-                      <span className="text-gray-400 ml-2">· {s.available_seats} мест</span>
+                      <span className="text-aspectum-text-disabled ml-2">· {s.available_seats} мест</span>
                     </div>
                   ))}
-                  {slotsTotal > 5 && <p className="text-xs text-gray-400">…и ещё {slotsTotal - 5}</p>}
+                  {slotsTotal > 5 && <p className="text-xs text-aspectum-text-disabled">…и ещё {slotsTotal - 5}</p>}
                 </div>
               ) : (
-                <p className="text-sm text-gray-400">Слотов нет — добавьте первый</p>
+                <p className="text-sm text-aspectum-text-disabled">Слотов нет — добавьте первый</p>
               )}
               {showSlotForm && (
-                <form onSubmit={handleCreateSlots} className="mt-4 pt-4 border-t border-gray-100 space-y-3">
+                <form onSubmit={handleCreateSlots} className="mt-4 pt-4 border-t border-aspectum-border-subtle space-y-3">
                   <div className="flex flex-wrap gap-2">
-                    {[['interval', 'Интервал'], ['schedule', 'Расписание'], ['list', 'Список дат']].map(([m, l]) => (
-                      <button key={m} type="button" onClick={() => setSlotMode(m)}
-                        className={`px-3 py-1.5 text-xs rounded-lg border transition-colors ${slotMode === m ? 'bg-purple-50 border-purple-300 text-purple-700' : 'bg-white border-gray-200 text-gray-600 hover:bg-gray-50'}`}>
-                        {l}
-                      </button>
-                    ))}
+                    <SegmentedControl
+                      ariaLabel="Режим создания слотов"
+                      value={slotMode}
+                      onChange={setSlotMode}
+                      items={[['interval', 'Интервал'], ['schedule', 'Расписание'], ['list', 'Список дат']].map(([id, label]) => ({ id, label }))}
+                    />
                   </div>
 
                   {slotMode === 'interval' && (
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                    <div className={formGridClassName({ columns: 3 })}>
                       <Field label="Начало" required><TextInput type="datetime-local" value={slotForm.start_datetime} onChange={(e) => setSlotForm((p) => ({ ...p, start_datetime: e.target.value }))} required /></Field>
                       <Field label="Конец" required><TextInput type="datetime-local" value={slotForm.end_datetime} onChange={(e) => setSlotForm((p) => ({ ...p, end_datetime: e.target.value }))} required /></Field>
                       <Field label="Шаг (мин)"><TextInput type="number" min={1} value={slotForm.step_minutes} onChange={(e) => setSlotForm((p) => ({ ...p, step_minutes: +e.target.value || 60 }))} /></Field>
@@ -1618,7 +1597,7 @@ export default function BookingSetupWorkbenchPage() {
 
                   {slotMode === 'schedule' && (
                     <div className="space-y-3">
-                      <div className="grid grid-cols-2 gap-3">
+                      <div className={formGridClassName({ responsive: false })}>
                         <Field label="С даты" required><TextInput type="date" value={slotForm.schedule_start_date} onChange={(e) => setSlotForm((p) => ({ ...p, schedule_start_date: e.target.value }))} required /></Field>
                         <Field label="По дату" required><TextInput type="date" value={slotForm.schedule_end_date} onChange={(e) => setSlotForm((p) => ({ ...p, schedule_end_date: e.target.value }))} required /></Field>
                       </div>
@@ -1630,31 +1609,30 @@ export default function BookingSetupWorkbenchPage() {
                             ['Все', { mon:true, tue:true, wed:true, thu:true, fri:true, sat:true, sun:true }],
                             ['Сбросить', { mon:false, tue:false, wed:false, thu:false, fri:false, sat:false, sun:false }],
                           ].map(([label, days]) => (
-                            <button key={label} type="button"
+                            <Button key={label} type="button" variant="outline" size="sm"
                               onClick={() => setSlotForm((p) => ({ ...p, schedule_days: days }))}
-                              className="px-2 py-1 text-xs rounded border border-gray-200 bg-gray-50 text-gray-600 hover:bg-gray-100 transition-colors">
+                            >
                               {label}
-                            </button>
+                            </Button>
                           ))}
                         </div>
                         <div className="flex flex-wrap gap-3">
                           {[['mon','Пн'],['tue','Вт'],['wed','Ср'],['thu','Чт'],['fri','Пт'],['sat','Сб'],['sun','Вс']].map(([k,l]) => (
-                            <label key={k} className="flex items-center gap-1.5 text-sm text-gray-700 cursor-pointer">
-                              <input type="checkbox" checked={!!slotForm.schedule_days[k]} onChange={(e) => setSlotForm((p) => ({ ...p, schedule_days: { ...p.schedule_days, [k]: e.target.checked } }))} />
+                            <FormLabel key={k}  layout="rowTight" size="sm" tone="strong" interactive>
+                              <Checkbox checked={!!slotForm.schedule_days[k]} onChange={(e) => setSlotForm((p) => ({ ...p, schedule_days: { ...p.schedule_days, [k]: e.target.checked } }))} />
                               {l}
-                            </label>
+                            </FormLabel>
                           ))}
                         </div>
                       </div>
                       <Field label="Время (HH:mm, по строке)" required>
-                        <textarea rows={3} value={slotForm.schedule_times_text} onChange={(e) => setSlotForm((p) => ({ ...p, schedule_times_text: e.target.value }))}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm font-mono focus:ring-2 focus:ring-blue-500 outline-none" required />
+                        <Textarea className="font-mono" rows={3} value={slotForm.schedule_times_text} onChange={(e) => setSlotForm((p) => ({ ...p, schedule_times_text: e.target.value }))} required />
                         {(() => {
                           const bad = slotForm.schedule_times_text.split('\n')
                             .map((l, i) => ({ l: l.trim(), i: i + 1 }))
                             .filter(({ l }) => l && !/^([01]\d|2[0-3]):([0-5]\d)$/.test(l));
                           return bad.length > 0 ? (
-                            <p className="text-xs text-red-600 mt-1">
+                            <p className="text-xs text-aspectum-danger mt-1">
                               Неверный формат в строках: {bad.map(({ l, i }) => `${i} («${l}»)`).join(', ')}
                             </p>
                           ) : null;
@@ -1665,12 +1643,11 @@ export default function BookingSetupWorkbenchPage() {
 
                   {slotMode === 'list' && (
                     <Field label="Даты/время по строке" required>
-                      <textarea rows={4} value={slotForm.datetimes_text} onChange={(e) => setSlotForm((p) => ({ ...p, datetimes_text: e.target.value }))}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm font-mono focus:ring-2 focus:ring-blue-500 outline-none" placeholder="2026-06-01 10:00" required />
+                      <Textarea className="font-mono" rows={4} value={slotForm.datetimes_text} onChange={(e) => setSlotForm((p) => ({ ...p, datetimes_text: e.target.value }))} placeholder="2026-06-01 10:00" required />
                     </Field>
                   )}
 
-                  <div className="grid grid-cols-2 gap-3">
+                  <div className={formGridClassName({ responsive: false })}>
                     <Field label="Кол-во мест" hint="Общий пул на слот — делится между всеми выбранными типами билетов ниже."><TextInput type="number" min={0} value={slotForm.available_seats} onChange={(e) => setSlotForm((p) => ({ ...p, available_seats: +e.target.value || 0 }))} /></Field>
                     <Field label="Закрытие брони (мин до)"><TextInput type="number" min={0} value={slotForm.booking_closes_minutes_before} onChange={(e) => setSlotForm((p) => ({ ...p, booking_closes_minutes_before: +e.target.value || 0 }))} /></Field>
                   </div>
@@ -1681,25 +1658,27 @@ export default function BookingSetupWorkbenchPage() {
                     hint="Только глобальные типы — событийные (устаревшие) недоступны для слотов, так как их не видят покупатели."
                   >
                     {!globalEventTicketTypes.length ? (
-                      <p className="text-sm text-gray-400">Сначала добавьте глобальный тип билета для события</p>
+                      <p className="text-sm text-aspectum-text-disabled">Сначала добавьте глобальный тип билета для события</p>
                     ) : (
                       <div className="space-y-2">
                         <div className="flex flex-wrap gap-2">
-                          <button
+                          <Button
                             type="button"
+                            variant="outline"
+                            size="sm"
                             onClick={() => setSlotForm((p) => ({ ...p, ticket_type_ids: globalEventTicketTypes.map((tt) => String(tt.id)) }))}
-                            className="px-2 py-1 text-xs rounded border border-gray-200 bg-gray-50 hover:bg-gray-100"
                           >
                             Выбрать все
-                          </button>
-                          <button
+                          </Button>
+                          <Button
                             type="button"
+                            variant="outline"
+                            size="sm"
                             onClick={() => setSlotForm((p) => ({ ...p, ticket_type_ids: [] }))}
-                            className="px-2 py-1 text-xs rounded border border-gray-200 bg-gray-50 hover:bg-gray-100"
                           >
                             Снять выбор
-                          </button>
-                          <span className="text-xs text-gray-500 self-center">
+                          </Button>
+                          <span className="text-xs text-aspectum-text-muted self-center">
                             Выбрано: {slotForm.ticket_type_ids?.length || 0} из {globalEventTicketTypes.length}
                           </span>
                         </div>
@@ -1708,9 +1687,8 @@ export default function BookingSetupWorkbenchPage() {
                             const id = String(tt.id);
                             const checked = (slotForm.ticket_type_ids || []).includes(id);
                             return (
-                              <label key={id} className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg border text-sm cursor-pointer transition-colors ${checked ? 'bg-purple-50 border-purple-300 text-purple-800' : 'bg-white border-gray-200 text-gray-600 hover:bg-gray-50'}`}>
-                                <input
-                                  type="checkbox"
+                              <FormLabel key={id} className={`flex items-center gap-1.5 px-2.5 py-1 rounded-aspectum-control border text-sm cursor-pointer transition-colors ${checked ? 'bg-aspectum-purple-soft border-aspectum-purple-border-strong text-aspectum-purple-emphasis' : 'bg-aspectum-surface border-aspectum-border text-aspectum-text-subtle hover:bg-aspectum-surface-muted'}`}>
+                                <Checkbox
                                   checked={checked}
                                   onChange={(e) => {
                                     setSlotForm((p) => {
@@ -1721,10 +1699,10 @@ export default function BookingSetupWorkbenchPage() {
                                       return { ...p, ticket_type_ids: curr.filter((x) => x !== id) };
                                     });
                                   }}
-                                  className="rounded border-gray-300 text-purple-600"
+                                  className="rounded border-aspectum-border-strong text-aspectum-purple"
                                 />
                                 {getTicketTypeLabel(tt)}
-                              </label>
+                              </FormLabel>
                             );
                           })}
                         </div>
@@ -1732,23 +1710,22 @@ export default function BookingSetupWorkbenchPage() {
                     )}
                   </Field>
 
-                  <label className="flex items-center gap-2 text-sm text-gray-700 cursor-pointer">
-                    <input
-                      type="checkbox"
+                  <FormLabel  layout="row" size="sm" tone="strong" interactive>
+                    <Checkbox
                       checked={!!slotForm.also_create_prices}
                       onChange={(e) => setSlotForm((p) => ({ ...p, also_create_prices: e.target.checked }))}
-                      className="rounded border-gray-300 text-purple-600"
+                      className="rounded border-aspectum-border-strong text-aspectum-purple"
                     />
                     <span>
                       Сразу сохранить цены из раздела «Цены» на новые слоты
-                      <span className="block text-xs text-gray-400">По умолчанию выкл. — для приложения достаточно базовых цен</span>
+                      <span className="block text-xs text-aspectum-text-disabled">По умолчанию выкл. — для приложения достаточно базовых цен</span>
                     </span>
-                  </label>
+                  </FormLabel>
 
                   <div className="flex items-center gap-3">
-                    <button type="submit" disabled={slotSaving} className="px-4 py-2 text-sm text-white bg-purple-600 rounded-lg hover:bg-purple-700 disabled:opacity-50 transition-colors">
+                    <Button type="submit" variant="purple" size="md" disabled={slotSaving}>
                       {slotSaving ? 'Создание…' : 'Создать слоты'}
-                    </button>
+                    </Button>
                     <Err msg={slotError} />
                     <Ok msg={slotOk} />
                   </div>
@@ -1759,7 +1736,7 @@ export default function BookingSetupWorkbenchPage() {
 
           </>
         )}
-      </div>
+      </PageContainer>
 
       {/* Edit Ticket Type Modal */}
       <Modal open={!!editingTt} onClose={() => setEditingTt(null)} title="Редактировать тип билета" size="sm">
@@ -1775,12 +1752,12 @@ export default function BookingSetupWorkbenchPage() {
               <TextInput type="number" min={0} value={editTtForm.sort_order} onChange={(e) => setEditTtForm((p) => ({ ...p, sort_order: +e.target.value || 0 }))} />
             </Field>
             <div className="flex items-center gap-3 pt-1">
-              <button type="submit" disabled={editTtSaving} className="px-4 py-2 text-sm text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors">
+              <Button type="submit" variant="primary" size="md" disabled={editTtSaving}>
                 {editTtSaving ? 'Сохранение…' : 'Сохранить'}
-              </button>
-              <button type="button" onClick={() => setEditingTt(null)} className="px-4 py-2 text-sm text-gray-600 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors">
+              </Button>
+              <Button type="button" variant="secondary" size="md" onClick={() => setEditingTt(null)}>
                 Отмена
-              </button>
+              </Button>
               <Err msg={editTtError} />
             </div>
           </form>
@@ -1804,6 +1781,16 @@ export default function BookingSetupWorkbenchPage() {
           await loadSlots(eventId);
           await loadPricePreview(eventId, null, eventTicketTypes, { refetchSlots: true });
         }}
+      />
+
+      <ConfirmModal
+        open={!!deleteTtTarget}
+        onClose={() => setDeleteTtTarget(null)}
+        onConfirm={handleDeleteTt}
+        title="Удалить тип билета?"
+        message={deleteTtTarget ? `Тип «${getTicketTypeLabel(deleteTtTarget)}» будет удалён.` : ''}
+        confirmLabel="Удалить"
+        danger
       />
 
       <ConfirmModal

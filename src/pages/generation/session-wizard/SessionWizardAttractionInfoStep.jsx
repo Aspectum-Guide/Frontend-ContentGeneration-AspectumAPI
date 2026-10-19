@@ -1,19 +1,13 @@
 import { useMemo, useState } from 'react';
-import AiGenerationModal, { WizardGenerationActionFooter } from '../../../components/generation/AiGenerationModal.jsx';
+import AiGenerationModal from '../../../components/generation/AiGenerationModal.jsx';
+import { FormLabel, WizardActionFooter as WizardGenerationActionFooter } from '@aspectum/ui';
 import AiGenerationQualitySettings from '../../../components/generation/AiGenerationQualitySettings.jsx';
 import AiGenerationDedupeToggle from '../../../components/generation/AiGenerationDedupeToggle.jsx';
 import AiGenerationCountField from '../../../components/generation/AiGenerationCountField.jsx';
-import { getAttrName, getFlag, normalizeId, filterPersistedSessionAttractions } from './sessionWizardShared.jsx';
+import { getAttrName, normalizeId, filterPersistedSessionAttractions } from './sessionWizardShared.jsx';
 import UsefulInfoTextImportBox from './UsefulInfoTextImportBox.jsx';
-
-const AI_GENERATION_LANG_OPTIONS = [
-  { value: 'ru', label: 'Русский (ru)' },
-  { value: 'en', label: 'English (en)' },
-  { value: 'it', label: 'Italiano (it)' },
-  { value: 'fr', label: 'Français (fr)' },
-  { value: 'de', label: 'Deutsch (de)' },
-  { value: 'es', label: 'Español (es)' },
-];
+import { useAppLanguages } from '../../../hooks/useAppLanguages';
+import { Alert, Button, Checkbox, EmptyState, EntityDraftsPanel, IconButton, LocaleEditor, Panel, SectionHeader, Select, SelectableCard, Textarea, TextInput } from '@aspectum/ui';
 
 const getAttractionDisplayName = (attraction) => {
   if (!attraction) return 'Без названия';
@@ -167,55 +161,40 @@ function AttractionInfoDraftsPanel({
   const currentId = normalizeId(currentAttractionInfo?.id);
 
   return (
-    <div className="p-3 border border-gray-200 rounded-xl bg-gray-50">
-      <div className="flex items-center justify-between mb-2">
-        <p className="text-sm font-medium text-gray-800">
-          Черновики полезной информации о достопримечательностях
-        </p>
-
-        <button
-          type="button"
-          onClick={onAddAttractionInfo}
-          className="px-2.5 py-1 text-xs font-medium text-blue-700 bg-blue-100 rounded-md hover:bg-blue-200 transition-colors"
-        >
+    <EntityDraftsPanel
+      title="Черновики полезной информации о достопримечательностях"
+      items={attractionInfos}
+      emptyText="Пока нет полезной информации"
+      actions={(
+        <Button type="button" onClick={onAddAttractionInfo} variant="softStrong" size="sm">
           + Добавить
-        </button>
-      </div>
-
-      <div className="flex flex-wrap gap-2">
-        {attractionInfos.length === 0 ? (
-          <span className="text-xs text-gray-500">
-            Пока нет полезной информации
-          </span>
-        ) : (
-          attractionInfos.map((info, index) => {
-            const infoId = normalizeId(info.id);
-            const isActive = infoId === currentId;
-
-            return (
-              <button
+        </Button>
+      )}
+      renderItem={(info, index) => {
+        const infoId = normalizeId(info.id);
+        const isActive = infoId === currentId;
+        return (
+              <SelectableCard
                 key={info.id}
-                type="button"
-                onClick={() => {
+                onSelect={() => {
                   if (!isActive) {
                     onSelectAttractionInfo?.(info.id);
                   }
                 }}
-                className={`flex items-center gap-1 px-2 py-1 rounded-lg border text-xs transition-colors ${
+                ariaLabel={getAttractionInfoName(info)}
+                className={`flex items-center gap-1 px-2 py-1 rounded-aspectum-control border text-xs transition-colors ${
                   isActive
-                    ? 'bg-blue-50 border-blue-300 text-blue-700 font-medium'
-                    : 'bg-white border-gray-200 text-gray-700 hover:border-blue-300 hover:bg-blue-50'
+                    ? 'bg-aspectum-primary-soft border-aspectum-primary-border-strong text-aspectum-primary-hover font-medium'
+                    : 'bg-aspectum-surface border-aspectum-border text-aspectum-text-strong hover:border-aspectum-primary-border-strong hover:bg-aspectum-primary-soft'
                 }`}
                 title={getAttractionInfoName(info)}
               >
-                <span className="text-gray-400">{index + 1}.</span>
+                <span className="text-aspectum-text-disabled">{index + 1}.</span>
                 <span>{getAttractionInfoName(info)}</span>
-              </button>
-            );
-          })
-        )}
-      </div>
-    </div>
+              </SelectableCard>
+        );
+      }}
+    />
   );
 }
 
@@ -266,6 +245,8 @@ export default function SessionWizardAttractionInfoStep({
   onAiGenerationModeChange,
   onAiUseWebSearchChange,
 }) {
+  const { languages: appLanguages } = useAppLanguages();
+  const aiGenerationLangOptions = appLanguages.map((language) => ({ value: language.code, label: `${language.label || language.name || language.code} (${language.code})` }));
   const currentLocale =
     attractionInfoLocaleData[attractionInfoActiveLocale] || {};
 
@@ -319,20 +300,22 @@ export default function SessionWizardAttractionInfoStep({
 
   const attractionInfoHeaderActions = (
     <div className="flex items-center gap-2 shrink-0">
-      <button
+      <Button
         type="button"
         onClick={() => onOpenAttractionInfoGenerateModal?.()}
-        className="px-3 py-1.5 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors"
+        variant="primary"
+        size="md"
       >
         Сгенерировать
-      </button>
-      <button
+      </Button>
+      <Button
         type="button"
         onClick={onAddAttractionInfo}
-        className="px-3 py-1.5 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors"
+        variant="primary"
+        size="md"
       >
         + Добавить
-      </button>
+      </Button>
     </div>
   );
 
@@ -346,47 +329,38 @@ export default function SessionWizardAttractionInfoStep({
       busy={attractionInfoGenerating}
       footer={(
         <WizardGenerationActionFooter>
-          <button
+          <Button
             type="button"
             onClick={() => onCloseAttractionInfoGenerateModal?.()}
             disabled={attractionInfoGenerating}
-            className="px-4 py-2 text-sm font-medium text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50"
+            variant="outline"
+            size="md"
           >
             Отмена
-          </button>
-          <button
+          </Button>
+          <Button
             type="button"
             onClick={() => onGenerateAttractionInfoFromPrompt?.()}
             disabled={!canSubmitAttractionInfoGeneration}
-            className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-50"
+            variant="primary"
+            size="md"
           >
             Сгенерировать
-          </button>
+          </Button>
         </WizardGenerationActionFooter>
       )}
     >
-      <h2
-        id="attraction-info-gen-title"
-        className="text-lg font-semibold text-gray-900"
-      >
-        Сгенерировать полезную информацию
-      </h2>
+      <SectionHeader headingId="attraction-info-gen-title" title="Сгенерировать полезную информацию" />
 
       {savedAttractions.length > 0 ? (
         <div>
-          <label
+          <FormLabel
             htmlFor="attraction-info-gen-attraction"
-            className="block text-sm font-medium text-gray-700 mb-1"
+             layout="block" size="sm" weight="medium" tone="strong" spacing="xs"
           >
             Достопримечательность
-          </label>
-          <select
-            id="attraction-info-gen-attraction"
-            value={attractionInfoGenerationTargetId || ''}
-            onChange={(e) => onAttractionInfoGenerationTargetIdChange?.(e.target.value)}
-            disabled={attractionInfoGenerating || attractionSelectLocked}
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
-          >
+          </FormLabel>
+          <Select className="disabled:bg-aspectum-surface-subtle" id="attraction-info-gen-attraction" value={attractionInfoGenerationTargetId || ''} onChange={(e) => onAttractionInfoGenerationTargetIdChange?.(e.target.value)} disabled={attractionInfoGenerating || attractionSelectLocked}>
             {savedAttractions.length > 1 && (
               <option value="">— Выберите достопримечательность —</option>
             )}
@@ -395,39 +369,32 @@ export default function SessionWizardAttractionInfoStep({
                 {getAttrName(attr)}
               </option>
             ))}
-          </select>
+          </Select>
           {attractionSelectLocked && selectedGenerationAttraction && (
-            <p className="mt-1 text-xs text-gray-500">
+            <p className="mt-1 text-xs text-aspectum-text-muted">
               В сессии одна достопримечательность — выбрана автоматически.
             </p>
           )}
         </div>
       ) : (
-        <p className="text-sm text-amber-700 bg-amber-50 border border-amber-200 rounded-lg p-3">
-          Сначала добавьте достопримечательность.
-        </p>
+        <Alert tone="warning">Сначала добавьте достопримечательность.
+        </Alert>
       )}
 
       <div>
-        <label
+        <FormLabel
           htmlFor="attraction-info-gen-lang"
-          className="block text-sm font-medium text-gray-700 mb-1"
+           layout="block" size="sm" weight="medium" tone="strong" spacing="xs"
         >
           Язык
-        </label>
-        <select
-          id="attraction-info-gen-lang"
-          value={attractionInfoGenerationLang || 'ru'}
-          onChange={(e) => onAttractionInfoGenerationLangChange?.(e.target.value)}
-          disabled={attractionInfoGenerating}
-          className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
-        >
-          {AI_GENERATION_LANG_OPTIONS.map((opt) => (
+        </FormLabel>
+        <Select className="disabled:bg-aspectum-surface-subtle" id="attraction-info-gen-lang" value={attractionInfoGenerationLang || 'ru'} onChange={(e) => onAttractionInfoGenerationLangChange?.(e.target.value)} disabled={attractionInfoGenerating}>
+          {aiGenerationLangOptions.map((opt) => (
             <option key={opt.value} value={opt.value}>
               {opt.label}
             </option>
           ))}
-        </select>
+        </Select>
       </div>
 
       <div>
@@ -442,9 +409,7 @@ export default function SessionWizardAttractionInfoStep({
       </div>
 
       {attractionInfoGenerationError && (
-        <div className="text-sm text-red-700 bg-red-50 border border-red-200 rounded-lg p-3">
-          {attractionInfoGenerationError}
-        </div>
+        <Alert tone="error">{attractionInfoGenerationError}</Alert>
       )}
 
       <AiGenerationQualitySettings
@@ -464,21 +429,13 @@ export default function SessionWizardAttractionInfoStep({
       />
 
       <div>
-        <label
+        <FormLabel
           htmlFor="attraction-info-gen-prompt"
-          className="block text-sm font-medium text-gray-700 mb-1"
+           layout="block" size="sm" weight="medium" tone="strong" spacing="xs"
         >
           Дополнительный промпт
-        </label>
-        <textarea
-          id="attraction-info-gen-prompt"
-          rows={4}
-          value={attractionInfoGeneratePrompt}
-          onChange={(e) => onAttractionInfoGeneratePromptChange?.(e.target.value)}
-          disabled={attractionInfoGenerating}
-          placeholder="Например: режим работы, билеты, как добраться, советы для семей"
-          className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 resize-none"
-        />
+        </FormLabel>
+        <Textarea className="disabled:bg-aspectum-surface-subtle" id="attraction-info-gen-prompt" rows={4} value={attractionInfoGeneratePrompt} onChange={(e) => onAttractionInfoGeneratePromptChange?.(e.target.value)} disabled={attractionInfoGenerating} placeholder="Например: режим работы, билеты, как добраться, советы для семей" />
       </div>
     </AiGenerationModal>
   );
@@ -503,61 +460,53 @@ export default function SessionWizardAttractionInfoStep({
       <section className="space-y-4">
         {attractionInfoGenerationModal}
 
-        <div className="flex items-start justify-between gap-3">
-          <div className="flex flex-wrap items-center gap-3">
-            <div>
-              <h2 className="text-lg font-semibold text-gray-900">
-                Полезная информация о достопримечательности
-              </h2>
-
-              <p className="text-sm text-gray-500">
-                Добавьте полезные блоки: часы работы, билеты, правила посещения,
-                советы
-              </p>
-            </div>
-
-            {!selectMode && attractionInfoHeaderActions}
-          </div>
-
-          {attractionInfos.length > 0 && (
-            <div className="flex items-center gap-2 shrink-0">
+        <SectionHeader
+          title="Полезная информация о достопримечательности"
+          description="Добавьте полезные блоки: часы работы, билеты, правила посещения, советы"
+          aside={!selectMode ? attractionInfoHeaderActions : null}
+          actions={attractionInfos.length > 0 ? (
+            <>
               {selectMode ? (
                 <>
-                  <button
+                  <Button
                     type="button"
                     onClick={toggleSelectAll}
-                    className="px-3 py-1.5 text-sm font-medium text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+                    variant="outline"
+                    size="md"
                   >
                     {allSelected ? 'Снять все' : 'Выбрать все'}
-                  </button>
-                  <button
+                  </Button>
+                  <Button
                     type="button"
                     onClick={handleBulkDelete}
                     disabled={selectedIds.size === 0}
-                    className="px-3 py-1.5 text-sm font-medium text-white bg-red-600 rounded-lg hover:bg-red-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    variant="danger"
+                    size="md"
                   >
                     Удалить ({selectedIds.size})
-                  </button>
-                  <button
+                  </Button>
+                  <Button
                     type="button"
                     onClick={exitSelectMode}
-                    className="px-3 py-1.5 text-sm font-medium text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+                    variant="outline"
+                    size="md"
                   >
                     Отмена
-                  </button>
+                  </Button>
                 </>
               ) : (
-                <button
+                <Button
                   type="button"
                   onClick={() => setSelectMode(true)}
-                  className="px-3 py-1.5 text-sm font-medium text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+                  variant="outline"
+                  size="md"
                 >
                   Выбрать
-                </button>
+                </Button>
               )}
-            </div>
-          )}
-        </div>
+            </>
+          ) : null}
+        />
 
         {scopedToAttractionId ? (
           <UsefulInfoTextImportBox
@@ -571,15 +520,14 @@ export default function SessionWizardAttractionInfoStep({
         ) : null}
 
         {attractionInfos.length === 0 ? (
-          <div className="text-center py-10 text-gray-400 border border-dashed border-gray-200 rounded-xl bg-gray-50">
-            <div className="text-3xl mb-2">💡</div>
-
-            <p className="text-sm">
-              {scopedToAttractionId
-                ? 'Для этой достопримечательности пока нет полезной информации.'
-                : 'Нет полезной информации. Нажмите «+ Добавить»'}
-            </p>
-          </div>
+          <EmptyState
+            icon="💡"
+            title={scopedToAttractionId
+              ? 'Для этой достопримечательности пока нет полезной информации.'
+              : 'Нет полезной информации'}
+            description={scopedToAttractionId ? 'Добавьте первый блок.' : 'Нажмите «+ Добавить», чтобы начать.'}
+            className="py-10"
+          />
         ) : (
           <div className="space-y-2">
             {attractionInfos.map((info, idx) => {
@@ -594,36 +542,35 @@ export default function SessionWizardAttractionInfoStep({
                       ? toggleSelected(info.id)
                       : onOpenAttractionInfoDetail?.(info.id)
                   }
-                  className={`flex items-center justify-between p-3 bg-white border rounded-lg cursor-pointer transition-colors ${
+                  className={`flex items-center justify-between p-3 bg-aspectum-surface border rounded-aspectum-control cursor-pointer transition-colors ${
                     selectMode && isSelected
-                      ? 'border-blue-400 bg-blue-50'
-                      : 'border-gray-200 hover:border-blue-300 hover:bg-blue-50'
+                      ? 'border-aspectum-primary-light bg-aspectum-primary-soft'
+                      : 'border-aspectum-border hover:border-aspectum-primary-border-strong hover:bg-aspectum-primary-soft'
                   }`}
                 >
                   <div className="flex items-center gap-3 min-w-0">
                     {selectMode && (
-                      <input
-                        type="checkbox"
+                      <Checkbox
                         checked={isSelected}
                         onChange={() => toggleSelected(info.id)}
                         onClick={(e) => e.stopPropagation()}
-                        className="w-4 h-4 accent-blue-600 shrink-0 cursor-pointer"
+                        className="shrink-0 cursor-pointer"
                       />
                     )}
 
-                    <span className="w-6 h-6 flex items-center justify-center rounded-full bg-gray-100 text-xs font-medium text-gray-600 shrink-0">
+                    <span className="w-6 h-6 flex items-center justify-center rounded-full bg-aspectum-surface-subtle text-xs font-medium text-aspectum-text-subtle shrink-0">
                       {idx + 1}
                     </span>
 
                     <div className="min-w-0">
-                      <div className="text-sm font-medium text-gray-900 truncate">
+                      <div className="text-sm font-medium text-aspectum-text truncate">
                         {getAttractionInfoName(info)}
                       </div>
 
-                      <div className="flex items-center gap-1.5 text-xs text-gray-500">
+                      <div className="flex items-center gap-1.5 text-xs text-aspectum-text-muted">
                         {getAttractionInfoBindingLabel(info, referenceAttractions, attractions)}
                         {isAttractionInfoBindingIncomplete(info) && (
-                          <span className="px-1.5 py-0.5 rounded bg-amber-100 text-amber-700 font-medium shrink-0">
+                          <span className="px-1.5 py-0.5 rounded bg-aspectum-warning-muted text-aspectum-warning-strong font-medium shrink-0">
                             ⚠ не выбрана
                           </span>
                         )}
@@ -632,11 +579,11 @@ export default function SessionWizardAttractionInfoStep({
                   </div>
 
                   {selectMode ? (
-                    <span className="text-xs text-gray-400 font-medium shrink-0">
+                    <span className="text-xs text-aspectum-text-disabled font-medium shrink-0">
                       {isSelected ? 'Выбрано' : 'Выбрать'}
                     </span>
                   ) : (
-                    <span className="text-xs text-blue-600 font-medium shrink-0">
+                    <span className="text-xs text-aspectum-primary font-medium shrink-0">
                       Открыть →
                     </span>
                   )}
@@ -648,21 +595,23 @@ export default function SessionWizardAttractionInfoStep({
 
         {!embedded && (
           <div className="flex justify-between pt-2">
-            <button
+            <Button
               type="button"
               onClick={() => onGoToStep?.(3)}
-              className="px-4 py-2 text-sm text-gray-600 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+              variant="outline"
+              size="md"
             >
               ← Назад
-            </button>
+            </Button>
 
-            <button
+            <Button
               type="button"
               onClick={() => onGoToStep?.(4)}
-              className="px-5 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors"
+              variant="primary"
+              size="md"
             >
               Далее: Публикация →
-            </button>
+            </Button>
           </div>
         )}
       </section>
@@ -674,25 +623,29 @@ export default function SessionWizardAttractionInfoStep({
       {attractionInfoGenerationModal}
 
       <div className="flex items-center gap-3">
-        <button
+        <IconButton
+          label="Вернуться к списку полезной информации"
           type="button"
           onClick={() => onSetCurrentAttractionInfo?.(null)}
-          className="w-8 h-8 flex items-center justify-center border border-gray-300 rounded-lg text-gray-500 hover:bg-gray-50 transition-colors"
+          variant="outline"
+          className="w-8 h-8"
         >
           ←
-        </button>
+        </IconButton>
 
-        <span className="text-base font-semibold text-gray-900">
+        <span className="text-base font-semibold text-aspectum-text">
           {getAttractionInfoName(currentAttractionInfo)}
         </span>
 
-        <button
+        <Button
           type="button"
           onClick={onDeleteCurrentAttractionInfo}
-          className="ml-auto px-3 py-1 text-xs font-medium text-red-600 bg-red-50 rounded-lg hover:bg-red-100 transition-colors"
+          variant="softDanger"
+          size="sm"
+          className="ml-auto"
         >
           Удалить
-        </button>
+        </Button>
       </div>
 
       <AttractionInfoDraftsPanel
@@ -702,103 +655,42 @@ export default function SessionWizardAttractionInfoStep({
         onAddAttractionInfo={onAddAttractionInfo}
       />
 
-      <div className="flex items-center gap-1 flex-wrap">
-        {Object.entries(attractionInfoLocaleData || {}).map(([key, loc]) => {
-          const isActive = key === attractionInfoActiveLocale;
-
-          return (
-            <button
-              key={key}
-              type="button"
-              onClick={() => onSetAttractionInfoActiveLocale?.(key)}
-              className={`flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium border transition-all ${
-                isActive
-                  ? 'bg-blue-600 text-white border-blue-600'
-                  : 'bg-white text-gray-600 border-gray-300 hover:border-blue-400'
-              }`}
-            >
-              <span>{getFlag(loc.code)}</span>
-              <span>{loc.langName}</span>
-            </button>
-          );
-        })}
-      </div>
+      <LocaleEditor
+        localeData={attractionInfoLocaleData}
+        activeLocale={attractionInfoActiveLocale}
+        onSwitch={onSetAttractionInfoActiveLocale}
+        showStatus={false}
+      />
 
       <main className="space-y-4">
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
+          <FormLabel  layout="block" size="sm" weight="medium" tone="strong" spacing="xs">
             Название ({currentLocale.lang?.toUpperCase() || 'RU'})
-          </label>
+          </FormLabel>
 
-          <input
-            type="text"
-            value={currentLocale.name || ''}
-            onChange={(e) =>
-              onUpdateAttractionInfoLocaleField?.('name', e.target.value)
-            }
-            placeholder="Например: Часы работы, Билеты, Как добраться"
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-          />
+          <TextInput type="text" value={currentLocale.name || ''} onChange={(e) => onUpdateAttractionInfoLocaleField?.('name', e.target.value) } placeholder="Например: Часы работы, Билеты, Как добраться" />
         </div>
 
-        <div className="p-3 border border-gray-200 rounded-lg bg-gray-50 space-y-3">
+        <Panel tone="muted" className="p-3 space-y-3">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <FormLabel  layout="block" size="sm" weight="medium" tone="strong" spacing="xs">
               Привязка к достопримечательности
-            </label>
+            </FormLabel>
 
-            <select
-              value={assignedAttractionType}
-              onChange={(e) => {
-                const type = e.target.value;
-
-                updatePatch({
-                  assigned_attraction_type: type,
-
-                  event: null,
-                  event_id: null,
-
-                  attraction: null,
-                  attraction_id: null,
-
-                  session_attraction: null,
-                  session_attraction_id: null,
-                });
-              }}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-            >
+            <Select className="bg-aspectum-surface" value={assignedAttractionType} onChange={(e) => { const type = e.target.value; updatePatch({ assigned_attraction_type: type, event: null, event_id: null, attraction: null, attraction_id: null, session_attraction: null, session_attraction_id: null, }); }}>
               <option value="none">Без достопримечательности</option>
               <option value="database">Достопримечательность из базы</option>
               <option value="draft">Достопримечательность из сессии</option>
-            </select>
+            </Select>
           </div>
 
           {assignedAttractionType === 'database' && (
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <FormLabel  layout="block" size="sm" weight="medium" tone="strong" spacing="xs">
                 Достопримечательность из базы
-              </label>
+              </FormLabel>
 
-              <select
-                value={selectedDatabaseAttractionId}
-                onChange={(e) => {
-                  const attractionId = e.target.value || null;
-
-                  updatePatch({
-                    assigned_attraction_type: 'database',
-
-                    event: attractionId,
-                    event_id: attractionId,
-
-                    attraction: attractionId,
-                    attraction_id: attractionId,
-
-                    session_attraction: null,
-                    session_attraction_id: null,
-                  });
-                }}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-              >
+              <Select className="bg-aspectum-surface" value={selectedDatabaseAttractionId} onChange={(e) => { const attractionId = e.target.value || null; updatePatch({ assigned_attraction_type: 'database', event: attractionId, event_id: attractionId, attraction: attractionId, attraction_id: attractionId, session_attraction: null, session_attraction_id: null, }); }}>
                 <option value="">Выберите достопримечательность из базы</option>
 
                 {referenceAttractions.map((attraction) => (
@@ -806,10 +698,10 @@ export default function SessionWizardAttractionInfoStep({
                     {getAttractionDisplayName(attraction)}
                   </option>
                 ))}
-              </select>
+              </Select>
 
               {referenceAttractions.length === 0 && (
-                <p className="mt-1 text-xs text-amber-600">
+                <p className="mt-1 text-xs text-aspectum-warning">
                   Список достопримечательностей из базы не загружен.
                 </p>
               )}
@@ -818,30 +710,11 @@ export default function SessionWizardAttractionInfoStep({
 
           {assignedAttractionType === 'draft' && (
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <FormLabel  layout="block" size="sm" weight="medium" tone="strong" spacing="xs">
                 Достопримечательность из сессии
-              </label>
+              </FormLabel>
 
-              <select
-                value={selectedSessionAttractionId}
-                onChange={(e) => {
-                  const attractionId = e.target.value || null;
-
-                  updatePatch({
-                    assigned_attraction_type: 'draft',
-
-                    session_attraction: attractionId,
-                    session_attraction_id: attractionId,
-
-                    event: null,
-                    event_id: null,
-
-                    attraction: null,
-                    attraction_id: null,
-                  });
-                }}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-              >
+              <Select className="bg-aspectum-surface" value={selectedSessionAttractionId} onChange={(e) => { const attractionId = e.target.value || null; updatePatch({ assigned_attraction_type: 'draft', session_attraction: attractionId, session_attraction_id: attractionId, event: null, event_id: null, attraction: null, attraction_id: null, }); }}>
                 <option value="">Выберите достопримечательность из сессии</option>
 
                 {attractions.map((attraction) => (
@@ -849,10 +722,10 @@ export default function SessionWizardAttractionInfoStep({
                     {getAttractionDisplayName(attraction)}
                   </option>
                 ))}
-              </select>
+              </Select>
 
               {attractions.length === 0 && (
-                <p className="mt-1 text-xs text-amber-600">
+                <p className="mt-1 text-xs text-aspectum-warning">
                   В текущей сессии пока нет достопримечательностей.
                 </p>
               )}
@@ -860,46 +733,39 @@ export default function SessionWizardAttractionInfoStep({
           )}
 
           {isBindingIncomplete && (
-            <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+            <p className="text-xs text-aspectum-warning-strong bg-aspectum-warning-soft border border-aspectum-warning-border rounded-aspectum-control px-3 py-2">
               ⚠ Выбран тип привязки, но достопримечательность не выбрана. Информация сохранится без привязки.
             </p>
           )}
-        </div>
+        </Panel>
 
         <div>
           <div className="flex items-center gap-2 mb-1">
-            <label className="text-sm font-medium text-gray-700">
+            <FormLabel  size="sm" weight="medium" tone="strong">
               Описание
-            </label>
+            </FormLabel>
 
-            <span className="px-1.5 py-0.5 bg-blue-100 text-blue-700 text-xs rounded font-mono">
+            <span className="px-1.5 py-0.5 bg-aspectum-primary-muted text-aspectum-primary-hover text-xs rounded font-mono">
               {currentLocale.lang?.toUpperCase() || 'RU'}
             </span>
           </div>
 
-          <textarea
-            value={currentLocale.description || ''}
-            onChange={(e) =>
-              onUpdateAttractionInfoLocaleField?.('description', e.target.value)
-            }
-            rows={embedded ? 5 : 7}
-            placeholder="Описание полезной информации для пользователя..."
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
-          />
+          <Textarea value={currentLocale.description || ''} onChange={(e) => onUpdateAttractionInfoLocaleField?.('description', e.target.value) } rows={embedded ? 5 : 7} placeholder="Описание полезной информации для пользователя..." />
         </div>
 
         <div className="flex items-center justify-end gap-3">
           {isBindingIncomplete && (
-            <span className="text-xs text-amber-600">Привязка не выбрана</span>
+            <span className="text-xs text-aspectum-warning">Привязка не выбрана</span>
           )}
-          <button
+          <Button
             type="button"
             onClick={onSaveCurrentAttractionInfo}
             disabled={attractionInfoSaving}
-            className="px-5 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors"
+            variant="primary"
+            size="md"
           >
             {attractionInfoSaving ? 'Сохранение...' : 'Сохранить'}
-          </button>
+          </Button>
         </div>
       </main>
     </section>

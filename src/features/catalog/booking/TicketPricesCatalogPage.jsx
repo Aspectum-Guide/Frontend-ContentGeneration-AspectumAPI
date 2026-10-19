@@ -1,23 +1,15 @@
 import { useCallback, useEffect, useState } from 'react';
 import { eventSlotAvailabilitiesAPI, ticketPricesAPI } from '../../../api/booking';
 import Layout from '../../../components/Layout';
-import DataTable from '../../../components/ui/DataTable';
-import { Field, FormActions, TextInput } from '../../../components/ui/FormField';
-import Modal, { ConfirmModal } from '../../../components/ui/Modal';
+import { Select, Alert, CheckboxField, FormHint, PageHeader, ConfirmModal, DataTable, Field, FormActions, Modal, StatusBadge, TableRowActions, TextInput, formGridClassName } from '@aspectum/ui';
 import { useLayoutActions } from '../../../context/useLayoutActions';
 import { parseApiError } from '../../../utils/apiError';
 import { useCatalogFilters } from '../core/useCatalogFilters';
 import { useCatalogPagedReload } from '../core/useCatalogPagedReload';
 import { useCatalogResource } from '../core/useCatalogResource';
 import { useEventOptions, useTicketTypeMap, useTicketTypeOptions } from '../shared/bookingOptions';
-import ActiveCheckboxField from '../shared/components/ActiveCheckboxField';
-import CatalogPageHeader from '../shared/components/CatalogPageHeader';
 import EventSelect from '../shared/components/EventSelect';
-import FormErrorAlert from '../shared/components/FormErrorAlert';
-import FormHint from '../shared/components/FormHint';
 import PricePrecedenceHint from '../shared/components/PricePrecedenceHint';
-import StatusBadge from '../shared/components/StatusBadge';
-import TableRowActions from '../shared/components/TableRowActions';
 import TicketTypeSelect from '../shared/components/TicketTypeSelect';
 import { DEFAULT_CURRENCY, formatMoney, normalizeCurrency } from '../shared/currencies';
 import { getEventLabelById } from '../shared/labels';
@@ -105,11 +97,12 @@ export default function TicketPricesCatalog() {
     loadSlots(eventId, ticketTypeId);
   }, [editingPrice?.event, editingPrice?.ticket_type, loadSlots]);
 
+  const loadPrices = prices.load;
   const reload = useCallback(async (pageNum) => {
     const isActiveParam =
       statusFilter === 'active' ? 'true' : statusFilter === 'inactive' ? 'false' : undefined;
 
-    await prices.load(
+    await loadPrices(
       {
         page: pageNum,
         page_size: PAGE_SIZE,
@@ -121,7 +114,7 @@ export default function TicketPricesCatalog() {
       },
       (err) => parseApiError(err, 'Ошибка загрузки цен')
     );
-  }, [prices.load, eventFilter, ticketTypeFilter, statusFilter, debouncedSearch]);
+  }, [loadPrices, eventFilter, ticketTypeFilter, statusFilter, debouncedSearch]);
 
   useCatalogPagedReload({
     page,
@@ -242,7 +235,7 @@ export default function TicketPricesCatalog() {
       key: 'id',
       label: 'ID',
       render: (id) => (
-        <span className="font-mono text-xs text-gray-500" title={String(id)}>
+        <span className="font-mono text-xs text-aspectum-text-muted" title={String(id)}>
           {String(id).slice(0, 8)}…
         </span>
       ),
@@ -251,7 +244,7 @@ export default function TicketPricesCatalog() {
       key: 'event',
       label: 'Событие',
       render: (eventId) => (
-        <span className="text-sm text-gray-700">
+        <span className="text-sm text-aspectum-text-strong">
           {getEventLabelById(eventOptions, eventId) || '—'}
         </span>
       ),
@@ -260,7 +253,7 @@ export default function TicketPricesCatalog() {
       key: 'ticket_type',
       label: 'Тип',
       render: (ticketTypeId) => (
-        <span className="text-sm text-gray-700">
+        <span className="text-sm text-aspectum-text-strong">
           {ticketTypeLabelById.get(String(ticketTypeId))?.title || String(ticketTypeId || '—')}
         </span>
       ),
@@ -269,7 +262,7 @@ export default function TicketPricesCatalog() {
       key: 'slot',
       label: 'Слот',
       render: (slotId) => (
-        <span className="font-mono text-xs text-gray-500" title={String(slotId || '')}>
+        <span className="font-mono text-xs text-aspectum-text-muted" title={String(slotId || '')}>
           {slotId ? `${String(slotId).slice(0, 8)}…` : '—'}
         </span>
       ),
@@ -278,7 +271,7 @@ export default function TicketPricesCatalog() {
       key: 'price',
       label: 'Цена',
       render: (price, row) => (
-        <span className="text-sm text-gray-700">
+        <span className="text-sm text-aspectum-text-strong">
           {price != null && price !== '' ? formatMoney(price, row?.currency) : '—'}
         </span>
       ),
@@ -299,7 +292,7 @@ export default function TicketPricesCatalog() {
 
   return (
     <Layout>
-      <CatalogPageHeader
+      <PageHeader
         title="Справочник цен билетов"
         description="Управление ценами по слотам и типам билетов"
         createLabel="Создать цену"
@@ -334,7 +327,7 @@ export default function TicketPricesCatalog() {
               options={eventOptions}
               disabled={eventsLoading}
               placeholder={eventsLoading ? 'Загрузка событий…' : 'Все события'}
-              className={`px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none ${eventsLoading ? 'opacity-60 cursor-wait' : ''}`}
+              className={eventsLoading ? 'opacity-60 cursor-wait' : undefined}
             />
 
             <TicketTypeSelect
@@ -343,18 +336,14 @@ export default function TicketPricesCatalog() {
               options={ticketTypeOptions}
               disabled={!eventFilter || ticketTypesLoading}
               placeholder={ticketTypesLoading ? 'Загрузка типов…' : eventFilter ? 'Все типы' : 'Сначала выберите событие'}
-              className={`px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none ${ticketTypesLoading ? 'opacity-60 cursor-wait' : ''}`}
+              className={ticketTypesLoading ? 'opacity-60 cursor-wait' : undefined}
             />
 
-            <select
-              value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value)}
-              className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none"
-            >
+            <Select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
               <option value="">Любой статус</option>
               <option value="active">Активные</option>
               <option value="inactive">Отключенные</option>
-            </select>
+            </Select>
           </>
         )}
         actions={(row) => (
@@ -373,9 +362,9 @@ export default function TicketPricesCatalog() {
       >
         {editingPrice && (
           <form onSubmit={handleSave} className="space-y-4">
-            <FormErrorAlert message={saveError} />
+            <Alert tone="error">{saveError}</Alert>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <div className={formGridClassName()}>
               <Field label="Событие" required>
                 <EventSelect
                   value={editingPrice.event}
@@ -399,22 +388,9 @@ export default function TicketPricesCatalog() {
 
             <Field label="Слот" required>
               {slotOptions.length > 8 && (
-                <input
-                  type="text"
-                  value={slotSearch}
-                  onChange={(e) => setSlotSearch(e.target.value)}
-                  placeholder="Поиск по дате…"
-                  className="w-full px-3 py-1.5 border border-gray-300 rounded-lg text-sm mb-1 focus:ring-2 focus:ring-blue-500 outline-none"
-                />
+                <TextInput className="mb-1" type="text" value={slotSearch} onChange={(e) => setSlotSearch(e.target.value)} placeholder="Поиск по дате…" />
               )}
-              <select
-                value={editingPrice.slot}
-                onChange={(e) => setEditingPrice((prev) => ({ ...prev, slot: e.target.value }))}
-                className={`w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none ${slotsLoading ? 'opacity-60 cursor-wait' : ''}`}
-                required
-                disabled={!editingPrice.ticket_type || slotsLoading}
-                size={Math.min(8, slotOptions.length > 0 ? slotOptions.length + 1 : 1)}
-              >
+              <Select className={`w-full ${slotsLoading ? 'opacity-60 cursor-wait' : ''}`} value={editingPrice.slot} onChange={(e) => setEditingPrice((prev) => ({ ...prev, slot: e.target.value }))} required disabled={!editingPrice.ticket_type || slotsLoading} size={Math.min(8, slotOptions.length > 0 ? slotOptions.length + 1 : 1)}>
                 <option value="">
                   {slotsLoading ? 'Загрузка слотов…' : editingPrice.ticket_type ? 'Выберите слот' : 'Сначала выберите тип билета'}
                 </option>
@@ -425,9 +401,9 @@ export default function TicketPricesCatalog() {
                       {new Date(slotItem.slot_datetime).toLocaleString('ru-RU', { day:'2-digit', month:'2-digit', year:'2-digit', hour:'2-digit', minute:'2-digit' })} · {slotItem.available_seats} мест
                     </option>
                   ))}
-              </select>
+              </Select>
               {slotOptions.length > 0 && (
-                <p className="text-xs text-gray-400 mt-0.5">
+                <p className="text-xs text-aspectum-text-disabled mt-0.5">
                   {slotSearch
                     ? `${slotOptions.filter((s) => new Date(s.slot_datetime).toLocaleString('ru-RU').includes(slotSearch)).length} из ${slotOptions.length}`
                     : `${slotOptions.length} слотов`}
@@ -435,7 +411,7 @@ export default function TicketPricesCatalog() {
               )}
             </Field>
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+            <div className={formGridClassName({ columns: 3 })}>
               <Field label="Цена" required>
                 <TextInput
                   type="number"
@@ -456,7 +432,7 @@ export default function TicketPricesCatalog() {
                   required
                 />
               </Field>
-              <ActiveCheckboxField
+              <CheckboxField
                 checked={editingPrice.is_active}
                 onChange={(next) => setEditingPrice((prev) => ({ ...prev, is_active: next }))}
                 text="Активна"

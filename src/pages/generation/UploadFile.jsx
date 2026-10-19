@@ -1,7 +1,8 @@
-import { useState, useRef } from 'react';
+import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Layout from '../../components/Layout';
 import apiClient from '../../api/client';
+import { Alert, Button, FileDropzone, PageContainer, PageHeader, Panel, Spinner } from '@aspectum/ui';
 
 export default function UploadFile() {
   const navigate = useNavigate();
@@ -9,7 +10,6 @@ export default function UploadFile() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [success, setSuccess] = useState(null);
-  const inputRef = useRef(null);
 
   const handleUpload = async (e) => {
     e.preventDefault();
@@ -37,102 +37,86 @@ export default function UploadFile() {
     }
   };
 
-  const handleDrop = (e) => {
-    e.preventDefault();
-    const droppedFile = e.dataTransfer.files?.[0];
-    if (droppedFile) setFile(droppedFile);
-  };
-
   return (
     <Layout>
-      <div className="max-w-lg">
-        <div className="mb-6">
-          <h1 className="text-2xl font-bold text-gray-900">Загрузить из файла</h1>
-          <p className="mt-1 text-sm text-gray-500">
-            Загрузка данных сессии генерации из JSON-файла
-          </p>
-        </div>
+      <PageContainer maxWidth="narrow">
+        <PageHeader
+          title="Загрузить из файла"
+          description="Загрузка данных сессии генерации из JSON-файла"
+        />
 
-        <div className="bg-white rounded-xl border border-gray-200 p-6">
+        <Panel className="p-6">
           <form onSubmit={handleUpload} className="space-y-4">
             {/* Drop zone */}
-            <div
-              onDrop={handleDrop}
-              onDragOver={(e) => e.preventDefault()}
-              onClick={() => inputRef.current?.click()}
-              className="border-2 border-dashed border-gray-300 rounded-xl p-10 text-center cursor-pointer hover:border-blue-400 hover:bg-blue-50 transition-colors"
+            <FileDropzone
+              onFiles={(files) => setFile(files[0] || null)}
+              accept=".json"
+              className="border-2 border-dashed border-aspectum-border-strong rounded-aspectum-card p-10 text-center cursor-pointer hover:border-aspectum-primary-light hover:bg-aspectum-primary-soft transition-colors"
             >
-              <input
-                ref={inputRef}
-                type="file"
-                accept=".json"
-                onChange={(e) => setFile(e.target.files?.[0] || null)}
-                className="hidden"
-              />
               <div className="text-4xl mb-3">{file ? '📄' : '📂'}</div>
               {file ? (
                 <div>
-                  <p className="font-medium text-gray-900">{file.name}</p>
-                  <p className="text-sm text-gray-400 mt-1">
+                  <p className="font-medium text-aspectum-text">{file.name}</p>
+                  <p className="text-sm text-aspectum-text-disabled mt-1">
                     {(file.size / 1024).toFixed(1)} KB
                   </p>
                 </div>
               ) : (
                 <div>
-                  <p className="text-gray-700 font-medium">Нажмите или перетащите файл</p>
-                  <p className="text-sm text-gray-400 mt-1">JSON-файл с данными города</p>
+                  <p className="text-aspectum-text-strong font-medium">Нажмите или перетащите файл</p>
+                  <p className="text-sm text-aspectum-text-disabled mt-1">JSON-файл с данными города</p>
                 </div>
               )}
-            </div>
+            </FileDropzone>
 
             {file && (
-              <button
+              <Button
                 type="button"
                 onClick={() => setFile(null)}
-                className="text-xs text-gray-400 hover:text-gray-600"
+                variant="ghost"
+                size="sm"
               >
                 Убрать файл
-              </button>
+              </Button>
             )}
 
             {error && (
-              <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">
-                {error}
-              </div>
+              <Alert tone="error">{error}</Alert>
             )}
 
             {success && (
-              <div className="p-3 bg-green-50 border border-green-200 rounded-lg text-sm text-green-700">
-                ✅ {success}
-              </div>
+              <Alert tone="success">{success}</Alert>
             )}
 
             <div className="flex gap-3">
-              <button
+              <Button
                 type="submit"
                 disabled={!file || loading}
-                className="flex-1 py-2.5 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                variant="primary"
+                size="lg"
+                className="flex-1"
               >
                 {loading ? (
                   <span className="flex items-center justify-center gap-2">
-                    <span className="animate-spin inline-block w-4 h-4 border-2 border-white border-t-transparent rounded-full" />
+                    <Spinner size="sm" className="border-aspectum-on-accent" />
                     Загрузка...
                   </span>
                 ) : (
                   '⬆ Загрузить'
                 )}
-              </button>
-              <button
+              </Button>
+              <Button
                 type="button"
                 onClick={() => navigate('/generation')}
-                className="px-4 py-2.5 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
+                variant="secondary"
+                size="lg"
               >
                 Отмена
-              </button>
+              </Button>
             </div>
           </form>
-        </div>
-      </div>
+        </Panel>
+      </PageContainer>
     </Layout>
   );
 }

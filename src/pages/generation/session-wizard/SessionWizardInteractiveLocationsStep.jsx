@@ -1,13 +1,16 @@
 import { useEffect, useRef, useState } from 'react';
 import 'leaflet/dist/leaflet.css';
 import { usePasteImageOnHover } from '../../../hooks/usePasteImageOnHover';
-import AiGenerationModal, { WizardGenerationActionFooter } from '../../../components/generation/AiGenerationModal.jsx';
+import AiGenerationModal from '../../../components/generation/AiGenerationModal.jsx';
+import { FormLabel, WizardActionFooter as WizardGenerationActionFooter, formGridClassName } from '@aspectum/ui';
 import AiGenerationQualitySettings from '../../../components/generation/AiGenerationQualitySettings.jsx';
 import AiGenerationDedupeToggle from '../../../components/generation/AiGenerationDedupeToggle.jsx';
 import AiGenerationCountField from '../../../components/generation/AiGenerationCountField.jsx';
-import { getAttrName, getFlag, getSessionEntityImagePreview, resolveSessionEntityImageOriginalUrl, resolveSessionEntityImageCopyright, normalizeId } from './sessionWizardShared.jsx';
+import { getAttrName, getSessionEntityImagePreview, resolveSessionEntityImageOriginalUrl, resolveSessionEntityImageCopyright, normalizeId } from './sessionWizardShared.jsx';
 import SessionWizardAttractionTagsPicker from './SessionWizardAttractionTagsPicker.jsx';
 import { createCoordinatePasteHandler } from '../../../utils/coordinates';
+import { useAppLanguages } from '../../../hooks/useAppLanguages';
+import { Alert, Button, EmptyState, FileButton, IconButton, LoadingOverlay, LocaleEditor, Panel, SectionHeader, Select, Spinner, Textarea, TextInput } from '@aspectum/ui';
 
 const getCityDisplayName = (city) => {
   if (!city) return 'Без названия';
@@ -45,14 +48,6 @@ const getDraftCityDisplayName = (draft) => {
   return draft.display_name || draft.id || 'Без названия';
 };
 
-const AI_GENERATION_LANG_OPTIONS = [
-  { value: 'ru', label: 'Русский (ru)' },
-  { value: 'en', label: 'English (en)' },
-  { value: 'it', label: 'Italiano (it)' },
-  { value: 'fr', label: 'Français (fr)' },
-  { value: 'de', label: 'Deutsch (de)' },
-  { value: 'es', label: 'Español (es)' },
-];
 
 const getIlDatabaseCityId = (item) => normalizeId(item?.city_id ?? item?.city);
 
@@ -114,33 +109,32 @@ function IlDraftsPanel({
   const currentIlId = normalizeId(currentIl?.id);
 
   return (
-    <div className="p-3 border border-gray-200 rounded-xl bg-gray-50">
+    <Panel tone="muted" className="p-3">
       <div className="flex items-center justify-between mb-2">
-        <p className="text-sm font-medium text-gray-800">
+        <p className="text-sm font-medium text-aspectum-text-emphasis">
           Интерактивные локации в сессии
         </p>
 
-        <button
+        <Button
           type="button"
           onClick={onAddLocation}
-          className="px-2.5 py-1 text-xs font-medium text-blue-700 bg-blue-100 rounded-md hover:bg-blue-200 transition-colors"
+          variant="softStrong"
+          size="sm"
         >
           + Добавить
-        </button>
+        </Button>
       </div>
 
       <div className="flex flex-wrap gap-2">
         {interactiveLocations.length === 0 ? (
-          <span className="text-xs text-gray-500">
-            Пока нет интерактивных локаций
-          </span>
+          <EmptyState title="Пока нет интерактивных локаций" className="py-3" />
         ) : (
           interactiveLocations.map((item, index) => {
             const itemId = normalizeId(item.id);
             const isActive = itemId === currentIlId;
 
             return (
-              <button
+              <Button
                 key={item.id}
                 type="button"
                 onClick={() => {
@@ -148,21 +142,19 @@ function IlDraftsPanel({
                     onSelectLocation(item.id);
                   }
                 }}
-                className={`flex items-center gap-1 px-2 py-1 rounded-lg border text-xs transition-colors ${
-                  isActive
-                    ? 'bg-blue-50 border-blue-300 text-blue-700 font-medium'
-                    : 'bg-white border-gray-200 text-gray-700 hover:border-blue-300 hover:bg-blue-50'
-                }`}
+                variant={isActive ? 'selectableActive' : 'selectable'}
+                size="sm"
+                className="gap-1"
                 title={getAttrName(item) || 'без названия'}
               >
-                <span className="text-gray-400">{index + 1}.</span>
+                <span className="text-aspectum-text-disabled">{index + 1}.</span>
                 <span>{getAttrName(item) || 'без названия'}</span>
-              </button>
+              </Button>
             );
           })
         )}
       </div>
-    </div>
+    </Panel>
   );
 }
 
@@ -188,11 +180,11 @@ export function IlPhotoPanel({
   );
 
   return (
-    <aside className="w-52 shrink-0 space-y-3">
+    <Panel as="aside" tone="muted" className="w-52 shrink-0 space-y-3 p-3">
       <div
         {...photoPaste}
         title="Наведите и нажмите Ctrl+V, чтобы вставить фото из буфера"
-        className="relative aspect-[3/4] bg-gray-100 rounded-xl overflow-hidden border border-gray-200 flex items-center justify-center">
+        className="relative aspect-[3/4] bg-aspectum-surface-subtle rounded-aspectum-card overflow-hidden border border-aspectum-border flex items-center justify-center">
         {preview ? (
           <img
             src={preview}
@@ -200,123 +192,94 @@ export function IlPhotoPanel({
             className="w-full h-full object-cover"
           />
         ) : (
-          <div className="text-gray-400 text-sm text-center px-2">
+          <div className="text-aspectum-text-disabled text-sm text-center px-2">
             Фото интерактивной локации
           </div>
         )}
 
-        {photoUploading && (
-          <div className="absolute inset-0 bg-black/40 flex items-center justify-center">
-            <div className="animate-spin w-6 h-6 border-2 border-white border-t-transparent rounded-full" />
-          </div>
-        )}
+        <LoadingOverlay loading={photoUploading} label="Загрузка фото…" className="absolute inset-0" />
 
-        <button
+        <Button
           type="button"
           onClick={() => onOpenCommonsModal?.(currentIl)}
-          className="absolute top-2 right-2 px-2 py-1 text-xs bg-purple-600 text-white rounded-md hover:bg-purple-700 transition-colors shadow-lg"
           title="Библиотека изображений: Commons, Минкульт, Openverse, Pastvu, Mapillary"
+          variant="purple"
+          size="sm"
+          className="absolute top-2 right-2 shadow-aspectum-elevated"
         >
           ⊞ Библиотека
-        </button>
+        </Button>
       </div>
 
       <div>
-        <label className="block w-full text-center text-xs text-blue-600 bg-blue-50 border border-blue-200 rounded-lg py-1.5 cursor-pointer hover:bg-blue-100 transition-colors">
+        <FileButton
+          inputRef={photoFileRef}
+          accept="image/*"
+          variant="soft"
+          size="md"
+          className="w-full"
+          onChange={(e) => onPhotoFileChange?.(e, currentIl)}
+        >
           + Добавить фото
-          <input
-            ref={photoFileRef}
-            type="file"
-            accept="image/*"
-            className="hidden"
-            onChange={(e) => {
-              onPhotoFileChange?.(e, currentIl);
-            }}
-          />
-        </label>
+        </FileButton>
       </div>
 
       <div className="space-y-1.5">
         <div>
-          <label className="block text-xs text-gray-500 mb-0.5">URL</label>
-          <input
-            type="url"
-            value={imageOriginalUrl || ''}
-            onChange={(e) => {
-              onUpdateIlPatch?.({
-                image_original_url: e.target.value,
-                imageOriginalUrl: e.target.value,
-              });
-            }}
-            placeholder="https://upload.wikimedia.org/..."
-            className="w-full px-2 py-1 text-xs border border-gray-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-blue-400"
-          />
+          <FormLabel  layout="block" size="xs" tone="muted" spacing="xxs">URL</FormLabel>
+          <TextInput type="url" value={imageOriginalUrl || ''} onChange={(e) => { onUpdateIlPatch?.({ image_original_url: e.target.value, imageOriginalUrl: e.target.value, }); }} placeholder="https://upload.wikimedia.org/..." />
         </div>
 
         <div>
-          <label className="block text-xs text-gray-500 mb-0.5">
+          <FormLabel  layout="block" size="xs" tone="muted" spacing="xxs">
             Авторские права
-          </label>
-          <input
-            type="text"
-            value={imageCopyright || ''}
-            onChange={(e) => {
-              onUpdateIlPatch?.({
-                image_copyright: e.target.value,
-                imageCopyright: e.target.value,
-              });
-            }}
-            placeholder="© Автор / Источник"
-            className="w-full px-2 py-1 text-xs border border-gray-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-blue-400"
-          />
+          </FormLabel>
+          <TextInput type="text" value={imageCopyright || ''} onChange={(e) => { onUpdateIlPatch?.({ image_copyright: e.target.value, imageCopyright: e.target.value, }); }} placeholder="© Автор / Источник" />
         </div>
       </div>
 
-      <div className="border-t border-gray-100 pt-3 space-y-2">
-        <p className="text-xs text-gray-500 font-medium">Иконка на карте</p>
+      <div className="border-t border-aspectum-border-subtle pt-3 space-y-2">
+        <p className="text-xs text-aspectum-text-muted font-medium">Иконка на карте</p>
         <div className="flex items-center gap-2">
-          <div className="relative w-10 h-10 rounded-lg border border-gray-200 bg-gray-50 flex items-center justify-center shrink-0 overflow-hidden">
+          <div className="relative w-10 h-10 rounded-aspectum-control border border-aspectum-border bg-aspectum-surface-muted flex items-center justify-center shrink-0 overflow-hidden">
             {currentIl?.icon_url
               ? <img src={currentIl.icon_url} alt="Иконка на карте" className="w-full h-full object-contain" />
               : <span className="text-base">📍</span>
             }
             {iconUploading && (
-              <div className="absolute inset-0 bg-black/40 flex items-center justify-center rounded-lg">
-                <div className="animate-spin w-4 h-4 border-2 border-white border-t-transparent rounded-full" />
+              <div className="absolute inset-0 bg-aspectum-overlay-medium flex items-center justify-center rounded-aspectum-control">
+                <Spinner size="sm" className="border-aspectum-on-accent" />
               </div>
             )}
           </div>
           <div className="flex-1 flex flex-col gap-1.5">
-            <input
-              ref={iconFileRef}
-              type="file"
+            <FileButton
+              inputRef={iconFileRef}
               accept="image/*,.svg"
-              className="hidden"
+              variant="soft"
+              size="sm"
               disabled={iconUploading}
               onChange={(e) => onIconFileChange?.(e, currentIl)}
-            />
-            <button
-              type="button"
-              disabled={iconUploading}
-              onClick={() => iconFileRef?.current?.click()}
-              className="w-full text-center text-xs text-blue-600 bg-blue-50 border border-blue-200 rounded-lg py-1.5 hover:bg-blue-100 transition-colors disabled:cursor-not-allowed disabled:opacity-50"
+              className="w-full"
             >
               {iconUploading ? 'Сохранение…' : hasMapIcon ? 'Заменить' : '+ Добавить'}
-            </button>
+            </FileButton>
             {hasMapIcon && (
-              <button
+              <Button
                 type="button"
+                variant="softDanger"
+                size="sm"
                 disabled={iconUploading}
                 onClick={() => onRemoveIcon?.(currentIl)}
-                className="w-full text-center text-xs text-red-600 bg-red-50 border border-red-200 rounded-lg py-1.5 hover:bg-red-100 transition-colors disabled:cursor-not-allowed disabled:opacity-50"
+                className="w-full"
               >
                 Удалить
-              </button>
+              </Button>
             )}
           </div>
         </div>
       </div>
-    </aside>
+    </Panel>
   );
 }
 
@@ -334,6 +297,8 @@ function IlMapPanel({ lat, lon, onLatChange, onLonChange, onCoordsChange }) {
   const mapInstanceRef = useRef(null);
   const markerRef = useRef(null);
   const [mapNode, setMapNode] = useState(null);
+  const latestMapPropsRef = useRef({ lat, lon, onLatChange, onLonChange });
+  latestMapPropsRef.current = { lat, lon, onLatChange, onLonChange };
 
   useEffect(() => {
     if (!mapNode) return;
@@ -358,9 +323,10 @@ function IlMapPanel({ lat, lon, onLatChange, onLonChange, onCoordsChange }) {
         shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
       });
 
-      const hasCoords = hasValidMapCoords(lat, lon);
-      const initialLat = parseMapCoord(lat);
-      const initialLon = parseMapCoord(lon);
+      const initialProps = latestMapPropsRef.current;
+      const hasCoords = hasValidMapCoords(initialProps.lat, initialProps.lon);
+      const initialLat = parseMapCoord(initialProps.lat);
+      const initialLon = parseMapCoord(initialProps.lon);
 
       const map = L.map(mapNode, {
         zoomControl: true,
@@ -409,8 +375,9 @@ function IlMapPanel({ lat, lon, onLatChange, onLonChange, onCoordsChange }) {
       };
 
       map.on('click', (event) => {
-        onLatChange(event.latlng.lat.toFixed(6));
-        onLonChange(event.latlng.lng.toFixed(6));
+        const { onLatChange: handleLatChange, onLonChange: handleLonChange } = latestMapPropsRef.current;
+        handleLatChange(event.latlng.lat.toFixed(6));
+        handleLonChange(event.latlng.lng.toFixed(6));
       });
 
       mapInstanceRef.current = {
@@ -427,7 +394,7 @@ function IlMapPanel({ lat, lon, onLatChange, onLonChange, onCoordsChange }) {
       }, 250);
 
       if (hasCoords) {
-        updateMarker(lat, lon);
+        updateMarker(initialProps.lat, initialProps.lon);
       }
     });
 
@@ -449,44 +416,28 @@ function IlMapPanel({ lat, lon, onLatChange, onLonChange, onCoordsChange }) {
   }, [lat, lon]);
 
   return (
-    <div>
+    <Panel className="p-3">
       <div className="flex items-center justify-between mb-1">
-        <label className="text-sm font-medium text-gray-700">
+        <FormLabel  size="sm" weight="medium" tone="strong">
           Координаты
-        </label>
+        </FormLabel>
 
-        <span className="text-xs text-gray-400">
+        <span className="text-xs text-aspectum-text-disabled">
           Клик по карте или ввод вручную
         </span>
       </div>
 
       <div
         ref={setMapNode}
-        className="w-full h-48 rounded-lg border border-gray-200 overflow-hidden z-0"
+        className="w-full h-48 rounded-aspectum-control border border-aspectum-border overflow-hidden z-0"
       />
 
       <div className="grid grid-cols-2 gap-2 mt-2">
-        <input
-          type="number"
-          step="0.000001"
-          value={lat ?? ''}
-          onChange={(e) => onLatChange(e.target.value)}
-          onPaste={handleCoordPaste}
-          placeholder="Широта"
-          className="px-3 py-1.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-        />
+        <TextInput type="number" step="0.000001" value={lat ?? ''} onChange={(e) => onLatChange(e.target.value)} onPaste={handleCoordPaste} placeholder="Широта" />
 
-        <input
-          type="number"
-          step="0.000001"
-          value={lon ?? ''}
-          onChange={(e) => onLonChange(e.target.value)}
-          onPaste={handleCoordPaste}
-          placeholder="Долгота"
-          className="px-3 py-1.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-        />
+        <TextInput type="number" step="0.000001" value={lon ?? ''} onChange={(e) => onLonChange(e.target.value)} onPaste={handleCoordPaste} placeholder="Долгота" />
       </div>
-    </div>
+    </Panel>
   );
 }
 
@@ -544,6 +495,8 @@ export default function SessionWizardInteractiveLocationsStep({
   onAiUseWebSearchChange,
   onGoToStep,
 }) {
+  const { languages: appLanguages } = useAppLanguages();
+  const aiGenerationLangOptions = appLanguages.map((language) => ({ value: language.code, label: `${language.label || language.name || language.code} (${language.code})` }));
   const ilCurrentLocale = ilLocaleData[ilActiveLocale] || {};
   const canSubmitIlGeneration = Boolean(ilGenerationPrompt?.trim());
 
@@ -570,64 +523,56 @@ export default function SessionWizardInteractiveLocationsStep({
           progress={ilGenerationProgress?.progress}
           footer={(
             <WizardGenerationActionFooter>
-              <button
+              <Button
                 type="button"
                 onClick={() => onCloseIlGenerationModal?.()}
                 disabled={ilGenerating}
-                className="px-4 py-2 text-sm font-medium text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50"
+                variant="outline"
+                size="md"
               >
                 Отмена
-              </button>
-              <button
+              </Button>
+              <Button
                 type="button"
                 onClick={() => onGenerateInteractiveLocationsFromPrompt?.()}
                 disabled={ilGenerating || !canSubmitIlGeneration}
-                className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-50"
+                variant="primary"
+                size="md"
               >
                 Сгенерировать
-              </button>
+              </Button>
             </WizardGenerationActionFooter>
           )}
         >
-          <h2 id="il-gen-title" className="text-lg font-semibold text-gray-900">
-            Сгенерировать интерактивные локации
-          </h2>
+          <SectionHeader headingId="il-gen-title" title="Сгенерировать интерактивные локации" />
 
-          <p className="text-sm text-gray-600">
+          <p className="text-sm text-aspectum-text-subtle">
             Все созданные интерактивные локации автоматически привязываются к городу сессии.
           </p>
 
           <div className="space-y-3">
             <div>
-              <label
+              <FormLabel
                 htmlFor="il-gen-lang"
-                className="block text-sm font-medium text-gray-700 mb-1"
+                 layout="block" size="sm" weight="medium" tone="strong" spacing="xs"
               >
                 Основной язык запроса
-              </label>
-              <select
-                id="il-gen-lang"
-                value={ilGenerationLang || 'ru'}
-                onChange={(e) => onIlGenerationLangChange?.(e.target.value)}
-                disabled={ilGenerating}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
-              >
-                {AI_GENERATION_LANG_OPTIONS.map((opt) => (
+              </FormLabel>
+              <Select className="disabled:bg-aspectum-surface-subtle" id="il-gen-lang" value={ilGenerationLang || 'ru'} onChange={(e) => onIlGenerationLangChange?.(e.target.value)} disabled={ilGenerating}>
+                {aiGenerationLangOptions.map((opt) => (
                   <option key={opt.value} value={opt.value}>
                     {opt.label}
                   </option>
                 ))}
-              </select>
-              <p className="text-xs text-gray-500 mt-1">
+              </Select>
+              <p className="text-xs text-aspectum-text-muted mt-1">
                 В карточках будут заполнены все языки, настроенные на шаге «Город».
               </p>
             </div>
           </div>
 
           {ilGenerationError && (
-            <div className="text-sm text-red-700 bg-red-50 border border-red-200 rounded-lg p-3">
-              {ilGenerationError}
-            </div>
+            <Alert tone="error">{ilGenerationError}</Alert>
           )}
 
           <AiGenerationCountField
@@ -656,88 +601,64 @@ export default function SessionWizardInteractiveLocationsStep({
             entityType="interactive_locations"
           />
 
-          <label className="block text-sm font-medium text-gray-700" htmlFor="il-gen-prompt">
+          <FormLabel  layout="block" size="sm" weight="medium" tone="strong" htmlFor="il-gen-prompt">
             Запрос к ИИ
-          </label>
-          <textarea
-            id="il-gen-prompt"
-            rows={5}
-            value={ilGenerationPrompt}
-            onChange={(e) => onIlGenerationPromptChange?.(e.target.value)}
-            disabled={ilGenerating}
-            placeholder="Например: Необычные места для прогулок с координатами и описанием."
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
-          />
+          </FormLabel>
+          <Textarea className="disabled:bg-aspectum-surface-subtle" id="il-gen-prompt" rows={5} value={ilGenerationPrompt} onChange={(e) => onIlGenerationPromptChange?.(e.target.value)} disabled={ilGenerating} placeholder="Например: Необычные места для прогулок с координатами и описанием." />
         </AiGenerationModal>
 
-        <div className="flex items-center justify-between">
-          <div>
-            <h2 className="text-lg font-semibold text-gray-900">
-              Интерактивные локации
-            </h2>
-
-            <p className="text-sm text-gray-500">
-              Добавьте объекты — они будут привязаны к городу сессии автоматически
-            </p>
-          </div>
-
-          <div className="flex items-center gap-2">
-            <button
+        <SectionHeader title="Интерактивные локации" description="Добавьте объекты — они будут привязаны к городу сессии автоматически" actions={<>
+            <Button
               type="button"
               onClick={() => onOpenIlGenerationModal?.()}
-              className="px-3 py-1.5 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors"
+              variant="primary"
+              size="md"
             >
               Сгенерировать
-            </button>
-            <button
+            </Button>
+            <Button
               type="button"
               onClick={onAddInteractiveLocation}
-              className="px-3 py-1.5 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors"
+              variant="primary"
+              size="md"
             >
               + Добавить
-            </button>
-          </div>
-        </div>
+            </Button>
+          </>} />
 
         {interactiveLocations.length === 0 ? (
-          <div className="text-center py-12 text-gray-400">
-            <div className="text-3xl mb-2">📍</div>
-
-            <p className="text-sm">
-              Нет интерактивных локаций. Нажмите «+ Добавить»
-            </p>
-          </div>
+          <EmptyState icon="📍" title="Нет интерактивных локаций. Нажмите «+ Добавить»" />
         ) : (
           <div className="space-y-2">
             {interactiveLocations.map((item, idx) => (
               <div
                 key={item.id}
                 onClick={() => onOpenIlDetail?.(item.id)}
-                className="flex items-center justify-between p-3 bg-white border border-gray-200 rounded-lg hover:border-blue-300 hover:bg-blue-50 cursor-pointer transition-colors"
+                className="flex items-center justify-between p-3 bg-aspectum-surface border border-aspectum-border rounded-aspectum-control hover:border-aspectum-primary-border-strong hover:bg-aspectum-primary-soft cursor-pointer transition-colors"
               >
                 <div className="flex items-center gap-3">
-                  <span className="w-6 h-6 flex items-center justify-center rounded-full bg-gray-100 text-xs font-medium text-gray-600">
+                  <span className="w-6 h-6 flex items-center justify-center rounded-full bg-aspectum-surface-subtle text-xs font-medium text-aspectum-text-subtle">
                     {idx + 1}
                   </span>
 
                   <div>
-                    <div className="text-sm font-medium text-gray-900">
+                    <div className="text-sm font-medium text-aspectum-text">
                       {getAttrName(item) || 'без названия'}
                     </div>
 
-                    <div className="text-xs text-gray-500">
+                    <div className="text-xs text-aspectum-text-muted">
                       {getIlCityBindingLabel(item, referenceCities, cityDrafts)}
                     </div>
 
                     {hasValidMapCoords(item?.lat, item?.lon) && (
-                      <div className="text-xs text-gray-400">
+                      <div className="text-xs text-aspectum-text-disabled">
                         {item.lat}, {item.lon}
                       </div>
                     )}
                   </div>
                 </div>
 
-                <span className="text-xs text-blue-600 font-medium">
+                <span className="text-xs text-aspectum-primary font-medium">
                   Открыть →
                 </span>
               </div>
@@ -746,25 +667,27 @@ export default function SessionWizardInteractiveLocationsStep({
         )}
 
         <div className="flex justify-between pt-2">
-          <button
+          <Button
             type="button"
             onClick={() => {
               void onGoToStep?.(3);
             }}
-            className="px-4 py-2 text-sm text-gray-600 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+            variant="outline"
+            size="md"
           >
             ← Назад: Достопримечательности
-          </button>
+          </Button>
 
-          <button
+          <Button
             type="button"
             onClick={() => {
               void onGoToStep?.(5);
             }}
-            className="px-5 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors"
+            variant="primary"
+            size="md"
           >
             Далее: Публикация →
-          </button>
+          </Button>
         </div>
       </div>
     );
@@ -777,27 +700,30 @@ export default function SessionWizardInteractiveLocationsStep({
   return (
     <div className="space-y-4">
       <div className="flex items-center gap-3">
-        <button
-          type="button"
+        <IconButton
           onClick={() => {
             void onLeaveIlDetailView?.();
           }}
-          className="w-8 h-8 flex items-center justify-center border border-gray-300 rounded-lg text-gray-500 hover:bg-gray-50 transition-colors"
+          variant="outline"
+          className="w-8 h-8"
+          label="Вернуться к списку интерактивных локаций"
         >
           ←
-        </button>
+        </IconButton>
 
-        <span className="text-base font-semibold text-gray-900">
+        <span className="text-base font-semibold text-aspectum-text">
           {getAttrName(currentIl) || 'без названия'}
         </span>
 
-        <button
+        <Button
           type="button"
           onClick={onDeleteCurrentIl}
-          className="ml-auto px-3 py-1 text-xs font-medium text-red-600 bg-red-50 rounded-lg hover:bg-red-100 transition-colors"
+          variant="softDanger"
+          size="sm"
+          className="ml-auto"
         >
           Удалить
-        </button>
+        </Button>
       </div>
 
       <IlDraftsPanel
@@ -807,27 +733,12 @@ export default function SessionWizardInteractiveLocationsStep({
         onAddLocation={onAddInteractiveLocation}
       />
 
-      <div className="flex items-center gap-1 flex-wrap">
-        {Object.entries(ilLocaleData || {}).map(([key, loc]) => {
-          const isActive = key === ilActiveLocale;
-
-          return (
-            <button
-              key={key}
-              type="button"
-              onClick={() => onSetIlActiveLocale?.(key)}
-              className={`flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium border transition-all ${
-                isActive
-                  ? 'bg-blue-600 text-white border-blue-600'
-                  : 'bg-white text-gray-600 border-gray-300 hover:border-blue-400'
-              }`}
-            >
-              <span>{getFlag(loc.code)}</span>
-              <span>{loc.langName}</span>
-            </button>
-          );
-        })}
-      </div>
+      <LocaleEditor
+        localeData={ilLocaleData}
+        activeLocale={ilActiveLocale}
+        onSwitch={onSetIlActiveLocale}
+        showStatus={false}
+      />
 
       <div className="flex gap-5 items-start">
         <IlPhotoPanel
@@ -847,55 +758,28 @@ export default function SessionWizardInteractiveLocationsStep({
           <div className="grid grid-cols-2 gap-5">
             <div className="space-y-3">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <FormLabel  layout="block" size="sm" weight="medium" tone="strong" spacing="xs">
                   Название интерактивной локации ({localeLabel})
-                </label>
+                </FormLabel>
 
-                <input
-                  type="text"
-                  value={ilCurrentLocale.name || ''}
-                  onChange={(e) => onUpdateIlLocaleField?.('name', e.target.value)}
-                  placeholder="Название интерактивной локации"
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
+                <TextInput type="text" value={ilCurrentLocale.name || ''} onChange={(e) => onUpdateIlLocaleField?.('name', e.target.value)} placeholder="Название интерактивной локации" />
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
+              <div className={formGridClassName({ responsive: false })}>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                  <FormLabel  layout="block" size="sm" weight="medium" tone="strong" spacing="xs">
                     Индекс
-                  </label>
+                  </FormLabel>
 
-                  <input
-                    type="number"
-                    value={currentIl?.index ?? currentIl?.order ?? 0}
-                    onChange={(e) => {
-                      const value = Number(e.target.value || 0);
-
-                      updateIlPatch({
-                        index: value,
-                        order: value,
-                      });
-                    }}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  />
+                  <TextInput type="number" value={currentIl?.index ?? currentIl?.order ?? 0} onChange={(e) => { const value = Number(e.target.value || 0); updateIlPatch({ index: value, order: value, }); }} />
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                  <FormLabel  layout="block" size="sm" weight="medium" tone="strong" spacing="xs">
                     Ранг
-                  </label>
+                  </FormLabel>
 
-                  <input
-                    type="number"
-                    value={currentIl?.rank ?? 0}
-                    onChange={(e) => {
-                      updateIlPatch({
-                        rank: Number(e.target.value || 0),
-                      });
-                    }}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  />
+                  <TextInput type="number" value={currentIl?.rank ?? 0} onChange={(e) => { updateIlPatch({ rank: Number(e.target.value || 0), }); }} />
                 </div>
               </div>
 
@@ -908,18 +792,18 @@ export default function SessionWizardInteractiveLocationsStep({
                 onReloadEventFilters={onReloadEventFilters}
               />
 
-              <div className="p-3 border border-gray-200 rounded-lg bg-gray-50">
-                <p className="text-sm font-medium text-gray-800">
+              <Panel tone="muted" className="p-3">
+                <p className="text-sm font-medium text-aspectum-text-emphasis">
                   {getIlCityBindingLabel(
                     currentIl,
                     referenceCities,
                     cityDrafts,
                   )}
                 </p>
-                <p className="mt-1 text-xs text-gray-500">
+                <p className="mt-1 text-xs text-aspectum-text-muted">
                   Привязка к городу сессии управляется автоматически.
                 </p>
-              </div>
+              </Panel>
             </div>
 
             <IlMapPanel
@@ -939,24 +823,16 @@ export default function SessionWizardInteractiveLocationsStep({
 
           <div>
             <div className="flex items-center gap-2 mb-1">
-              <label className="text-sm font-medium text-gray-700">
+              <FormLabel  size="sm" weight="medium" tone="strong">
                 Описание
-              </label>
+              </FormLabel>
 
-              <span className="px-1.5 py-0.5 bg-blue-100 text-blue-700 text-xs rounded font-mono">
+              <span className="px-1.5 py-0.5 bg-aspectum-primary-muted text-aspectum-primary-hover text-xs rounded font-mono">
                 {localeLabel}
               </span>
             </div>
 
-            <textarea
-              value={ilCurrentLocale.description || ''}
-              onChange={(e) =>
-                onUpdateIlLocaleField?.('description', e.target.value)
-              }
-              rows={7}
-              placeholder="Краткое описание интерактивной локации..."
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
-            />
+            <Textarea value={ilCurrentLocale.description || ''} onChange={(e) => onUpdateIlLocaleField?.('description', e.target.value) } rows={7} placeholder="Краткое описание интерактивной локации..." />
           </div>
 
           <div className="flex items-center justify-end gap-3">
@@ -964,13 +840,13 @@ export default function SessionWizardInteractiveLocationsStep({
               <div
                 className={`flex items-center gap-1.5 text-xs transition-opacity ${
                   ilAutoSaved && !ilAutoSaving
-                    ? 'text-emerald-600'
-                    : 'text-gray-400'
+                    ? 'text-aspectum-success'
+                    : 'text-aspectum-text-disabled'
                 }`}
               >
                 {ilAutoSaving ? (
                   <>
-                    <span className="inline-block w-3 h-3 border-2 border-gray-300 border-t-transparent rounded-full animate-spin" />
+                    <Spinner size="xs" className="border-2 border-aspectum-border-strong" />
                     <span>Сохранение...</span>
                   </>
                 ) : (
@@ -993,14 +869,15 @@ export default function SessionWizardInteractiveLocationsStep({
                 )}
               </div>
             )}
-            <button
+            <Button
               type="button"
               onClick={onSaveCurrentIl}
               disabled={ilSaving}
-              className="px-5 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors"
+              variant="primary"
+              size="md"
             >
               {ilSaving ? 'Сохранение...' : 'Сохранить'}
-            </button>
+            </Button>
           </div>
         </main>
       </div>

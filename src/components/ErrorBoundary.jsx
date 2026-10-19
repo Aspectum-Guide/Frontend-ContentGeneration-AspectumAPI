@@ -1,5 +1,7 @@
 import { Component } from 'react';
+import { Button, ErrorState } from '@aspectum/ui';
 import { reportError } from '../utils/errorReporting';
+import { isLazyChunkLoadError } from '../utils/lazyChunkRecovery';
 
 export default class ErrorBoundary extends Component {
   constructor(props) {
@@ -33,29 +35,20 @@ export default class ErrorBoundary extends Component {
       }
 
       return (
-        <div className="min-h-screen flex items-center justify-center bg-gray-50 p-6">
-          <div className="max-w-md w-full bg-white rounded-2xl border border-red-100 shadow-sm p-8 text-center">
-            <div className="text-4xl mb-4">⚠️</div>
-            <h1 className="text-lg font-semibold text-gray-900 mb-2">Что-то пошло не так</h1>
-            <p className="text-sm text-gray-500 mb-6">
-              Произошла непредвиденная ошибка. Попробуйте обновить страницу.
-            </p>
-            <details className="text-left mb-6">
-              <summary className="text-xs text-gray-400 cursor-pointer hover:text-gray-600">
-                Подробности ошибки
-              </summary>
-              <pre className="mt-2 text-xs text-red-500 bg-red-50 rounded-lg p-3 overflow-auto max-h-40 whitespace-pre-wrap">
-                {this.state.error?.message}
-              </pre>
-            </details>
-            <button
+        <ErrorState
+          title="Что-то пошло не так"
+          description="Произошла непредвиденная ошибка. Попробуйте обновить страницу."
+          details={this.state.error?.message}
+          actions={(
+            <Button type="button"
               onClick={() => window.location.reload()}
-              className="px-5 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition-colors"
+              variant="primary"
+              size="md"
             >
               Обновить страницу
-            </button>
-          </div>
-        </div>
+            </Button>
+          )}
+        />
       );
     }
 
@@ -64,38 +57,34 @@ export default class ErrorBoundary extends Component {
 }
 
 function SessionWizardFallback({ error, reset }) {
+  const chunkLoadFailed = isLazyChunkLoadError(error);
+  const retry = () => {
+    if (chunkLoadFailed) {
+      window.location.reload();
+      return;
+    }
+    reset();
+  };
+
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 p-6">
-      <div className="max-w-md w-full bg-white rounded-2xl border border-red-100 shadow-sm p-8 text-center">
-        <div className="text-4xl mb-4">⚠️</div>
-        <h1 className="text-lg font-semibold text-gray-900 mb-2">Ошибка в редакторе сессии</h1>
-        <p className="text-sm text-gray-500 mb-6">
-          Данные не потеряны — они сохранены на сервере. Вернитесь к списку сессий.
-        </p>
-        <details className="text-left mb-6">
-          <summary className="text-xs text-gray-400 cursor-pointer hover:text-gray-600">
-            Подробности
-          </summary>
-          <pre className="mt-2 text-xs text-red-500 bg-red-50 rounded-lg p-3 overflow-auto max-h-32 whitespace-pre-wrap">
-            {error?.message}
-          </pre>
-        </details>
-        <div className="flex gap-3 justify-center">
-          <button
-            onClick={reset}
-            className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+    <ErrorState
+      title="Ошибка в редакторе сессии"
+      description="Данные не потеряны — они сохранены на сервере. Вернитесь к списку сессий."
+      details={error?.message}
+      detailsLabel="Подробности"
+      actions={(
+        <>
+          <Button type="button"
+            onClick={retry}
+            variant="outline"
+            size="md"
           >
-            Попробовать снова
-          </button>
-          <a
-            href="/generation"
-            className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors"
-          >
-            К списку сессий
-          </a>
-        </div>
-      </div>
-    </div>
+            {chunkLoadFailed ? 'Повторить загрузку' : 'Попробовать снова'}
+          </Button>
+          <a href="/generation"><Button size="md">К списку сессий</Button></a>
+        </>
+      )}
+    />
   );
 }
 

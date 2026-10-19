@@ -1,9 +1,8 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { eventSlotAvailabilitiesAPI, eventTicketTypePricesAPI, ticketTypesAPI } from '../../../api/booking';
 import { citiesCatalogAPI } from '../cities/api';
-import BulkActionModal from '../../../components/bulk/BulkActionModal';
 import Layout from '../../../components/Layout';
-import { Select, TextInput } from '../../../components/ui/FormField';
+import { FormLabel, Alert, BulkActionModal, Button, Checkbox, DataTableSurface, EmptyState, InlineState, PageHeader, Select, TextInput, formGridClassName } from '@aspectum/ui';
 import { parseApiError } from '../../../utils/apiError';
 import { loadReferenceEventsForCity } from '../shared/bookingOptions';
 import TicketTypeSelect from '../shared/components/TicketTypeSelect';
@@ -176,17 +175,14 @@ export default function CityPricingWorkbenchPage() {
 
   return (
     <Layout>
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold text-gray-900">Массовые цены по городу</h1>
-        <p className="mt-1 text-sm text-gray-500">
-          Базовые цены (событие + тип билета) для всех событий выбранного города. Слоты и правила
-          цен по-прежнему редактируются в мастере настройки конкретного события.
-        </p>
-      </div>
+      <PageHeader
+        title="Массовые цены по городу"
+        description="Базовые цены (событие + тип билета) для всех событий выбранного города. Слоты и правила цен по-прежнему редактируются в мастере настройки конкретного события."
+      />
 
       <div className="flex flex-wrap items-end gap-4 mb-4">
         <div className="w-64">
-          <label className="block text-xs text-gray-500 mb-1">Город</label>
+          <FormLabel  layout="block" size="xs" tone="muted" spacing="xs">Город</FormLabel>
           <Select
             value={cityId}
             onChange={(e) => setCityId(e.target.value)}
@@ -200,7 +196,7 @@ export default function CityPricingWorkbenchPage() {
         </div>
 
         <div className="w-64">
-          <label className="block text-xs text-gray-500 mb-1">Тип билета (фильтр)</label>
+          <FormLabel  layout="block" size="xs" tone="muted" spacing="xs">Тип билета (фильтр)</FormLabel>
           <TicketTypeSelect
             value={ticketTypeFilter}
             onChange={setTicketTypeFilter}
@@ -210,69 +206,49 @@ export default function CityPricingWorkbenchPage() {
           />
         </div>
 
-        <label className="flex items-center gap-2 px-3 py-2 bg-white border border-gray-300 rounded-lg text-sm cursor-pointer">
-          <input
-            type="checkbox"
+        <FormLabel  layout="row" size="sm" interactive className="px-3 py-2 bg-aspectum-surface border border-aspectum-border-strong rounded-aspectum-control">
+          <Checkbox
             checked={ruMode}
             onChange={(e) => setRuMode(e.target.checked)}
-            className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+            className="rounded border-aspectum-border-strong text-aspectum-primary focus:ring-aspectum-focus"
           />
           RU-контур (только RUB)
-        </label>
+        </FormLabel>
 
         {selectedKeys.size > 0 && (
-          <button
-            type="button"
-            onClick={() => setBulkModalOpen(true)}
-            className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors"
-          >
+          <Button type="button" variant="primary" size="md" onClick={() => setBulkModalOpen(true)}>
             Применить к выбранным ({selectedKeys.size})
-          </button>
+          </Button>
         )}
 
         {dirtyCount > 0 && (
-          <button
-            type="button"
-            onClick={handleSaveAll}
-            disabled={savingAll}
-            className="px-4 py-2 text-sm font-medium text-white bg-emerald-600 rounded-lg hover:bg-emerald-700 disabled:opacity-50 transition-colors"
-          >
+          <Button type="button" variant="emerald" size="md" onClick={handleSaveAll} disabled={savingAll}>
             {savingAll ? 'Сохранение…' : `Сохранить изменённые (${dirtyCount})`}
-          </button>
+          </Button>
         )}
       </div>
 
-      {saveError && (
-        <div className="mb-4 px-4 py-2 bg-red-50 border border-red-200 text-red-700 text-sm rounded-lg">
-          {saveError}
-        </div>
-      )}
-      {saveNotice && (
-        <div className="mb-4 px-4 py-2 bg-emerald-50 border border-emerald-200 text-emerald-700 text-sm rounded-lg">
-          {saveNotice}
-        </div>
-      )}
-      {loadError && (
-        <div className="mb-4 px-4 py-2 bg-red-50 border border-red-200 text-red-700 text-sm rounded-lg">
-          {loadError}
-        </div>
-      )}
+      {saveError && <Alert tone="error" className="mb-4">{saveError}</Alert>}
+      {saveNotice && <Alert tone="success" className="mb-4">{saveNotice}</Alert>}
+      {loadError && <Alert tone="error" className="mb-4">{loadError}</Alert>}
 
       {!cityId ? (
-        <div className="px-4 py-8 text-center text-gray-400 text-sm border border-dashed border-gray-300 rounded-xl">
-          Выберите город, чтобы увидеть цены по его событиям.
-        </div>
+        <EmptyState
+          icon="🏙️"
+          title="Выберите город"
+          description="После выбора здесь появятся цены по его событиям."
+          className="py-8"
+        />
       ) : (
-        <div className="overflow-x-auto rounded-xl border border-gray-200">
+        <DataTableSurface className="rounded-aspectum-card">
           <table className="w-full text-sm">
-            <thead className="bg-gray-50 text-xs text-gray-500 uppercase">
+            <thead className="bg-aspectum-surface-muted text-xs text-aspectum-text-muted uppercase">
               <tr>
                 <th className="px-3 py-2 text-center w-8">
-                  <input
-                    type="checkbox"
+                  <Checkbox
                     checked={rows.length > 0 && selectedKeys.size === rows.length}
                     onChange={toggleSelectAll}
-                    className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                    className="rounded border-aspectum-border-strong text-aspectum-primary focus:ring-aspectum-focus"
                   />
                 </th>
                 <th className="px-3 py-2 text-left">Событие</th>
@@ -283,11 +259,11 @@ export default function CityPricingWorkbenchPage() {
                 <th className="px-3 py-2 text-center">Слоты</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-100">
+            <tbody className="divide-y divide-aspectum-border-subtle">
               {dataLoading ? (
-                <tr><td colSpan={7} className="px-3 py-6 text-center text-gray-400">Загрузка…</td></tr>
+                <tr><InlineState as="td" colSpan={7} loading align="center" tone="disabled" className="px-3 py-6">Загрузка…</InlineState></tr>
               ) : rows.length === 0 ? (
-                <tr><td colSpan={7} className="px-3 py-6 text-center text-gray-400">Нет событий с ценами для этого города</td></tr>
+                <tr><InlineState as="td" colSpan={7} align="center" tone="disabled" className="px-3 py-6">Нет событий с ценами для этого города</InlineState></tr>
               ) : rows.map((row) => {
                 const draft = draftByKey.get(row.key) || {};
                 const isDirty = draft.price !== undefined && draft.price !== '';
@@ -301,50 +277,39 @@ export default function CityPricingWorkbenchPage() {
                   || (ruMode ? 'RUB' : DEFAULT_CURRENCY);
                 const currencyWarning = ruMode && row.savedBase && normalizeCurrency(row.savedBase.currency) !== 'RUB';
                 return (
-                  <tr key={row.key} className={selectedKeys.has(row.key) ? 'bg-blue-50' : 'hover:bg-gray-50'}>
+                  <tr key={row.key} className={selectedKeys.has(row.key) ? 'bg-aspectum-primary-soft' : 'hover:bg-aspectum-surface-muted'}>
                     <td className="px-3 py-2 text-center">
-                      <input
-                        type="checkbox"
+                      <Checkbox
                         checked={selectedKeys.has(row.key)}
                         onChange={() => toggleSelect(row.key)}
-                        className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                        className="rounded border-aspectum-border-strong text-aspectum-primary focus:ring-aspectum-focus"
                       />
                     </td>
-                    <td className="px-3 py-2 text-gray-700">{row.eventLabel}</td>
-                    <td className="px-3 py-2 text-gray-700">{row.ticketTypeLabel}</td>
+                    <td className="px-3 py-2 text-aspectum-text-strong">{row.eventLabel}</td>
+                    <td className="px-3 py-2 text-aspectum-text-strong">{row.ticketTypeLabel}</td>
                     <td className="px-3 py-2">
                       <span className={`inline-block px-2 py-0.5 rounded text-xs ${priceStatusClass(rowStatus.kind)}`}>
                         {rowStatus.label}
                       </span>
                       {currencyWarning && (
-                        <span className="ml-2 text-xs text-amber-600">не RUB — не виден в RU-приложении</span>
+                        <span className="ml-2 text-xs text-aspectum-warning">не RUB — не виден в RU-приложении</span>
                       )}
                     </td>
                     <td className="px-3 py-2 text-right">
-                      <input
-                        type="number" step="0.01" min={0}
-                        value={draft.price ?? ''}
-                        onChange={(e) => setDraft(row.key, { price: e.target.value })}
-                        placeholder={row.savedBase ? String(row.savedBase.base_price) : '—'}
-                        className="w-24 px-2 py-1 border border-gray-300 rounded text-sm text-right focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      />
+                      <TextInput className="w-24 text-right" type="number" step="0.01" min={0} value={draft.price ?? ''} onChange={(e) => setDraft(row.key, { price: e.target.value })} placeholder={row.savedBase ? String(row.savedBase.base_price) : '—'} />
                     </td>
                     <td className="px-3 py-2">
                       {ruMode ? (
-                        <span className="text-xs text-gray-500">RUB</span>
+                        <span className="text-xs text-aspectum-text-muted">RUB</span>
                       ) : (
-                        <select
-                          value={rowCurrency}
-                          onChange={(e) => setDraft(row.key, { currency: e.target.value })}
-                          className="w-20 px-2 py-1 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                        >
+                        <Select className="w-20" value={rowCurrency} onChange={(e) => setDraft(row.key, { currency: e.target.value })}>
                           {CURRENCIES.map((c) => <option key={c} value={c}>{c}</option>)}
-                        </select>
+                        </Select>
                       )}
                     </td>
-                    <td className="px-3 py-2 text-center text-xs text-gray-500">
+                    <td className="px-3 py-2 text-center text-xs text-aspectum-text-muted">
                       {row.slotsSummary.total === 0
-                        ? <span className="text-amber-600">нет слотов</span>
+                        ? <span className="text-aspectum-warning">нет слотов</span>
                         : `${row.slotsSummary.active}/${row.slotsSummary.total} открыт`}
                     </td>
                   </tr>
@@ -352,7 +317,7 @@ export default function CityPricingWorkbenchPage() {
               })}
             </tbody>
           </table>
-        </div>
+        </DataTableSurface>
       )}
 
       <BulkActionModal
@@ -364,10 +329,10 @@ export default function CityPricingWorkbenchPage() {
         onSubmit={handleBulkApply}
         renderFields={({ values, setValues, error }) => (
           <div className="space-y-3">
-            {error && <div className="text-sm text-red-600">{error}</div>}
-            <div className="grid grid-cols-2 gap-3">
+            {error && <div className="text-sm text-aspectum-danger">{error}</div>}
+            <div className={formGridClassName({ responsive: false })}>
               <div>
-                <label className="block text-xs text-gray-500 mb-1">Цена</label>
+                <FormLabel  layout="block" size="xs" tone="muted" spacing="xs">Цена</FormLabel>
                 <TextInput
                   type="number" step="0.01" min={0}
                   value={values.price}
@@ -376,9 +341,9 @@ export default function CityPricingWorkbenchPage() {
                 />
               </div>
               <div>
-                <label className="block text-xs text-gray-500 mb-1">Валюта</label>
+                <FormLabel  layout="block" size="xs" tone="muted" spacing="xs">Валюта</FormLabel>
                 {ruMode ? (
-                  <span className="block px-3 py-2 text-sm text-gray-500">RUB</span>
+                  <span className="block px-3 py-2 text-sm text-aspectum-text-muted">RUB</span>
                 ) : (
                   <Select
                     value={values.currency}
@@ -392,7 +357,7 @@ export default function CityPricingWorkbenchPage() {
           </div>
         )}
         renderResult={({ result }) => (
-          <div className="text-sm text-emerald-700">
+          <div className="text-sm text-aspectum-success-strong">
             Создано: {result?.created_count ?? 0}, обновлено: {result?.updated_count ?? 0}
           </div>
         )}

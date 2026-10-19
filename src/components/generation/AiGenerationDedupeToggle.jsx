@@ -1,3 +1,5 @@
+import { FormLabel, Checkbox } from '@aspectum/ui';
+
 const HELPER_TEXT = {
   city_info: {
     on: 'Уже существующие блоки полезной информации по этому городу будут переданы модели и исключены из результата.',
@@ -31,51 +33,17 @@ export default function AiGenerationDedupeToggle({
   const helperOff = disabledText || texts.off;
 
   return (
-    <div className={`rounded-lg border border-gray-200 bg-gray-50 px-3 py-3 space-y-2 ${className}`.trim()}>
-      <label className="flex items-center justify-between gap-3 cursor-pointer">
-        <span className="text-sm font-medium text-gray-900">Исключать дубли</span>
-        <input
-          type="checkbox"
+    <div className={`rounded-aspectum-control border border-aspectum-border bg-aspectum-surface-muted px-3 py-3 space-y-2 ${className}`.trim()}>
+      <FormLabel  layout="rowSpread" interactive>
+        <span className="text-sm font-medium text-aspectum-text">Исключать дубли</span>
+        <Checkbox
           checked={Boolean(checked)}
           onChange={(e) => onChange?.(e.target.checked)}
           disabled={disabled}
-          className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500 disabled:opacity-50"
+          className="h-4 w-4 rounded border-aspectum-border-strong text-aspectum-primary focus:ring-aspectum-focus disabled:opacity-50"
         />
-      </label>
-      <p className="text-xs text-gray-600">{checked ? helperOn : helperOff}</p>
+      </FormLabel>
+      <p className="text-xs text-aspectum-text-subtle">{checked ? helperOn : helperOff}</p>
     </div>
   );
-}
-
-export function formatGenerationDedupeResultMessage(createData, { dedupeField = 'dedupe_existing_items' } = {}) {
-  const data = createData || {};
-  const createdCount = typeof data.created_count === 'number' ? data.created_count : 0;
-  const requestedCount = data.requested_count;
-  const dedupeOn = data[dedupeField] !== false;
-  const skippedExisting = data.skipped_existing_duplicates_count || 0;
-  const skippedBatch = data.skipped_batch_duplicates_count || 0;
-  const skippedInvalid = data.skipped_invalid_count || 0;
-  const refillAttempts = data.refill_attempts || 0;
-
-  let message = `Создано: ${createdCount}`;
-  if (typeof requestedCount === 'number') {
-    message += ` из ${requestedCount}`;
-  }
-  if (dedupeOn) {
-    if (skippedExisting > 0) {
-      message += `. Пропущено дублей с существующими: ${skippedExisting}`;
-    }
-  } else {
-    message += '. Дубли с существующими разрешены';
-  }
-  if (skippedBatch > 0) {
-    message += `. Пропущено повторов в ответе AI: ${skippedBatch}`;
-  }
-  if (skippedInvalid > 0) {
-    message += `. Пропущено некорректных: ${skippedInvalid}`;
-  }
-  if (refillAttempts > 0) {
-    message += `. Догенерация: ${refillAttempts}/1`;
-  }
-  return message;
 }

@@ -4,7 +4,6 @@ import type {
   CityDraft,
   SessionAttraction,
   SessionInteractiveLocation,
-  SessionCityInfo,
   SessionAttractionInfo,
   SessionAttractionFeedItem,
   SessionAttractionAudioGuide,
@@ -12,12 +11,8 @@ import type {
   FilterItem,
   ReferenceCity,
   ReferenceAttraction,
-  GenerationTask,
   TaskStatus,
-  GenerationMode,
-  MultilangDict,
   FeedItemType,
-  LocaleDef,
 } from './models';
 
 // ─── Shared context passed to all sub-hooks ───────────────────────────────────

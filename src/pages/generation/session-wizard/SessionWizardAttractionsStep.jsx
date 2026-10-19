@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
-import AiGenerationModal, { WizardGenerationActionFooter } from '../../../components/generation/AiGenerationModal.jsx';
+import AiGenerationModal from '../../../components/generation/AiGenerationModal.jsx';
+import { FormLabel, WizardActionFooter as WizardGenerationActionFooter, formGridClassName } from '@aspectum/ui';
 import AiGenerationQualitySettings from '../../../components/generation/AiGenerationQualitySettings.jsx';
 import AiGenerationDedupeToggle from '../../../components/generation/AiGenerationDedupeToggle.jsx';
 import AiGenerationCountField from '../../../components/generation/AiGenerationCountField.jsx';
@@ -12,6 +13,8 @@ import SessionAttractionTourPanel from './SessionAttractionTourPanel.jsx';
 import UsefulInfoTextImportBox from './UsefulInfoTextImportBox.jsx';
 import { TTSProviderSettingsPanel } from './SessionWizardAttractionAudioGuidesBlock.jsx';
 import { createCoordinatePasteHandler } from '../../../utils/coordinates';
+import { useAppLanguages } from '../../../hooks/useAppLanguages';
+import { Alert, Button, Checkbox, EmptyState, EntityDraftsPanel, LocaleEditor, MediaUploadField, Panel, ProgressBar, SectionHeader, Select, SelectableCard, Spinner, Textarea, TextInput } from '@aspectum/ui';
 
 const getCityDisplayName = (city) => {
   if (!city) return 'Без названия';
@@ -49,14 +52,6 @@ const getDraftCityDisplayName = (draft) => {
   return draft.display_name || draft.id || 'Без названия';
 };
 
-const AI_GENERATION_LANG_OPTIONS = [
-  { value: 'ru', label: 'Русский (ru)' },
-  { value: 'en', label: 'English (en)' },
-  { value: 'it', label: 'Italiano (it)' },
-  { value: 'fr', label: 'Français (fr)' },
-  { value: 'de', label: 'Deutsch (de)' },
-  { value: 'es', label: 'Español (es)' },
-];
 
 const parseMapCoord = (value) => {
   if (value === null || value === undefined || value === '') return NaN;
@@ -131,55 +126,40 @@ function AttractionDraftsPanel({
   const currentAttrId = normalizeId(currentAttr?.id);
 
   return (
-    <div className="p-3 border border-gray-200 rounded-xl bg-gray-50">
-      <div className="flex items-center justify-between mb-2">
-        <p className="text-sm font-medium text-gray-800">
-          Черновики достопримечательностей в сессии
-        </p>
-
-        <button
-          type="button"
-          onClick={onAddAttraction}
-          className="px-2.5 py-1 text-xs font-medium text-blue-700 bg-blue-100 rounded-md hover:bg-blue-200 transition-colors"
-        >
+    <EntityDraftsPanel
+      title="Черновики достопримечательностей в сессии"
+      items={attractions}
+      emptyText="Пока нет достопримечательностей"
+      actions={(
+        <Button type="button" onClick={onAddAttraction} variant="softStrong" size="sm">
           + Добавить
-        </button>
-      </div>
-
-      <div className="flex flex-wrap gap-2">
-        {attractions.length === 0 ? (
-          <span className="text-xs text-gray-500">
-            Пока нет достопримечательностей
-          </span>
-        ) : (
-          attractions.map((attr, index) => {
-            const attrId = normalizeId(attr.id);
-            const isActiveAttr = attrId === currentAttrId;
-
-            return (
-              <button
+        </Button>
+      )}
+      renderItem={(attr, index) => {
+        const attrId = normalizeId(attr.id);
+        const isActiveAttr = attrId === currentAttrId;
+        return (
+              <SelectableCard
                 key={attr.id}
-                type="button"
-                onClick={() => {
+                onSelect={() => {
                   if (!isActiveAttr) {
                     onSelectAttraction(attr.id);
                   }
                 }}
-                className={`flex items-center gap-1 px-2 py-1 rounded-lg border text-xs transition-colors ${
+                ariaLabel={getAttrName(attr)}
+                className={`flex items-center gap-1 px-2 py-1 rounded-aspectum-control border text-xs transition-colors ${
                   isActiveAttr
-                    ? 'bg-blue-50 border-blue-300 text-blue-700 font-medium'
-                    : 'bg-white border-gray-200 text-gray-700 hover:border-blue-300 hover:bg-blue-50'
+                    ? 'bg-aspectum-primary-soft border-aspectum-primary-border-strong text-aspectum-primary-hover font-medium'
+                    : 'bg-aspectum-surface border-aspectum-border text-aspectum-text-strong hover:border-aspectum-primary-border-strong hover:bg-aspectum-primary-soft'
                 }`}
                 title={getAttrName(attr)}
               >
-                <span className="text-gray-400">{index + 1}.</span>
+                <span className="text-aspectum-text-disabled">{index + 1}.</span>
                 <span>{getAttrName(attr)}</span>
-              </button>
-            );
-          })
-        )}
-      </div>
-    </div>
+              </SelectableCard>
+        );
+      }}
+    />
   );
 }
 
@@ -201,86 +181,50 @@ function AttractionPhotoPanel({
 
   return (
     <aside className="w-52 shrink-0 space-y-3">
-      <div
-        {...photoPaste}
-        title="Наведите и нажмите Ctrl+V, чтобы вставить фото из буфера"
-        className="relative aspect-[3/4] bg-gray-100 rounded-xl overflow-hidden border border-gray-200 flex items-center justify-center">
-        {preview ? (
-          <img
-            src={preview}
-            alt="Фото достопримечательности"
-            className="w-full h-full object-cover"
-          />
-        ) : (
-          <div className="text-gray-400 text-sm text-center px-2">
-            Фото достопримечательности
+      <MediaUploadField
+        previewUrl={preview}
+        alt="Фото достопримечательности"
+        placeholder="Фото достопримечательности"
+        previewProps={{ ...photoPaste, title: 'Наведите и нажмите Ctrl+V, чтобы вставить фото из буфера' }}
+        previewClassName="w-full h-full object-cover"
+        previewContainerClassName="relative aspect-[3/4] w-full overflow-hidden rounded-aspectum-card border border-aspectum-border bg-aspectum-surface-muted flex items-center justify-center"
+        uploadLabel="+ Добавить фото"
+        uploadVariant="soft"
+        uploadSize="md"
+        uploadClassName="w-full"
+        inputRef={photoFileRef}
+        onChange={(e) => onPhotoFileChange?.(e, currentAttr)}
+        previewOverlay={photoUploading && (
+          <div className="absolute inset-0 bg-aspectum-overlay-medium flex items-center justify-center">
+            <Spinner size="md" className="w-6 h-6 border-aspectum-on-accent" />
           </div>
         )}
-
-        {photoUploading && (
-          <div className="absolute inset-0 bg-black/40 flex items-center justify-center">
-            <div className="animate-spin w-6 h-6 border-2 border-white border-t-transparent rounded-full" />
-          </div>
+        previewActions={(
+          <Button
+            type="button"
+            onClick={() => onOpenCommonsModal?.(currentAttr)}
+            title="Библиотека изображений: Commons, Минкульт, Openverse, Pastvu, Mapillary"
+            variant="purple"
+            size="sm"
+            className="shadow-aspectum-elevated"
+          >
+            ⊞ Библиотека
+          </Button>
         )}
-
-        <button
-          type="button"
-          onClick={() => onOpenCommonsModal?.(currentAttr)}
-          className="absolute top-2 right-2 px-2 py-1 text-xs bg-purple-600 text-white rounded-md hover:bg-purple-700 transition-colors shadow-lg"
-          title="Библиотека изображений: Commons, Минкульт, Openverse, Pastvu, Mapillary"
-        >
-          ⊞ Библиотека
-        </button>
-      </div>
-
-      <div>
-        <label className="block w-full text-center text-xs text-blue-600 bg-blue-50 border border-blue-200 rounded-lg py-1.5 cursor-pointer hover:bg-blue-100 transition-colors">
-          + Добавить фото
-          <input
-            ref={photoFileRef}
-            type="file"
-            accept="image/*"
-            className="hidden"
-            onChange={(e) => {
-              onPhotoFileChange?.(e, currentAttr);
-            }}
-          />
-        </label>
-      </div>
+        className="w-full"
+      />
 
       <div className="space-y-1.5">
         <div>
-          <label className="block text-xs text-gray-500 mb-0.5">URL</label>
-          <input
-            type="url"
-            value={imageOriginalUrl || ''}
-            onChange={(e) => {
-              onUpdateAttractionPatch({
-                image_original_url: e.target.value,
-                imageOriginalUrl: e.target.value,
-              });
-            }}
-            placeholder="https://upload.wikimedia.org/..."
-            className="w-full px-2 py-1 text-xs border border-gray-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-blue-400"
-          />
+          <FormLabel  layout="block" size="xs" tone="muted" spacing="xxs">URL</FormLabel>
+          <TextInput type="url" value={imageOriginalUrl || ''} onChange={(e) => { onUpdateAttractionPatch({ image_original_url: e.target.value, imageOriginalUrl: e.target.value, }); }} placeholder="https://upload.wikimedia.org/..." />
         </div>
 
         <div>
-          <label className="block text-xs text-gray-500 mb-0.5">
+          <FormLabel  layout="block" size="xs" tone="muted" spacing="xxs">
             Авторские права
-          </label>
-          <input
-            type="text"
-            value={imageCopyright || ''}
-            onChange={(e) => {
-              onUpdateAttractionPatch({
-                image_copyright: e.target.value,
-                imageCopyright: e.target.value,
-              });
-            }}
-            placeholder="© Автор / Источник"
-            className="w-full px-2 py-1 text-xs border border-gray-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-blue-400"
-          />
+          </FormLabel>
+          <TextInput type="text" value={imageCopyright || ''} onChange={(e) => { onUpdateAttractionPatch({ image_copyright: e.target.value, imageCopyright: e.target.value, }); }} placeholder="© Автор / Источник" />
         </div>
       </div>
     </aside>
@@ -307,6 +251,8 @@ function AttractionMapPanel({
   const mapInstanceRef = useRef(null);
   const markerRef = useRef(null);
   const [mapNode, setMapNode] = useState(null);
+  const latestMapPropsRef = useRef({ lat, lon, onLatChange, onLonChange });
+  latestMapPropsRef.current = { lat, lon, onLatChange, onLonChange };
 
   useEffect(() => {
     if (!mapNode) return;
@@ -331,9 +277,10 @@ function AttractionMapPanel({
         shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
       });
 
-      const hasCoords = hasValidMapCoords(lat, lon);
-      const initialLat = parseMapCoord(lat);
-      const initialLon = parseMapCoord(lon);
+      const initialProps = latestMapPropsRef.current;
+      const hasCoords = hasValidMapCoords(initialProps.lat, initialProps.lon);
+      const initialLat = parseMapCoord(initialProps.lat);
+      const initialLon = parseMapCoord(initialProps.lon);
 
       const map = L.map(mapNode, {
         zoomControl: true,
@@ -382,8 +329,9 @@ function AttractionMapPanel({
       };
 
       map.on('click', (event) => {
-        onLatChange(event.latlng.lat.toFixed(6));
-        onLonChange(event.latlng.lng.toFixed(6));
+        const { onLatChange: handleLatChange, onLonChange: handleLonChange } = latestMapPropsRef.current;
+        handleLatChange(event.latlng.lat.toFixed(6));
+        handleLonChange(event.latlng.lng.toFixed(6));
       });
 
       mapInstanceRef.current = {
@@ -400,7 +348,7 @@ function AttractionMapPanel({
       }, 250);
 
       if (hasCoords) {
-        updateMarker(lat, lon);
+        updateMarker(initialProps.lat, initialProps.lon);
       }
     });
 
@@ -424,40 +372,24 @@ function AttractionMapPanel({
   return (
     <div>
       <div className="flex items-center justify-between mb-1">
-        <label className="text-sm font-medium text-gray-700">
+        <FormLabel  size="sm" weight="medium" tone="default">
           Координаты
-        </label>
+        </FormLabel>
 
-        <span className="text-xs text-gray-400">
+        <span className="text-xs text-aspectum-text-muted">
           Клик по карте или ввод вручную
         </span>
       </div>
 
       <div
         ref={setMapNode}
-        className="w-full h-48 rounded-lg border border-gray-200 overflow-hidden z-0"
+        className="w-full h-48 rounded-aspectum-card border border-aspectum-border overflow-hidden z-0"
       />
 
       <div className="grid grid-cols-2 gap-2 mt-2">
-        <input
-          type="number"
-          step="0.000001"
-          value={lat ?? ''}
-          onChange={(e) => onLatChange(e.target.value)}
-          onPaste={handleCoordPaste}
-          placeholder="Широта"
-          className="px-3 py-1.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-        />
+        <TextInput type="number" step="0.000001" value={lat ?? ''} onChange={(e) => onLatChange(e.target.value)} onPaste={handleCoordPaste} placeholder="Широта" />
 
-        <input
-          type="number"
-          step="0.000001"
-          value={lon ?? ''}
-          onChange={(e) => onLonChange(e.target.value)}
-          onPaste={handleCoordPaste}
-          placeholder="Долгота"
-          className="px-3 py-1.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-        />
+        <TextInput type="number" step="0.000001" value={lon ?? ''} onChange={(e) => onLonChange(e.target.value)} onPaste={handleCoordPaste} placeholder="Долгота" />
       </div>
     </div>
   );
@@ -561,6 +493,8 @@ export default function SessionWizardAttractionsStep({
   onAiGenerationModeChange,
   onAiUseWebSearchChange,
 }) {
+  const { languages: appLanguages } = useAppLanguages();
+  const aiGenerationLangOptions = appLanguages.map((language) => ({ value: language.code, label: `${language.label || language.name || language.code} (${language.code})` }));
   const attrCurrentLocale = attrLocaleData[attrActiveLocale] || {};
   const batchAudioLanguageOptions = Object.entries(attrLocaleData || {}).reduce(
     (options, [key, loc]) => {
@@ -721,61 +655,53 @@ export default function SessionWizardAttractionsStep({
         progress={attractionGenerationProgress?.progress}
         footer={(
           <WizardGenerationActionFooter>
-            <button
+            <Button
               type="button"
               onClick={() => onCloseAttractionGenerationModal?.()}
               disabled={attractionGenerating}
-              className="px-4 py-2 text-sm font-medium text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50"
+              variant="outline"
+              size="md"
             >
               Отмена
-            </button>
-            <button
+            </Button>
+            <Button
               type="button"
               onClick={() => onGenerateAttractionsFromPrompt?.()}
               disabled={attractionGenerating || !attractionGenCanSubmit}
-              className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-50"
+              variant="primary"
+              size="md"
             >
               Сгенерировать
-            </button>
+            </Button>
           </WizardGenerationActionFooter>
         )}
       >
-        <h2 id="attraction-gen-title" className="text-lg font-semibold text-gray-900">
-          Сгенерировать достопримечательности
-        </h2>
+        <SectionHeader headingId="attraction-gen-title" title="Сгенерировать достопримечательности" />
 
-        <p className="text-sm text-gray-600">
+        <p className="text-sm text-aspectum-text-subtle">
           Все созданные достопримечательности автоматически привязываются к городу сессии.
         </p>
 
         <div className="space-y-3">
           <div>
-            <label
+            <FormLabel
               htmlFor="attraction-gen-lang"
-              className="block text-sm font-medium text-gray-700 mb-1"
+               layout="block" size="sm" weight="medium" tone="strong" spacing="xs"
             >
               Язык генерации
-            </label>
-            <select
-              id="attraction-gen-lang"
-              value={attractionGenerationLang || 'ru'}
-              onChange={(e) => onAttractionGenerationLangChange?.(e.target.value)}
-              disabled={attractionGenerating}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
-            >
-              {AI_GENERATION_LANG_OPTIONS.map((opt) => (
+            </FormLabel>
+            <Select className="disabled:bg-aspectum-surface-subtle" id="attraction-gen-lang" value={attractionGenerationLang || 'ru'} onChange={(e) => onAttractionGenerationLangChange?.(e.target.value)} disabled={attractionGenerating}>
+              {aiGenerationLangOptions.map((opt) => (
                 <option key={opt.value} value={opt.value}>
                   {opt.label}
                 </option>
               ))}
-            </select>
+            </Select>
           </div>
         </div>
 
         {attractionGenerationError && (
-          <div className="text-sm text-red-700 bg-red-50 border border-red-200 rounded-lg p-3">
-            {attractionGenerationError}
-          </div>
+          <Alert tone="error">{attractionGenerationError}</Alert>
         )}
 
         <AiGenerationCountField
@@ -803,18 +729,10 @@ export default function SessionWizardAttractionsStep({
           entityType="attractions"
         />
 
-        <label className="block text-sm font-medium text-gray-700" htmlFor="attraction-gen-prompt">
+        <FormLabel  layout="block" size="sm" weight="medium" tone="strong" htmlFor="attraction-gen-prompt">
           Запрос к ИИ
-        </label>
-        <textarea
-          id="attraction-gen-prompt"
-          rows={5}
-          value={attractionGenerationPrompt}
-          onChange={(e) => onAttractionGenerationPromptChange?.(e.target.value)}
-          disabled={attractionGenerating}
-          placeholder="Например: Главные музеи и архитектурные памятники центра города."
-          className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
-        />
+        </FormLabel>
+        <Textarea className="disabled:bg-aspectum-surface-subtle" id="attraction-gen-prompt" rows={5} value={attractionGenerationPrompt} onChange={(e) => onAttractionGenerationPromptChange?.(e.target.value)} disabled={attractionGenerating} placeholder="Например: Главные музеи и архитектурные памятники центра города." />
       </AiGenerationModal>
 
       <AiGenerationModal
@@ -828,30 +746,30 @@ export default function SessionWizardAttractionsStep({
         maxWidthClass="max-w-xl"
         footer={(
           <WizardGenerationActionFooter>
-            <button
+            <Button
               type="button"
               onClick={() => setBatchAudioModalOpen(false)}
               disabled={batchAudioGenerating}
-              className="px-4 py-2 text-sm font-medium text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50"
+              variant="outline"
+              size="md"
             >
               Отмена
-            </button>
-            <button
+            </Button>
+            <Button
               type="button"
               onClick={startBatchAudio}
               disabled={batchAudioGenerating || !batchAudioCanStart}
-              className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
+              variant="primary"
+              size="md"
             >
               Запустить озвучку
-            </button>
+            </Button>
           </WizardGenerationActionFooter>
         )}
       >
-        <h2 id="batch-attraction-audio-title" className="text-lg font-semibold text-gray-900">
-          Озвучить основные локации
-        </h2>
+        <SectionHeader headingId="batch-attraction-audio-title" title="Озвучить основные локации" />
 
-        <div className="rounded-lg bg-blue-50 px-3 py-2 text-sm text-blue-900">
+        <Panel tone="info" className="px-3 py-2 text-sm">
           {batchAudioStatusLoading ? (
             'Проверяем готовность аудиогидов…'
           ) : batchAudioStatus ? (
@@ -875,15 +793,16 @@ export default function SessionWizardAttractionsStep({
           ) : (
             'Будут озвучены только ОЛ с полным текстом и без готовой аудиодорожки.'
           )}
-        </div>
+        </Panel>
 
-        <div className="rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-800">
+        <Panel className="px-3 py-2 text-sm text-aspectum-text">
           <div className="mb-1 flex items-center justify-between gap-2">
             <span className="font-medium">Языки озвучки</span>
             {batchAudioLanguageOptions.length > 1 ? (
-              <button
+              <Button
                 type="button"
-                className="text-xs text-blue-600 hover:underline disabled:opacity-50"
+                variant="link"
+                size="sm"
                 disabled={batchAudioGenerating || batchAudioStatusLoading}
                 onClick={() => changeBatchAudioLanguages(
                   batchAudioLanguages.length === batchAudioLanguageOptions.length
@@ -894,14 +813,13 @@ export default function SessionWizardAttractionsStep({
                 {batchAudioLanguages.length === batchAudioLanguageOptions.length
                   ? 'Снять все'
                   : 'Все языки'}
-              </button>
+              </Button>
             ) : null}
           </div>
           <div className="flex flex-wrap gap-x-4 gap-y-1">
             {batchAudioLanguageOptions.map((item) => (
-              <label key={item.lang} className="flex items-center gap-1.5">
-                <input
-                  type="checkbox"
+              <FormLabel key={item.lang}  layout="rowTight">
+                <Checkbox
                   checked={batchAudioLanguages.includes(item.lang)}
                   disabled={batchAudioGenerating || batchAudioStatusLoading}
                   onChange={(event) => changeBatchAudioLanguages(
@@ -913,19 +831,18 @@ export default function SessionWizardAttractionsStep({
                   )}
                 />
                 <span>{item.label}</span>
-              </label>
+              </FormLabel>
             ))}
           </div>
           {batchAudioLanguages.length > 1 ? (
-            <p className="mt-1 text-xs text-gray-500">
+            <p className="mt-1 text-xs text-aspectum-text-muted">
               Языки озвучиваются по очереди, у каждого свой голос проекта.
             </p>
           ) : null}
-        </div>
+        </Panel>
 
-        <label className="flex items-start gap-2 rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-800">
-          <input
-            type="checkbox"
+        <FormLabel  size="sm" tone="emphasis"  layout="start" className="rounded-aspectum-control border border-aspectum-border px-3 py-2">
+          <Checkbox
             className="mt-0.5"
             checked={batchAudioReplaceExisting}
             disabled={batchAudioGenerating || batchAudioStatusLoading}
@@ -934,25 +851,23 @@ export default function SessionWizardAttractionsStep({
           <span>
             Перезаписать существующее аудио
             {alreadyVoicedCount > 0 ? ` (${alreadyVoicedCount} уже озвучено)` : ''}
-            <span className="block text-xs text-gray-500">
+            <span className="block text-xs text-aspectum-text-muted">
               Старые файлы удаляются, чтобы не занимать место. Озвучка платная —
               включайте, только если нужна именно замена.
             </span>
           </span>
-        </label>
+        </FormLabel>
 
         {batchAudioStatus && batchAudioTargetCount === 0 && !batchAudioStatus.active_task ? (
-          <p className="text-sm text-amber-700">
+          <Alert tone="warning" className="text-sm">
             Новых ОЛ для озвучки нет. Уже озвучено: {Number(batchAudioStatus.already_voiced_count || 0)},
             {' '}без полного текста: {Number(batchAudioStatus.missing_text_count || 0)},
             {' '}без аудиогида: {Number(batchAudioStatus.missing_guide_count || 0)}.
-          </p>
+          </Alert>
         ) : null}
 
         {batchAudioStatusError ? (
-          <p className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
-            {batchAudioStatusError}
-          </p>
+          <Alert tone="error">{batchAudioStatusError}</Alert>
         ) : null}
 
         <TTSProviderSettingsPanel
@@ -978,44 +893,42 @@ export default function SessionWizardAttractionsStep({
         <div className="space-y-4">
           <div className="flex items-start justify-between gap-3">
             <div className="flex flex-wrap items-center gap-3">
-              <div>
-                <h2 className="text-lg font-semibold text-gray-900">
-                  Достопримечательности
-                </h2>
-
-                <p className="text-sm text-gray-500">
-                  Добавьте объекты. Новые объекты из вставки будут привязаны к текущему городу сессии.
-                </p>
-              </div>
+              <SectionHeader
+                title="Достопримечательности"
+                description="Добавьте объекты. Новые объекты из вставки будут привязаны к текущему городу сессии."
+              />
 
               {!selectMode && (
                 <div className="flex items-center gap-2">
                   {onGenerateMissingAttractionAudio ? (
-                    <button
+                    <Button
                       type="button"
                       onClick={openBatchAudioModal}
                       disabled={batchAudioGenerating || attractions.length === 0}
-                      className="px-3 py-1.5 text-sm font-medium text-blue-700 border border-blue-300 bg-white rounded-lg hover:bg-blue-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                      variant="soft"
+                      size="md"
                     >
                       {batchAudioGenerating
                         ? 'Озвучиваем ОЛ...'
                         : 'Озвучить все ОЛ без аудио'}
-                    </button>
+                    </Button>
                   ) : null}
-                  <button
+                    <Button
                     type="button"
                     onClick={() => onOpenAttractionGenerationModal?.()}
-                    className="px-3 py-1.5 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors"
+                    variant="primary"
+                    size="md"
                   >
                     Сгенерировать
-                  </button>
-                  <button
+                    </Button>
+                  <Button
                     type="button"
                     onClick={onAddAttraction}
-                    className="px-3 py-1.5 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors"
+                    variant="primary"
+                    size="md"
                   >
                     + Добавить
-                  </button>
+                  </Button>
                 </div>
               )}
             </div>
@@ -1024,45 +937,49 @@ export default function SessionWizardAttractionsStep({
               <div className="flex items-center gap-2 shrink-0">
                 {selectMode ? (
                   <>
-                    <button
+                    <Button
                       type="button"
                       onClick={toggleSelectAllAttractions}
-                      className="px-3 py-1.5 text-sm font-medium text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+                      variant="outline"
+                      size="md"
                     >
                       {allSelected ? 'Снять все' : 'Выбрать все'}
-                    </button>
-                    <button
+                    </Button>
+                    <Button
                       type="button"
                       onClick={handleBulkDeleteAttractions}
                       disabled={selectedAttractionIds.size === 0}
-                      className="px-3 py-1.5 text-sm font-medium text-white bg-red-600 rounded-lg hover:bg-red-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                      variant="danger"
+                      size="md"
                     >
                       Удалить ({selectedAttractionIds.size})
-                    </button>
-                    <button
+                    </Button>
+                    <Button
                       type="button"
                       onClick={exitSelectMode}
-                      className="px-3 py-1.5 text-sm font-medium text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+                      variant="outline"
+                      size="md"
                     >
                       Отмена
-                    </button>
+                    </Button>
                   </>
                 ) : (
-                  <button
+                  <Button
                     type="button"
                     onClick={() => setSelectMode(true)}
-                    className="px-3 py-1.5 text-sm font-medium text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+                    variant="outline"
+                    size="md"
                   >
                     Выбрать
-                  </button>
+                  </Button>
                 )}
               </div>
             )}
           </div>
 
           {(batchAudioGenerating || batchAudioResult || batchAudioCurrentStep) ? (
-            <div className="space-y-2 py-1">
-              <div className="flex items-center justify-between gap-3 text-xs text-gray-600">
+            <Panel tone="info" className="space-y-2 p-3">
+              <div className="flex items-center justify-between gap-3 text-xs text-aspectum-text-muted">
                 <span className="truncate">
                   {batchAudioCurrentStep || 'Пакетная озвучка завершена'}
                 </span>
@@ -1072,21 +989,9 @@ export default function SessionWizardAttractionsStep({
                     : `${Math.round(displayedBatchProgress)}%`}
                 </span>
               </div>
-              <div
-                className="h-2 w-full overflow-hidden rounded bg-gray-200"
-                role="progressbar"
-                aria-label="Прогресс озвучки основных локаций"
-                aria-valuemin="0"
-                aria-valuemax="100"
-                aria-valuenow={Math.round(displayedBatchProgress)}
-              >
-                <div
-                  className="h-full bg-blue-600 transition-[width] duration-300"
-                  style={{ width: `${displayedBatchProgress}%` }}
-                />
-              </div>
+              <ProgressBar value={displayedBatchProgress} label="Прогресс озвучки основных локаций" />
               {!batchAudioGenerating && batchAudioResult ? (
-                <p className="text-xs text-gray-500">
+                <p className="text-xs text-aspectum-text-muted">
                   Озвучено: {Number(batchAudioResult.generated_count || 0)}.
                   {' '}Уже было готово: {Number(batchAudioResult.already_voiced_count || 0)}.
                   {' '}Без полного текста: {Number(batchAudioResult.missing_text_count || 0)}.
@@ -1096,7 +1001,7 @@ export default function SessionWizardAttractionsStep({
                     : ''}
                 </p>
               ) : null}
-            </div>
+            </Panel>
           ) : null}
 
           <UsefulInfoTextImportBox
@@ -1125,13 +1030,7 @@ export default function SessionWizardAttractionsStep({
           />
 
           {attractions.length === 0 ? (
-            <div className="text-center py-12 text-gray-400">
-              <div className="text-3xl mb-2">🏛️</div>
-
-              <p className="text-sm">
-                Нет достопримечательностей. Нажмите «+ Добавить»
-              </p>
-            </div>
+            <EmptyState icon="🏛️" title="Нет достопримечательностей. Нажмите «+ Добавить»" />
           ) : (
             <div className="space-y-2">
               {attractions.map((attr, idx) => {
@@ -1146,33 +1045,32 @@ export default function SessionWizardAttractionsStep({
                         ? toggleSelectedAttraction(attr.id)
                         : onOpenAttrDetail(attr.id)
                     }
-                    className={`flex items-center justify-between p-3 bg-white border rounded-lg cursor-pointer transition-colors ${
+                    className={`flex items-center justify-between p-3 bg-aspectum-surface border rounded-aspectum-control cursor-pointer transition-colors ${
                       selectMode && isSelected
-                        ? 'border-blue-400 bg-blue-50'
-                        : 'border-gray-200 hover:border-blue-300 hover:bg-blue-50'
+                        ? 'border-aspectum-primary-light bg-aspectum-primary-soft'
+                        : 'border-aspectum-border hover:border-aspectum-primary-border-strong hover:bg-aspectum-primary-soft'
                     }`}
                   >
                   <div className="flex items-center gap-3 min-w-0">
                     {selectMode && (
-                      <input
-                        type="checkbox"
+                      <Checkbox
                         checked={isSelected}
                         onChange={() => toggleSelectedAttraction(attr.id)}
                         onClick={(e) => e.stopPropagation()}
-                        className="w-4 h-4 accent-blue-600 shrink-0 cursor-pointer"
+                        className="shrink-0 cursor-pointer"
                       />
                     )}
 
-                    <span className="w-6 h-6 flex items-center justify-center rounded-full bg-gray-100 text-xs font-medium text-gray-600">
+                    <span className="w-6 h-6 flex items-center justify-center rounded-full bg-aspectum-surface-subtle text-xs font-medium text-aspectum-text-subtle">
                       {idx + 1}
                     </span>
 
                     <div className="min-w-0">
-                      <div className="text-sm font-medium text-gray-900 truncate">
+                      <div className="text-sm font-medium text-aspectum-text truncate">
                         {getAttrName(attr)}
                       </div>
 
-                      <div className="text-xs text-gray-500">
+                      <div className="text-xs text-aspectum-text-muted">
                         {getAttractionCityBindingLabel(
                           attr,
                           referenceCities,
@@ -1181,7 +1079,7 @@ export default function SessionWizardAttractionsStep({
                       </div>
 
                       {hasValidMapCoords(attr?.lat, attr?.lon) && (
-                        <div className="text-xs text-gray-400">
+                        <div className="text-xs text-aspectum-text-disabled">
                           {attr.lat}, {attr.lon}
                         </div>
                       )}
@@ -1189,11 +1087,11 @@ export default function SessionWizardAttractionsStep({
                   </div>
 
                   {selectMode ? (
-                    <span className="text-xs text-gray-400 font-medium shrink-0">
+                    <span className="text-xs text-aspectum-text-disabled font-medium shrink-0">
                       {isSelected ? 'Выбрано' : 'Выбрать'}
                     </span>
                   ) : (
-                    <span className="text-xs text-blue-600 font-medium shrink-0">
+                    <span className="text-xs text-aspectum-primary font-medium shrink-0">
                       Открыть →
                     </span>
                   )}
@@ -1204,48 +1102,54 @@ export default function SessionWizardAttractionsStep({
           )}
 
           <div className="flex justify-between pt-2">
-            <button
+            <Button
               type="button"
               onClick={() => onGoToStep(2)}
-              className="px-4 py-2 text-sm text-gray-600 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+              variant="outline"
+              size="md"
             >
               ← Назад: Теги
-            </button>
+            </Button>
 
-            <button
+            <Button
               type="button"
               onClick={() => onGoToStep(4)}
-              className="px-5 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors"
+              variant="primary"
+              size="md"
             >
               Далее: Интерактивные локации →
-            </button>
+            </Button>
           </div>
         </div>
       ) : (
         <div className="space-y-4">
           <div className="flex items-center gap-3">
-            <button
+            <Button
               type="button"
               onClick={() => {
                 onSetAttrView('list');
                 onSetCurrentAttr(null);
               }}
-              className="w-8 h-8 flex items-center justify-center border border-gray-300 rounded-lg text-gray-500 hover:bg-gray-50 transition-colors"
+              variant="outline"
+              size="sm"
+              className="w-8 h-8 p-0"
             >
               ←
-            </button>
+            </Button>
 
-            <span className="text-base font-semibold text-gray-900">
+            <span className="text-base font-semibold text-aspectum-text">
               {getAttrName(currentAttr)}
             </span>
 
-            <button
+            <Button
               type="button"
+              variant="softDanger"
+              size="sm"
               onClick={onDeleteCurrentAttr}
-              className="ml-auto px-3 py-1 text-xs font-medium text-red-600 bg-red-50 rounded-lg hover:bg-red-100 transition-colors"
+              className="ml-auto"
             >
               Удалить
-            </button>
+            </Button>
           </div>
 
           <AttractionDraftsPanel
@@ -1255,27 +1159,12 @@ export default function SessionWizardAttractionsStep({
             onAddAttraction={onAddAttraction}
           />
 
-          <div className="flex items-center gap-1 flex-wrap">
-            {Object.entries(attrLocaleData || {}).map(([key, loc]) => {
-              const isActive = key === attrActiveLocale;
-
-              return (
-                <button
-                  key={key}
-                  type="button"
-                  onClick={() => onSetAttrActiveLocale(key)}
-                  className={`flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium border transition-all ${
-                    isActive
-                      ? 'bg-blue-600 text-white border-blue-600'
-                      : 'bg-white text-gray-600 border-gray-300 hover:border-blue-400'
-                  }`}
-                >
-                  <span>{getFlag(loc.code)}</span>
-                  <span>{loc.langName}</span>
-                </button>
-              );
-            })}
-          </div>
+          <LocaleEditor
+            localeData={attrLocaleData}
+            activeLocale={attrActiveLocale}
+            onSwitch={onSetAttrActiveLocale}
+            showStatus={false}
+          />
 
           <div className="flex gap-5 items-start">
             <AttractionPhotoPanel
@@ -1291,55 +1180,28 @@ export default function SessionWizardAttractionsStep({
               <div className="grid grid-cols-2 gap-5">
                 <div className="space-y-3">
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                    <FormLabel  layout="block" size="sm" weight="medium" tone="strong" spacing="xs">
                       Название достопримечательности ({localeLabel})
-                    </label>
+                    </FormLabel>
 
-                    <input
-                      type="text"
-                      value={attrCurrentLocale.name || ''}
-                      onChange={(e) => onUpdateAttrLocaleField('name', e.target.value)}
-                      placeholder="Название достопримечательности"
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    />
+                    <TextInput type="text" value={attrCurrentLocale.name || ''} onChange={(e) => onUpdateAttrLocaleField('name', e.target.value)} placeholder="Название достопримечательности" />
                   </div>
 
-                  <div className="grid grid-cols-2 gap-3">
+                  <div className={formGridClassName({ responsive: false })}>
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                      <FormLabel  layout="block" size="sm" weight="medium" tone="strong" spacing="xs">
                         Индекс
-                      </label>
+                      </FormLabel>
 
-                      <input
-                        type="number"
-                        value={currentAttr?.index ?? currentAttr?.order ?? 0}
-                        onChange={(e) => {
-                          const value = Number(e.target.value || 0);
-
-                          updateAttractionPatch({
-                            index: value,
-                            order: value,
-                          });
-                        }}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      />
+                      <TextInput type="number" value={currentAttr?.index ?? currentAttr?.order ?? 0} onChange={(e) => { const value = Number(e.target.value || 0); updateAttractionPatch({ index: value, order: value, }); }} />
                     </div>
 
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                      <FormLabel  layout="block" size="sm" weight="medium" tone="strong" spacing="xs">
                         Ранг
-                      </label>
+                      </FormLabel>
 
-                      <input
-                        type="number"
-                        value={currentAttr?.rank ?? 0}
-                        onChange={(e) => {
-                          updateAttractionPatch({
-                            rank: Number(e.target.value || 0),
-                          });
-                        }}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      />
+                      <TextInput type="number" value={currentAttr?.rank ?? 0} onChange={(e) => { updateAttractionPatch({ rank: Number(e.target.value || 0), }); }} />
                     </div>
                   </div>
 
@@ -1368,15 +1230,15 @@ export default function SessionWizardAttractionsStep({
                   />
                   <SessionAttractionCommercePanel sessionId={sessionId} attractionId={currentAttr?.id} />
 
-                  <div className="p-3 border border-gray-200 rounded-lg bg-gray-50">
-                    <p className="text-sm text-gray-700">
+                  <Panel tone="muted" className="p-3">
+                    <p className="text-sm text-aspectum-text-strong">
                       Город: {getAttractionCityBindingLabel(
                         currentAttr,
                         referenceCities,
                         cityDrafts
                       )}. Привязка управляется автоматически.
                     </p>
-                  </div>
+                  </Panel>
                 </div>
 
                 <AttractionMapPanel
@@ -1401,26 +1263,27 @@ export default function SessionWizardAttractionsStep({
               <div>
                 <div className="flex items-center justify-between gap-3 mb-1">
                   <div className="flex items-center gap-2">
-                    <label className="text-sm font-medium text-gray-700">
+                    <FormLabel  size="sm" weight="medium" tone="strong">
                       Описание
-                    </label>
-                    <span className="px-1.5 py-0.5 bg-blue-100 text-blue-700 text-xs rounded font-mono">
+                    </FormLabel>
+                    <span className="px-1.5 py-0.5 bg-aspectum-primary-muted text-aspectum-primary-hover text-xs rounded font-mono">
                       {localeLabel}
                     </span>
                   </div>
-                  <button
+                  <Button
                     type="button"
                     onClick={() => onOpenAttractionInfoGenerateModal?.()}
                     disabled={!currentAttr}
-                    className="px-3 py-1.5 text-xs font-medium text-blue-700 bg-blue-50 border border-blue-200 rounded-lg hover:bg-blue-100 disabled:opacity-50 transition-colors"
+                    variant="soft"
+                    size="sm"
                   >
                     Сгенерировать полезную информацию
-                  </button>
+                  </Button>
                 </div>
 
                 {typeof onRegenerateAttractionDetail === 'function' && currentAttr?.id && (
                   <div className="flex justify-end mb-1">
-                    <button
+                    <Button
                       type="button"
                       disabled={regenDetailLoading}
                       onClick={async () => {
@@ -1432,21 +1295,14 @@ export default function SessionWizardAttractionsStep({
                         }
                       }}
                       title="Перегенерировать описание этой достопримечательности через ИИ"
-                      className="px-3 py-1 text-xs font-medium text-indigo-700 bg-indigo-50 border border-indigo-200 rounded-lg hover:bg-indigo-100 disabled:opacity-50 transition-colors"
+                      variant="softIndigoStrong"
+                      size="sm"
                     >
                       {regenDetailLoading ? '↻ Генерирую…' : '↻ Перегенерировать ИИ'}
-                    </button>
+                    </Button>
                   </div>
                 )}
-                <textarea
-                  value={attrCurrentLocale.description || ''}
-                  onChange={(e) =>
-                    onUpdateAttrLocaleField('description', e.target.value)
-                  }
-                  rows={7}
-                  placeholder="Описание достопримечательности: история, интересные факты — то, что увидит пользователь в приложении."
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
-                />
+                <Textarea value={attrCurrentLocale.description || ''} onChange={(e) => onUpdateAttrLocaleField('description', e.target.value) } rows={7} placeholder="Описание достопримечательности: история, интересные факты — то, что увидит пользователь в приложении." />
               </div>
 
               <div className="flex items-center justify-end gap-3">
@@ -1454,13 +1310,13 @@ export default function SessionWizardAttractionsStep({
                   <div
                     className={`flex items-center gap-1.5 text-xs transition-opacity ${
                       attrAutoSaved && !attrAutoSaving
-                        ? 'text-emerald-600'
-                        : 'text-gray-400'
+                        ? 'text-aspectum-success'
+                        : 'text-aspectum-text-disabled'
                     }`}
                   >
                     {attrAutoSaving ? (
                       <>
-                        <span className="inline-block w-3 h-3 border-2 border-gray-300 border-t-transparent rounded-full animate-spin" />
+                        <Spinner size="xs" className="border-2 border-aspectum-border-strong" />
                         <span>Сохранение...</span>
                       </>
                     ) : (
@@ -1483,14 +1339,15 @@ export default function SessionWizardAttractionsStep({
                     )}
                   </div>
                 )}
-                <button
+                <Button
                   type="button"
                   onClick={onSaveCurrentAttr}
                   disabled={attrSaving}
-                  className="px-5 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors"
+                  variant="primary"
+                  size="md"
                 >
                   {attrSaving ? 'Сохранение...' : 'Сохранить'}
-                </button>
+                </Button>
               </div>
             </main>
           </div>

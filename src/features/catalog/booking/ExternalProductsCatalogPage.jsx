@@ -2,12 +2,10 @@ import { useEffect, useMemo, useState } from 'react';
 import { externalProductsAPI } from '../../../api/booking';
 import { citiesAPI } from '../../../api/generation';
 import Layout from '../../../components/Layout';
+import { Alert, Button, CalendarDayButton, Field, Heading, InlineState, PageHeader, Panel, SectionHeader, Select, StatusBadge, TextInput } from '@aspectum/ui';
 import { parseApiError } from '../../../utils/apiError';
-import CatalogPageHeader from '../shared/components/CatalogPageHeader';
 import { getMultiLangValue } from '../shared/i18n';
 import { normalizeListResponse } from '../shared/normalize';
-
-const inputClass = 'w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none';
 
 function label(value, fallback = '—') {
   return getMultiLangValue(value) || fallback;
@@ -219,175 +217,172 @@ export default function ExternalProductsCatalogPage() {
 
   return (
     <Layout>
-      <CatalogPageHeader
+      <PageHeader
         title="Внешние продукты"
         description="Тестовый экран каталога, live availability и резервации у поставщика. Платёж и подтверждение брони пока не создаются."
       />
 
-      {error && <div className="mb-4 text-sm text-red-700 bg-red-50 border border-red-200 rounded-lg px-3 py-2">{error}</div>}
+      {error && <Alert tone="error" className="mb-4">{error}</Alert>}
 
       <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.4fr)]">
-        <section className="bg-white border border-gray-200 rounded-xl p-5 space-y-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Город</label>
-            <select value={cityId} onChange={(e) => setCityId(e.target.value)} className={inputClass} disabled={citiesLoading}>
+        <Panel as="section" className="p-5 space-y-4">
+          <Field label="Город">
+            <Select value={cityId} onChange={(e) => setCityId(e.target.value)} disabled={citiesLoading}>
               <option value="">{citiesLoading ? 'Загрузка…' : 'Выберите город'}</option>
               {cities.map((city) => <option key={city.id} value={city.id}>{label(city.name, city.id)}</option>)}
-            </select>
-          </div>
+            </Select>
+          </Field>
 
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Продукт поставщика</label>
-            <select value={productId} onChange={(e) => setProductId(e.target.value)} className={inputClass} disabled={!cityId || productsLoading || !products.length}>
+          <Field label="Продукт поставщика">
+            <Select value={productId} onChange={(e) => setProductId(e.target.value)} disabled={!cityId || productsLoading || !products.length}>
               <option value="">{productsLoading ? 'Загрузка…' : products.length ? 'Выберите продукт' : 'Нет опубликованных продуктов'}</option>
               {products.map((item) => <option key={item.id} value={item.id}>{label(item.title, item.external_id)}</option>)}
-            </select>
-          </div>
+            </Select>
+          </Field>
 
           {product && <>
-            <div className="rounded-lg bg-gray-50 p-3 text-xs text-gray-600 space-y-1">
+            <Panel tone="muted" className="p-3 text-xs space-y-1">
               <p><span className="font-medium">Поставщик:</span> {product.supplier_name || product.provider}</p>
               <p><span className="font-medium">External ID:</span> <span className="font-mono">{product.external_id}</span></p>
               {product.description && <p>{label(product.description, '')}</p>}
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Option</label>
-              <select value={optionId} onChange={(e) => setOptionId(e.target.value)} className={inputClass}>
+            </Panel>
+            <Field label="Option">
+              <Select value={optionId} onChange={(e) => setOptionId(e.target.value)}>
                 {product.options?.map((item) => <option key={item.id} value={item.id}>{label(item.title, item.external_id)}</option>)}
-              </select>
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Дата</label>
-              <input type="date" value={date} min={today()} onChange={(e) => setDate(e.target.value)} className={inputClass} />
-            </div>
+              </Select>
+            </Field>
+            <Field label="Дата">
+              <TextInput type="date" value={date} min={today()} onChange={(e) => setDate(e.target.value)} />
+            </Field>
             <div>
               <div className="flex items-center justify-between gap-3 mb-2">
-                <p className="text-sm font-medium text-gray-700">Календарь доступности</p>
-                {calendarLoading && <span className="text-xs text-gray-400">Загрузка…</span>}
+                <p className="text-sm font-medium text-aspectum-text-strong">Календарь доступности</p>
+                {calendarLoading && <InlineState as="span" loading size="xs" tone="disabled">Загрузка…</InlineState>}
               </div>
               <div className="grid grid-cols-4 sm:grid-cols-5 gap-2">
                 {calendar.map((day) => {
                   const selected = date === day.localDate;
                   return (
-                    <button
-                      type="button" key={day.localDate} disabled={!day.available}
-                      onClick={() => setDate(day.localDate)}
-                      className={`rounded-lg border px-2 py-2 text-left text-xs transition ${selected ? 'border-blue-600 bg-blue-50 text-blue-800' : day.available ? 'border-emerald-200 bg-emerald-50 text-emerald-800 hover:border-emerald-400' : 'border-gray-200 bg-gray-50 text-gray-400 cursor-not-allowed'}`}
-                    >
-                      <span className="block font-medium">{day.localDate?.slice(8, 10)}.{day.localDate?.slice(5, 7)}</span>
-                      <span className="block mt-0.5">{day.available ? `${day.vacancies ?? 0} мест` : 'Закрыто'}</span>
-                    </button>
+                    <CalendarDayButton
+                      key={day.localDate}
+                      date={day.localDate}
+                      available={day.available}
+                      selected={selected}
+                      vacancies={day.vacancies ?? 0}
+                      onSelect={setDate}
+                    />
                   );
                 })}
               </div>
-              {!calendarLoading && calendar.length === 0 && <p className="text-xs text-gray-400">Нет данных на ближайший месяц.</p>}
+              {!calendarLoading && calendar.length === 0 && <p className="text-xs text-aspectum-text-disabled">Нет данных на ближайший месяц.</p>}
             </div>
             <div>
-              <p className="text-sm font-medium text-gray-700 mb-2">Билеты</p>
+              <p className="text-sm font-medium text-aspectum-text-strong mb-2">Билеты</p>
               <div className="space-y-2">
                 {option?.units?.map((unit) => (
-                  <div key={unit.id} className="flex items-center gap-3 rounded-lg border border-gray-200 px-3 py-2">
+                  <div key={unit.id} className="flex items-center gap-3 rounded-aspectum-control border border-aspectum-border px-3 py-2">
                     <div className="min-w-0 flex-1">
-                      <p className="text-sm font-medium text-gray-800 truncate">{label(unit.title, unit.external_id)}</p>
-                      <p className="text-xs text-gray-400">{unit.unit_type || unit.external_id}</p>
+                      <p className="text-sm font-medium text-aspectum-text-emphasis truncate">{label(unit.title, unit.external_id)}</p>
+                      <p className="text-xs text-aspectum-text-disabled">{unit.unit_type || unit.external_id}</p>
                     </div>
-                    <input
-                      type="number" min="0" max="100" value={quantities[unit.id] || 0}
-                      onChange={(e) => setQuantities((current) => ({ ...current, [unit.id]: e.target.value }))}
-                      className="w-20 px-2 py-1.5 border border-gray-300 rounded text-sm text-right"
-                      aria-label={`Количество ${label(unit.title, unit.external_id)}`}
-                    />
+                    <TextInput className="w-20 text-right" type="number" min="0" max="100" value={quantities[unit.id] || 0} onChange={(e) => setQuantities((current) => ({ ...current, [unit.id]: e.target.value }))} aria-label={`Количество ${label(unit.title, unit.external_id)}`} />
                   </div>
                 ))}
               </div>
             </div>
-            <button type="button" onClick={checkAvailability} disabled={checking || !option} className="w-full rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50">
+            <Button type="button" variant="primary" size="md" onClick={checkAvailability} disabled={checking || !option} className="w-full">
               {checking ? 'Проверяем…' : 'Проверить доступность'}
-            </button>
-            <div className="border-t border-gray-200 pt-4 space-y-3">
-              <p className="text-sm font-medium text-gray-700">Тестовая резервация</p>
-              <input value={fullName} onChange={(e) => setFullName(e.target.value)} className={inputClass} placeholder="Имя гостя" />
-              <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} className={inputClass} placeholder="E-mail гостя" />
-              <button type="button" onClick={reserveHold} disabled={bookingLoading || !availability} className="w-full rounded-lg bg-amber-600 px-4 py-2 text-sm font-medium text-white hover:bg-amber-700 disabled:opacity-50">
+            </Button>
+            <div className="border-t border-aspectum-border pt-4 space-y-3">
+              <p className="text-sm font-medium text-aspectum-text-strong">Тестовая резервация</p>
+              <TextInput value={fullName} onChange={(e) => setFullName(e.target.value)} placeholder="Имя гостя" />
+              <TextInput type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="E-mail гостя" />
+              <Button type="button" onClick={reserveHold} disabled={bookingLoading || !availability} variant="amber" size="md" className="w-full">
                 {bookingLoading ? 'Резервируем…' : 'Создать hold на 10 минут'}
-              </button>
-              <p className="text-xs text-gray-500">Повторная проверка цены и мест выполняется на сервере перед запросом в Ventrata. Деньги не списываются.</p>
+              </Button>
+              <p className="text-xs text-aspectum-text-muted">Повторная проверка цены и мест выполняется на сервере перед запросом в Ventrata. Деньги не списываются.</p>
             </div>
           </>}
-        </section>
+        </Panel>
 
-        <section className="bg-white border border-gray-200 rounded-xl p-5">
-          <h2 className="text-base font-semibold text-gray-900">Результат availability</h2>
-          {!availability && <p className="mt-3 text-sm text-gray-400">Выберите продукт и нажмите «Проверить доступность».</p>}
+        <Panel as="section" className="p-5">
+          <SectionHeader title="Результат availability" size="sm" />
+          {!availability && <p className="mt-3 text-sm text-aspectum-text-disabled">Выберите продукт и нажмите «Проверить доступность».</p>}
           {availability && <div className="mt-4 space-y-3">
-            <p className="text-xs text-gray-400">Provider: {availability.provider} · Request ID: <span className="font-mono">{availability.request_id}</span></p>
+            <p className="text-xs text-aspectum-text-disabled">Provider: {availability.provider} · Request ID: <span className="font-mono">{availability.request_id}</span></p>
             {availability.availability?.map((item) => (
-              <article key={item.id || item.localDateTimeStart} className="rounded-lg border border-gray-200 p-4">
+              <Panel as="article" radius="control" key={item.id || item.localDateTimeStart} className="p-4">
                 <div className="flex justify-between gap-3">
                   <div>
-                    <p className="font-medium text-gray-900">{item.localDateTimeStart || item.id}</p>
-                    <p className="mt-1 text-sm text-gray-500">{item.statusMessage || item.status || '—'}</p>
+                    <p className="font-medium text-aspectum-text">{item.localDateTimeStart || item.id}</p>
+                    <p className="mt-1 text-sm text-aspectum-text-muted">{item.statusMessage || item.status || '—'}</p>
                   </div>
-                  <span className={`h-fit rounded-full px-2 py-1 text-xs font-medium ${item.available ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'}`}>
-                    {item.available ? 'Доступно' : 'Недоступно'}
-                  </span>
+                  <StatusBadge tone={item.available ? 'success' : 'danger'} label={item.available ? 'Доступно' : 'Недоступно'} className="h-fit py-1" />
                 </div>
                 <div className="mt-3 grid grid-cols-2 gap-3 text-sm">
-                  <p className="text-gray-600">Мест: <b className="text-gray-900">{item.vacancies ?? '—'}</b></p>
-                  <p className="text-gray-600">Цена: <b className="text-gray-900">{formatSupplierMoney(item.pricing?.retail, item.pricing?.currency, item.pricing?.currencyPrecision)}</b></p>
+                  <p className="text-aspectum-text-subtle">Мест: <b className="text-aspectum-text">{item.vacancies ?? '—'}</b></p>
+                  <p className="text-aspectum-text-subtle">Цена: <b className="text-aspectum-text">{formatSupplierMoney(item.pricing?.retail, item.pricing?.currency, item.pricing?.currencyPrecision)}</b></p>
                 </div>
-              </article>
+              </Panel>
             ))}
-            {availability.availability?.length === 0 && <p className="text-sm text-gray-500">Поставщик не вернул вариантов на эту дату.</p>}
+            {availability.availability?.length === 0 && <p className="text-sm text-aspectum-text-muted">Поставщик не вернул вариантов на эту дату.</p>}
           </div>}
-          {booking && <div className="mt-5 rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
+          {booking && <Alert tone="warning" className="mt-5 p-4 text-sm">
             <p className="font-semibold">Hold создан</p>
             <p className="mt-1">Статус: {booking.status} · до {booking.expires_at ? new Date(booking.expires_at).toLocaleString('ru-RU') : 'срок не передан поставщиком'}</p>
             <p className="mt-1">Сумма: {booking.total_price ?? '—'} {booking.currency}</p>
             <p className="mt-1 text-xs">Aspectum ID: <span className="font-mono">{booking.id}</span></p>
-          </div>}
-          <div className="mt-5 border-t border-gray-200 pt-5">
+          </Alert>}
+          <div className="mt-5 border-t border-aspectum-border pt-5">
             <div className="flex items-center justify-between gap-3">
-              <h3 className="text-sm font-semibold text-gray-900">Мои внешние бронирования</h3>
-              <button type="button" onClick={loadHolds} disabled={!product || holdsLoading} className="text-xs text-blue-600 hover:text-blue-700 disabled:opacity-50">
+              <Heading level={3} size="xs">Мои внешние бронирования</Heading>
+              <Button type="button" variant="link" size="sm" onClick={loadHolds} disabled={!product || holdsLoading}>
                 {holdsLoading ? 'Обновляем…' : 'Обновить'}
-              </button>
+              </Button>
             </div>
-            {!holdsLoading && holds.length === 0 && <p className="mt-2 text-sm text-gray-400">Для этого продукта пока нет сохранённых бронирований.</p>}
+            {!holdsLoading && holds.length === 0 && <p className="mt-2 text-sm text-aspectum-text-disabled">Для этого продукта пока нет сохранённых бронирований.</p>}
             <div className="mt-3 space-y-2">
               {holds.map((item) => (
-                <article key={item.id} className="rounded-lg border border-gray-200 p-3 text-sm">
+                <Panel as="article" radius="control" key={item.id} className="p-3 text-sm">
                   <div className="flex justify-between gap-3">
-                    <p className="font-medium text-gray-900">{item.status}</p>
-                    <p className="text-gray-700">{item.total_price ?? '—'} {item.currency}</p>
+                    <p className="font-medium text-aspectum-text">{item.status}</p>
+                    <p className="text-aspectum-text-strong">{item.total_price ?? '—'} {item.currency}</p>
                   </div>
-                  <p className="mt-1 text-xs text-gray-500">Создано: {new Date(item.created_at).toLocaleString('ru-RU')}</p>
-                  {item.expires_at && <p className="text-xs text-gray-500">Hold до: {new Date(item.expires_at).toLocaleString('ru-RU')}</p>}
-                  {item.provider_booking_id && <p className="mt-1 text-xs text-gray-500">Supplier ID: <span className="font-mono">{item.provider_booking_id}</span></p>}
-                  <p className="mt-1 text-xs text-gray-400">Aspectum ID: <span className="font-mono">{item.id}</span></p>
+                  <p className="mt-1 text-xs text-aspectum-text-muted">Создано: {new Date(item.created_at).toLocaleString('ru-RU')}</p>
+                  {item.expires_at && <p className="text-xs text-aspectum-text-muted">Hold до: {new Date(item.expires_at).toLocaleString('ru-RU')}</p>}
+                  {item.provider_booking_id && <p className="mt-1 text-xs text-aspectum-text-muted">Supplier ID: <span className="font-mono">{item.provider_booking_id}</span></p>}
+                  <p className="mt-1 text-xs text-aspectum-text-disabled">Aspectum ID: <span className="font-mono">{item.id}</span></p>
                   <div className="mt-3 flex gap-3 text-xs">
-                    <button type="button" onClick={() => updateHold(item.id, 'refresh')} disabled={holdActionId === item.id} className="text-blue-600 hover:text-blue-700 disabled:opacity-50">
+                    <Button type="button" variant="link" size="sm" onClick={() => updateHold(item.id, 'refresh')} disabled={holdActionId === item.id}>
                       {holdActionId === item.id ? 'Обновляем…' : 'Обновить статус'}
-                    </button>
-                    {item.status === 'on_hold' && <button type="button" onClick={() => updateHold(item.id, 'cancel')} disabled={holdActionId === item.id} className="text-red-600 hover:text-red-700 disabled:opacity-50">
-                      Отменить hold
-                    </button>}
-                    {item.status === 'on_hold' && <button type="button" onClick={() => updateHold(item.id, 'test-pay')} disabled={holdActionId === item.id} className="text-emerald-600 hover:text-emerald-700 disabled:opacity-50">
-                      Тестово оплатить и подтвердить
-                    </button>}
+                    </Button>
+                    {item.status === 'on_hold' && (
+                      <Button type="button" variant="linkDanger" size="sm" onClick={() => updateHold(item.id, 'cancel')} disabled={holdActionId === item.id}>
+                        Отменить hold
+                      </Button>
+                    )}
+                    {item.status === 'on_hold' && (
+                      <Button type="button" variant="linkEmerald" size="sm" onClick={() => updateHold(item.id, 'test-pay')} disabled={holdActionId === item.id}>
+                        Тестово оплатить и подтвердить
+                      </Button>
+                    )}
                   </div>
-                  {item.status === 'confirmed' && <div className="mt-3 text-xs text-emerald-700">
+                  {item.status === 'confirmed' && <div className="mt-3 text-xs text-aspectum-success-strong">
                     <p>Оплата: {item.payment_status || 'succeeded'} · подтверждено: {item.confirmed_at ? new Date(item.confirmed_at).toLocaleString('ru-RU') : '—'}</p>
                     {item.fulfillment?.voucher_url && <a className="mt-1 inline-block underline" href={item.fulfillment.voucher_url} target="_blank" rel="noreferrer">Открыть ваучер</a>}
                     {item.fulfillment?.tickets?.map((ticket, index) => <a key={`${ticket.url}-${index}`} className="mt-1 ml-3 inline-block underline" href={ticket.url} target="_blank" rel="noreferrer">Билет {index + 1}</a>)}
                   </div>}
-                  {item.status === 'confirmed' && item.refund_status !== 'succeeded' && <button type="button" onClick={() => updateHold(item.id, 'refund')} disabled={holdActionId === item.id} className="mt-3 text-xs text-red-600 hover:text-red-700 disabled:opacity-50">Тестовый refund</button>}
-                  {item.refund_status === 'succeeded' && <p className="mt-3 text-xs text-emerald-700">Refund выполнен: <span className="font-mono">{item.refund_id}</span></p>}
-                </article>
+                  {item.status === 'confirmed' && item.refund_status !== 'succeeded' && (
+                    <Button type="button" variant="linkDanger" size="sm" onClick={() => updateHold(item.id, 'refund')} disabled={holdActionId === item.id} className="mt-3">
+                      Тестовый refund
+                    </Button>
+                  )}
+                  {item.refund_status === 'succeeded' && <p className="mt-3 text-xs text-aspectum-success-strong">Refund выполнен: <span className="font-mono">{item.refund_id}</span></p>}
+                </Panel>
               ))}
             </div>
           </div>
-        </section>
+        </Panel>
       </div>
     </Layout>
   );

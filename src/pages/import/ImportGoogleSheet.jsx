@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
 import Layout from '../../components/Layout';
 import { importAPI } from '../../api/generation';
+import { Alert, Button, Field, FileButton, PageContainer, PageHeader, Panel, SectionHeader, Spinner, TextInput } from '@aspectum/ui';
 
 export default function ImportGoogleSheet() {
   const [sheetUrl, setSheetUrl] = useState('');
@@ -64,56 +65,41 @@ export default function ImportGoogleSheet() {
 
   return (
     <Layout>
-      <div className="max-w-lg">
-        <div className="mb-6">
-          <h1 className="text-2xl font-bold text-gray-900">Импорт из Google Таблицы</h1>
-          <p className="mt-1 text-sm text-gray-500">
-            Импорт городов и событий из Google Sheets
-          </p>
-        </div>
+      <PageContainer maxWidth="narrow">
+        <PageHeader
+          title="Импорт из Google Таблицы"
+          description="Импорт городов и событий из Google Sheets"
+        />
 
-        <div className="bg-white rounded-xl border border-gray-200 p-6 space-y-5">
-          <div className="flex items-start gap-4">
-            <div className="text-4xl">📊</div>
-            <div>
-              <h3 className="font-semibold text-gray-900">Google Sheets → База данных</h3>
-              <p className="text-sm text-gray-500 mt-1">
-                Введите ссылку на таблицу Google Sheets с данными для импорта.
-                Таблица должна быть открыта для просмотра.
-              </p>
-            </div>
-          </div>
+        <Panel className="p-6 space-y-5">
+          <SectionHeader
+            title="Google Sheets → База данных"
+            description="Введите ссылку на таблицу Google Sheets с данными для импорта. Таблица должна быть открыта для просмотра."
+            icon={<span className="text-4xl" aria-hidden="true">📊</span>}
+            level={3}
+            size="sm"
+          />
 
           <form onSubmit={handleImport} className="space-y-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Ссылка на таблицу
-              </label>
-              <input
+            <Field label="Ссылка на таблицу">
+              <TextInput
                 type="url"
                 value={sheetUrl}
                 onChange={(e) => setSheetUrl(e.target.value)}
                 placeholder="https://docs.google.com/spreadsheets/d/..."
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
                 disabled={isRunning}
               />
-            </div>
+            </Field>
 
             {error && (
-              <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">
-                {error}
-              </div>
+              <Alert tone="error">{error}</Alert>
             )}
 
             {status && (
-              <div className={`p-3 border rounded-lg text-sm ${
-                isDone ? 'bg-green-50 border-green-200 text-green-700'
-                : isFailed ? 'bg-red-50 border-red-200 text-red-700'
-                : 'bg-blue-50 border-blue-200 text-blue-700'
-              }`}>
+              <Alert tone={isDone ? 'success' : isFailed ? 'error' : 'info'} className="p-3 text-sm">
                 <div className="flex items-center gap-2">
                   {isRunning && (
-                    <span className="animate-spin inline-block w-3.5 h-3.5 border-2 border-current border-t-transparent rounded-full" />
+                    <Spinner size="xs" className="w-3.5 h-3.5 border-2 border-current" />
                   )}
                   {isDone ? '✅' : isFailed ? '❌' : ''}
                   <span>
@@ -128,35 +114,40 @@ export default function ImportGoogleSheet() {
                     ))}
                   </ul>
                 )}
-              </div>
+              </Alert>
             )}
 
-            <button
+            <Button
               type="submit"
               disabled={loading || !sheetUrl.trim()}
-              className="w-full py-3 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              variant="primary"
+              size="md"
+              className="w-full"
             >
               {isRunning ? (
                 <span className="flex items-center justify-center gap-2">
-                  <span className="animate-spin inline-block w-4 h-4 border-2 border-white border-t-transparent rounded-full" />
+                  <Spinner size="sm" className="border-aspectum-on-accent" />
                   Импорт выполняется...
                 </span>
               ) : (
                 '📊 Начать импорт'
               )}
-            </button>
+            </Button>
           </form>
-        </div>
+        </Panel>
 
         {/* Import ZIP */}
-        <div className="mt-4 bg-white rounded-xl border border-gray-200 p-6">
-          <h3 className="font-semibold text-gray-900 mb-2">Импорт из ZIP-архива</h3>
-          <p className="text-sm text-gray-500 mb-4">
-            Загрузите ZIP-архив с данными городов или событий, экспортированный ранее.
-          </p>
+        <Panel className="mt-4 p-6">
+          <SectionHeader
+            title="Импорт из ZIP-архива"
+            description="Загрузите ZIP-архив с данными городов или событий, экспортированный ранее."
+            level={3}
+            size="sm"
+            className="mb-4"
+          />
           <ImportZip />
-        </div>
-      </div>
+        </Panel>
+      </PageContainer>
     </Layout>
   );
 }
@@ -188,22 +179,24 @@ function ImportZip() {
 
   return (
     <form onSubmit={handleUpload} className="space-y-3">
-      <input
-        type="file"
+      <FileButton
         accept=".zip"
         onChange={(e) => { setFile(e.target.files?.[0] || null); setError(null); setSuccess(null); }}
-        className="block w-full text-sm text-gray-700 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-medium file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 cursor-pointer"
-      />
-      {file && <p className="text-xs text-gray-500">Выбран: {file.name}</p>}
-      {error && <div className="p-2 bg-red-50 border border-red-200 rounded text-sm text-red-700">{error}</div>}
-      {success && <div className="p-2 bg-green-50 border border-green-200 rounded text-sm text-green-700">✅ {success}</div>}
-      <button
+      >
+        📦 Выбрать ZIP
+      </FileButton>
+      {file && <p className="text-xs text-aspectum-text-muted">Выбран: {file.name}</p>}
+      {error && <Alert tone="error">{error}</Alert>}
+      {success && <Alert tone="success">{success}</Alert>}
+      <Button
         type="submit"
         disabled={!file || loading}
-        className="w-full py-2.5 text-sm font-medium text-white bg-gray-700 rounded-lg hover:bg-gray-800 disabled:opacity-50 transition-colors"
+        variant="dark"
+        size="md"
+        className="w-full"
       >
         {loading ? 'Загрузка...' : '📁 Загрузить ZIP'}
-      </button>
+      </Button>
     </form>
   );
 }

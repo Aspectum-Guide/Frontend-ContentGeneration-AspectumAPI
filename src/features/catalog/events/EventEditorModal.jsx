@@ -1,8 +1,7 @@
 import 'leaflet/dist/leaflet.css';
 import { useEffect, useRef, useState } from 'react';
 import EventMediaPanel from './EventMediaPanel';
-import { Field, FormActions, TextInput } from '../../../components/ui/FormField';
-import Modal, { ConfirmModal } from '../../../components/ui/Modal';
+import { FormLabel, Alert, Chip, ConfirmModal, Field, FormActions, FormGrid, Modal, Panel, Select, Spinner, Switch, Tabs, TextInput } from '@aspectum/ui';
 import { createCoordinatePasteHandler, parseCoord } from '../../../utils/coordinates';
 import { buildLangOptions, getMultiLangValue } from '../shared/i18n';
 import { LangBlock, LangTabs } from '../shared/LangFields';
@@ -57,6 +56,10 @@ export default function EventEditorModal({
   const markerRef = useRef(null);
   const leafletRef = useRef(null);
   const snapshotRef = useRef(null);
+  const eventRef = useRef(event);
+  const setEventRef = useRef(setEvent);
+  eventRef.current = event;
+  setEventRef.current = setEvent;
 
   // Сбрасываем таб при смене ивента
   useEffect(() => {
@@ -65,7 +68,7 @@ export default function EventEditorModal({
 
   // Снимок берём только после завершения загрузки, иначе ложный dirty при закрытии
   useEffect(() => {
-    if (open && !editLoading) snapshotRef.current = JSON.stringify(event);
+    if (open && !editLoading) snapshotRef.current = JSON.stringify(eventRef.current);
   }, [open, event?.id, editLoading]);
 
   const handleClose = () => {
@@ -94,8 +97,9 @@ export default function EventEditorModal({
           shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
         });
       }
-      const lat = parseCoord(event?.lat);
-      const lon = parseCoord(event?.lon);
+      const currentEvent = eventRef.current;
+      const lat = parseCoord(currentEvent?.lat);
+      const lon = parseCoord(currentEvent?.lon);
       const map = L.map(mapElRef.current).setView(
         lat != null && lon != null ? [lat, lon] : [41.9028, 12.4964],
         lat != null && lon != null ? 13 : 5
@@ -105,7 +109,7 @@ export default function EventEditorModal({
         attribution: '&copy; OpenStreetMap contributors',
       }).addTo(map);
       map.on('click', (e) => {
-        setEvent((p) => ({
+        setEventRef.current((p) => ({
           ...p,
           lat: Number(e.latlng.lat.toFixed(6)),
           lon: Number(e.latlng.lng.toFixed(6)),
@@ -160,20 +164,19 @@ export default function EventEditorModal({
         {event && (
           <form onSubmit={onSave} className="space-y-5">
             {saveError && (
-              <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">
-                {saveError}
-              </div>
+              <Alert tone="error">{saveError}</Alert>
             )}
 
             {editLoading && (
-              <div className="flex items-center gap-2 text-sm text-gray-400 py-1">
-                <span className="animate-spin w-4 h-4 border-2 border-blue-500 border-t-transparent rounded-full inline-block" />
+              <div className="flex items-center gap-2 text-sm text-aspectum-text-disabled py-1">
+                <Spinner className="border-aspectum-focus" />
                 Загрузка данных события...
               </div>
             )}
 
-            <div className="flex flex-wrap gap-2 border-b border-gray-200 pb-3">
-              {[
+            <div className="border-b border-aspectum-border pb-3">
+              <Tabs
+                items={[
                 { key: 'content', label: 'Контент' },
                 { key: 'media', label: 'Обложка' },
                 { key: 'meta', label: 'Связи' },
@@ -187,23 +190,16 @@ export default function EventEditorModal({
                   { key: 'inclusions', label: 'Что включено' },
                 ] : []),
                 { key: 'map', label: 'Карта' },
-              ].map((tab) => (
-                <button
-                  key={tab.key}
-                  type="button"
-                  onClick={() => setActiveTab(tab.key)}
-                  className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${activeTab === tab.key ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                    }`}
-                >
-                  {tab.label}
-                </button>
-              ))}
+                ].map(({ key, label }) => ({ id: key, label }))}
+                value={activeTab}
+                onChange={setActiveTab}
+              />
             </div>
 
             {activeTab === 'content' && (langOptions.length > 0 ? (
               <>
-                <div className="p-3 bg-gray-50 rounded-xl border border-gray-200">
-                  <p className="text-xs font-medium text-gray-500 mb-2 uppercase tracking-wide">Активный язык</p>
+                <Panel tone="muted" className="p-3">
+                  <p className="text-xs font-medium text-aspectum-text-muted mb-2 uppercase tracking-wide">Активный язык</p>
                   <LangTabs
                     active={activeLang}
                     onSwitch={setActiveLang}
@@ -226,7 +222,7 @@ export default function EventEditorModal({
                       });
                     }}
                   />
-                </div>
+                </Panel>
 
                 <LangBlock
                   label="Название"
@@ -246,9 +242,9 @@ export default function EventEditorModal({
                 />
               </>
             ) : (
-              <div className="p-3 bg-yellow-50 border border-yellow-200 rounded-lg text-sm text-yellow-800">
+              <Alert tone="warning">
                 Для этого события бэкенд не прислал переводы. Языки отображаются строго из JSON-ключей ответа.
-              </div>
+              </Alert>
             ))}
 
             {activeTab === 'media' && (
@@ -262,20 +258,16 @@ export default function EventEditorModal({
             )}
 
             {activeTab === 'meta' && (
-              <div className="grid grid-cols-2 gap-3">
+              <FormGrid responsive={false}>
                 <Field label="Город">
-                  <select
-                    value={event?.city_id || ''}
-                    onChange={(e) => setEvent((p) => ({ ...p, city_id: e.target.value }))}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none"
-                  >
+                  <Select value={event?.city_id || ''} onChange={(e) => setEvent((p) => ({ ...p, city_id: e.target.value }))}>
                     <option value="">— Без города —</option>
                     {cityOptions.map((c) => (
                       <option key={c.id} value={String(c.id)}>
                         {getMultiLangValue(c.name) || c.display_name || c.display_country || c.id}
                       </option>
                     ))}
-                  </select>
+                  </Select>
                 </Field>
 
                 <Field label="Индекс (index)">
@@ -304,41 +296,32 @@ export default function EventEditorModal({
 
                 <Field label="Видимость">
                   <div className="flex items-center h-full pt-1">
-                    <label className="flex items-center gap-2 cursor-pointer select-none">
-                      <button
-                        type="button"
-                        role="switch"
-                        aria-checked={!!event?.is_show}
+                    <FormLabel  layout="row" interactive unselectable>
+                      <Switch
+                        checked={!!event?.is_show}
                         aria-label="Видимость события"
-                        onClick={() => setEvent((p) => ({ ...p, is_show: !p.is_show }))}
-                        className={`relative w-10 h-5 rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-offset-1 focus:ring-blue-500 ${event?.is_show ? 'bg-blue-600' : 'bg-gray-300'}`}
-                      >
-                        <span className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-all ${event?.is_show ? 'left-5' : 'left-0.5'}`} />
-                      </button>
-                      <span className="text-sm text-gray-700">
+                        onChange={(next) => setEvent((p) => ({ ...p, is_show: next }))}
+                      />
+                      <span className="text-sm text-aspectum-text-strong">
                         {event?.is_show ? 'Показывается' : 'Скрыто'}
                       </span>
-                    </label>
+                    </FormLabel>
                   </div>
                 </Field>
 
                 <Field label="В сторе">
                   <div className="flex items-center h-full pt-1">
-                    <label className="flex items-center gap-2 cursor-pointer select-none">
-                      <button
-                        type="button"
-                        role="switch"
-                        aria-checked={!!event?.is_bookable}
+                    <FormLabel  layout="row" interactive unselectable>
+                      <Switch
+                        checked={!!event?.is_bookable}
+                        color="green"
                         aria-label="Доступность в сторе"
-                        onClick={() => setEvent((p) => ({ ...p, is_bookable: !p.is_bookable }))}
-                        className={`relative w-10 h-5 rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-offset-1 focus:ring-green-500 ${event?.is_bookable ? 'bg-green-500' : 'bg-gray-300'}`}
-                      >
-                        <span className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-all ${event?.is_bookable ? 'left-5' : 'left-0.5'}`} />
-                      </button>
-                      <span className="text-sm text-gray-700">
+                        onChange={(next) => setEvent((p) => ({ ...p, is_bookable: next }))}
+                      />
+                      <span className="text-sm text-aspectum-text-strong">
                         {event?.is_bookable ? 'Продажи открыты' : 'Не в продаже'}
                       </span>
-                    </label>
+                    </FormLabel>
                   </div>
                 </Field>
 
@@ -349,38 +332,35 @@ export default function EventEditorModal({
                     onChange={(e) => setEvent((p) => ({ ...p, start_address: e.target.value }))}
                     placeholder="Например: Москва, Театральная площадь, у памятника Карлу Марксу"
                   />
-                  <p className="mt-1 text-xs text-gray-400">
+                  <p className="mt-1 text-xs text-aspectum-text-disabled">
                     Показывается покупателю при бронировании и в письме-подтверждении. Координаты на вкладке «Карта» остаются отдельными.
                   </p>
                 </Field>
                 </div>
-              </div>
+              </FormGrid>
             )}
 
             {activeTab === 'meta' && allEventFilters?.length > 0 && (
               <Field label="Теги / категории события">
-                <div className="flex flex-wrap gap-2 max-h-36 overflow-y-auto p-2 border border-gray-200 rounded-lg bg-gray-50">
+                <div className="flex flex-wrap gap-2 max-h-36 overflow-y-auto p-2 border border-aspectum-border rounded-aspectum-control bg-aspectum-surface-muted">
                   {allEventFilters.map((f) => {
                     const fid = String(f.id);
                     const selected = (event?.tag_ids || []).includes(fid);
                     const label = f.display_name || f.slug || fid;
                     return (
-                      <button
+                      <Chip
                         key={fid}
-                        type="button"
+                        selected={selected}
+                        variant="purple"
                         onClick={() => toggleTag(fid)}
-                        className={`flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium border transition-all ${selected
-                            ? 'bg-purple-600 text-white border-purple-600'
-                            : 'bg-white text-gray-600 border-gray-300 hover:border-purple-400 hover:text-purple-600'
-                          }`}
                       >
                         {label}
                         {selected && <span className="ml-0.5">✓</span>}
-                      </button>
+                      </Chip>
                     );
                   })}
                 </div>
-                <p className="mt-1 text-xs text-gray-400">
+                <p className="mt-1 text-xs text-aspectum-text-disabled">
                   Выбрано: {(event?.tag_ids || []).length} тегов
                 </p>
               </Field>
@@ -454,7 +434,7 @@ export default function EventEditorModal({
 
             {activeTab === 'map' && (
               <div className="space-y-4">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <FormGrid>
                   <Field label="Широта (lat)">
                     <TextInput
                       type="number"
@@ -479,11 +459,11 @@ export default function EventEditorModal({
                       placeholder="12.496366"
                     />
                   </Field>
-                </div>
+                </FormGrid>
 
                 <div>
-                  <div className="text-xs text-gray-500 mb-2">Кликните по карте, чтобы выставить координаты</div>
-                  <div ref={mapElRef} className="w-full h-72 rounded-xl border border-gray-200 overflow-hidden" />
+                  <div className="text-xs text-aspectum-text-muted mb-2">Кликните по карте, чтобы выставить координаты</div>
+                  <div ref={mapElRef} className="w-full h-72 rounded-aspectum-card border border-aspectum-border overflow-hidden" />
                 </div>
               </div>
             )}

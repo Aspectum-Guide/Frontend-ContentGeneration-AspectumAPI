@@ -48,7 +48,9 @@ export default defineConfig(({ mode, command }) => {
     },
     resolve: {
       alias: {
-        '@': path.resolve(__dirname, './src'),
+        '@': path.resolve(import.meta.dirname, './src'),
+        // Выносимый UI-пакет: сейчас локальный barrel, позже — npm-пакет.
+        '@aspectum/ui': path.resolve(import.meta.dirname, './src/components/ui'),
       },
     },
     server: {
@@ -68,6 +70,15 @@ export default defineConfig(({ mode, command }) => {
       // so browsers/devtools never auto-fetch them in prod (they're still on
       // disk for local upload to an error tracker, and nginx denies *.map too).
       sourcemap: mode === 'production' ? 'hidden' : true,
+      rollupOptions: {
+        output: {
+          manualChunks(id) {
+            if (!id.includes('node_modules')) return undefined
+            if (id.includes('/leaflet/')) return 'leaflet'
+            return 'vendor'
+          },
+        },
+      },
     },
     test: {
       environment: 'jsdom',

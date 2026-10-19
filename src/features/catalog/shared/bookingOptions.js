@@ -249,6 +249,8 @@ export function useTicketTypeMapForEvents(eventIds, pageSize = 500) {
     };
   }, [idsKey, pageSize]);
 
-  return useMemo(() => new Map(cacheRef.current), [version]);
+  return useMemo(() => {
+    void version;
+    return new Map(cacheRef.current);
+  }, [version]);
 }
-

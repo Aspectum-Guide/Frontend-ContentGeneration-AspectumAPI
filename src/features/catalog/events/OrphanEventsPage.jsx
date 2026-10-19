@@ -1,8 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import Layout from '../../../components/Layout';
-import DataTable from '../../../components/ui/DataTable';
-import Modal, { ConfirmModal } from '../../../components/ui/Modal';
-import Toast, { useToast } from '../../../components/ui/Toast';
+import { Alert, Button, ConfirmModal, DataTable, Modal, PageHeader, Select, Tabs, Toast, useToast } from '@aspectum/ui';
 import { citiesAPI } from '../../../api/generation';
 import { parseApiError } from '../../../utils/apiError';
 import { useCatalogFilters } from '../core/useCatalogFilters';
@@ -15,9 +13,6 @@ const TABS = [
   { id: 'orphans', label: 'Без города' },
   { id: 'archived', label: 'Корзина' },
 ];
-
-const btn = (tone) =>
-  `px-3 py-1.5 text-xs font-medium rounded-md transition-colors disabled:opacity-50 ${tone}`;
 
 export default function OrphanEventsPage() {
   const { note, showNote } = useToast();
@@ -85,9 +80,9 @@ export default function OrphanEventsPage() {
       label: 'Название',
       render: (title, row) => (
         <div>
-          <div className="font-medium text-gray-900 text-sm">{getMultiLangValue(title) || '—'}</div>
+          <div className="font-medium text-aspectum-text text-sm">{getMultiLangValue(title) || '—'}</div>
           {row.description && (
-            <div className="mt-0.5 text-xs text-gray-500 line-clamp-2">{row.description}</div>
+            <div className="mt-0.5 text-xs text-aspectum-text-muted line-clamp-2">{row.description}</div>
           )}
         </div>
       ),
@@ -96,14 +91,14 @@ export default function OrphanEventsPage() {
       key: 'image_url',
       label: 'Фото',
       render: (url) => (url
-        ? <img src={url} alt="" className="w-10 h-10 object-cover rounded-md" />
-        : <span className="text-gray-300 text-xs">—</span>),
+        ? <img src={url} alt="" className="w-10 h-10 object-cover rounded-aspectum-compact" />
+        : <span className="text-aspectum-text-faint text-xs">—</span>),
     },
     {
       key: 'info_count',
       label: 'Содержимое',
       render: (_, row) => (
-        <span className="text-xs text-gray-600">
+        <span className="text-xs text-aspectum-text-subtle">
           блоков {row.info_count} · лента {row.feed_count} · 🎧 {row.audio_guide_count}
         </span>
       ),
@@ -112,7 +107,7 @@ export default function OrphanEventsPage() {
       key: 'subscription_count',
       label: 'Связи',
       render: (_, row) => (
-        <span className={`text-xs ${row.booking_refs ? 'text-red-600 font-medium' : 'text-gray-600'}`}>
+        <span className={`text-xs ${row.booking_refs ? 'text-aspectum-danger font-medium' : 'text-aspectum-text-subtle'}`}>
           подписок {row.subscription_count} · букинг {row.booking_refs}
         </span>
       ),
@@ -125,42 +120,30 @@ export default function OrphanEventsPage() {
           ? (
             <div className="flex flex-col gap-0.5">
               {dups.map((d) => (
-                <span key={d.id} className="text-xs text-amber-700 bg-amber-50 rounded px-1.5 py-0.5">
+                <span key={d.id} className="text-xs text-aspectum-warning-strong bg-aspectum-warning-soft rounded px-1.5 py-0.5">
                   {d.city_display_name} · 🎧 {d.audio_guide_count}
                 </span>
               ))}
             </div>
           )
-          : <span className="text-gray-300 text-xs">нет</span>),
+          : <span className="text-aspectum-text-faint text-xs">нет</span>),
       }
       : {
         key: 'archived_at',
         label: 'В корзине с',
-        render: (v) => <span className="text-xs text-gray-600">{v ? new Date(v).toLocaleString() : '—'}</span>,
+        render: (v) => <span className="text-xs text-aspectum-text-subtle">{v ? new Date(v).toLocaleString() : '—'}</span>,
       },
   ];
 
   return (
     <Layout>
-      <div className="mb-4">
-        <h1 className="text-2xl font-bold text-gray-900">События без города и корзина</h1>
-        <p className="mt-1 text-sm text-gray-500">
-          Привяжите событие к городу или отправьте в корзину. Из корзины событие можно вернуть или удалить насовсем.
-        </p>
-      </div>
+      <PageHeader
+        title="События без города и корзина"
+        description="Привяжите событие к городу или отправьте в корзину. Из корзины событие можно вернуть или удалить насовсем."
+        spacing="sm"
+      />
 
-      <div className="mb-4 flex gap-2">
-        {TABS.map((t) => (
-          <button
-            key={t.id}
-            type="button"
-            onClick={() => switchTab(t.id)}
-            className={`px-3 py-1.5 text-sm rounded-lg ${tab === t.id ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}
-          >
-            {t.label}
-          </button>
-        ))}
-      </div>
+      <Tabs items={TABS} value={tab} onChange={switchTab} className="mb-4" />
 
       <DataTable
         columns={columns}
@@ -180,39 +163,28 @@ export default function OrphanEventsPage() {
         actions={(row) => (tab === 'orphans'
           ? (
             <>
-              <button
-                disabled={busyId === row.id}
-                onClick={() => { setAssignCityId(''); setAssignTarget(row); }}
-                className={btn('text-blue-600 bg-blue-50 hover:bg-blue-100')}
-              >
+              <Button type="button" variant="soft" size="sm" disabled={busyId === row.id}
+                onClick={() => { setAssignCityId(''); setAssignTarget(row); }}>
                 К городу
-              </button>
-              <button
-                disabled={busyId === row.id}
-                onClick={() => setArchiveTarget(row)}
-                className={btn('text-gray-700 bg-gray-100 hover:bg-gray-200')}
-              >
+              </Button>
+              <Button type="button" variant="secondary" size="sm" disabled={busyId === row.id}
+                onClick={() => setArchiveTarget(row)}>
                 В корзину
-              </button>
+              </Button>
             </>
           )
           : (
             <>
-              <button
-                disabled={busyId === row.id}
-                onClick={() => run(row.id, () => orphanEventsAPI.restore(row.id), 'Событие возвращено (скрытым)')}
-                className={btn('text-blue-600 bg-blue-50 hover:bg-blue-100')}
-              >
+              <Button type="button" variant="soft" size="sm" disabled={busyId === row.id}
+                onClick={() => run(row.id, () => orphanEventsAPI.restore(row.id), 'Событие возвращено (скрытым)')}>
                 Вернуть
-              </button>
-              <button
+              </Button>
+              <Button type="button" variant="softDanger" size="sm"
                 disabled={busyId === row.id || row.booking_refs > 0}
                 title={row.booking_refs > 0 ? 'Есть связанные бронирования/билеты' : undefined}
-                onClick={() => setPurgeTarget(row)}
-                className={btn('text-red-600 bg-red-50 hover:bg-red-100')}
-              >
+                onClick={() => setPurgeTarget(row)}>
                 Удалить насовсем
-              </button>
+              </Button>
             </>
           ))}
       />
@@ -223,47 +195,40 @@ export default function OrphanEventsPage() {
         title="Привязать к городу"
         footer={(
           <>
-            <button
-              type="button"
-              onClick={() => setAssignTarget(null)}
-              className="px-3 py-2 text-sm text-gray-600"
-            >
+            <Button type="button" variant="ghost" size="md" onClick={() => setAssignTarget(null)}>
               Отмена
-            </button>
-            <button
+            </Button>
+            <Button
               type="button"
+              variant="primary"
+              size="md"
               disabled={!assignCityId}
               onClick={async () => {
                 const target = assignTarget;
                 setAssignTarget(null);
                 await run(target.id, () => orphanEventsAPI.assignCity(target.id, assignCityId), 'Событие привязано к городу');
               }}
-              className="px-3 py-2 text-sm text-white bg-blue-600 rounded-lg disabled:opacity-50"
             >
               Привязать
-            </button>
+            </Button>
           </>
         )}
       >
-        <p className="mb-3 text-sm text-gray-600">
+        <p className="mb-3 text-sm text-aspectum-text-subtle">
           «{getMultiLangValue(assignTarget?.title) || assignTarget?.id}»
         </p>
         {assignTarget?.duplicates?.length > 0 && (
-          <p className="mb-3 text-sm text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+          <Alert tone="warning" className="mb-3 text-sm px-3 py-2">
             Событие с таким названием уже есть в городах: {assignTarget.duplicates.map((d) => d.city_display_name).join(', ')}.
             Возможно, это дубль — тогда лучше отправить в корзину.
-          </p>
+          </Alert>
         )}
-        <select
-          value={assignCityId}
-          onChange={(evt) => setAssignCityId(evt.target.value)}
-          className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
-        >
+        <Select value={assignCityId} onChange={(evt) => setAssignCityId(evt.target.value)}>
           <option value="">Выберите город</option>
           {cities.map((c) => (
             <option key={c.id} value={c.id}>{getMultiLangValue(c.name) || c.id}</option>
           ))}
-        </select>
+        </Select>
       </Modal>
 
       <ConfirmModal

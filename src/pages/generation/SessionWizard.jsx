@@ -1,21 +1,9 @@
 import 'leaflet/dist/leaflet.css';
-import { useEffect, useMemo, useState } from 'react';
+import { lazy, Suspense, useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import Layout from '../../components/Layout';
 import CommonsImagePicker from '../../components/generation/CommonsImagePicker';
-import SessionWizardAttractionsStep from './session-wizard/SessionWizardAttractionsStep';
-import SessionWizardInteractiveLocationsStep from './session-wizard/SessionWizardInteractiveLocationsStep';
-import SessionWizardCityStep from './session-wizard/SessionWizardCityStep';
-import SessionWizardGenerateCityFull from './session-wizard/SessionWizardGenerateCityFull';
-import SessionWizardPublishStep from './session-wizard/SessionWizardPublishStep';
-import SessionWizardTagsCatalogStep from './session-wizard/SessionWizardTagsCatalogStep';
-import SessionWizardCityTagsPicker from './session-wizard/SessionWizardCityTagsPicker';
-import SessionWizardCityInfoStep from './session-wizard/SessionWizardCityInfoStep';
-import SessionWizardAttractionInfoStep from './session-wizard/SessionWizardAttractionInfoStep';
-import SessionWizardAttractionFeedStep from './session-wizard/SessionWizardAttractionFeedStep.jsx';
-import SessionWizardAttractionAudioGuidesBlock from './session-wizard/SessionWizardAttractionAudioGuidesBlock.jsx';
 import {
-  StatusBadge as DefaultStatusBadge,
   filterCityInfosForActiveDraft,
   filterItemsForActiveAttraction,
   getAttrName,
@@ -25,11 +13,28 @@ import {
 } from './session-wizard/sessionWizardShared.jsx';
 import { useSessionWizardController } from './session-wizard/useSessionWizardController.ts';
 import { aiAPI } from '../../api/generation';
-import DefaultToast from '../../components/ui/Toast.jsx';
-import DefaultInlineProgressBanner from '../../components/ui/InlineProgressBanner.jsx';
-import { ConfirmModal as DefaultConfirmModal } from '../../components/ui/Modal.jsx';
-import { useConfirmModal } from '../../components/ui/useConfirmModal.jsx';
+import { FormLabel, Button, ConfirmModal as DefaultConfirmModal, DetailHeader, EmptyState, InlineAction, InlineProgressBanner as DefaultInlineProgressBanner, Modal, ProgressBar, SessionStatusBadge as DefaultStatusBadge, Spinner, TextInput, Toast as DefaultToast, WizardStepButton, useConfirmModal } from '@aspectum/ui';
 import DefaultSessionCloseDialog from '../../components/generation/SessionCloseDialog.jsx';
+import { sessionWizardStepLoaders } from './session-wizard/sessionWizardStepLoaders';
+import useUnsavedChangesWarning from './session-wizard/useUnsavedChangesWarning';
+
+const SessionWizardAttractionsStep = lazy(sessionWizardStepLoaders.attractions);
+const SessionWizardInteractiveLocationsStep = lazy(sessionWizardStepLoaders.interactiveLocations);
+const SessionWizardCityStep = lazy(sessionWizardStepLoaders.city);
+const SessionWizardGenerateCityFull = lazy(sessionWizardStepLoaders.generateCityFull);
+const SessionWizardPublishStep = lazy(sessionWizardStepLoaders.publish);
+const SessionWizardTagsCatalogStep = lazy(sessionWizardStepLoaders.tagsCatalog);
+const SessionWizardCityTagsPicker = lazy(sessionWizardStepLoaders.cityTags);
+const SessionWizardCityInfoStep = lazy(sessionWizardStepLoaders.cityInfo);
+const SessionWizardAttractionInfoStep = lazy(sessionWizardStepLoaders.attractionInfo);
+const SessionWizardAttractionFeedStep = lazy(sessionWizardStepLoaders.attractionFeed);
+const SessionWizardAttractionAudioGuidesBlock = lazy(sessionWizardStepLoaders.attractionAudioGuides);
+
+export function SessionWizardStepFallback() {
+  return (
+    <EmptyState icon={<Spinner size="md" />} title="Загрузка шага…" />
+  );
+}
 
 const STEP_LABELS = [
   'Город',
@@ -469,19 +474,10 @@ export default function SessionWizard({ components = {} } = {}) {
     handleTranslateSession,
 
     goToStep,
+    navigatingStep,
   } = controller;
 
-  // Предупреждение при закрытии вкладки если есть несохранённые изменения
-  useEffect(() => {
-    const handler = (e) => {
-      if (hasUnsavedChangesRef.current) {
-        e.preventDefault();
-        e.returnValue = '';
-      }
-    };
-    window.addEventListener('beforeunload', handler);
-    return () => window.removeEventListener('beforeunload', handler);
-  }, [hasUnsavedChangesRef]);
+  useUnsavedChangesWarning(hasUnsavedChangesRef);
 
   const currentLocale = localeData[activeLocale] || {};
 
@@ -839,12 +835,7 @@ export default function SessionWizard({ components = {} } = {}) {
   if (loading) {
     return (
       <Layout>
-        <div className="flex items-center justify-center py-24">
-          <div className="flex items-center gap-3 text-gray-500">
-            <div className="animate-spin w-6 h-6 border-2 border-blue-600 border-t-transparent rounded-full" />
-            <span>Загрузка сессии...</span>
-          </div>
-        </div>
+        <EmptyState icon={<Spinner size="md" className="h-6 w-6 border-aspectum-primary" />} title="Загрузка сессии..." className="py-24" />
       </Layout>
     );
   }
@@ -852,7 +843,7 @@ export default function SessionWizard({ components = {} } = {}) {
   if (!session) {
     return (
       <Layout>
-        <div className="text-center py-24 text-red-600">Сессия не найдена</div>
+        <EmptyState icon="⚠️" title="Сессия не найдена" tone="danger" className="py-24" />
       </Layout>
     );
   }
@@ -877,79 +868,76 @@ export default function SessionWizard({ components = {} } = {}) {
           .join(' ')}
       />
 
-      <div className="flex items-center justify-between gap-4 mb-5 pb-4 border-b border-gray-200">
-        <div className="flex items-center gap-3 min-w-0">
-          <button
+      <DetailHeader
+        leading={(
+          <Button
             type="button"
-            onClick={() => {
+            variant="ghost"
+            size="sm"
+            onClick={async () => {
               if (hasUnsavedChangesRef.current) {
-                if (!window.confirm('Есть несохранённые изменения. Покинуть страницу?')) return;
+                const confirmed = await confirm({
+                  title: 'Покинуть страницу?',
+                  message: 'Есть несохранённые изменения. Покинуть страницу?',
+                  confirmLabel: 'Покинуть',
+                  danger: true,
+                });
+                if (!confirmed) return;
               }
               navigate('/generation');
             }}
             title="Вернуться к списку сессий"
-            className="shrink-0 p-1.5 text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
           >
             <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
             </svg>
-          </button>
-
-          <div className="min-w-0">
-            <div className="flex items-center gap-2">
-              <h1 className="text-lg font-bold text-gray-900 truncate">
-                {session.name || 'Сессия генерации контента'}
-              </h1>
-              <StatusBadge status={session.status} label={session.status_display} />
-            </div>
-
-            {session.created_at && (
-              <div className="flex items-center gap-3 mt-0.5 text-xs text-gray-400">
-                <span>
-                  {new Date(session.created_at).toLocaleString('ru-RU', {
-                    day: '2-digit',
-                    month: '2-digit',
-                    year: 'numeric',
-                    hour: '2-digit',
-                    minute: '2-digit',
-                  })}
-                </span>
-                <button
-                  type="button"
-                  title="Скопировать UID"
-                  onClick={() => navigator.clipboard?.writeText(session.uuid || session.session_uuid || session.id)}
-                  className="font-mono truncate max-w-[180px] hover:text-gray-600 transition-colors cursor-copy"
-                >
-                  {(session.uuid || session.session_uuid || String(session.id)).slice(0, 8)}…
-                </button>
-              </div>
+          </Button>
+        )}
+        title={session.name || 'Сессия генерации контента'}
+        titleAdornment={<StatusBadge status={session.status} label={session.status_display} />}
+        metadata={session.created_at ? (
+          <>
+            <span>
+              {new Date(session.created_at).toLocaleString('ru-RU', {
+                day: '2-digit',
+                month: '2-digit',
+                year: 'numeric',
+                hour: '2-digit',
+                minute: '2-digit',
+              })}
+            </span>
+            <InlineAction
+              title="Скопировать UID"
+              onClick={() => navigator.clipboard?.writeText(session.uuid || session.session_uuid || session.id)}
+              variant="link"
+              className="font-mono truncate max-w-[180px] hover:text-aspectum-text-subtle transition-colors cursor-copy"
+            >
+              {(session.uuid || session.session_uuid || String(session.id)).slice(0, 8)}…
+            </InlineAction>
+          </>
+        ) : null}
+        status={currentStep === 1 && (autoSaving || autoSaved) ? (
+          <div className={`flex items-center gap-1.5 text-xs transition-opacity ${autoSaved && !autoSaving ? 'text-aspectum-success' : 'text-aspectum-text-disabled'}`}>
+            {autoSaving ? (
+              <>
+                <Spinner size="xs" className="border-2 border-aspectum-border-strong" />
+                <span>Сохранение...</span>
+              </>
+            ) : (
+              <>
+                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                </svg>
+                <span>Сохранено</span>
+              </>
             )}
           </div>
-        </div>
-
-        <div className="flex items-center gap-3 shrink-0">
-
-          {/* Индикатор авто-сохранения */}
-          {currentStep === 1 && (autoSaving || autoSaved) && (
-            <div className={`flex items-center gap-1.5 text-xs transition-opacity ${autoSaved && !autoSaving ? 'text-emerald-600' : 'text-gray-400'}`}>
-              {autoSaving ? (
-                <>
-                  <span className="inline-block w-3 h-3 border-2 border-gray-300 border-t-transparent rounded-full animate-spin" />
-                  <span>Сохранение...</span>
-                </>
-              ) : (
-                <>
-                  <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-                  </svg>
-                  <span>Сохранено</span>
-                </>
-              )}
-            </div>
-          )}
-
-          <button
+        ) : null}
+        actions={(
+          <Button
             type="button"
+            variant="primary"
+            size="md"
             onClick={() => {
               if (currentStep === 1) {
                 void (async () => {
@@ -1021,7 +1009,6 @@ export default function SessionWizard({ components = {} } = {}) {
             }
             style={currentStep === 2 || currentStep === 5 ? { visibility: 'hidden' } : undefined}
             title={currentStep === 2 || currentStep === 5 ? '' : 'Сохранить текущие данные'}
-            className="px-3 py-1.5 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors"
           >
             {saving ||
             cityInfoSaving ||
@@ -1032,18 +1019,13 @@ export default function SessionWizard({ components = {} } = {}) {
             attractionAudioGuideSaving
               ? 'Сохранение...'
               : 'Сохранить'}
-          </button>
-        </div>
-      </div>
+          </Button>
+        )}
+      />
 
       <main className="min-w-0 w-full">
         <div className="mb-5">
-          <div className="relative h-1.5 bg-gray-200 rounded-full mb-3">
-            <div
-              className="absolute inset-y-0 left-0 bg-blue-600 rounded-full transition-all duration-300"
-              style={{ width: `${((currentStep - 1) / (STEP_LABELS.length - 1)) * 100}%` }}
-            />
-          </div>
+          <ProgressBar value={currentStep - 1} max={STEP_LABELS.length - 1} size="sm" label="Прогресс заполнения сессии" className="mb-3" />
 
           <div className="flex">
             {STEP_LABELS.map((label, index) => {
@@ -1052,25 +1034,20 @@ export default function SessionWizard({ components = {} } = {}) {
               const isActive = step === currentStep;
 
               return (
-                <button
+                <WizardStepButton
                   key={step}
-                  type="button"
                   onClick={() => goToStep(step)}
-                  className={`flex-1 text-xs py-1 px-1 text-center transition-colors border-b-2 ${
-                    isActive
-                      ? 'border-blue-600 text-blue-700 font-semibold'
-                      : isCompleted
-                        ? 'border-blue-300 text-blue-500 hover:text-blue-700 cursor-pointer'
-                        : 'border-transparent text-gray-400 hover:text-gray-600 cursor-pointer'
-                  }`}
-                >
-                  {step}. {label}
-                </button>
+                  disabled={navigatingStep}
+                  step={step} label={label} active={isActive} completed={isCompleted}
+                />
               );
             })}
           </div>
         </div>
 
+        <Suspense
+          fallback={<SessionWizardStepFallback />}
+        >
         {currentStep === 1 && (
           /* onBlur: сейв города при уходе фокуса из формы — вместо таймера
              2.5с, который дёргал сервер и сбрасывал курсор при наборе */
@@ -1128,7 +1105,7 @@ export default function SessionWizard({ components = {} } = {}) {
               saving={saving}
             />
 
-            <div className="pt-5 border-t border-gray-200">
+            <div className="pt-5 border-t border-aspectum-border">
               <SessionWizardCityTagsPicker
                 cityTags={cityTags}
                 cityTagCatalog={cityTagCatalog}
@@ -1143,7 +1120,7 @@ export default function SessionWizard({ components = {} } = {}) {
               />
             </div>
 
-            <div className="pt-5 border-t border-gray-200">
+            <div className="pt-5 border-t border-aspectum-border">
               <SessionWizardCityInfoStep
                 embedded
                 scopedToCityDraftId={scopedCityDraftId || scopedDatabaseCityId || ''}
@@ -1316,7 +1293,7 @@ export default function SessionWizard({ components = {} } = {}) {
               onRemoveCurrentAttractionRelatedEvent={removeCurrentAttractionRelatedEvent}
             />
 
-            <div className="pt-5 border-t border-gray-200">
+            <div className="pt-5 border-t border-aspectum-border">
               <SessionWizardAttractionInfoStep
                 embedded
                 scopedToAttractionId={activeAttractionId || activeEventId || ''}
@@ -1362,7 +1339,7 @@ export default function SessionWizard({ components = {} } = {}) {
               />
             </div>
 
-            <div className="pt-5 border-t border-gray-200">
+            <div className="pt-5 border-t border-aspectum-border">
               <SessionWizardAttractionFeedStep
                 embedded
                 scopedToAttractionId={activeAttractionId || activeEventId || ''}
@@ -1394,7 +1371,7 @@ export default function SessionWizard({ components = {} } = {}) {
               />
             </div>
 
-            <div className="pt-5 border-t border-gray-200">
+            <div className="pt-5 border-t border-aspectum-border">
               <SessionWizardAttractionAudioGuidesBlock
                 embedded
                 scopedToAttractionId={activeAttractionId || activeEventId || ''}
@@ -1596,67 +1573,41 @@ export default function SessionWizard({ components = {} } = {}) {
             onPublish={handlePublish}
           />
         )}
+        </Suspense>
       </main>
 
-      {addLocaleOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center">
-          <div
-            className="absolute inset-0 bg-black/40"
-            onClick={() => setAddLocaleOpen(false)}
-          />
-
-          <div className="relative bg-white rounded-xl shadow-xl p-6 w-80 space-y-4">
-            <h3 className="text-base font-semibold text-gray-900">
-              Добавить адаптацию
-            </h3>
-
+      <Modal
+        open={addLocaleOpen}
+        onClose={() => setAddLocaleOpen(false)}
+        title="Добавить адаптацию"
+        size="sm"
+        footer={(
+          <>
+            <Button type="button" variant="outline" size="md" onClick={() => setAddLocaleOpen(false)}>
+              Отмена
+            </Button>
+            <Button type="button" variant="primary" size="md" onClick={addLocale}>
+              Добавить
+            </Button>
+          </>
+        )}
+      >
+        <div className="space-y-4">
             <div>
-              <label className="block text-sm text-gray-600 mb-1">
+              <FormLabel  layout="block" size="sm" tone="subtle" spacing="xs">
                 Код страны (2 буквы)
-              </label>
-              <input
-                type="text"
-                maxLength={2}
-                value={newLocaleCode}
-                onChange={(e) => setNewLocaleCode(e.target.value.toUpperCase())}
-                placeholder="RU, US, DE..."
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
+              </FormLabel>
+              <TextInput type="text" maxLength={2} value={newLocaleCode} onChange={(e) => setNewLocaleCode(e.target.value.toUpperCase())} placeholder="RU, US, DE..." />
             </div>
 
             <div>
-              <label className="block text-sm text-gray-600 mb-1">
+              <FormLabel  layout="block" size="sm" tone="subtle" spacing="xs">
                 Название языка
-              </label>
-              <input
-                type="text"
-                value={newLocaleLang}
-                onChange={(e) => setNewLocaleLang(e.target.value)}
-                placeholder="Немецкий, Испанский..."
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
+              </FormLabel>
+              <TextInput type="text" value={newLocaleLang} onChange={(e) => setNewLocaleLang(e.target.value)} placeholder="Немецкий, Испанский..." />
             </div>
-
-            <div className="flex gap-2 justify-end">
-              <button
-                type="button"
-                onClick={() => setAddLocaleOpen(false)}
-                className="px-4 py-2 text-sm text-gray-600 border border-gray-300 rounded-lg hover:bg-gray-50"
-              >
-                Отмена
-              </button>
-
-              <button
-                type="button"
-                onClick={addLocale}
-                className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700"
-              >
-                Добавить
-              </button>
-            </div>
-          </div>
         </div>
-      )}
+      </Modal>
 
       <SessionCloseDialogComp
         open={closeOpen}

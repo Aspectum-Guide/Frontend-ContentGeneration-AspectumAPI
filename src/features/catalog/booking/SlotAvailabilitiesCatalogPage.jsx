@@ -1,25 +1,17 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { eventSlotAvailabilitiesAPI, ticketPricesAPI } from '../../../api/booking';
 import Layout from '../../../components/Layout';
-import DataTable from '../../../components/ui/DataTable';
-import { Field, FormActions, TextInput } from '../../../components/ui/FormField';
-import Modal, { ConfirmModal } from '../../../components/ui/Modal';
+import { FormLabel, Alert, BulkActionModal, Button, Checkbox, CheckboxField, ConfirmModal, DataTable, Field, FormActions, FormHint, InlineState, Modal, PageHeader, Panel, Select, StatusBadge, TableRowActions, Tabs, Textarea, TextInput, formGridClassName } from '@aspectum/ui';
 import { useLayoutActions } from '../../../context/useLayoutActions';
 import { parseApiError } from '../../../utils/apiError';
 import { useCatalogFilters } from '../core/useCatalogFilters';
 import { useCatalogCrud } from '../core/useCatalogCrud';
 import { useCatalogPagedReload } from '../core/useCatalogPagedReload';
 import { useCatalogResource } from '../core/useCatalogResource';
-import BulkActionModal from '../../../components/bulk/BulkActionModal';
+import { useAppLanguages } from '../../../hooks/useAppLanguages';
 import { useEventOptions, useTicketTypeMapForEvents, useTicketTypeOptions } from '../shared/bookingOptions';
-import ActiveCheckboxField from '../shared/components/ActiveCheckboxField';
 import BlockingReservationsList from '../shared/components/BlockingReservationsList';
-import CatalogPageHeader from '../shared/components/CatalogPageHeader';
 import EventSelect from '../shared/components/EventSelect';
-import FormErrorAlert from '../shared/components/FormErrorAlert';
-import FormHint from '../shared/components/FormHint';
-import StatusBadge from '../shared/components/StatusBadge';
-import TableRowActions from '../shared/components/TableRowActions';
 import TicketTypeSelect from '../shared/components/TicketTypeSelect';
 import { DEFAULT_CURRENCY, normalizeCurrency } from '../shared/currencies';
 import { getEventLabel, getTicketTypeLabel } from '../shared/labels';
@@ -53,17 +45,6 @@ function dateInputToIsoEnd(value) {
   const d = new Date(`${value}T23:59:59.999`);
   return Number.isNaN(d.getTime()) ? '' : d.toISOString();
 }
-
-// Совпадает с backend settings.LANGUAGES (AspectumBack/settings.py) — те же
-// 6 языков, что и в мобильном приложении. Пусто = слот доступен на любом языке.
-const SLOT_LANGUAGE_OPTIONS = [
-  ['en', 'Английский'],
-  ['ru', 'Русский'],
-  ['it', 'Итальянский'],
-  ['fr', 'Французский'],
-  ['de', 'Немецкий'],
-  ['es', 'Испанский'],
-];
 
 function createEmptyAvailability() {
   return {
@@ -107,6 +88,11 @@ function createEmptyBulk() {
 }
 
 export default function SlotAvailabilitiesCatalog() {
+  const { languages: appLanguages } = useAppLanguages();
+  const slotLanguageOptions = appLanguages.map((language) => [
+    language.code,
+    language.label || language.name || language.code,
+  ]);
   const { setMobileActions } = useLayoutActions();
 
   // note: search here is UI-only; API doesn't support search for this resource.
@@ -174,6 +160,12 @@ export default function SlotAvailabilitiesCatalog() {
     updateErrorMessage: 'Ошибка сохранения слота',
     deleteErrorMessage: 'Ошибка удаления слота',
   });
+  const availabilityItems = avail.items;
+  const loadAvailabilities = avail.load;
+  const editingItem = crud.editingItem;
+  const openCreate = crud.openCreate;
+  const closeEdit = crud.closeEdit;
+  const openCrudEdit = crud.openEdit;
 
   // Отдельный источник для формы редактирования/создания — раньше она
   // переиспользовала `eventFilter` таблицы, из-за чего открытие "Ред."
@@ -217,9 +209,9 @@ export default function SlotAvailabilitiesCatalog() {
   // Prefetch ticket type labels for all events visible in current table page,
   // so the "Тип билета" column shows code/name instead of UUID.
   const visibleEventIds = useMemo(() => {
-    const items = Array.isArray(avail.items) ? avail.items : [];
+    const items = Array.isArray(availabilityItems) ? availabilityItems : [];
     return Array.from(new Set(items.map((x) => String(x?.event || '')).filter(Boolean)));
-  }, [avail.items]);
+  }, [availabilityItems]);
   const ticketTypeById = useTicketTypeMapForEvents(visibleEventIds);
 
   useEffect(() => {
@@ -227,7 +219,7 @@ export default function SlotAvailabilitiesCatalog() {
   }, [eventFilter]);
 
   const reload = useCallback(async (pageNum) => {
-    await avail.load(
+    await loadAvailabilities(
       {
         page: pageNum,
         page_size: PAGE_SIZE,
@@ -239,7 +231,7 @@ export default function SlotAvailabilitiesCatalog() {
       },
       (err) => parseApiError(err, 'Ошибка загрузки слотов')
     );
-  }, [avail.load, eventFilter, ticketTypeFilter, dateFrom, dateTo]);
+  }, [loadAvailabilities, eventFilter, ticketTypeFilter, dateFrom, dateTo]);
 
   useCatalogPagedReload({
     page,
@@ -255,11 +247,11 @@ export default function SlotAvailabilitiesCatalog() {
     const actions = [
       {
         id: 'create-slot-availability',
-        label: crud.editingItem ? 'Новый слот' : 'Создать слот',
+        label: editingItem ? 'Новый слот' : 'Создать слот',
         onClick: () => {
-          crud.openCreate();
+          openCreate();
         },
-        variant: crud.editingItem ? 'secondary' : 'primary',
+        variant: editingItem ? 'secondary' : 'primary',
       },
       {
         id: 'bulk-create-slot-availabilities',
@@ -271,34 +263,34 @@ export default function SlotAvailabilitiesCatalog() {
       },
     ];
 
-    if (crud.editingItem) {
+    if (editingItem) {
       actions.push({
         id: 'close-slot-availability-editor',
         label: 'Закрыть форму',
-        onClick: () => crud.closeEdit(),
+        onClick: () => closeEdit(),
         variant: 'secondary',
       });
     }
 
     setMobileActions(actions);
     return () => setMobileActions([]);
-  }, [crud.editingItem, crud.openCreate, crud.closeEdit, setMobileActions]);
+  }, [editingItem, openCreate, closeEdit, setMobileActions]);
 
   const openEdit = useCallback(async (row) => {
-    await crud.openEdit(row);
-  }, [crud.openEdit]);
+    await openCrudEdit(row);
+  }, [openCrudEdit]);
 
   const columns = [
     {
       key: 'slot_datetime',
       label: 'Время слота',
-      render: (iso) => <span className="text-sm text-gray-700">{iso ? new Date(iso).toLocaleString() : '—'}</span>,
+      render: (iso) => <span className="text-sm text-aspectum-text-strong">{iso ? new Date(iso).toLocaleString() : '—'}</span>,
     },
     {
       key: 'event',
       label: 'Событие',
       render: (eventId) => (
-        <span className="text-sm text-gray-700">
+        <span className="text-sm text-aspectum-text-strong">
           {eventLabelById.get(String(eventId)) || String(eventId || '—')}
         </span>
       ),
@@ -310,14 +302,14 @@ export default function SlotAvailabilitiesCatalog() {
         <div className="min-w-0">
           {(() => {
             const ids = Array.isArray(ticketTypeIds) ? ticketTypeIds.map((x) => String(x)) : [];
-            if (!ids.length) return <div className="text-sm text-gray-400">—</div>;
+            if (!ids.length) return <div className="text-sm text-aspectum-text-disabled">—</div>;
             const titles = ids.map((id) => ticketTypeById.get(id)?.title || id).filter(Boolean);
             const primaries = ids.map((id) => ticketTypeById.get(id)?.code || '').filter(Boolean);
             return (
               <>
-                <div className="text-sm text-gray-700 truncate">{titles.join(', ')}</div>
+                <div className="text-sm text-aspectum-text-strong truncate">{titles.join(', ')}</div>
                 {primaries.length ? (
-                  <div className="text-xs text-gray-400 truncate">{primaries.join(', ')}</div>
+                  <div className="text-xs text-aspectum-text-disabled truncate">{primaries.join(', ')}</div>
                 ) : null}
               </>
             );
@@ -328,12 +320,12 @@ export default function SlotAvailabilitiesCatalog() {
     {
       key: 'available_seats',
       label: 'Мест',
-      render: (v) => <span className="text-sm text-gray-700">{Number.isFinite(v) ? v : 0}</span>,
+      render: (v) => <span className="text-sm text-aspectum-text-strong">{Number.isFinite(v) ? v : 0}</span>,
     },
     {
       key: 'booking_closes_minutes_before',
       label: 'Закрытие (мин)',
-      render: (v) => <span className="text-sm text-gray-700">{Number.isFinite(v) ? v : 60}</span>,
+      render: (v) => <span className="text-sm text-aspectum-text-strong">{Number.isFinite(v) ? v : 60}</span>,
     },
     {
       key: 'is_active',
@@ -345,15 +337,15 @@ export default function SlotAvailabilitiesCatalog() {
       label: 'Языки',
       render: (langs) => {
         const codes = Array.isArray(langs) ? langs : [];
-        if (!codes.length) return <span className="text-sm text-gray-400">любой</span>;
-        return <span className="text-sm text-gray-700">{codes.join(', ')}</span>;
+        if (!codes.length) return <span className="text-sm text-aspectum-text-disabled">любой</span>;
+        return <span className="text-sm text-aspectum-text-strong">{codes.join(', ')}</span>;
       },
     },
   ];
 
   return (
     <Layout>
-      <CatalogPageHeader
+      <PageHeader
         title="Справочник слотов (доступность)"
         description="Слоты по событиям и типам билетов"
         createLabel="Создать слот"
@@ -393,7 +385,6 @@ export default function SlotAvailabilitiesCatalog() {
               options={eventOptions}
               disabled={eventsLoading}
               placeholder="Все события"
-              className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none"
             />
 
             <TicketTypeSelect
@@ -402,31 +393,19 @@ export default function SlotAvailabilitiesCatalog() {
               options={ticketTypeOptions}
               disabled={!eventFilter || ticketTypesLoading}
               placeholder={eventFilter ? 'Все типы' : 'Сначала выберите событие'}
-              className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none"
             />
 
-            <input
-              type="date"
-              value={dateFrom}
-              onChange={(e) => setDateFrom(e.target.value)}
-              title="Слоты с этой даты"
-              className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none"
-            />
-            <input
-              type="date"
-              value={dateTo}
-              onChange={(e) => setDateTo(e.target.value)}
-              title="Слоты по эту дату"
-              className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none"
-            />
+            <TextInput type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} title="Слоты с этой даты" />
+            <TextInput type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} title="Слоты по эту дату" />
             {(dateFrom || dateTo) && (
-              <button
+              <Button
                 type="button"
+                variant="ghost"
+                size="md"
                 onClick={() => { setDateFrom(''); setDateTo(''); }}
-                className="px-3 py-2 text-sm text-gray-500 hover:text-gray-700"
               >
                 Сбросить даты
-              </button>
+              </Button>
             )}
           </>
         )}
@@ -446,9 +425,9 @@ export default function SlotAvailabilitiesCatalog() {
       >
         {crud.editingItem && (
           <form onSubmit={crud.save} className="space-y-4">
-            <FormErrorAlert message={crud.saveError} />
+            <Alert tone="error">{crud.saveError}</Alert>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <div className={formGridClassName()}>
               <Field label="Событие" required>
                 <EventSelect
                   value={crud.editingItem.event}
@@ -481,7 +460,7 @@ export default function SlotAvailabilitiesCatalog() {
               />
             </Field>
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+            <div className={formGridClassName({ columns: 3 })}>
               <Field
                 label="Доступно мест"
                 hint="Один общий пул на весь слот — делится между всеми выбранными типами билетов, а не считается отдельно для каждого."
@@ -501,7 +480,7 @@ export default function SlotAvailabilitiesCatalog() {
                   onChange={(e) => crud.setEditingItem((prev) => ({ ...prev, booking_closes_minutes_before: Number(e.target.value || 0) }))}
                 />
               </Field>
-              <ActiveCheckboxField
+              <CheckboxField
                 checked={crud.editingItem.is_active}
                 onChange={(next) => crud.setEditingItem((prev) => ({ ...prev, is_active: next }))}
                 text="Активен"
@@ -516,22 +495,12 @@ export default function SlotAvailabilitiesCatalog() {
                   : 'Один слот — один язык гида. Не выбрано — слот виден на любом языке.'
               }
             >
-              <select
-                required={eventTitleLangCount(crud.editingItem.event) >= 2}
-                value={(crud.editingItem.languages || [])[0] || ''}
-                onChange={(e) =>
-                  crud.setEditingItem((prev) => ({
-                    ...prev,
-                    languages: e.target.value ? [e.target.value] : [],
-                  }))
-                }
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none"
-              >
+              <Select required={eventTitleLangCount(crud.editingItem.event) >= 2} value={(crud.editingItem.languages || [])[0] || ''} onChange={(e) => crud.setEditingItem((prev) => ({ ...prev, languages: e.target.value ? [e.target.value] : [], })) }>
                 <option value="">Любой язык</option>
-                {SLOT_LANGUAGE_OPTIONS.map(([code, label]) => (
+                {slotLanguageOptions.map(([code, label]) => (
                   <option key={code} value={code}>{label}</option>
                 ))}
-              </select>
+              </Select>
             </Field>
 
             <FormHint>
@@ -565,16 +534,18 @@ export default function SlotAvailabilitiesCatalog() {
       >
         <BlockingReservationsList details={crud.deleteErrorDetails} />
         {crud.deleteErrorDetails?.blocking_count ? (
-          <button
+          <Button
             type="button"
+            variant="linkDanger"
+            size="sm"
             onClick={() => {
               setForceDeleteError('');
               setForceDeleteTarget(crud.deleteTarget);
             }}
-            className="mt-2 text-xs text-red-700 underline hover:no-underline"
+            className="mt-2"
           >
             Удалить принудительно вместе с этими бронированиями
-          </button>
+          </Button>
         ) : null}
       </ConfirmModal>
 
@@ -690,9 +661,9 @@ export default function SlotAvailabilitiesCatalog() {
         }}
         renderFields={({ values, setValues, error }) => (
           <>
-            <FormErrorAlert message={error} />
+            <Alert tone="error">{error}</Alert>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <div className={formGridClassName()}>
               <Field label="Событие" required>
                 <EventSelect
                   value={values.event}
@@ -708,15 +679,16 @@ export default function SlotAvailabilitiesCatalog() {
 
               <Field label="Типы билетов (опционально)">
                 {!values.event ? (
-                  <div className="text-sm text-gray-500">Сначала выберите событие</div>
+                  <div className="text-sm text-aspectum-text-muted">Сначала выберите событие</div>
                 ) : ticketTypesLoading ? (
-                  <div className="text-sm text-gray-500">Загрузка типов билетов…</div>
+                  <InlineState loading>Загрузка типов билетов…</InlineState>
                 ) : (
                   <div className="space-y-2">
                     <div className="flex flex-wrap gap-2">
-                      <button
+                      <Button
                         type="button"
-                        className="px-3 py-1.5 text-xs rounded-lg border border-gray-300 bg-white hover:bg-gray-50"
+                        variant="outline"
+                        size="sm"
                         onClick={() =>
                           setValues((prev) => ({
                             ...prev,
@@ -726,21 +698,22 @@ export default function SlotAvailabilitiesCatalog() {
                         disabled={!ticketTypeOptions.length}
                       >
                         Выбрать все
-                      </button>
-                      <button
+                      </Button>
+                      <Button
                         type="button"
-                        className="px-3 py-1.5 text-xs rounded-lg border border-gray-300 bg-white hover:bg-gray-50"
+                        variant="outline"
+                        size="sm"
                         onClick={() => setValues((prev) => ({ ...prev, ticket_types: [] }))}
                         disabled={!values.ticket_types?.length}
                       >
                         Снять выбор
-                      </button>
-                      <div className="text-xs text-gray-500 self-center">
+                      </Button>
+                      <div className="text-xs text-aspectum-text-muted self-center">
                         Выбрано: {Array.isArray(values.ticket_types) ? values.ticket_types.length : 0}
                       </div>
                     </div>
 
-                    <div className="max-h-48 overflow-auto rounded-lg border border-gray-200 p-2 bg-white">
+                    <Panel tone="muted" className="max-h-48 overflow-auto p-2">
                       {ticketTypeOptions.length ? (
                         <div className="space-y-1">
                           {ticketTypeOptions.map((tt) => {
@@ -750,9 +723,8 @@ export default function SlotAvailabilitiesCatalog() {
                               ? values.ticket_types.includes(id)
                               : false;
                             return (
-                              <label key={id} className="flex items-center gap-2 text-sm text-gray-700">
-                                <input
-                                  type="checkbox"
+                              <FormLabel key={id}  layout="row" size="sm" tone="strong">
+                                <Checkbox
                                   checked={checked}
                                   onChange={(e) => {
                                     const nextChecked = e.target.checked;
@@ -766,20 +738,20 @@ export default function SlotAvailabilitiesCatalog() {
                                   }}
                                 />
                                 <span className="min-w-0 truncate">{label}</span>
-                              </label>
+                              </FormLabel>
                             );
                           })}
                         </div>
                       ) : (
-                        <div className="text-sm text-gray-500">Для события нет типов билетов</div>
+                        <div className="text-sm text-aspectum-text-muted">Для события нет типов билетов</div>
                       )}
-                    </div>
+                    </Panel>
                   </div>
                 )}
               </Field>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+            <div className={formGridClassName({ columns: 3 })}>
               <Field
                 label="Мест"
                 hint="Общий пул на каждый создаваемый слот — делится между всеми выбранными типами билетов."
@@ -801,7 +773,7 @@ export default function SlotAvailabilitiesCatalog() {
                   }
                 />
               </Field>
-              <ActiveCheckboxField
+              <CheckboxField
                 checked={values.is_active}
                 onChange={(next) => setValues((prev) => ({ ...prev, is_active: next }))}
                 text="Активны"
@@ -816,50 +788,26 @@ export default function SlotAvailabilitiesCatalog() {
                   : 'Один слот — один язык гида. Применится ко всем создаваемым слотам. Не выбрано — доступны на любом языке.'
               }
             >
-              <select
-                required={eventTitleLangCount(values.event) >= 2}
-                value={(values.languages || [])[0] || ''}
-                onChange={(e) =>
-                  setValues((prev) => ({
-                    ...prev,
-                    languages: e.target.value ? [e.target.value] : [],
-                  }))
-                }
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none"
-              >
+              <Select required={eventTitleLangCount(values.event) >= 2} value={(values.languages || [])[0] || ''} onChange={(e) => setValues((prev) => ({ ...prev, languages: e.target.value ? [e.target.value] : [], })) }>
                 <option value="">Любой язык</option>
-                {SLOT_LANGUAGE_OPTIONS.map(([code, label]) => (
+                {slotLanguageOptions.map(([code, label]) => (
                   <option key={code} value={code}>{label}</option>
                 ))}
-              </select>
+              </Select>
             </Field>
 
-            <div className="flex items-center gap-2">
-              <button
-                type="button"
-                onClick={() => setValues((prev) => ({ ...prev, mode: 'interval' }))}
-                className={`px-3 py-2 text-sm rounded-lg border ${values.mode === 'interval' ? 'bg-blue-50 border-blue-300 text-blue-700' : 'bg-white border-gray-300 text-gray-700'}`}
-              >
-                Интервал
-              </button>
-              <button
-                type="button"
-                onClick={() => setValues((prev) => ({ ...prev, mode: 'list' }))}
-                className={`px-3 py-2 text-sm rounded-lg border ${values.mode === 'list' ? 'bg-blue-50 border-blue-300 text-blue-700' : 'bg-white border-gray-300 text-gray-700'}`}
-              >
-                Список дат
-              </button>
-              <button
-                type="button"
-                onClick={() => setValues((prev) => ({ ...prev, mode: 'schedule' }))}
-                className={`px-3 py-2 text-sm rounded-lg border ${values.mode === 'schedule' ? 'bg-blue-50 border-blue-300 text-blue-700' : 'bg-white border-gray-300 text-gray-700'}`}
-              >
-                Дни + время
-              </button>
-            </div>
+            <Tabs
+              items={[
+                { id: 'interval', label: 'Интервал' },
+                { id: 'list', label: 'Список дат' },
+                { id: 'schedule', label: 'Дни + время' },
+              ]}
+              value={values.mode}
+              onChange={(mode) => setValues((prev) => ({ ...prev, mode }))}
+            />
 
             {values.mode === 'interval' ? (
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+              <div className={formGridClassName({ columns: 3 })}>
                 <Field label="Начало" required>
                   <TextInput
                     type="datetime-local"
@@ -888,7 +836,7 @@ export default function SlotAvailabilitiesCatalog() {
               </div>
             ) : values.mode === 'schedule' ? (
               <div className="space-y-3">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <div className={formGridClassName()}>
                   <Field label="Дата начала" required>
                     <TextInput
                       type="date"
@@ -918,9 +866,8 @@ export default function SlotAvailabilitiesCatalog() {
                       ['sat', 'Сб'],
                       ['sun', 'Вс'],
                     ].map(([k, label]) => (
-                      <label key={k} className="inline-flex items-center gap-2 text-sm text-gray-700">
-                        <input
-                          type="checkbox"
+                      <FormLabel key={k}  size="sm" tone="strong"  layout="inlineRow">
+                        <Checkbox
                           checked={!!values.schedule_days?.[k]}
                           onChange={(e) =>
                             setValues((prev) => ({
@@ -930,87 +877,54 @@ export default function SlotAvailabilitiesCatalog() {
                           }
                         />
                         {label}
-                      </label>
+                      </FormLabel>
                     ))}
                   </div>
                 </Field>
 
                 <Field label="Времена (HH:mm, по строке)" required>
-                  <textarea
-                    rows={5}
-                    value={values.schedule_times_text}
-                    onChange={(e) => setValues((prev) => ({ ...prev, schedule_times_text: e.target.value }))}
-                    placeholder={'Например:\n10:00\n12:30\n15:00'}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none font-mono"
-                    required
-                  />
+                  <Textarea className="font-mono" rows={5} value={values.schedule_times_text} onChange={(e) => setValues((prev) => ({ ...prev, schedule_times_text: e.target.value }))} placeholder={'Например:\n10:00\n12:30\n15:00'} required />
                 </Field>
               </div>
             ) : (
               <Field label="Даты/время (по одной строке)" required>
-                <textarea
-                  rows={6}
-                  value={values.datetimes_text}
-                  onChange={(e) => setValues((prev) => ({ ...prev, datetimes_text: e.target.value }))}
-                  placeholder={'Примеры:\n2026-05-10 10:00\n2026-05-10 12:00\n2026-05-11T09:30'}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none font-mono"
-                  required
-                />
+                <Textarea className="font-mono" rows={6} value={values.datetimes_text} onChange={(e) => setValues((prev) => ({ ...prev, datetimes_text: e.target.value }))} placeholder={'Примеры:\n2026-05-10 10:00\n2026-05-10 12:00\n2026-05-11T09:30'} required />
               </Field>
             )}
 
-            <div className="rounded-lg border border-gray-200 p-3 space-y-3">
-              <label className="inline-flex items-center gap-2 text-sm text-gray-800">
-                <input
-                  type="checkbox"
+            <Panel tone="muted" className="p-3 space-y-3">
+              <FormLabel  size="sm" tone="emphasis"  layout="inlineRow">
+                <Checkbox
                   checked={!!values.also_create_prices}
                   onChange={(e) => setValues((prev) => ({ ...prev, also_create_prices: e.target.checked }))}
                 />
                 Автоматически создать цены для созданных слотов
-              </label>
+              </FormLabel>
 
               {values.also_create_prices ? (
                 <div className="space-y-3">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <button
-                      type="button"
-                      onClick={() => setValues((prev) => ({ ...prev, price_mode: 'single' }))}
-                      className={`px-3 py-1.5 text-xs rounded-lg border ${
-                        (values.price_mode || 'single') === 'single'
-                          ? 'bg-blue-50 border-blue-300 text-blue-700'
-                          : 'bg-white border-gray-300 text-gray-700'
-                      }`}
-                    >
-                      Одна цена на все типы
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setValues((prev) => ({ ...prev, price_mode: 'per_type' }))}
-                      className={`px-3 py-1.5 text-xs rounded-lg border ${
-                        values.price_mode === 'per_type'
-                          ? 'bg-blue-50 border-blue-300 text-blue-700'
-                          : 'bg-white border-gray-300 text-gray-700'
-                      }`}
-                      disabled={!Array.isArray(values.ticket_types) || !values.ticket_types.length}
-                      title={
-                        Array.isArray(values.ticket_types) && values.ticket_types.length
-                          ? ''
-                          : 'Сначала выберите типы билетов'
-                      }
-                    >
-                      Разные цены по типам
-                    </button>
-                  </div>
+                  <Tabs
+                    items={[
+                      { id: 'single', label: 'Одна цена на все типы' },
+                      {
+                        id: 'per_type',
+                        label: 'Разные цены по типам',
+                        disabled: !Array.isArray(values.ticket_types) || !values.ticket_types.length,
+                      },
+                    ]}
+                    value={values.price_mode || 'single'}
+                    onChange={(price_mode) => setValues((prev) => ({ ...prev, price_mode }))}
+                  />
 
                   {values.price_mode === 'per_type' ? (
-                    <div className="rounded-lg border border-gray-200 p-2 bg-white space-y-2">
+                    <Panel className="p-2 space-y-2">
                       {(Array.isArray(values.ticket_types) ? values.ticket_types : []).map((ttId) => {
                         const tt = ticketTypeOptions.find((x) => String(x.id) === String(ttId));
                         const label = getTicketTypeLabel(tt) || String(ttId);
                         const v = values.price_by_ticket_type?.[ttId] ?? '';
                         return (
                           <div key={ttId} className="grid grid-cols-1 md:grid-cols-[1fr_140px] gap-2 items-center">
-                            <div className="text-sm text-gray-700 truncate" title={label}>
+                            <div className="text-sm text-aspectum-text-strong truncate" title={label}>
                               {label}
                             </div>
                             <TextInput
@@ -1033,9 +947,9 @@ export default function SlotAvailabilitiesCatalog() {
                           </div>
                         );
                       })}
-                    </div>
+                    </Panel>
                   ) : (
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                    <div className={formGridClassName({ columns: 3 })}>
                       <Field label="Цена" required>
                         <TextInput
                           type="number"
@@ -1055,7 +969,7 @@ export default function SlotAvailabilitiesCatalog() {
                           required
                         />
                       </Field>
-                      <ActiveCheckboxField
+                      <CheckboxField
                         checked={values.price_is_active}
                         onChange={(next) => setValues((prev) => ({ ...prev, price_is_active: next }))}
                         text="Цена активна"
@@ -1064,7 +978,7 @@ export default function SlotAvailabilitiesCatalog() {
                   )}
 
                   {values.price_mode === 'per_type' ? (
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    <div className={formGridClassName()}>
                       <Field label="Валюта" required>
                         <TextInput
                           value={values.price_currency}
@@ -1073,7 +987,7 @@ export default function SlotAvailabilitiesCatalog() {
                           required
                         />
                       </Field>
-                      <ActiveCheckboxField
+                      <CheckboxField
                         checked={values.price_is_active}
                         onChange={(next) => setValues((prev) => ({ ...prev, price_is_active: next }))}
                         text="Цена активна"
@@ -1082,24 +996,24 @@ export default function SlotAvailabilitiesCatalog() {
                   ) : null}
                 </div>
               ) : null}
-            </div>
+            </Panel>
           </>
         )}
         renderResult={({ result }) =>
           result ? (
-            <div className="rounded-lg border border-gray-200 bg-gray-50 p-3 text-sm text-gray-700">
-              <div className="font-medium text-gray-800">Результат</div>
+            <Panel tone="muted" className="p-3 text-sm">
+              <div className="font-medium text-aspectum-text-emphasis">Результат</div>
               <div className="mt-1">
                 Создано: <span className="font-semibold">{result.created_count ?? 0}</span>, пропущено (уже было):{' '}
                 <span className="font-semibold">{result.skipped_existing ?? 0}</span>
               </div>
               {Array.isArray(result.errors) && result.errors.length ? (
-                <div className="mt-2 text-xs text-red-700">
+                <div className="mt-2 text-xs text-aspectum-danger-strong">
                   Ошибки: {result.errors.length} (первые показаны в ответе API)
                 </div>
               ) : null}
               {Array.isArray(result.overlap_warnings) && result.overlap_warnings.length ? (
-                <div className="mt-2 text-xs text-amber-700 bg-amber-50 rounded px-2 py-1.5">
+                <Alert tone="warning" className="mt-2 text-xs px-2 py-1.5">
                   <div className="font-medium">
                     ⚠️ Слоты слишком близко друг к другу ({result.overlap_warnings.length}):
                   </div>
@@ -1111,13 +1025,12 @@ export default function SlotAvailabilitiesCatalog() {
                       </div>
                     ))}
                   </div>
-                </div>
+                </Alert>
               ) : null}
-            </div>
+            </Panel>
           ) : null
         }
       />
     </Layout>
   );
 }
-

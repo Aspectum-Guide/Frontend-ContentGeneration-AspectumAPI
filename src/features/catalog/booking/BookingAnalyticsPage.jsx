@@ -6,7 +6,7 @@ import EventSelect from '../shared/components/EventSelect';
 import { DEFAULT_CURRENCY, normalizeCurrency } from '../shared/currencies';
 import { getMultiLangValue } from '../shared/i18n';
 import { parseApiError } from '../../../utils/apiError';
-import MetricCard from '../shared/components/MetricCard';
+import { Alert, DataTable, EmptyState, MetricCard, PageHeader, SectionHeader, Spinner } from '@aspectum/ui';
 
 export default function BookingAnalyticsPage() {
   const [data, setData] = useState(null);
@@ -36,30 +36,24 @@ export default function BookingAnalyticsPage() {
 
   return (
     <Layout>
-      <div className="mb-6 flex items-center justify-between gap-4 flex-wrap">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Аналитика бронирований</h1>
-          <p className="mt-1 text-sm text-gray-500">Только подтверждённые резервации</p>
-        </div>
-        <EventSelect
+      <PageHeader
+        title="Аналитика бронирований"
+        description="Только подтверждённые резервации"
+        className="flex-wrap"
+        actions={<EventSelect
           value={eventFilter}
           onChange={setEventFilter}
           options={eventOptions}
           disabled={eventsLoading}
           placeholder={eventsLoading ? 'Загрузка…' : 'Все события'}
-          className={`px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none ${eventsLoading ? 'opacity-60' : ''}`}
-        />
-      </div>
+          className={eventsLoading ? 'opacity-60 cursor-wait' : undefined}
+        />}
+      />
 
-      {error && (
-        <div className="mb-4 text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">{error}</div>
-      )}
+      {error && <Alert tone="error" className="mb-4">{error}</Alert>}
 
       {loading ? (
-        <div className="flex items-center gap-2 text-sm text-gray-400 py-8">
-          <span className="animate-spin w-4 h-4 border-2 border-blue-500 border-t-transparent rounded-full inline-block" />
-          Загрузка...
-        </div>
+        <EmptyState icon={<Spinner className="border-aspectum-focus" />} title="Загрузка..." spacing="md" />
       ) : data && (
         <div className="space-y-6">
           {/* Summary cards */}
@@ -81,79 +75,60 @@ export default function BookingAnalyticsPage() {
           {/* По коду типа билета */}
           {data.by_code?.length > 0 && (
             <div>
-              <h2 className="text-sm font-semibold text-gray-700 mb-2">По типу билета</h2>
-              <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-                <table className="w-full text-sm">
-                  <thead className="bg-gray-50 text-xs text-gray-500 uppercase">
-                    <tr>
-                      <th className="px-4 py-2 text-left">Тип</th>
-                      <th className="px-4 py-2 text-left">Код</th>
-                      <th className="px-4 py-2 text-right">Резерваций</th>
-                      <th className="px-4 py-2 text-right">Билетов</th>
-                      <th className="px-4 py-2 text-right">Выручка</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-100">
-                    {data.by_code.map((row, i) => (
-                      <tr key={i} className="hover:bg-gray-50">
-                        <td className="px-4 py-2 font-medium text-gray-800">{row.code || '—'}</td>
-                        <td className="px-4 py-2 font-mono text-xs text-gray-400">{row.code || '—'}</td>
-                        <td className="px-4 py-2 text-right text-gray-700">{row.reservations}</td>
-                        <td className="px-4 py-2 text-right text-gray-700">{row.qty}</td>
-                        <td className="px-4 py-2 text-right font-medium text-gray-900">
-                          {Number(row.revenue).toLocaleString('ru-RU', { minimumFractionDigits: 2 })}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+              <SectionHeader title="По типу билета" size="xs" className="mb-2" />
+              <DataTable
+                rows={data.by_code}
+                columns={[
+                  { key: 'code', label: 'Тип', className: 'font-medium text-aspectum-text-emphasis' },
+                  { key: 'code', label: 'Код', className: 'font-mono text-xs text-aspectum-text-disabled' },
+                  { key: 'reservations', label: 'Резерваций', className: 'text-right text-aspectum-text-strong', headerClass: 'text-right' },
+                  { key: 'qty', label: 'Билетов', className: 'text-right text-aspectum-text-strong', headerClass: 'text-right' },
+                  {
+                    key: 'revenue',
+                    label: 'Выручка',
+                    className: 'text-right font-medium text-aspectum-text',
+                    headerClass: 'text-right',
+                    render: (value) => Number(value).toLocaleString('ru-RU', { minimumFractionDigits: 2 }),
+                  },
+                ]}
+              />
             </div>
           )}
 
           {/* По ивентам */}
           {data.by_event?.length > 0 && !eventFilter && (
             <div>
-              <h2 className="text-sm font-semibold text-gray-700 mb-2">По событиям</h2>
-              <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-                <table className="w-full text-sm">
-                  <thead className="bg-gray-50 text-xs text-gray-500 uppercase">
-                    <tr>
-                      <th className="px-4 py-2 text-left">Событие</th>
-                      <th className="px-4 py-2 text-right">Резерваций</th>
-                      <th className="px-4 py-2 text-right">Билетов</th>
-                      <th className="px-4 py-2 text-right">Выручка</th>
-                      <th className="px-4 py-2 text-left">Валюта</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-100">
-                    {data.by_event.map((row, i) => (
-                      <tr key={i} className="hover:bg-gray-50">
-                        <td className="px-4 py-2 font-medium text-gray-800">
-                          {getMultiLangValue(
-                            typeof row.event__title === 'string'
-                              ? (() => { try { return JSON.parse(row.event__title); } catch { return {}; } })()
-                              : row.event__title
-                          ) || row.event_id}
-                        </td>
-                        <td className="px-4 py-2 text-right text-gray-700">{row.reservations}</td>
-                        <td className="px-4 py-2 text-right text-gray-700">{row.qty}</td>
-                        <td className="px-4 py-2 text-right font-medium text-gray-900">
-                          {Number(row.revenue).toLocaleString('ru-RU', { minimumFractionDigits: 2 })}
-                        </td>
-                        <td className="px-4 py-2 text-xs text-gray-400">{row.currency}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+              <SectionHeader title="По событиям" size="xs" className="mb-2" />
+              <DataTable
+                rows={data.by_event}
+                columns={[
+                  {
+                    key: 'event__title',
+                    label: 'Событие',
+                    className: 'font-medium text-aspectum-text-emphasis',
+                    render: (value, row) => getMultiLangValue(
+                      typeof value === 'string'
+                        ? (() => { try { return JSON.parse(value); } catch { return {}; } })()
+                        : value,
+                    ) || row.event_id,
+                  },
+                  { key: 'reservations', label: 'Резерваций', className: 'text-right text-aspectum-text-strong', headerClass: 'text-right' },
+                  { key: 'qty', label: 'Билетов', className: 'text-right text-aspectum-text-strong', headerClass: 'text-right' },
+                  {
+                    key: 'revenue',
+                    label: 'Выручка',
+                    className: 'text-right font-medium text-aspectum-text',
+                    headerClass: 'text-right',
+                    render: (value) => Number(value).toLocaleString('ru-RU', { minimumFractionDigits: 2 }),
+                  },
+                  { key: 'currency', label: 'Валюта', className: 'text-xs text-aspectum-text-disabled' },
+                ]}
+              />
             </div>
           )}
 
           {data.total_reservations === 0 && (
-            <div className="text-center py-12 text-sm text-gray-400">
-              Подтверждённых бронирований пока нет
-            </div>
+            <EmptyState icon="🎟️" title="Подтверждённых бронирований пока нет" />
           )}
         </div>
       )}

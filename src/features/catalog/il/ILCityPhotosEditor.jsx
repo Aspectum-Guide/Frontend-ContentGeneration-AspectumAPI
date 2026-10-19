@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Field, TextInput } from '../../../components/ui/FormField';
-import { ConfirmModal } from '../../../components/ui/Modal';
+import { Alert, Button, ConfirmModal, EmptyState, Field, FormGrid, MediaUploadField, Panel, TextInput } from '@aspectum/ui';
 import { imagesAPI } from '../../../api/generation';
 import { parseApiError } from '../../../utils/apiError';
 import { createCoordinatePasteHandler, parseCoord } from '../../../utils/coordinates';
@@ -13,7 +12,6 @@ export default function ILCityPhotosEditor({ cityId, disabled = false }) {
   const [savingId, setSavingId] = useState(null);
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [uploadingId, setUploadingId] = useState(null);
-  const fileInputRef = useRef(null);
   const uploadTargetRef = useRef(null);
 
   const loadItems = useCallback(async () => {
@@ -65,10 +63,6 @@ export default function ILCityPhotosEditor({ cityId, disabled = false }) {
     }
   };
 
-  const handleImagePick = (photoId) => {
-    uploadTargetRef.current = photoId;
-    fileInputRef.current?.click();
-  };
 
   const handleFileChange = async (e) => {
     const file = e.target.files?.[0];
@@ -104,7 +98,7 @@ export default function ILCityPhotosEditor({ cityId, disabled = false }) {
 
   if (!cityId) {
     return (
-      <p className="text-sm text-gray-500">
+      <p className="text-sm text-aspectum-text-muted">
         Выберите город для локации — фото привязаны к городу, а не к отдельной IL.
       </p>
     );
@@ -112,44 +106,43 @@ export default function ILCityPhotosEditor({ cityId, disabled = false }) {
 
   return (
     <div className="space-y-4">
-      <p className="text-xs text-gray-500">
+      <p className="text-xs text-aspectum-text-muted">
         Фото интерактивных локаций города (InteractiveLocationPhoto). Общие для всех IL этого города.
       </p>
 
-      <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={handleFileChange} />
-
-      {error && (
-        <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">{error}</div>
-      )}
+      {error && <Alert tone="error">{error}</Alert>}
 
       {loading ? (
-        <p className="text-sm text-gray-400">Загрузка...</p>
+        <EmptyState icon={null} title="Загрузка..." spacing="sm" />
       ) : items.length === 0 ? (
-        <p className="text-sm text-gray-500">Фото пока нет.</p>
+        <EmptyState title="Фото пока нет" description="Добавьте первое изображение для локации." className="py-5" />
       ) : (
         items.map((item) => {
           const busy = savingId === item.id || uploadingId === item.id;
           return (
-            <div key={item.id} className="p-4 border border-gray-200 rounded-xl space-y-3 bg-gray-50/50">
+            <Panel key={item.id} tone="muted" className="p-4 space-y-3">
               <div className="flex flex-wrap gap-3 justify-between items-start">
-                {item.image_url ? (
-                  <img src={item.image_url} alt="" className="max-h-36 rounded-lg border border-gray-200" />
-                ) : (
-                  <div className="w-40 h-28 rounded-lg border border-dashed border-gray-300 bg-white flex items-center justify-center text-xs text-gray-400">
-                    Нет изображения
-                  </div>
-                )}
-                <button
+                <MediaUploadField
+                  previewUrl={item.image_url}
+                  placeholder="Нет изображения"
+                  disabled={disabled || busy}
+                  uploading={uploadingId === item.id}
+                  onTrigger={() => { uploadTargetRef.current = item.id; }}
+                  onChange={handleFileChange}
+                  uploadLabel="Загрузить изображение"
+                />
+                <Button
                   type="button"
                   disabled={disabled || busy}
                   onClick={() => setDeleteTarget(item)}
-                  className="text-sm text-red-600 hover:text-red-700 disabled:opacity-50"
+                  variant="softDanger"
+                  size="sm"
                 >
                   Удалить
-                </button>
+                </Button>
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
+              <FormGrid responsive={false}>
                 <Field label="Широта">
                   <TextInput
                     type="number"
@@ -179,39 +172,33 @@ export default function ILCityPhotosEditor({ cityId, disabled = false }) {
                     }}
                   />
                 </Field>
-              </div>
+              </FormGrid>
 
               <div className="flex flex-wrap gap-2">
-                <button
+                <Button
                   type="button"
                   disabled={disabled || busy}
                   onClick={() => patchItem(item.id, { lat: item.lat, lon: item.lon })}
-                  className="text-sm text-blue-700 hover:text-blue-800 disabled:opacity-50"
+                  variant="link"
+                  size="sm"
                 >
                   {busy ? 'Сохранение...' : 'Сохранить координаты'}
-                </button>
-                <button
-                  type="button"
-                  disabled={disabled || busy}
-                  onClick={() => handleImagePick(item.id)}
-                  className="text-sm text-blue-700 hover:text-blue-800 disabled:opacity-50"
-                >
-                  {uploadingId === item.id ? 'Загрузка...' : 'Загрузить изображение'}
-                </button>
+                </Button>
               </div>
-            </div>
+            </Panel>
           );
         })
       )}
 
-      <button
+      <Button
         type="button"
         disabled={disabled || savingId === 'new'}
         onClick={handleAdd}
-        className="px-3 py-2 text-sm font-medium text-blue-700 bg-blue-50 rounded-lg hover:bg-blue-100 disabled:opacity-50"
+        variant="soft"
+        size="md"
       >
         {savingId === 'new' ? 'Добавление...' : '+ Добавить фото'}
-      </button>
+      </Button>
 
       <ConfirmModal
         open={!!deleteTarget}

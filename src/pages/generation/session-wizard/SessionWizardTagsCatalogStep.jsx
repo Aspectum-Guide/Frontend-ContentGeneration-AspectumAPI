@@ -1,17 +1,13 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { appLanguagesAPI } from '../../../api/generation';
-import MultiLangInput from '../../../components/forms/MultiLangInput';
-import ModalPortal from '../../../components/ui/ModalPortal';
-import { ConfirmModal as DefaultConfirmModal } from '../../../components/ui/Modal.jsx';
-import { useConfirmModal } from '../../../components/ui/useConfirmModal.jsx';
+import { FormLabel, Alert, Button, Checkbox, ConfirmModal as DefaultConfirmModal, EmptyState, Field, FileButton, Heading, InlineState, Modal, MultiField, Panel, SectionHeader, Select, Tabs, TextInput, useConfirmModal } from '@aspectum/ui';
 import {
   DEFAULT_APP_LANGUAGES,
   ensureAppLanguages,
-  mapAppLanguagesForMultiLangInput,
-  parseAppLanguagesResponse,
+  mapAppLanguagesForFields,
 } from '../../../features/catalog/shared/normalize';
 import { getMultiLangValue } from '../../../features/catalog/shared/i18n';
 import { normalizeId } from './sessionWizardShared.jsx';
+import { useAppLanguages } from '../../../hooks/useAppLanguages';
 
 const transliterateRu = (value) => {
   const map = {
@@ -517,228 +513,205 @@ function CityFilterForm({
 
   return (
     <form onSubmit={handleSubmit} className="space-y-3 max-h-[85vh] overflow-y-auto overflow-x-hidden min-w-0">
-      <h3 className="text-base font-semibold text-gray-900">
+      <Heading level={3} size="sm">
         {mode === 'create-folder' && 'Новая папка'}
         {mode === 'create-tag' && (flatCatalog ? 'Новый тег города' : 'Новый тег')}
         {mode === 'edit' && 'Редактирование'}
-      </h3>
+      </Heading>
 
       {error ? (
-        <p className="text-sm text-red-600 bg-red-50 border border-red-100 rounded-lg px-3 py-2">
-          {error}
-        </p>
+        <Alert tone="error">{error}</Alert>
       ) : null}
 
       {isCreate && !advancedOpen ? (
         <>
           <div>
-            <label className="block text-xs font-medium text-gray-600 mb-0.5">
+            <FormLabel  layout="block" size="xs" weight="medium" tone="subtle" spacing="xxs">
               {primaryLabel}
-            </label>
-            <input
-              type="text"
-              value={quickTitle}
-              onChange={(ev) => setQuickTitle(ev.target.value)}
-              onKeyDown={handleQuickKeyDown}
-              disabled={submitting}
-              autoFocus
-              placeholder={
-                mode === 'create-folder' ? 'Например: Атмосфера' : 'Например: Романтичный'
-              }
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm disabled:opacity-50"
-            />
+            </FormLabel>
+            <TextInput className="disabled:opacity-50" type="text" value={quickTitle} onChange={(ev) => setQuickTitle(ev.target.value)} onKeyDown={handleQuickKeyDown} disabled={submitting} autoFocus placeholder={ mode === 'create-folder' ? 'Например: Атмосфера' : 'Например: Романтичный' } />
           </div>
 
           {mode === 'create-tag' && folderDisplayName && !flatCatalog ? (
-            <p className="text-xs text-gray-500">
+            <p className="text-xs text-aspectum-text-muted">
               Создаст тег внутри папки:{' '}
-              <span className="font-medium text-gray-700">{folderDisplayName}</span>
+              <span className="font-medium text-aspectum-text-strong">{folderDisplayName}</span>
             </p>
           ) : null}
 
           <div className="flex flex-wrap items-center gap-2 pt-1">
-            <button
+            <Button
               type="submit"
+              variant="primary"
+              size="md"
               disabled={submitting || !quickTitle.trim()}
-              className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-50"
             >
               {submitting ? 'Добавление...' : submitLabel}
-            </button>
-            <button
+            </Button>
+            <Button
               type="button"
               onClick={onCancel}
               disabled={submitting}
-              className="px-4 py-2 text-sm text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50"
+              variant="outline"
+              size="md"
             >
               Отмена
-            </button>
-            <button
+            </Button>
+            <Button
               type="button"
               onClick={openAdvanced}
               disabled={submitting}
-              className="px-4 py-2 text-sm text-blue-700 bg-blue-50 border border-blue-200 rounded-lg hover:bg-blue-100"
+              variant="soft"
+              size="md"
             >
               Дополнительно
-            </button>
+            </Button>
           </div>
         </>
       ) : null}
 
       {(isEdit || (isCreate && advancedOpen)) ? (
-        <div className="space-y-3 pt-1 border-t border-gray-100">
+        <div className="space-y-3 pt-1 border-t border-aspectum-border-subtle">
           {isCreate && advancedOpen ? (
-            <p className="text-xs font-medium text-gray-600">Дополнительные настройки</p>
+            <p className="text-xs font-medium text-aspectum-text-subtle">Дополнительные настройки</p>
           ) : null}
 
           <div>
-            <label className="block text-xs font-medium text-gray-600 mb-0.5">
+            <FormLabel  layout="block" size="xs" weight="medium" tone="subtle" spacing="xxs">
               Техническое имя (name)
-            </label>
-            <input
-              type="text"
-              value={form.name}
-              onChange={(ev) => setForm((p) => ({ ...p, name: ev.target.value }))}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
-            />
+            </FormLabel>
+            <TextInput type="text" value={form.name} onChange={(ev) => setForm((p) => ({ ...p, name: ev.target.value }))} />
           </div>
 
-          <MultiLangInput
-            label="Название"
-            required
-            languages={multiLangLanguages}
-            value={form.title || {}}
-            onChange={(title) => setForm((prev) => ({ ...prev, title }))}
-          />
+          <Field label="Название" required>
+            <MultiField
+              items={multiLangLanguages.map((lang) => ({ id: lang.code, label: lang.name }))}
+              value={form.title || {}}
+              onChange={(title) => setForm((prev) => ({ ...prev, title }))}
+              placeholder="Введите название"
+            />
+          </Field>
 
-          <MultiLangInput
-            label="Описание"
-            languages={multiLangLanguages}
-            value={Object.fromEntries(
-              Object.entries(form.description || {}).filter(([key]) => key !== 'emoji'),
-            )}
-            onChange={(description) =>
-              setForm((prev) => ({
-                ...prev,
-                description: {
-                  ...description,
-                  ...(prev.description?.emoji ? { emoji: prev.description.emoji } : {}),
-                },
-              }))
-            }
-          />
+          <Field label="Описание">
+            <MultiField
+              items={multiLangLanguages.map((lang) => ({ id: lang.code, label: lang.name }))}
+              value={Object.fromEntries(
+                Object.entries(form.description || {}).filter(([key]) => key !== 'emoji'),
+              )}
+              onChange={(description) =>
+                setForm((prev) => ({
+                  ...prev,
+                  description: {
+                    ...description,
+                    ...(prev.description?.emoji ? { emoji: prev.description.emoji } : {}),
+                  },
+                }))
+              }
+              placeholder="Введите описание"
+            />
+          </Field>
 
           <div className="grid grid-cols-2 gap-2 items-end">
             <div>
-              <label className="block text-xs font-medium text-gray-600 mb-0.5">
+              <FormLabel  layout="block" size="xs" weight="medium" tone="subtle" spacing="xxs">
                 Индекс
-              </label>
-              <input
-                type="number"
-                value={form.index}
-                onChange={(ev) =>
-                  setForm((p) => ({ ...p, index: ev.target.value }))
-                }
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
-              />
+              </FormLabel>
+              <TextInput type="number" value={form.index} onChange={(ev) => setForm((p) => ({ ...p, index: ev.target.value })) } />
             </div>
-            <label className="flex items-center gap-2 text-sm text-gray-700 cursor-pointer">
-              <input
-                type="checkbox"
+            <FormLabel  layout="row" size="sm" tone="strong" interactive>
+              <Checkbox
                 checked={form.isShow}
                 onChange={(ev) =>
                   setForm((p) => ({ ...p, isShow: ev.target.checked }))
                 }
-                className="rounded border-gray-300 text-blue-600"
+                className="rounded border-aspectum-border-strong text-aspectum-primary"
               />
               Показывать (is_show)
-            </label>
+            </FormLabel>
           </div>
 
           {form.filterType === 'tag' && isEdit && !flatCatalog ? (
             <div>
-              <label className="block text-xs font-medium text-gray-600 mb-0.5">
+              <FormLabel  layout="block" size="xs" weight="medium" tone="subtle" spacing="xxs">
                 Папка
-              </label>
-              <select
-                value={form.parentId}
-                onChange={(ev) =>
-                  setForm((p) => ({ ...p, parentId: ev.target.value }))
-                }
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white"
-              >
+              </FormLabel>
+              <Select className="bg-aspectum-surface" value={form.parentId} onChange={(ev) => setForm((p) => ({ ...p, parentId: ev.target.value })) }>
                 <option value="">Выберите папку</option>
                 {folderOptions.map((opt) => (
                   <option key={opt.id} value={opt.id}>
                     {opt.label || opt.id}
                   </option>
                 ))}
-              </select>
+              </Select>
             </div>
           ) : null}
 
-          <div className="border border-gray-200 rounded-lg p-3 space-y-2 bg-gray-50">
-            <p className="text-xs font-medium text-gray-600">Изображение (pic_id)</p>
+          <Panel tone="muted" className="p-3 space-y-2">
+            <p className="text-xs font-medium text-aspectum-text-subtle">Изображение (pic_id)</p>
             {previewSrc ? (
               <img
                 src={previewSrc}
                 alt=""
-                className="w-20 h-20 rounded-lg object-cover border border-gray-200"
+                className="w-20 h-20 rounded-aspectum-control object-cover border border-aspectum-border"
               />
             ) : (
-              <span className="text-xs text-gray-400">Нет изображения</span>
+              <span className="text-xs text-aspectum-text-disabled">Нет изображения</span>
             )}
             <div className="flex flex-wrap gap-2">
-              <label className="px-3 py-1.5 text-xs font-medium text-blue-700 bg-blue-100 rounded-lg cursor-pointer hover:bg-blue-200">
+              <FileButton
+                inputRef={fileRef}
+                accept="image/*"
+                size="sm"
+                variant="softStrong"
+                disabled={uploading}
+                onChange={handleFile}
+              >
                 {uploading ? 'Загрузка…' : '+ Загрузить изображение'}
-                <input
-                  ref={fileRef}
-                  type="file"
-                  accept="image/*"
-                  className="hidden"
-                  disabled={uploading}
-                  onChange={handleFile}
-                />
-              </label>
-              <button
+              </FileButton>
+              <Button
                 type="button"
+                variant="outline"
+                size="sm"
                 onClick={() =>
                   setForm((p) => ({ ...p, picId: null, imagePreview: '' }))
                 }
-                className="px-3 py-1.5 text-xs text-gray-600 border border-gray-300 rounded-lg hover:bg-gray-100"
               >
                 Убрать изображение
-              </button>
+              </Button>
             </div>
-          </div>
+          </Panel>
 
-          <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-gray-200">
-            <button
+          <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-aspectum-border">
+            <Button
               type="submit"
               disabled={submitting}
-              className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-50"
+              variant="primary"
+              size="md"
             >
               {submitLabel}
-            </button>
-            <button
+            </Button>
+            <Button
               type="button"
               onClick={onCancel}
               disabled={submitting}
-              className="px-4 py-2 text-sm text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50"
+              variant="outline"
+              size="md"
             >
               Отмена
-            </button>
+            </Button>
             {isCreate ? (
-              <button
+              <Button
                 type="button"
+                variant="outline"
+                size="md"
                 onClick={() => {
                   setQuickTitle(getMultiLangValue(form.title) || quickTitle.trim());
                   setAdvancedOpen(false);
                 }}
                 disabled={submitting}
-                className="px-4 py-2 text-sm text-gray-600 border border-gray-200 rounded-lg hover:bg-gray-50"
               >
                 Простой ввод
-              </button>
+              </Button>
             ) : null}
           </div>
         </div>
@@ -794,28 +767,11 @@ export default function SessionWizardTagsCatalogStep({
   const [collapsedFolders, setCollapsedFolders] = useState({});
   const [eventModal, setEventModal] = useState(null);
 
-  const [appLanguages, setAppLanguages] = useState(DEFAULT_APP_LANGUAGES);
+  const { languages: appLanguages } = useAppLanguages();
   const multiLangLanguages = useMemo(
-    () => mapAppLanguagesForMultiLangInput(appLanguages),
+    () => mapAppLanguagesForFields(appLanguages),
     [appLanguages],
   );
-
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      try {
-        const res = await appLanguagesAPI.list();
-        if (!cancelled) {
-          setAppLanguages(parseAppLanguagesResponse(res));
-        }
-      } catch (error) {
-        console.error('Failed to load app languages for filter editor', error);
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, []);
 
   useEffect(() => {
     setSelectedCityTagIds(new Set());
@@ -951,15 +907,16 @@ export default function SessionWizardTagsCatalogStep({
 
   const bulkActionsToolbar = (selectedCount, { onDelete }) => (
     <div className="flex items-center justify-end gap-2 mb-2">
-      <span className="text-xs font-medium text-gray-600">Выбрано: {selectedCount}</span>
-      <button
+      <span className="text-xs font-medium text-aspectum-text-subtle">Выбрано: {selectedCount}</span>
+      <Button
         type="button"
         onClick={onDelete}
         disabled={selectedCount === 0 || bulkDeleting || bulkTranslating}
-        className="px-3 py-1.5 text-xs font-medium text-red-600 bg-red-5в0 border border-red-200 rounded-lg hover:bg-red-100 disabled:opacity-50 disabled:pointer-events-none"
+        variant="softDanger"
+        size="sm"
       >
         {bulkDeleting ? '...' : 'Удалить'}
-      </button>
+      </Button>
     </div>
   );
 
@@ -1258,109 +1215,82 @@ export default function SessionWizardTagsCatalogStep({
     handleQuickSubmit(event);
   };
 
-  const tabBtn = (id, label) => (
-    <button
-      key={id}
-      type="button"
-      onClick={() => setCatalogTab(id)}
-      className={`px-4 py-2 text-sm font-medium rounded-t-lg border-b-2 -mb-px transition-colors ${
-        catalogTab === id
-          ? 'border-blue-600 text-blue-700 bg-white'
-          : 'border-transparent text-gray-500 hover:text-gray-700 bg-gray-50'
-      }`}
-    >
-      {label}
-    </button>
-  );
-
   return (
     <div className="space-y-4">
-      <div>
-        <h2 className="text-lg font-semibold text-gray-900">Справочник тегов</h2>
-        <p className="text-sm text-gray-500">
-          Создавайте и редактируйте теги. На странице города теги только выбираются.
-        </p>
-      </div>
+      <SectionHeader title="Справочник тегов" description="Создавайте и редактируйте теги. На странице города теги только выбираются." />
 
-      <div className="flex gap-1 border-b border-gray-200">
-        {tabBtn('city', 'Теги городов')}
-        {tabBtn('attraction', 'Теги достопримечательностей')}
+      <div className="border-b border-aspectum-border">
+        <Tabs
+          items={[
+            { id: 'city', label: 'Теги городов' },
+            { id: 'attraction', label: 'Теги достопримечательностей' },
+          ]}
+          value={catalogTab}
+          onChange={setCatalogTab}
+        />
       </div>
 
       {catalogTab === 'city' ? (
         <div className="space-y-4 pt-2">
           <div>
-            <h3 className="text-base font-medium text-gray-900 mb-1">Теги городов</h3>
-            <p className="text-xs text-gray-500 mb-3">
+            <Heading level={3} size="sm" weight="medium" className="mb-1">Теги городов</Heading>
+            <p className="text-xs text-aspectum-text-muted mb-3">
               Плоский список без папок. Быстрое создание по названию.
             </p>
 
             <form onSubmit={handleQuickSubmit} className="flex flex-wrap gap-2 items-end">
               <div className="flex-1 min-w-[200px]">
-                <label className="block text-xs font-medium text-gray-600 mb-0.5">
+                <FormLabel  layout="block" size="xs" weight="medium" tone="subtle" spacing="xxs">
                   Название тега
-                </label>
-                <input
-                  type="text"
-                  value={quickName}
-                  onChange={(ev) => setQuickName(ev.target.value)}
-                  onKeyDown={handleQuickKeyDown}
-                  disabled={creatingCityTagQuick}
-                  placeholder="Введите название тега…"
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm disabled:opacity-50"
-                />
+                </FormLabel>
+                <TextInput className="disabled:opacity-50" type="text" value={quickName} onChange={(ev) => setQuickName(ev.target.value)} onKeyDown={handleQuickKeyDown} disabled={creatingCityTagQuick} placeholder="Введите название тега…" />
               </div>
-              <button
+              <Button
                 type="submit"
                 disabled={cityTagCatalogLoading || creatingCityTagQuick || !quickName.trim()}
-                className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-50"
+                variant="primary"
+                size="md"
               >
                 {creatingCityTagQuick ? 'Добавление...' : 'Добавить'}
-              </button>
-              <button
+              </Button>
+              <Button
                 type="button"
                 onClick={openCreateFlat}
-                className="px-4 py-2 text-sm font-medium text-blue-700 bg-blue-50 border border-blue-200 rounded-lg hover:bg-blue-100"
+                variant="soft"
+                size="md"
               >
                 Форма…
-              </button>
+              </Button>
             </form>
           </div>
 
           <div>
-            <label className="block text-xs font-medium text-gray-600 mb-1">Поиск</label>
-            <input
-              type="search"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Название, описание…"
-              className="w-full max-w-md px-3 py-2 border border-gray-300 rounded-lg text-sm"
-            />
+            <FormLabel  layout="block" size="xs" weight="medium" tone="subtle" spacing="xs">Поиск</FormLabel>
+            <TextInput className="max-w-md" type="search" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} placeholder="Название, описание…" />
           </div>
 
           {cityTagCatalogLoading && (
-            <div className="text-sm text-gray-500 py-8 text-center border border-dashed border-gray-200 rounded-xl">
-              Загрузка тегов…
-            </div>
+            <Panel tone="muted" className="py-8">
+              <InlineState loading align="center">Загрузка тегов…</InlineState>
+            </Panel>
           )}
 
           {!cityTagCatalogLoading && cityTagCatalogError && (
-            <div className="p-4 rounded-xl border border-red-200 bg-red-50 text-sm text-red-800 space-y-2">
+            <Alert tone="error" className="space-y-2">
               <p>{cityTagCatalogError}</p>
-              <button
+              <Button
                 type="button"
                 onClick={() => onReloadCityTagCatalog?.()}
-                className="px-3 py-1.5 text-xs font-medium text-red-800 bg-white border border-red-200 rounded-lg hover:bg-red-100"
+                variant="outline"
+                size="sm"
               >
                 Повторить
-              </button>
-            </div>
+              </Button>
+            </Alert>
           )}
 
           {!cityTagCatalogLoading && !cityTagCatalogError && filteredCityTags.length === 0 && (
-            <div className="text-sm text-gray-500 py-8 text-center border border-dashed border-gray-200 rounded-xl bg-gray-50">
-              Пока нет тегов. Добавьте первый выше.
-            </div>
+            <EmptyState icon="🏷️" title="Тегов пока нет" description="Добавьте первый тег выше." />
           )}
 
           {!cityTagCatalogLoading && !cityTagCatalogError && filteredCityTags.length > 0 && (
@@ -1368,7 +1298,7 @@ export default function SessionWizardTagsCatalogStep({
               {bulkActionsToolbar(selectedCityTagIds.size, {
                 onDelete: handleBulkDeleteCityTags,
               })}
-            <ul className="divide-y divide-gray-100 border border-gray-200 rounded-xl overflow-hidden bg-white">
+            <ul className="divide-y divide-aspectum-border border border-aspectum-border rounded-aspectum-card overflow-hidden bg-aspectum-surface">
               {filteredCityTags.map((tag) => {
                 const id = normalizeId(tag.id);
                 const title = getMultilangDisplay(tag.title ?? tag.name) || id;
@@ -1376,46 +1306,49 @@ export default function SessionWizardTagsCatalogStep({
                 return (
                   <li
                     key={id}
-                    className="flex items-center gap-3 px-3 py-2.5 hover:bg-gray-50"
+                    className="flex items-center gap-3 px-3 py-2.5 hover:bg-aspectum-surface-muted"
                   >
-                    <input
-                      type="checkbox"
+                    <Checkbox
                       checked={selectedCityTagIds.has(id)}
                       onChange={() => toggleCityTagSelected(id)}
                       onClick={(event) => event.stopPropagation()}
-                      className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500 shrink-0"
+                      className="w-4 h-4 rounded border-aspectum-border-strong text-aspectum-primary focus:ring-aspectum-focus shrink-0"
                       aria-label={`Выбрать тег ${title}`}
                     />
                     {imageUrl ? (
                       <img
                         src={imageUrl}
                         alt=""
-                        className="w-9 h-9 rounded object-cover border border-gray-200 shrink-0"
+                        className="w-9 h-9 rounded object-cover border border-aspectum-border shrink-0"
                       />
                     ) : (
-                      <span className="w-9 h-9 rounded bg-gray-100 border border-gray-200 shrink-0" />
+                      <span className="w-9 h-9 rounded bg-aspectum-surface-subtle border border-aspectum-border shrink-0" />
                     )}
-                    <span className="flex-1 min-w-0 text-sm font-medium text-gray-900 truncate">
+                    <span className="flex-1 min-w-0 text-sm font-medium text-aspectum-text truncate">
                       {title}
                     </span>
-                    <button
+                    <Button
                       type="button"
                       onClick={() => openEditFlat(tag)}
-                      className="text-xs text-blue-600 hover:underline shrink-0"
+                      variant="link"
+                      size="sm"
+                      className="shrink-0"
                     >
                       Ред.
-                    </button>
-                    <button
+                    </Button>
+                    <Button
                       type="button"
                       disabled={deletingCityFilterIds.has(id)}
                       onClick={(event) => {
                         event.stopPropagation();
                         handleDeleteTag(tag);
                       }}
-                      className="text-xs text-red-600 hover:underline shrink-0 disabled:opacity-50 disabled:pointer-events-none"
+                      variant="softDanger"
+                      size="sm"
+                      className="shrink-0"
                     >
                       Удалить
-                    </button>
+                    </Button>
                   </li>
                 );
               })}
@@ -1426,10 +1359,10 @@ export default function SessionWizardTagsCatalogStep({
       ) : (
         <div className="space-y-4 pt-2">
           <div>
-            <h3 className="text-base font-medium text-gray-900 mb-1">
+            <Heading level={3} size="sm" weight="medium" className="mb-1">
               Теги достопримечательностей
-            </h3>
-            <p className="text-xs text-gray-500 mb-3">
+            </Heading>
+            <p className="text-xs text-aspectum-text-muted mb-3">
               Папки и теги для событий. На странице достопримечательности — только выбор.
             </p>
 
@@ -1438,74 +1371,61 @@ export default function SessionWizardTagsCatalogStep({
               className="flex flex-wrap gap-2 items-end mb-3"
             >
               <div className="flex-1 min-w-[200px]">
-                <label className="block text-xs font-medium text-gray-600 mb-0.5">
+                <FormLabel  layout="block" size="xs" weight="medium" tone="subtle" spacing="xxs">
                   + Новая папка
-                </label>
-                <input
-                  type="text"
-                  value={eventQuickFolder}
-                  onChange={(ev) => setEventQuickFolder(ev.target.value)}
-                  onKeyDown={handleEventQuickFolderKeyDown}
-                  disabled={creatingEventFolderQuick}
-                  placeholder="Название папки…"
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm disabled:opacity-50"
-                />
+                </FormLabel>
+                <TextInput className="disabled:opacity-50" type="text" value={eventQuickFolder} onChange={(ev) => setEventQuickFolder(ev.target.value)} onKeyDown={handleEventQuickFolderKeyDown} disabled={creatingEventFolderQuick} placeholder="Название папки…" />
               </div>
-              <button
+              <Button
                 type="submit"
                 disabled={
                   eventFilterTreeLoading || creatingEventFolderQuick || !eventQuickFolder.trim()
                 }
-                className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-50"
+                variant="primary"
+                size="md"
               >
                 {creatingEventFolderQuick ? 'Добавление...' : 'Создать'}
-              </button>
-              <button
+              </Button>
+              <Button
                 type="button"
                 onClick={openCreateEventFolderModal}
-                className="px-4 py-2 text-sm font-medium text-blue-700 bg-blue-50 border border-blue-200 rounded-lg hover:bg-blue-100"
+                variant="soft"
+                size="md"
               >
                 Форма…
-              </button>
+              </Button>
             </form>
           </div>
 
           <div>
-            <label className="block text-xs font-medium text-gray-600 mb-1">Поиск</label>
-            <input
-              type="search"
-              value={eventSearchQuery}
-              onChange={(e) => setEventSearchQuery(e.target.value)}
-              placeholder="Папка или тег…"
-              className="w-full max-w-md px-3 py-2 border border-gray-300 rounded-lg text-sm"
-            />
+            <FormLabel  layout="block" size="xs" weight="medium" tone="subtle" spacing="xs">Поиск</FormLabel>
+            <TextInput className="max-w-md" type="search" value={eventSearchQuery} onChange={(e) => setEventSearchQuery(e.target.value)} placeholder="Папка или тег…" />
           </div>
 
           {eventFilterTreeLoading && (
-            <div className="text-sm text-gray-500 py-8 text-center border border-dashed border-gray-200 rounded-xl">
-              Загрузка…
-            </div>
+            <Panel tone="muted" className="py-8">
+              <InlineState loading align="center">Загрузка…</InlineState>
+            </Panel>
           )}
 
           {!eventFilterTreeLoading && eventFilterTreeError && (
-            <div className="p-4 rounded-xl border border-red-200 bg-red-50 text-sm text-red-800 space-y-2">
+            <Alert tone="error" className="space-y-2">
               <p>{eventFilterTreeError}</p>
-              <button
+              <Button
                 type="button"
                 onClick={() => onReloadEventFilters?.()}
-                className="px-3 py-1.5 text-xs font-medium text-red-800 bg-white border border-red-200 rounded-lg hover:bg-red-100"
+                variant="outline"
+                size="sm"
               >
                 Повторить
-              </button>
-            </div>
+              </Button>
+            </Alert>
           )}
 
           {!eventFilterTreeLoading &&
             !eventFilterTreeError &&
             filteredEventFolders.length === 0 && (
-              <div className="text-sm text-gray-500 py-8 text-center border border-dashed border-gray-200 rounded-xl bg-gray-50">
-                Пока нет папок. Создайте первую выше.
-              </div>
+              <EmptyState icon="📁" title="Папок пока нет" description="Создайте первую папку выше." />
             )}
 
           {!eventFilterTreeLoading &&
@@ -1532,88 +1452,81 @@ export default function SessionWizardTagsCatalogStep({
                   return (
                     <li
                       key={fid}
-                      className="border border-gray-200 rounded-xl bg-white overflow-hidden"
+                      className="border border-aspectum-border rounded-aspectum-card bg-aspectum-surface overflow-hidden"
                     >
-                      <div className="flex items-center gap-2 px-3 py-2 bg-gray-50 border-b border-gray-100">
-                        <button
+                      <div className="flex items-center gap-2 px-3 py-2 bg-aspectum-surface-muted border-b border-aspectum-border-subtle">
+                        <Button
                           type="button"
+                          variant="link"
+                          size="sm"
                           onClick={() => toggleFolderCollapsed(fid)}
-                          className="text-gray-500 hover:text-gray-800 w-6"
+                          className="w-6"
                           aria-label={folded ? 'Развернуть' : 'Свернуть'}
                         >
                           {folded ? '▸' : '▾'}
-                        </button>
-                        <span className="flex-1 font-medium text-sm text-gray-900">
+                        </Button>
+                        <span className="flex-1 font-medium text-sm text-aspectum-text">
                           {folderTitle}
                         </span>
-                        <button
+                        <Button
                           type="button"
+                          variant="link"
+                          size="sm"
                           onClick={() => openEditEventFilter(folder, null)}
-                          className="text-xs text-blue-600 hover:underline"
                         >
                           Ред.
-                        </button>
-                        <button
+                        </Button>
+                        <Button
                           type="button"
+                          variant="linkDanger"
+                          size="sm"
                           disabled={deletingEventFilterIds.has(fid)}
                           onClick={(event) => {
                             event.stopPropagation();
                             handleDeleteEventFolder(folder);
                           }}
-                          className="text-xs text-red-600 hover:underline disabled:opacity-50 disabled:pointer-events-none"
                         >
                           Удалить
-                        </button>
+                        </Button>
                       </div>
 
                       {!folded && (
                         <div className="p-3 space-y-2">
                           <div className="flex flex-wrap gap-2 items-end">
                             <div className="flex-1 min-w-[160px]">
-                              <label className="block text-xs text-gray-500 mb-0.5">
+                              <FormLabel  layout="block" size="xs" tone="muted" spacing="xxs">
                                 + Тег
-                              </label>
-                              <input
-                                type="text"
-                                value={eventQuickTagByFolder[fid] || ''}
-                                onChange={(ev) =>
-                                  setEventQuickTagByFolder((p) => ({
-                                    ...p,
-                                    [fid]: ev.target.value,
-                                  }))
-                                }
-                                onKeyDown={(ev) => handleEventQuickTagKeyDown(ev, fid)}
-                                disabled={isCreatingInFolder(fid)}
-                                placeholder="Название тега…"
-                                className="w-full px-3 py-1.5 border border-gray-300 rounded-lg text-sm disabled:opacity-50"
-                              />
+                              </FormLabel>
+                              <TextInput className="disabled:opacity-50" type="text" value={eventQuickTagByFolder[fid] || ''} onChange={(ev) => setEventQuickTagByFolder((p) => ({ ...p, [fid]: ev.target.value, })) } onKeyDown={(ev) => handleEventQuickTagKeyDown(ev, fid)} disabled={isCreatingInFolder(fid)} placeholder="Название тега…" />
                             </div>
-                            <button
+                            <Button
                               type="button"
                               onClick={() => handleEventQuickTagSubmit(fid)}
                               disabled={
                                 isCreatingInFolder(fid)
                                 || !((eventQuickTagByFolder[fid] || '').trim())
                               }
-                              className="px-3 py-1.5 text-xs font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-50"
+                              variant="primary"
+                              size="sm"
                             >
                               {isCreatingInFolder(fid) ? 'Добавление...' : 'Добавить'}
-                            </button>
-                            <button
+                            </Button>
+                            <Button
                               type="button"
                               onClick={() => openCreateEventTagModal(folder)}
-                              className="px-3 py-1.5 text-xs text-blue-700 bg-blue-50 border border-blue-200 rounded-lg"
+                              variant="soft"
+                              size="sm"
                             >
                               Форма…
-                            </button>
+                            </Button>
                           </div>
 
                           {visibleTags.length === 0 ? (
-                            <p className="text-xs text-gray-400 py-2">
+                            <p className="text-xs text-aspectum-text-disabled py-2">
                               В этой папке пока нет тегов.
                             </p>
                           ) : (
-                            <ul className="divide-y divide-gray-100 border border-gray-100 rounded-lg">
+                            <ul className="divide-y divide-aspectum-border border border-aspectum-border rounded-aspectum-control bg-aspectum-surface">
                               {visibleTags.map((tag) => {
                                 const tid = normalizeId(tag.id);
                                 const ttitle =
@@ -1622,46 +1535,49 @@ export default function SessionWizardTagsCatalogStep({
                                 return (
                                   <li
                                     key={tid}
-                                    className="flex items-center gap-3 px-3 py-2 hover:bg-gray-50"
+                                    className="flex items-center gap-3 px-3 py-2 hover:bg-aspectum-surface-muted"
                                   >
-                                    <input
-                                      type="checkbox"
+                                    <Checkbox
                                       checked={selectedEventTagIds.has(tid)}
                                       onChange={() => toggleEventTagSelected(tid)}
                                       onClick={(event) => event.stopPropagation()}
-                                      className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500 shrink-0"
+                                      className="w-4 h-4 rounded border-aspectum-border-strong text-aspectum-primary focus:ring-aspectum-focus shrink-0"
                                       aria-label={`Выбрать тег ${ttitle}`}
                                     />
                                     {imageUrl ? (
                                       <img
                                         src={imageUrl}
                                         alt=""
-                                        className="w-8 h-8 rounded object-cover border border-gray-200 shrink-0"
+                                        className="w-8 h-8 rounded object-cover border border-aspectum-border shrink-0"
                                       />
                                     ) : (
-                                      <span className="w-8 h-8 rounded bg-gray-100 border border-gray-200 shrink-0" />
+                                      <span className="w-8 h-8 rounded bg-aspectum-surface-subtle border border-aspectum-border shrink-0" />
                                     )}
                                     <span className="flex-1 min-w-0 text-sm truncate">
                                       {ttitle}
                                     </span>
-                                    <button
+                                    <Button
                                       type="button"
+                                      variant="link"
+                                      size="sm"
                                       onClick={() => openEditEventFilter(tag, folder)}
-                                      className="text-xs text-blue-600 hover:underline shrink-0"
+                                      className="shrink-0"
                                     >
                                       Ред.
-                                    </button>
-                                    <button
+                                    </Button>
+                                    <Button
                                       type="button"
+                                      variant="linkDanger"
+                                      size="sm"
                                       disabled={deletingEventFilterIds.has(tid)}
                                       onClick={(event) => {
                                         event.stopPropagation();
                                         handleDeleteEventTag(tag);
                                       }}
-                                      className="text-xs text-red-600 hover:underline shrink-0 disabled:opacity-50 disabled:pointer-events-none"
+                                      className="shrink-0"
                                     >
                                       Удалить
-                                    </button>
+                                    </Button>
                                   </li>
                                 );
                               })}
@@ -1679,38 +1595,40 @@ export default function SessionWizardTagsCatalogStep({
       )}
 
       <div className="flex justify-between items-center pt-2">
-        <button
+        <Button
           type="button"
           onClick={() => onGoToStep?.(1)}
-          className="px-4 py-2 text-sm text-gray-600 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+          variant="outline"
+          size="md"
         >
           ← Назад: Город
-        </button>
+        </Button>
 
         <div className="flex items-center gap-3">
-          <button
+          <Button
             type="button"
             onClick={handleTranslateActiveTags}
             disabled={activeSelectedCount === 0 || bulkDeleting || bulkTranslating}
-            className="px-5 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:pointer-events-none transition-colors"
+            variant="soft"
+            size="md"
           >
             {bulkTranslating ? 'Перевод...' : 'Перевести'}
-          </button>
+          </Button>
 
-          <button
+          <Button
             type="button"
             onClick={() => onGoToStep?.(3)}
             disabled={saving}
-            className="px-5 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors"
+            variant="primary"
+            size="md"
           >
             {saving ? 'Сохранение...' : 'Далее: Достопримечательности →'}
-          </button>
+          </Button>
         </div>
       </div>
 
-      <ModalPortal open={Boolean(modal)} onClose={closeModal} zIndex={100}>
+      <Modal open={Boolean(modal)} onClose={closeModal} size="lg" title={modal?.mode === 'create-folder' ? 'Новая папка тегов' : 'Редактор тега'}>
         {modal ? (
-          <div className="relative bg-white rounded-xl shadow-xl border border-gray-200 w-full max-w-2xl p-5 max-h-[min(90dvh,90vh)] overflow-hidden min-w-0 mx-auto">
             <CityFilterForm
               key={`${modal.mode}-${modal.filterId}-${modal.flatCatalog ? 'flat' : 'tree'}-${modal.initial?.parentId ?? ''}`}
               mode={modal.mode}
@@ -1728,13 +1646,11 @@ export default function SessionWizardTagsCatalogStep({
               onCancel={closeModal}
               onUploadCityFilterImage={onUploadCityFilterImage}
             />
-          </div>
         ) : null}
-      </ModalPortal>
+      </Modal>
 
-      <ModalPortal open={Boolean(eventModal)} onClose={closeEventModal} zIndex={100}>
+      <Modal open={Boolean(eventModal)} onClose={closeEventModal} size="lg" title={eventModal?.mode === 'create-folder' ? 'Новая папка событий' : 'Редактор фильтра событий'}>
         {eventModal ? (
-          <div className="relative bg-white rounded-xl shadow-xl border border-gray-200 w-full max-w-2xl p-5 max-h-[min(90dvh,90vh)] overflow-hidden min-w-0 mx-auto">
             <CityFilterForm
               key={`event-${eventModal.mode}-${eventModal.filterId}-${eventModal.initial?.parentId ?? ''}`}
               mode={eventModal.mode}
@@ -1757,9 +1673,8 @@ export default function SessionWizardTagsCatalogStep({
               onUpdateFilter={onUpdateEventFilter}
               onUploadFilterImage={onUploadEventFilterImage}
             />
-          </div>
         ) : null}
-      </ModalPortal>
+      </Modal>
       {confirmModal}
     </div>
   );

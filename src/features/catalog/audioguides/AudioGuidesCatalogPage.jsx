@@ -2,14 +2,14 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { eventAudioGuidesAPI, audioAPI, eventsAPI } from './api';
 import Layout from '../../../components/Layout';
-import Modal, { ConfirmModal } from '../../../components/ui/Modal';
-import { Field, TextInput } from '../../../components/ui/FormField';
+import { FormLabel, Alert, Button, ConfirmModal, EmptyState, Field, FileButton, FormGrid, InlineState, Modal, PageHeader, Panel, Select, SelectableCard, Switch, TextInput } from '@aspectum/ui';
 import { parseApiError } from '../../../utils/apiError';
 import AudioPlayer from '../shared/components/AudioPlayer';
 import { getMultiLangValue } from '../shared/i18n';
 import { normalizeListResponse } from '../shared/normalize';
 
-const ALL_LANGS = ['ru', 'en', 'it', 'fr', 'es', 'de', 'pt', 'ja', 'zh', 'ko'];
+// Fallback для audio guide tracks: отдельного API-списка языков у каталога пока нет.
+const AUDIO_GUIDE_LANGUAGES_FALLBACK = ['ru', 'en', 'it', 'fr', 'es', 'de', 'pt', 'ja', 'zh', 'ko'];
 const LANG_LABELS = { ru: 'RU', en: 'EN', it: 'IT', de: 'DE', fr: 'FR', es: 'ES', pt: 'PT', ja: 'JA', zh: 'ZH', ko: 'KO' };
 function langLabel(code) { return LANG_LABELS[code] || code.toUpperCase(); }
 
@@ -60,38 +60,42 @@ function TrackRow({ track, guideId, onUploaded, onDeleted }) {
 
   return (
     <>
-      <div className={`rounded-lg border px-3 py-2.5 mb-2 last:mb-0 ${linked ? 'border-green-200 bg-green-50' : 'border-gray-200 bg-gray-50'}`}>
+      <div className={`rounded-aspectum-control border px-3 py-2.5 mb-2 last:mb-0 ${linked ? 'border-aspectum-positive-border bg-aspectum-positive-soft' : 'border-aspectum-border bg-aspectum-surface-muted'}`}>
         <div className="flex items-center gap-3 flex-wrap">
           <div className="flex items-center gap-2 shrink-0">
-            <span className="w-8 text-xs font-mono font-bold text-gray-700 uppercase">{langLabel(track.language)}</span>
-            <span className={`text-xs px-1.5 py-0.5 rounded-full font-medium ${linked ? 'bg-green-100 text-green-700' : 'bg-gray-200 text-gray-500'}`}>
+            <span className="w-8 text-xs font-mono font-bold text-aspectum-text-strong uppercase">{langLabel(track.language)}</span>
+            <span className={`text-xs px-1.5 py-0.5 rounded-full font-medium ${linked ? 'bg-aspectum-positive-muted text-aspectum-positive-strong' : 'bg-aspectum-border text-aspectum-text-muted'}`}>
               {linked ? '● есть' : '○ нет'}
             </span>
           </div>
 
           <div className="flex-1 min-w-0">
-            {linked ? <AudioPlayer audioId={track.audio_id} /> : <span className="text-xs text-gray-400 italic">Файл не загружен</span>}
+            {linked ? <AudioPlayer audioId={track.audio_id} /> : <span className="text-xs text-aspectum-text-disabled italic">Файл не загружен</span>}
           </div>
 
           <div className="flex items-center gap-1.5 shrink-0">
-            <label className={`cursor-pointer px-2.5 py-1.5 text-xs font-medium rounded-lg border transition-colors ${
-              uploading ? 'opacity-50 cursor-wait border-gray-300 text-gray-400' :
-              linked ? 'border-blue-300 text-blue-600 bg-white hover:bg-blue-50' :
-                       'border-green-400 text-green-700 bg-white hover:bg-green-50'
-            }`}>
+            <FileButton
+              inputRef={inputRef}
+              accept="audio/*,.mp3"
+              variant="soft"
+              size="sm"
+              onChange={handleUpload}
+              disabled={uploading}
+            >
               {uploading ? '…' : linked ? 'Заменить' : '+ MP3'}
-              <input ref={inputRef} type="file" accept="audio/*,.mp3" className="hidden" onChange={handleUpload} disabled={uploading} />
-            </label>
-            <button
+            </FileButton>
+            <Button
+              type="button"
               onClick={() => setConfirmDelete(true)}
+              variant="softDanger"
+              size="sm"
               disabled={deleting}
-              className="px-2.5 py-1.5 text-xs font-medium text-red-500 bg-white border border-red-200 rounded-lg hover:bg-red-50 disabled:opacity-50 transition-colors"
             >
               ✕
-            </button>
+            </Button>
           </div>
         </div>
-        {uploadError && <p className="text-xs text-red-500 mt-1">{uploadError}</p>}
+        {uploadError && <p className="text-xs text-aspectum-danger-subtle mt-1">{uploadError}</p>}
       </div>
 
       <ConfirmModal
@@ -112,7 +116,7 @@ function TrackRow({ track, guideId, onUploaded, onDeleted }) {
 
 function AddLanguageRow({ guideId, existingLangs, onAdded }) {
   const [adding, setAdding] = useState(false);
-  const available = ALL_LANGS.filter((l) => !existingLangs.includes(l));
+  const available = AUDIO_GUIDE_LANGUAGES_FALLBACK.filter((l) => !existingLangs.includes(l));
   const [selected, setSelected] = useState('');
 
   if (available.length === 0) return null;
@@ -130,24 +134,22 @@ function AddLanguageRow({ guideId, existingLangs, onAdded }) {
   };
 
   return (
-    <div className="flex items-center gap-2 mt-3 pt-3 border-t border-gray-200">
-      <select
-        value={selected}
-        onChange={(e) => setSelected(e.target.value)}
-        className="flex-1 px-3 py-1.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none"
-      >
+    <div className="flex items-center gap-2 mt-3 pt-3 border-t border-aspectum-border">
+      <Select className="flex-1" value={selected} onChange={(e) => setSelected(e.target.value)}>
         <option value="">+ Добавить язык</option>
         {available.map((l) => (
           <option key={l} value={l}>{langLabel(l)} — {l}</option>
         ))}
-      </select>
-      <button
+      </Select>
+      <Button
+        type="button"
+        variant="primary"
+        size="md"
         onClick={handleAdd}
         disabled={!selected || adding}
-        className="px-3 py-1.5 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors"
       >
         {adding ? '…' : 'Добавить'}
-      </button>
+      </Button>
     </div>
   );
 }
@@ -157,7 +159,7 @@ function AddLanguageRow({ guideId, existingLangs, onAdded }) {
 function LangDot({ linked }) {
   return (
     <span className={`w-5 h-5 rounded-full border-2 flex items-center justify-center text-[9px] font-bold ${
-      linked ? 'border-green-400 bg-green-100 text-green-700' : 'border-gray-300 bg-white text-gray-400'
+      linked ? 'border-aspectum-positive-light bg-aspectum-positive-muted text-aspectum-positive-strong' : 'border-aspectum-border-strong bg-aspectum-surface text-aspectum-text-disabled'
     }`}>
       {linked ? '✓' : '—'}
     </span>
@@ -171,34 +173,34 @@ function GuideCard({ guide, onClick, eventLabel }) {
   const allLinked = linked === total && total > 0;
 
   return (
-    <button type="button" onClick={onClick}
-      className="w-full text-left bg-white rounded-xl border border-gray-200 hover:border-blue-300 hover:shadow-sm transition-all overflow-hidden">
-      <div className="flex items-center gap-3 px-4 py-3 border-b border-gray-100">
-        <span className="w-6 h-6 rounded-full bg-gray-100 text-xs font-semibold text-gray-500 flex items-center justify-center shrink-0">
+    <SelectableCard onSelect={onClick} ariaLabel={title}
+      className="w-full text-left bg-aspectum-surface rounded-aspectum-card border border-aspectum-border hover:border-aspectum-primary-border-strong hover:shadow-aspectum-card transition-all overflow-hidden">
+      <div className="flex items-center gap-3 px-4 py-3 border-b border-aspectum-border-subtle">
+        <span className="w-6 h-6 rounded-full bg-aspectum-surface-subtle text-xs font-semibold text-aspectum-text-muted flex items-center justify-center shrink-0">
           {guide.index + 1}
         </span>
         <div className="flex-1 min-w-0">
-          <p className="text-sm font-semibold text-gray-900 truncate">{title}</p>
-          {eventLabel && <p className="text-xs text-gray-400 truncate">{eventLabel}</p>}
+          <p className="text-sm font-semibold text-aspectum-text truncate">{title}</p>
+          {eventLabel && <p className="text-xs text-aspectum-text-disabled truncate">{eventLabel}</p>}
         </div>
         <span className={`text-xs font-medium px-2 py-0.5 rounded-full shrink-0 ${
-          allLinked ? 'bg-green-100 text-green-700' :
-          linked === 0 ? 'bg-gray-100 text-gray-400' : 'bg-amber-100 text-amber-700'
+          allLinked ? 'bg-aspectum-positive-muted text-aspectum-positive-strong' :
+          linked === 0 ? 'bg-aspectum-surface-subtle text-aspectum-text-disabled' : 'bg-aspectum-warning-muted text-aspectum-warning-strong'
         }`}>
           {linked}/{total}
         </span>
       </div>
       <div className="px-4 py-2.5 flex flex-wrap gap-2">
         {guide.tracks.length === 0
-          ? <span className="text-xs text-gray-400 italic">Треков нет</span>
+          ? <span className="text-xs text-aspectum-text-disabled italic">Треков нет</span>
           : guide.tracks.map((t) => (
             <div key={t.id} className="flex items-center gap-1">
               <LangDot linked={!!t.audio_id} />
-              <span className="text-xs text-gray-500 font-mono">{langLabel(t.language)}</span>
+              <span className="text-xs text-aspectum-text-muted font-mono">{langLabel(t.language)}</span>
             </div>
           ))}
       </div>
-    </button>
+    </SelectableCard>
   );
 }
 
@@ -217,8 +219,11 @@ function GuideDetailModal({
   const [metaError, setMetaError] = useState('');
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const guideRef = useRef(guide);
+  guideRef.current = guide;
 
   useEffect(() => {
+    const guide = guideRef.current;
     if (!guide) return;
     setMeta({
       titleRu: guide.title?.ru || getMultiLangValue(guide.title) || '',
@@ -266,10 +271,10 @@ function GuideDetailModal({
   return (
     <>
       <Modal open={open} onClose={onClose} title={title} size="lg">
-        {eventLabel && <p className="text-xs text-gray-400 mb-3">Событие: {eventLabel}</p>}
+        {eventLabel && <p className="text-xs text-aspectum-text-disabled mb-3">Событие: {eventLabel}</p>}
 
-        <div className="mb-5 p-4 border border-gray-200 rounded-xl bg-gray-50/50 space-y-3">
-          <p className="text-sm font-medium text-gray-700">Метаданные гида</p>
+        <Panel tone="muted" className="mb-5 p-4 space-y-3">
+          <p className="text-sm font-medium text-aspectum-text-strong">Метаданные гида</p>
           <Field label="Название (RU)">
             <TextInput
               value={meta.titleRu}
@@ -277,7 +282,7 @@ function GuideDetailModal({
               disabled={savingMeta}
             />
           </Field>
-          <div className="grid grid-cols-2 gap-3">
+          <FormGrid responsive={false}>
             <Field label="Индекс">
               <TextInput
                 type="number"
@@ -287,39 +292,29 @@ function GuideDetailModal({
                 disabled={savingMeta}
               />
             </Field>
-            <label className="flex items-center gap-2 text-sm text-gray-700 pt-6">
-              <input
-                type="checkbox"
+            <FormLabel  layout="row" size="sm" tone="strong" className="pt-6">
+              <Switch
                 checked={meta.is_show}
-                onChange={(e) => setMeta((p) => ({ ...p, is_show: e.target.checked }))}
+                onChange={(is_show) => setMeta((p) => ({ ...p, is_show }))}
                 disabled={savingMeta}
+                aria-label="Показывать аудиогид в приложении"
               />
               Показывать в приложении
-            </label>
-          </div>
-          {metaError && <p className="text-xs text-red-600">{metaError}</p>}
+            </FormLabel>
+          </FormGrid>
+          {metaError && <p className="text-xs text-aspectum-danger">{metaError}</p>}
           <div className="flex flex-wrap gap-2">
-            <button
-              type="button"
-              onClick={handleSaveMeta}
-              disabled={savingMeta}
-              className="px-3 py-1.5 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-50"
-            >
+            <Button type="button" variant="primary" size="md" onClick={handleSaveMeta} disabled={savingMeta}>
               {savingMeta ? 'Сохранение...' : 'Сохранить метаданные'}
-            </button>
-            <button
-              type="button"
-              onClick={() => setConfirmDelete(true)}
-              disabled={savingMeta || deleting}
-              className="px-3 py-1.5 text-sm font-medium text-red-600 bg-red-50 rounded-lg hover:bg-red-100 disabled:opacity-50"
-            >
+            </Button>
+            <Button type="button" variant="softDanger" size="md" onClick={() => setConfirmDelete(true)} disabled={savingMeta || deleting}>
               Удалить гид
-            </button>
+            </Button>
           </div>
-        </div>
+        </Panel>
 
         {guide.tracks.length === 0
-          ? <p className="text-sm text-gray-400 py-4 text-center">Треков нет</p>
+          ? <p className="text-sm text-aspectum-text-disabled py-4 text-center">Треков нет</p>
           : guide.tracks.map((track) => (
             <TrackRow
               key={track.id}
@@ -367,23 +362,21 @@ function CoverageSummary({ guides }) {
   const incomplete = langs.filter(([, s]) => s.ok < s.total);
 
   if (!incomplete.length) return (
-    <div className="mb-4 text-sm text-green-700 bg-green-50 border border-green-200 rounded-lg px-3 py-2">
-      ✓ Все языки заполнены полностью
-    </div>
+    <Alert tone="success" className="mb-4">✓ Все языки заполнены полностью</Alert>
   );
 
   return (
-    <div className="mb-4 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
-      <p className="text-xs font-semibold text-amber-700 mb-2">Неполное покрытие:</p>
+    <Alert tone="warning" className="mb-4">
+      <p className="text-xs font-semibold text-aspectum-warning-strong mb-2">Неполное покрытие:</p>
       <div className="flex flex-wrap gap-3">
         {incomplete.map(([lang, s]) => (
           <div key={lang} className="flex items-center gap-1">
-            <span className="text-xs font-mono font-bold text-gray-600">{langLabel(lang)}</span>
-            <span className="text-xs text-amber-700">{s.ok}/{s.total}</span>
+            <span className="text-xs font-mono font-bold text-aspectum-text-subtle">{langLabel(lang)}</span>
+            <span className="text-xs text-aspectum-warning-strong">{s.ok}/{s.total}</span>
           </div>
         ))}
       </div>
-    </div>
+    </Alert>
   );
 }
 
@@ -513,65 +506,53 @@ export default function AudioGuidesCatalogPage() {
 
   return (
     <Layout>
-      <div className="mb-6 flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Аудиогиды</h1>
-          <p className="mt-1 text-sm text-gray-500">
-            <span className="text-green-600 font-medium">●</span> есть файл &nbsp;
-            <span className="text-gray-400">○</span> нет файла · клик → управление треками
-          </p>
-        </div>
-        <button
+      <PageHeader
+        title="Аудиогиды"
+        className="flex-wrap"
+        description={(
+          <>
+            <span className="text-aspectum-positive font-medium">●</span> есть файл &nbsp;
+            <span className="text-aspectum-text-disabled">○</span> нет файла · клик → управление треками
+          </>
+        )}
+        actions={<Button
           type="button"
+          variant="primary"
+          size="md"
           onClick={() => { setCreateError(''); setCreateTitle(''); setCreateOpen(true); }}
           disabled={!eventId || creating}
-          className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors"
         >
           + Создать аудиогид
-        </button>
-      </div>
+        </Button>}
+      />
 
       <div className="mb-4 flex flex-wrap gap-3">
-        <select
-          value={cityId}
-          onChange={(e) => setCityId(e.target.value)}
-          className={`w-full md:w-64 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none ${citiesLoading ? 'opacity-60 cursor-wait' : ''}`}
-          disabled={citiesLoading}
-        >
+        <Select className={`w-full md:w-64 ${citiesLoading ? 'opacity-60 cursor-wait' : ''}`} value={cityId} onChange={(e) => setCityId(e.target.value)} disabled={citiesLoading}>
           <option value="">{citiesLoading ? 'Загрузка…' : 'Все города'}</option>
           {cityOptions.map((c) => (
             <option key={c.id} value={c.id}>{c.name} ({c.events_count})</option>
           ))}
-        </select>
-        <select
-          value={eventId}
-          onChange={(e) => setEventId(e.target.value)}
-          className={`w-full md:w-96 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none ${eventsLoading ? 'opacity-60 cursor-wait' : ''}`}
-          disabled={eventsLoading}
-        >
+        </Select>
+        <Select className={`w-full md:w-96 ${eventsLoading ? 'opacity-60 cursor-wait' : ''}`} value={eventId} onChange={(e) => setEventId(e.target.value)} disabled={eventsLoading}>
           <option value="">{eventsLoading ? 'Загрузка…' : cityId ? 'Все события города' : 'Все события'}</option>
           {eventOptions.map((ev) => (
             <option key={ev.id} value={ev.id}>{getMultiLangValue(ev.title) || ev.id}</option>
           ))}
-        </select>
+        </Select>
       </div>
 
-      {error && <div className="mb-4 text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">{error}</div>}
+      {error && <Alert tone="error" className="mb-4">{error}</Alert>}
 
       {!loading && visibleGuides.length > 0 && <CoverageSummary guides={visibleGuides} />}
 
       {loading ? (
-        <div className="flex items-center gap-2 text-sm text-gray-400 py-8">
-          <span className="animate-spin w-4 h-4 border-2 border-blue-500 border-t-transparent rounded-full inline-block" />
-          Загрузка...
-        </div>
+        <InlineState loading tone="disabled" className="py-8">Загрузка...</InlineState>
       ) : visibleGuides.length === 0 ? (
-        <div className="text-center py-12 bg-white rounded-xl border border-gray-200">
-          <div className="text-4xl mb-3">🎧</div>
-          <p className="text-gray-500 text-sm">
-            {eventId ? 'У этого события нет аудиогидов' : cityId ? 'У этого города нет аудиогидов' : 'Нет аудиогидов'}
-          </p>
-        </div>
+        <EmptyState
+          icon="🎧"
+          title={eventId ? 'У этого события нет аудиогидов' : cityId ? 'У этого города нет аудиогидов' : 'Нет аудиогидов'}
+          className="py-12"
+        />
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
           {visibleGuides.map((guide) => (
@@ -602,10 +583,10 @@ export default function AudioGuidesCatalogPage() {
       >
         <form onSubmit={handleCreate} className="space-y-4">
           {createError && (
-            <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">{createError}</div>
+            <Alert tone="error">{createError}</Alert>
           )}
           {!eventId && (
-            <p className="text-sm text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+            <p className="text-sm text-aspectum-warning-strong bg-aspectum-warning-soft border border-aspectum-warning-border rounded-aspectum-control px-3 py-2">
               Сначала выберите событие в фильтре выше.
             </p>
           )}
@@ -619,20 +600,12 @@ export default function AudioGuidesCatalogPage() {
             />
           </Field>
           <div className="flex gap-2 justify-end">
-            <button
-              type="button"
-              onClick={() => setCreateOpen(false)}
-              className="px-4 py-2 text-sm text-gray-600 bg-gray-100 rounded-lg hover:bg-gray-200"
-            >
+            <Button type="button" variant="secondary" size="md" onClick={() => setCreateOpen(false)}>
               Отмена
-            </button>
-            <button
-              type="submit"
-              disabled={creating || !eventId}
-              className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-50"
-            >
+            </Button>
+            <Button type="submit" variant="primary" size="md" disabled={creating || !eventId}>
               {creating ? 'Создание...' : 'Создать'}
-            </button>
+            </Button>
           </div>
         </form>
       </Modal>

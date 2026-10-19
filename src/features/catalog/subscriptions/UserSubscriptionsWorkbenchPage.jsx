@@ -7,17 +7,9 @@ import {
   subscriptionUsersAdminAPI,
 } from '../../../api/subscription';
 import Layout from '../../../components/Layout';
-import DataTable from '../../../components/ui/DataTable';
-import { Field, FormActions, TextInput } from '../../../components/ui/FormField';
-import Modal, { ConfirmModal } from '../../../components/ui/Modal';
+import { Alert, Button, CheckboxField, ConfirmModal, DataTable, DataTableSurface, Field, FormActions, Heading, Modal, PageContainer, PageHeader, Panel, RawJsonModal, SectionHeader, Select, StatusBadge, TableRowActions, TextInput } from '@aspectum/ui';
 import { useLayoutActions } from '../../../context/useLayoutActions';
 import { parseApiError } from '../../../utils/apiError';
-import ActiveCheckboxField from '../shared/components/ActiveCheckboxField';
-import CatalogPageHeader from '../shared/components/CatalogPageHeader';
-import FormErrorAlert from '../shared/components/FormErrorAlert';
-import StatusBadge from '../shared/components/StatusBadge';
-import TableRowActions from '../shared/components/TableRowActions';
-import RawJsonModal from '../shared/components/RawJsonModal';
 import { formatDateTime, getCityLabel } from './subscriptionLabels';
 
 function createEmptyGrant() {
@@ -344,28 +336,28 @@ export default function UserSubscriptionsWorkbenchPage() {
       label: 'Email',
       render: (v, row) => (
         <div>
-          <div className={`text-sm font-medium ${selectedUser?.id === row.id ? 'text-violet-700' : 'text-gray-900'}`}>
+          <div className={`text-sm font-medium ${selectedUser?.id === row.id ? 'text-aspectum-violet' : 'text-aspectum-text'}`}>
             {v || '—'}
           </div>
-          {row.username ? <div className="text-xs text-gray-400">@{row.username}</div> : null}
+          {row.username ? <div className="text-xs text-aspectum-text-disabled">@{row.username}</div> : null}
         </div>
       ),
     },
     {
       key: 'active_city_subscriptions_count',
       label: 'Города',
-      render: (v) => <span className="text-sm text-gray-700">{v ?? 0}</span>,
+      render: (v) => <span className="text-sm text-aspectum-text-strong">{v ?? 0}</span>,
     },
     {
       key: 'iap_purchases_count',
       label: 'IAP',
-      render: (v) => <span className="text-sm text-gray-700">{v ?? 0}</span>,
+      render: (v) => <span className="text-sm text-aspectum-text-strong">{v ?? 0}</span>,
     },
     {
       key: 'is_active',
       label: 'Активен',
       render: (v) => (
-        <span className={`text-xs font-medium ${v ? 'text-green-600' : 'text-gray-400'}`}>
+        <span className={`text-xs font-medium ${v ? 'text-aspectum-positive' : 'text-aspectum-text-disabled'}`}>
           {v ? 'да' : 'нет'}
         </span>
       ),
@@ -373,7 +365,7 @@ export default function UserSubscriptionsWorkbenchPage() {
     {
       key: 'created_at',
       label: 'Создан',
-      render: (v) => <span className="text-xs text-gray-500">{formatDateTime(v)}</span>,
+      render: (v) => <span className="text-xs text-aspectum-text-muted">{formatDateTime(v)}</span>,
     },
   ];
 
@@ -382,7 +374,7 @@ export default function UserSubscriptionsWorkbenchPage() {
       key: 'city_name',
       label: 'Город',
       render: (_, row) => (
-        <span className="text-sm text-gray-800">
+        <span className="text-sm text-aspectum-text-emphasis">
           {row.city_name || cityLabelById.get(String(row.city)) || row.city}
         </span>
       ),
@@ -390,12 +382,12 @@ export default function UserSubscriptionsWorkbenchPage() {
     {
       key: 'subscription_type_name',
       label: 'Тип',
-      render: (v) => <span className="text-sm text-gray-700">{v || '—'}</span>,
+      render: (v) => <span className="text-sm text-aspectum-text-strong">{v || '—'}</span>,
     },
     {
       key: 'activation_method',
       label: 'Метод',
-      render: (v) => <span className="text-xs text-gray-600 font-mono">{v || '—'}</span>,
+      render: (v) => <span className="text-xs text-aspectum-text-subtle font-mono">{v || '—'}</span>,
     },
     {
       key: 'is_active',
@@ -405,7 +397,7 @@ export default function UserSubscriptionsWorkbenchPage() {
     {
       key: 'created_at',
       label: 'Создана',
-      render: (v) => <span className="text-sm text-gray-600">{formatDateTime(v)}</span>,
+      render: (v) => <span className="text-sm text-aspectum-text-subtle">{formatDateTime(v)}</span>,
     },
     {
       key: 'actions',
@@ -429,73 +421,51 @@ export default function UserSubscriptionsWorkbenchPage() {
     {
       key: 'product_id',
       label: 'Product ID',
-      render: (v) => <span className="text-sm font-mono text-gray-800">{v}</span>,
+      render: (v) => <span className="text-sm font-mono text-aspectum-text-emphasis">{v}</span>,
     },
     {
       key: 'platform',
       label: 'Платформа',
-      render: (v) => <span className="text-sm text-gray-700">{v}</span>,
+      render: (v) => <span className="text-sm text-aspectum-text-strong">{v}</span>,
     },
     {
       key: 'status',
       label: 'Статус',
       render: (v, row) => (
-        <select
-          className="text-sm border border-gray-200 rounded-lg px-2 py-1"
-          value={v}
-          disabled={iapSavingId === row.id}
-          onChange={(e) => void handleIapUpdate(row, { status: e.target.value })}
-        >
+        <Select value={v} disabled={iapSavingId === row.id} onChange={(e) => void handleIapUpdate(row, { status: e.target.value })}>
           <option value="active">active</option>
           <option value="expired">expired</option>
           <option value="refunded">refunded</option>
-        </select>
+        </Select>
       ),
     },
     {
       key: 'expires_at',
       label: 'Истекает',
       render: (v, row) => (
-        <input
-          type="datetime-local"
-          className="text-sm border border-gray-200 rounded-lg px-2 py-1"
-          defaultValue={v ? new Date(v).toISOString().slice(0, 16) : ''}
-          disabled={iapSavingId === row.id}
-          onBlur={(e) => {
-            const next = e.target.value ? new Date(e.target.value).toISOString() : null;
-            const prev = v ? new Date(v).toISOString() : null;
-            if (next !== prev) {
-              void handleIapUpdate(row, { expires_at: next });
-            }
-          }}
-        />
+        <TextInput type="datetime-local" defaultValue={v ? new Date(v).toISOString().slice(0, 16) : ''} disabled={iapSavingId === row.id} onBlur={(e) => { const next = e.target.value ? new Date(e.target.value).toISOString() : null; const prev = v ? new Date(v).toISOString() : null; if (next !== prev) { void handleIapUpdate(row, { expires_at: next }); } }} />
       ),
     },
     {
       key: 'purchased_at',
       label: 'Куплено',
-      render: (v) => <span className="text-sm text-gray-600">{formatDateTime(v)}</span>,
+      render: (v) => <span className="text-sm text-aspectum-text-subtle">{formatDateTime(v)}</span>,
     },
     {
       key: 'raw_response',
       label: 'Raw',
       render: (_, row) => (
-        <button
-          type="button"
-          onClick={() => openIapRaw(row)}
-          disabled={iapRawLoading}
-          className="px-2 py-1 text-xs text-blue-600 bg-blue-50 rounded-md hover:bg-blue-100 disabled:opacity-50"
-        >
+        <Button type="button" variant="soft" size="sm" onClick={() => openIapRaw(row)} disabled={iapRawLoading}>
           JSON
-        </button>
+        </Button>
       ),
     },
   ];
 
   return (
     <Layout>
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
-        <CatalogPageHeader
+      <PageContainer maxWidth="full" centered spacing="lg" className="px-4 py-6 sm:px-6 lg:px-8">
+        <PageHeader
           title="Подписки пользователей"
           description="Пользователи, доступ к городам, квоты ИИ и IAP premium."
           createLabel="Выдать город"
@@ -511,7 +481,7 @@ export default function UserSubscriptionsWorkbenchPage() {
         />
 
         <div className="space-y-3">
-          {userError ? <FormErrorAlert message={userError} /> : null}
+          {userError ? <Alert tone="error">{userError}</Alert> : null}
           <DataTable
             columns={userColumns}
             rows={userResults}
@@ -530,61 +500,53 @@ export default function UserSubscriptionsWorkbenchPage() {
             onRowClick={(row) => void handleSelectUser(row)}
           />
           {selectedUser ? (
-            <p className="text-xs text-gray-500">
-              Выбран: <span className="font-medium text-gray-800">{selectedUser.email}</span>
+            <p className="text-xs text-aspectum-text-muted">
+              Выбран: <span className="font-medium text-aspectum-text-emphasis">{selectedUser.email}</span>
               {' · '}
-              <button
-                type="button"
-                className="text-violet-600 hover:underline"
-                onClick={() => setSelectedUser(null)}
-              >
+              <Button type="button" variant="linkViolet" size="sm" onClick={() => setSelectedUser(null)}>
                 снять выбор
-              </button>
+              </Button>
             </p>
           ) : (
-            <p className="text-xs text-gray-400">Кликните по пользователю, чтобы открыть подписки и IAP.</p>
+            <p className="text-xs text-aspectum-text-disabled">Кликните по пользователю, чтобы открыть подписки и IAP.</p>
           )}
         </div>
 
         {selectedUser ? (
           <>
-            <div className="bg-white border border-gray-200 rounded-2xl p-4 sm:p-5">
+            <Panel className="p-4 sm:p-5">
               <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-4">
                 <div>
-                  <h2 className="text-lg font-semibold text-gray-900">{selectedUser.email}</h2>
-                  <p className="text-sm text-gray-500 mt-1">
-                    ID: {selectedUser.id}
-                    {selectedUser.username ? ` · @${selectedUser.username}` : ''}
-                  </p>
+                  <SectionHeader
+                    title={selectedUser.email}
+                    description={`ID: ${selectedUser.id}${selectedUser.username ? ` · @${selectedUser.username}` : ''}`}
+                  />
                   <div className="flex flex-wrap gap-2 mt-3">
-                    <span className="text-xs px-2 py-1 rounded-full bg-emerald-100 text-emerald-700">
+                    <span className="text-xs px-2 py-1 rounded-full bg-aspectum-success-muted text-aspectum-success-strong">
                       Города: {citySubscriptions.filter((s) => s.is_active).length} активных
                     </span>
-                    <span className="text-xs px-2 py-1 rounded-full bg-blue-100 text-blue-700">
+                    <span className="text-xs px-2 py-1 rounded-full bg-aspectum-primary-muted text-aspectum-primary-hover">
                       IAP: {iapPurchases.length}
                     </span>
                     <span className={`text-xs px-2 py-1 rounded-full ${
-                      selectedUser.has_premium ? 'bg-amber-100 text-amber-800' : 'bg-gray-100 text-gray-600'
+                      selectedUser.has_premium ? 'bg-aspectum-warning-muted text-aspectum-warning-emphasis' : 'bg-aspectum-surface-subtle text-aspectum-text-subtle'
                     }`}>
                       Premium: {selectedUser.has_premium ? 'да' : 'нет'}
                     </span>
-                    <span className="text-xs px-2 py-1 rounded-full bg-violet-100 text-violet-700">
+                    <span className="text-xs px-2 py-1 rounded-full bg-aspectum-violet-muted text-aspectum-violet">
                       Запросов ИИ: {selectedUser.ai_prompts_balance ?? 0}
                     </span>
                   </div>
                 </div>
 
                 <div className="flex flex-wrap gap-2">
-                  <button
-                    type="button"
-                    className="px-3 py-2 rounded-xl bg-violet-600 text-white text-sm"
-                    onClick={openAiGrant}
-                  >
+                  <Button type="button" variant="violet" size="md" onClick={openAiGrant}>
                     Начислить запросы ИИ
-                  </button>
-                  <button
+                  </Button>
+                  <Button
                     type="button"
-                    className="px-3 py-2 rounded-xl bg-violet-600 text-white text-sm"
+                    variant="violet"
+                    size="md"
                     onClick={() => {
                       setGrantError(null);
                       setGrantForm(createEmptyGrant());
@@ -592,10 +554,11 @@ export default function UserSubscriptionsWorkbenchPage() {
                     }}
                   >
                     Выдать город
-                  </button>
-                  <button
+                  </Button>
+                  <Button
                     type="button"
-                    className="px-3 py-2 rounded-xl border border-gray-200 text-sm"
+                    variant="outlineDanger"
+                    size="md"
                     disabled={refsLoading}
                     onClick={() => {
                       setBulkError(null);
@@ -604,45 +567,47 @@ export default function UserSubscriptionsWorkbenchPage() {
                     }}
                   >
                     По типу подписки
-                  </button>
-                  <button
+                  </Button>
+                  <Button
                     type="button"
-                    className="px-3 py-2 rounded-xl border border-gray-200 text-sm"
+                    variant="outline"
+                    size="md"
                     onClick={() => {
                       setBulkError(null);
                       setBulkAction('grant-all');
                     }}
                   >
                     Все города
-                  </button>
-                  <button
+                  </Button>
+                  <Button
                     type="button"
-                    className="px-3 py-2 rounded-xl border border-red-200 text-red-700 text-sm"
+                    variant="outline"
+                    size="md"
                     onClick={() => {
                       setBulkError(null);
                       setBulkAction('revoke-all');
                     }}
                   >
                     Отключить все
-                  </button>
+                  </Button>
                 </div>
               </div>
-            </div>
+            </Panel>
 
-            <div className="bg-white border border-gray-200 rounded-2xl p-4 sm:p-5 space-y-3">
+            <Panel className="p-4 sm:p-5 space-y-3">
               <div className="flex flex-wrap items-center justify-between gap-2">
-                <h3 className="text-base font-semibold text-gray-900">Квота ИИ</h3>
-                <span className="text-sm text-gray-600">Осталось: {selectedUser.ai_prompts_balance ?? 0}</span>
+                <Heading level={3} size="sm">Квота ИИ</Heading>
+                <span className="text-sm text-aspectum-text-subtle">Осталось: {selectedUser.ai_prompts_balance ?? 0}</span>
               </div>
-              <p className="text-xs text-gray-500">Один запрос — одно сообщение ассистенту или построение маршрута. Начисление увеличивает остаток, не меняя настройки типов подписки.</p>
+              <p className="text-xs text-aspectum-text-muted">Один запрос — одно сообщение ассистенту или построение маршрута. Начисление увеличивает остаток, не меняя настройки типов подписки.</p>
               {(selectedUser.ai_prompt_grants || []).length ? (
-                <div className="overflow-x-auto">
+                <DataTableSurface>
                   <table className="w-full text-sm text-left">
-                    <thead><tr className="text-gray-500 border-b"><th className="py-2">Когда</th><th>Запросов</th><th>Причина / источник</th><th>Кто выдал</th></tr></thead>
+                    <thead><tr className="text-aspectum-text-muted border-b"><th className="py-2">Когда</th><th>Запросов</th><th>Причина / источник</th><th>Кто выдал</th></tr></thead>
                     <tbody>
                       {selectedUser.ai_prompt_grants.map((grant) => (
-                        <tr key={grant.id} className="border-b border-gray-100">
-                          <td className="py-2 whitespace-nowrap">{formatDate(grant.created_at)}</td>
+                        <tr key={grant.id} className="border-b border-aspectum-border-subtle">
+                          <td className="py-2 whitespace-nowrap">{formatDateTime(grant.created_at)}</td>
                           <td>+{grant.amount}</td>
                           <td className="max-w-sm break-words">{grant.reason || grant.source_key}</td>
                           <td>{grant.granted_by || '—'}</td>
@@ -650,12 +615,12 @@ export default function UserSubscriptionsWorkbenchPage() {
                       ))}
                     </tbody>
                   </table>
-                </div>
-              ) : <p className="text-sm text-gray-500">Начислений пока нет.</p>}
-            </div>
+                </DataTableSurface>
+              ) : <p className="text-sm text-aspectum-text-muted">Начислений пока нет.</p>}
+            </Panel>
 
             <div className="space-y-3">
-              <h3 className="text-base font-semibold text-gray-900">Доступ к городам</h3>
+              <Heading level={3} size="sm">Доступ к городам</Heading>
               <DataTable
                 columns={subscriptionColumns}
                 rows={citySubscriptions}
@@ -665,8 +630,8 @@ export default function UserSubscriptionsWorkbenchPage() {
             </div>
 
             <div className="space-y-3">
-              <h3 className="text-base font-semibold text-gray-900">IAP покупки</h3>
-              {iapError ? <FormErrorAlert message={iapError} /> : null}
+              <Heading level={3} size="sm">IAP покупки</Heading>
+              {iapError ? <Alert tone="error">{iapError}</Alert> : null}
               <DataTable
                 columns={iapColumns}
                 rows={iapPurchases}
@@ -683,8 +648,8 @@ export default function UserSubscriptionsWorkbenchPage() {
           onClose={() => { if (!aiGrantSaving) setAiGrantOpen(false); }}
         >
           <form onSubmit={handleAiGrantSave} className="space-y-4">
-            {aiGrantError ? <FormErrorAlert message={aiGrantError} /> : null}
-            <p className="text-sm text-gray-600">Пользователь: {selectedUser?.email}. Текущий остаток: {selectedUser?.ai_prompts_balance ?? 0}</p>
+            {aiGrantError ? <Alert tone="error">{aiGrantError}</Alert> : null}
+            <p className="text-sm text-aspectum-text-subtle">Пользователь: {selectedUser?.email}. Текущий остаток: {selectedUser?.ai_prompts_balance ?? 0}</p>
             <Field label="Количество запросов" required>
               <TextInput type="number" min={1} max={1000000} step={1} required
                 value={aiGrantForm.amount}
@@ -707,31 +672,22 @@ export default function UserSubscriptionsWorkbenchPage() {
           onClose={() => setGrantOpen(false)}
         >
           <form onSubmit={handleGrantSave} className="space-y-4">
-            {grantError ? <FormErrorAlert message={grantError} /> : null}
+            {grantError ? <Alert tone="error">{grantError}</Alert> : null}
             <Field label="Город" required>
-              <select
-                className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm"
-                value={grantForm.city}
-                onChange={(e) => setGrantForm((prev) => ({ ...prev, city: e.target.value }))}
-                required
-              >
+              <Select value={grantForm.city} onChange={(e) => setGrantForm((prev) => ({ ...prev, city: e.target.value }))} required>
                 <option value="">Выберите город</option>
                 {cities.map((city) => (
                   <option key={city.id} value={city.id}>{getCityLabel(city)}</option>
                 ))}
-              </select>
+              </Select>
             </Field>
             <Field label="Тип подписки">
-              <select
-                className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm"
-                value={grantForm.subscription_type}
-                onChange={(e) => setGrantForm((prev) => ({ ...prev, subscription_type: e.target.value }))}
-              >
+              <Select value={grantForm.subscription_type} onChange={(e) => setGrantForm((prev) => ({ ...prev, subscription_type: e.target.value }))}>
                 <option value="">Без типа</option>
                 {subscriptionTypes.map((type) => (
                   <option key={type.id} value={type.id}>{type.name}</option>
                 ))}
-              </select>
+              </Select>
             </Field>
             <Field label="Метод активации">
               <TextInput
@@ -740,15 +696,15 @@ export default function UserSubscriptionsWorkbenchPage() {
                 placeholder="admin:manual"
               />
             </Field>
-            <ActiveCheckboxField
+            <CheckboxField
               checked={grantForm.is_active}
               onChange={(checked) => setGrantForm((prev) => ({ ...prev, is_active: checked }))}
               label="Активна"
             />
             <FormActions
               onCancel={() => setGrantOpen(false)}
-              submitLabel={grantSaving ? 'Сохранение…' : 'Выдать доступ'}
-              submitting={grantSaving}
+              saveLabel="Выдать доступ"
+              saving={grantSaving}
             />
           </form>
         </Modal>
@@ -760,26 +716,19 @@ export default function UserSubscriptionsWorkbenchPage() {
         >
           {editSubscription ? (
             <form onSubmit={handleEditSave} className="space-y-4">
-              {editError ? <FormErrorAlert message={editError} /> : null}
+              {editError ? <Alert tone="error">{editError}</Alert> : null}
               <Field label="Город">
-                <div className="text-sm text-gray-700">
+                <div className="text-sm text-aspectum-text-strong">
                   {editSubscription.city_name || cityLabelById.get(String(editSubscription.city))}
                 </div>
               </Field>
               <Field label="Тип подписки">
-                <select
-                  className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm"
-                  value={editSubscription.subscription_type || ''}
-                  onChange={(e) => setEditSubscription((prev) => ({
-                    ...prev,
-                    subscription_type: e.target.value,
-                  }))}
-                >
+                <Select value={editSubscription.subscription_type || ''} onChange={(e) => setEditSubscription((prev) => ({ ...prev, subscription_type: e.target.value, }))}>
                   <option value="">Без типа</option>
                   {subscriptionTypes.map((type) => (
                     <option key={type.id} value={type.id}>{type.name}</option>
                   ))}
-                </select>
+                </Select>
               </Field>
               <Field label="Метод активации">
                 <TextInput
@@ -790,15 +739,15 @@ export default function UserSubscriptionsWorkbenchPage() {
                   }))}
                 />
               </Field>
-              <ActiveCheckboxField
+              <CheckboxField
                 checked={!!editSubscription.is_active}
                 onChange={(checked) => setEditSubscription((prev) => ({ ...prev, is_active: checked }))}
                 label="Активна"
               />
               <FormActions
                 onCancel={() => setEditSubscription(null)}
-                submitLabel={editSaving ? 'Сохранение…' : 'Сохранить'}
-                submitting={editSaving}
+                saveLabel="Сохранить"
+                saving={editSaving}
               />
             </form>
           ) : null}
@@ -844,20 +793,16 @@ export default function UserSubscriptionsWorkbenchPage() {
         >
           {bulkAction === 'grant-type' ? (
             <div className="mt-4 space-y-2">
-              <select
-                className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm"
-                value={bulkSubscriptionTypeId}
-                onChange={(e) => setBulkSubscriptionTypeId(e.target.value)}
-              >
+              <Select value={bulkSubscriptionTypeId} onChange={(e) => setBulkSubscriptionTypeId(e.target.value)}>
                 <option value="">Выберите тип подписки</option>
                 {subscriptionTypes.map((type) => (
                   <option key={type.id} value={type.id}>{type.name}</option>
                 ))}
-              </select>
-              {bulkError ? <FormErrorAlert message={bulkError} /> : null}
+              </Select>
+              {bulkError ? <Alert tone="error">{bulkError}</Alert> : null}
             </div>
           ) : bulkError ? (
-            <FormErrorAlert message={bulkError} />
+            <Alert tone="error">{bulkError}</Alert>
           ) : null}
         </ConfirmModal>
 
@@ -867,7 +812,7 @@ export default function UserSubscriptionsWorkbenchPage() {
           title={`raw_response — ${iapRawTarget?.product_id || ''}`}
           data={iapRawTarget?.raw_response}
         />
-      </div>
+      </PageContainer>
     </Layout>
   );
 }

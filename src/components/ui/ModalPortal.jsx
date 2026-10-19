@@ -23,7 +23,7 @@ export default function ModalPortal({
       <div
         role="presentation"
         aria-hidden="true"
-        className="fixed top-0 left-0 w-screen h-[100dvh] min-h-screen bg-black/50"
+        className="fixed top-0 left-0 w-screen h-[100dvh] min-h-screen bg-aspectum-overlay"
         style={{ zIndex: backdropZ }}
         onClick={onClose}
       />

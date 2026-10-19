@@ -1,11 +1,9 @@
 import { useCallback, useEffect, useState } from 'react';
 import { citySubscriptionsAPI } from '../../../api/subscription';
 import Layout from '../../../components/Layout';
-import DataTable from '../../../components/ui/DataTable';
+import { Button, DataTable, PageHeader, Select, StatusBadge } from '@aspectum/ui';
 import { useLayoutActions } from '../../../context/useLayoutActions';
 import { parseApiError } from '../../../utils/apiError';
-import CatalogPageHeader from '../shared/components/CatalogPageHeader';
-import StatusBadge from '../shared/components/StatusBadge';
 import { formatDateTime, getCityLabel } from './subscriptionLabels';
 
 const PAGE_SIZE = 20;
@@ -80,22 +78,22 @@ export default function CitySubscriptionsCatalogPage() {
     {
       key: 'user_email',
       label: 'Пользователь',
-      render: (v) => <span className="text-sm text-gray-800">{v || '—'}</span>,
+      render: (v) => <span className="text-sm text-aspectum-text-emphasis">{v || '—'}</span>,
     },
     {
       key: 'city_name',
       label: 'Город',
-      render: (v) => <span className="text-sm text-gray-700">{getCityLabel({ name: v, city_name: v }) || '—'}</span>,
+      render: (v) => <span className="text-sm text-aspectum-text-strong">{getCityLabel({ name: v, city_name: v }) || '—'}</span>,
     },
     {
       key: 'subscription_type_name',
       label: 'Тип',
-      render: (v) => <span className="text-sm text-gray-700">{v || '—'}</span>,
+      render: (v) => <span className="text-sm text-aspectum-text-strong">{v || '—'}</span>,
     },
     {
       key: 'activation_method',
       label: 'Метод',
-      render: (v) => <span className="text-xs font-mono text-gray-600">{v || '—'}</span>,
+      render: (v) => <span className="text-xs font-mono text-aspectum-text-subtle">{v || '—'}</span>,
     },
     {
       key: 'is_active',
@@ -107,13 +105,13 @@ export default function CitySubscriptionsCatalogPage() {
     {
       key: 'created_at',
       label: 'Создана',
-      render: (v) => <span className="text-sm text-gray-600">{formatDateTime(v)}</span>,
+      render: (v) => <span className="text-sm text-aspectum-text-subtle">{formatDateTime(v)}</span>,
     },
   ];
 
   return (
     <Layout>
-      <CatalogPageHeader
+      <PageHeader
         title="Все подписки на города"
         description="Глобальный список CitySubscription. Для выдачи доступа конкретному пользователю используйте «Подписки пользователей»."
       />
@@ -134,24 +132,16 @@ export default function CitySubscriptionsCatalogPage() {
         pageSize={PAGE_SIZE}
         onPage={setPage}
         filters={(
-          <select
-            value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value)}
-            className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none"
-          >
+          <Select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
             <option value="">Любой статус</option>
             <option value="active">Активные</option>
             <option value="inactive">Отключенные</option>
-          </select>
+          </Select>
         )}
         actions={(row) => (
-          <button
-            type="button"
-            onClick={() => void toggleActive(row)}
-            className="px-3 py-1.5 text-xs font-medium text-blue-600 bg-blue-50 rounded-md hover:bg-blue-100 transition-colors"
-          >
+          <Button type="button" variant="soft" size="sm" onClick={() => void toggleActive(row)}>
             {row.is_active ? 'Отключить' : 'Включить'}
-          </button>
+          </Button>
         )}
       />
     </Layout>

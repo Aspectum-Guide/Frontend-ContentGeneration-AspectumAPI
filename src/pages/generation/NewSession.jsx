@@ -3,13 +3,14 @@ import { useNavigate } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import Layout from '../../components/Layout';
-import Button from '../../components/ui/Button';
+import { FormLabel, Checkbox, RadioGroup, Textarea, TextInput, Alert, Button, PageContainer, PageHeader, Panel } from '@aspectum/ui';
 import { sessionsAPI } from '../../api/generation';
 import { createSessionSchema } from '../../utils/validation';
-import { LANGUAGES } from '../../utils/constants';
+import { useAppLanguages } from '../../hooks/useAppLanguages';
 
 export default function NewSession() {
   const navigate = useNavigate();
+  const { languages: appLanguages } = useAppLanguages();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   
@@ -61,87 +62,46 @@ export default function NewSession() {
 
   return (
     <Layout>
-      <div className="max-w-2xl mx-auto">
-        <h1 className="text-3xl font-bold text-gray-900 mb-8">Создать новую сессию</h1>
+      <PageContainer maxWidth="medium" centered>
+        <PageHeader title="Создать новую сессию" />
 
-        <form onSubmit={handleSubmit(onSubmit)} className="bg-white shadow rounded-lg p-6">
+        <Panel as="form" onSubmit={handleSubmit(onSubmit)} className="p-6 shadow-aspectum-card">
           {error && (
-            <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-md">
-              <p className="text-red-800">{error}</p>
-            </div>
+            <Alert tone="error" className="mb-4">{error}</Alert>
           )}
 
           {/* Название сессии */}
           <div className="mb-6">
-            <label className="block text-sm font-medium text-gray-700 mb-2">
+            <FormLabel  layout="block" size="sm" weight="medium" tone="strong" spacing="sm">
               Название сессии (опционально)
-            </label>
-            <input
-              type="text"
-              {...register('name')}
-              placeholder="Например: Рим - историческое путешествие"
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
+            </FormLabel>
+            <TextInput type="text" {...register('name')} placeholder="Например: Рим - историческое путешествие" />
           </div>
 
           {/* Тип контента */}
           <div className="mb-6">
-            <label className="block text-sm font-medium text-gray-700 mb-3">
-              Что вы хотите создать? <span className="text-red-500">*</span>
-            </label>
-            <div className="space-y-3">
-              <label className={`flex items-start p-4 border-2 rounded-lg cursor-pointer transition-all ${
-                contentType === 'city_only' 
-                  ? 'border-blue-500 bg-blue-50' 
-                  : 'border-gray-300 hover:border-gray-400'
-              }`}>
-                <input
-                  type="radio"
-                  value="city_only"
-                  {...register('content_type')}
-                  className="mt-1 mr-3"
-                />
-                <div>
-                  <div className="font-medium text-gray-900">Только город</div>
-                  <div className="text-sm text-gray-600 mt-1">
-                    Создание карточки города с основной информацией и описанием
-                  </div>
-                </div>
-              </label>
-
-              <label className={`flex items-start p-4 border-2 rounded-lg cursor-pointer transition-all ${
-                contentType === 'city_with_attractions' 
-                  ? 'border-blue-500 bg-blue-50' 
-                  : 'border-gray-300 hover:border-gray-400'
-              }`}>
-                <input
-                  type="radio"
-                  value="city_with_attractions"
-                  {...register('content_type')}
-                  className="mt-1 mr-3"
-                />
-                <div>
-                  <div className="font-medium text-gray-900">Город с достопримечательностями</div>
-                  <div className="text-sm text-gray-600 mt-1">
-                    Создание города и генерация контента для его достопримечательностей (мероприятий)
-                  </div>
-                </div>
-              </label>
-            </div>
+            <FormLabel  layout="block" size="sm" weight="medium" tone="strong" spacing="md">
+              Что вы хотите создать? <span className="text-aspectum-danger-subtle">*</span>
+            </FormLabel>
+            <RadioGroup
+              name="content_type"
+              value={contentType}
+              onChange={(value) => setValue('content_type', value, { shouldValidate: true })}
+              options={[
+                { value: 'city_only', label: 'Только город', description: 'Создание карточки города с основной информацией и описанием' },
+                { value: 'city_with_attractions', label: 'Город с достопримечательностями', description: 'Создание города и генерация контента для его достопримечательностей (мероприятий)' },
+              ]}
+            />
           </div>
 
           {/* Использовать ИИ */}
           <div className="mb-6">
-            <label className="flex items-center">
-              <input
-                type="checkbox"
-                {...register('use_ai')}
-                className="mr-2 w-4 h-4 text-blue-600"
-              />
-              <span className="text-gray-700">Использовать ИИ для генерации контента</span>
-            </label>
+            <FormLabel   layout="rowBare">
+              <Checkbox {...register('use_ai')} />
+              <span className="text-aspectum-text-strong">Использовать ИИ для генерации контента</span>
+            </FormLabel>
             {contentType === 'city_with_attractions' && (
-              <p className="mt-2 text-sm text-gray-500">
+              <p className="mt-2 text-sm text-aspectum-text-muted">
                 💡 При выборе города с достопримечательностями рекомендуется включить ИИ для лучшего результата
               </p>
             )}
@@ -149,35 +109,33 @@ export default function NewSession() {
 
           {/* Выбор языков */}
           <div className="mb-6">
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Выберите языки (минимум 2) <span className="text-red-500">*</span>
-            </label>
+            <FormLabel  layout="block" size="sm" weight="medium" tone="strong" spacing="sm">
+              Выберите языки (минимум 2) <span className="text-aspectum-danger-subtle">*</span>
+            </FormLabel>
             <div className="grid grid-cols-3 gap-2">
-              {LANGUAGES.map((lang) => (
-                <label
+              {appLanguages.map((lang) => (
+                <FormLabel
                   key={lang.code}
-                  className={`flex items-center p-3 border rounded-md cursor-pointer transition-colors ${
+                  className={`flex items-center p-3 border rounded-aspectum-compact cursor-pointer transition-colors ${
                     selectedLanguages.includes(lang.code)
-                      ? 'border-blue-500 bg-blue-50'
-                      : 'border-gray-300 hover:border-gray-400'
+                      ? 'border-aspectum-focus bg-aspectum-primary-soft'
+                      : 'border-aspectum-border-strong hover:border-aspectum-border-disabled'
                   }`}
                 >
-                  <input
-                    type="checkbox"
+                  <Checkbox
                     checked={selectedLanguages.includes(lang.code)}
                     onChange={() => toggleLanguage(lang.code)}
                     disabled={selectedLanguages.includes(lang.code) && selectedLanguages.length === 2}
-                    className="mr-2"
                   />
-                  <span>{lang.name}</span>
-                </label>
+                  <span>{lang.label || lang.name || lang.code}</span>
+                </FormLabel>
               ))}
             </div>
             {errors.target_languages && (
-              <p className="mt-1 text-sm text-red-600">{errors.target_languages.message}</p>
+              <p className="mt-1 text-sm text-aspectum-danger">{errors.target_languages.message}</p>
             )}
             {selectedLanguages.length < 2 && (
-              <p className="mt-1 text-sm text-gray-500">
+              <p className="mt-1 text-sm text-aspectum-text-muted">
                 Выбрано: {selectedLanguages.length} из минимум 2
               </p>
             )}
@@ -185,15 +143,10 @@ export default function NewSession() {
 
           {/* Заметки */}
           <div className="mb-6">
-            <label className="block text-sm font-medium text-gray-700 mb-2">
+            <FormLabel  layout="block" size="sm" weight="medium" tone="strong" spacing="sm">
               Заметки (опционально)
-            </label>
-            <textarea
-              {...register('notes')}
-              rows={4}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-              placeholder="Добавьте заметки к сессии..."
-            />
+            </FormLabel>
+            <Textarea {...register('notes')} rows={4} placeholder="Добавьте заметки к сессии..." />
           </div>
 
           {/* Кнопки */}
@@ -213,8 +166,8 @@ export default function NewSession() {
               {loading ? 'Создание...' : 'Создать сессию'}
             </Button>
           </div>
-        </form>
-      </div>
+        </Panel>
+      </PageContainer>
     </Layout>
   );
 }

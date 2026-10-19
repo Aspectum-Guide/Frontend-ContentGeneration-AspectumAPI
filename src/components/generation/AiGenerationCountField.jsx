@@ -1,17 +1,5 @@
-const COUNT_LIMITS = {
-  cities: { min: 1, max: 50, default: 5 },
-  attractions: { min: 1, max: 50, default: 5 },
-  interactive_locations: { min: 1, max: 50, default: 5 },
-  city_info: { min: 1, max: 20, default: 5 },
-  attraction_info: { min: 1, max: 20, default: 5 },
-};
-
-export function clampGenerationCount(value, generationType = 'cities') {
-  const limits = COUNT_LIMITS[generationType] || COUNT_LIMITS.cities;
-  let count = parseInt(String(value), 10);
-  if (Number.isNaN(count)) count = limits.default;
-  return Math.max(limits.min, Math.min(limits.max, count));
-}
+import { Field, TextInput } from '@aspectum/ui';
+import { COUNT_LIMITS } from './generationUtils';
 
 export default function AiGenerationCountField({
   id,
@@ -25,11 +13,8 @@ export default function AiGenerationCountField({
   const limits = COUNT_LIMITS[generationType] || COUNT_LIMITS.cities;
 
   return (
-    <div>
-      <label htmlFor={id} className="block text-sm font-medium text-gray-700 mb-1">
-        {label}
-      </label>
-      <input
+    <Field label={label} hint={helperText}>
+      <TextInput
         id={id}
         type="number"
         min={limits.min}
@@ -37,11 +22,7 @@ export default function AiGenerationCountField({
         value={value}
         onChange={(e) => onChange?.(e.target.value)}
         disabled={disabled}
-        className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
       />
-      {helperText ? (
-        <p className="mt-1 text-xs text-gray-500">{helperText}</p>
-      ) : null}
-    </div>
+    </Field>
   );
 }

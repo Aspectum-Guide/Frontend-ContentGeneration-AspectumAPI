@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import Layout from '../../components/Layout';
-import Button from '../../components/ui/Button';
+import { Button, ConfirmModal, DataTable, EmptyState, PageHeader, Panel, Spinner } from '@aspectum/ui';
 import { sessionsAPI } from '../../api/generation';
 import { parseApiError } from '../../utils/apiError';
 
@@ -9,6 +9,7 @@ export default function GenerationList() {
   const [sessions, setSessions] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [deleteTarget, setDeleteTarget] = useState(null);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -50,26 +51,22 @@ export default function GenerationList() {
     }
   };
 
-  const handleDelete = async (sessionId) => {
-    if (!window.confirm('Вы уверены, что хотите удалить эту сессию?')) {
-      return;
-    }
-
+  const handleDelete = async () => {
+    if (!deleteTarget) return;
     try {
-      await sessionsAPI.delete(sessionId);
-      loadSessions();
+      await sessionsAPI.delete(deleteTarget.id);
+      setDeleteTarget(null);
+      await loadSessions();
     } catch (err) {
-      alert('Ошибка при удалении сессии');
       console.error(err);
+      throw new Error(parseApiError(err, 'Не удалось удалить сессию'));
     }
   };
 
   if (loading) {
     return (
       <Layout>
-        <div className="text-center py-12">
-          <p className="text-gray-600">Загрузка...</p>
-        </div>
+        <EmptyState icon={<Spinner size="md" />} title="Загрузка..." />
       </Layout>
     );
   }
@@ -77,9 +74,7 @@ export default function GenerationList() {
   if (error) {
     return (
       <Layout>
-        <div className="text-center py-12">
-          <p className="text-red-600">Ошибка: {error}</p>
-        </div>
+        <EmptyState icon="⚠️" title={`Ошибка: ${error}`} tone="danger" />
       </Layout>
     );
   }
@@ -87,147 +82,123 @@ export default function GenerationList() {
   return (
     <Layout>
       <div className="mb-8">
-        <div className="flex justify-between items-center mb-6">
-          <div>
-            <h1 className="text-4xl font-bold text-gray-900">Список сессий</h1>
-            <p className="text-gray-600 mt-2">Управление сессиями создания контента для городов</p>
-          </div>
-          <Button
+        <PageHeader
+          title="Список сессий"
+          titleSize="xl"
+          description="Управление сессиями создания контента для городов"
+          actions={<Button
             variant="primary"
             onClick={() => navigate('/generation/new')}
-            className="py-2 px-6 text-lg"
+            size="xl"
           >
             + Создать сессию
-          </Button>
-        </div>
+          </Button>}
+        />
 
         {sessions.length === 0 ? (
-          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-12 text-center">
+          <Panel className="p-12 text-center shadow-aspectum-card">
             <div className="text-6xl mb-4">📋</div>
-            <p className="text-gray-600 text-lg mb-6">Нет созданных сессий</p>
+            <p className="text-aspectum-text-subtle text-lg mb-6">Нет созданных сессий</p>
             <Button
               variant="primary"
               onClick={() => navigate('/generation/new')}
-              className="py-2 px-8 text-base"
+              size="lg"
             >
               Создать первую сессию
             </Button>
-          </div>
+          </Panel>
         ) : (
-          <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead>
-                  <tr className="bg-gray-50 border-b border-gray-200">
-                    <th className="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
-                      Название
-                    </th>
-                    <th className="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
-                      Статус
-                    </th>
-                    <th className="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
-                      Статус публикации
-                    </th>
-                    <th className="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
-                      Город
-                    </th>
-                    <th className="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
-                      Дата создания
-                    </th>
-                    <th className="px-6 py-4 text-right text-xs font-semibold text-gray-700 uppercase tracking-wider">
-                      Действия
-                    </th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-200">
-                  {sessions.map((session, idx) => (
-                    <tr 
-                      key={session.id} 
-                      className="hover:bg-blue-50 transition-colors"
-                    >
-                      <td className="px-6 py-4">
-                        <div className="flex items-center gap-3">
-                          <div className="flex-shrink-0 w-10 h-10 bg-gradient-to-br from-blue-400 to-blue-600 rounded-lg flex items-center justify-center text-white font-semibold">
-                            {idx + 1}
-                          </div>
-                          <div>
-                            <div className="text-sm font-medium text-gray-900 max-w-xs truncate">
-                              {session.name || 'Без названия'}
-                            </div>
-                            <div className="text-xs text-gray-500 font-mono">
-                              {session.uuid?.substring(0, 12)}...
-                            </div>
-                          </div>
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold ${
-                          session.status === 'draft' ? 'bg-gray-100 text-gray-800' :
-                          session.status === 'in_progress' ? 'bg-yellow-100 text-yellow-800' :
-                          session.status === 'completed' ? 'bg-green-100 text-green-800' :
-                          session.status === 'published' ? 'bg-blue-100 text-blue-800' :
-                          'bg-red-100 text-red-800'
-                        }`}>
-                          {session.status_display || session.status}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        {session.status === 'published' ? (
-                          <span className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-semibold bg-green-100 text-green-800">
-                            <span>✅</span> Опубликовано
-                          </span>
-                        ) : (
-                          <span className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-semibold bg-gray-100 text-gray-600">
-                            <span>📝</span> Черновик
-                          </span>
-                        )}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm text-gray-900">
-                          {session.published_city ? (
-                            <span className="font-medium">{session.published_city.name}</span>
-                          ) : (
-                            <span className="text-gray-400">—</span>
-                          )}
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
-                        {new Date(session.created_at).toLocaleDateString('ru-RU', {
-                          year: 'numeric',
-                          month: 'short',
-                          day: 'numeric',
-                          hour: '2-digit',
-                          minute: '2-digit'
-                        })}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-right">
-                        <div className="flex justify-end gap-2">
-                          <Link
-                            to={`/generation/${session.id}`}
-                            className="inline-flex items-center justify-center w-9 h-9 rounded-lg text-blue-600 hover:bg-blue-100 transition-colors font-medium"
-                            title="Редактировать"
-                          >
-                            ✏️
-                          </Link>
-                          {session.status === 'draft' ? (
-                            <button
-                              onClick={() => handleDelete(session.id)}
-                              className="inline-flex items-center justify-center w-9 h-9 rounded-lg text-red-600 hover:bg-red-100 transition-colors font-medium"
-                              title="Удалить"
-                            >
-                              🗑️
-                            </button>
-                          ) : null}
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
+          <DataTable
+            rows={sessions.map((session, index) => ({ ...session, listIndex: index + 1 }))}
+            columns={[
+              {
+                key: 'name',
+                label: 'Название',
+                render: (value, row) => (
+                  <div className="flex items-center gap-3">
+                    <div className="flex-shrink-0 w-10 h-10 bg-gradient-to-br from-aspectum-primary-light to-aspectum-primary rounded-aspectum-control flex items-center justify-center text-aspectum-on-accent font-semibold">
+                      {row.listIndex}
+                    </div>
+                    <div>
+                      <div className="text-sm font-medium text-aspectum-text max-w-xs truncate">{value || 'Без названия'}</div>
+                      <div className="text-xs text-aspectum-text-muted font-mono">{row.uuid?.substring(0, 12)}...</div>
+                    </div>
+                  </div>
+                ),
+              },
+              {
+                key: 'status',
+                label: 'Статус',
+                render: (value, row) => (
+                  <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold ${
+                    value === 'draft' ? 'bg-aspectum-surface-subtle text-aspectum-text-emphasis' :
+                    value === 'in_progress' ? 'bg-aspectum-caution-muted text-aspectum-caution-emphasis' :
+                    value === 'completed' ? 'bg-aspectum-positive-muted text-aspectum-positive-emphasis' :
+                    value === 'published' ? 'bg-aspectum-primary-muted text-aspectum-primary-strong' :
+                    'bg-aspectum-danger-muted text-aspectum-danger-emphasis'
+                  }`}>
+                    {row.status_display || value}
+                  </span>
+                ),
+              },
+              {
+                key: 'publicationStatus',
+                label: 'Статус публикации',
+                render: (_, row) => row.status === 'published' ? (
+                  <span className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-semibold bg-aspectum-positive-muted text-aspectum-positive-emphasis">✅ Опубликовано</span>
+                ) : (
+                  <span className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-semibold bg-aspectum-surface-subtle text-aspectum-text-subtle">📝 Черновик</span>
+                ),
+              },
+              {
+                key: 'published_city',
+                label: 'Город',
+                render: (value) => value?.name ? <span className="font-medium">{value.name}</span> : <span className="text-aspectum-text-disabled">—</span>,
+              },
+              {
+                key: 'created_at',
+                label: 'Дата создания',
+                className: 'whitespace-nowrap text-sm text-aspectum-text-subtle',
+                render: (value) => new Date(value).toLocaleDateString('ru-RU', {
+                  year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit',
+                }),
+              },
+            ]}
+            actions={(session) => (
+              <>
+                <Link
+                  to={`/generation/${session.id}`}
+                  className="inline-flex items-center justify-center w-9 h-9 rounded-aspectum-control text-aspectum-primary hover:bg-aspectum-primary-muted transition-colors font-medium"
+                  title="Редактировать"
+                >
+                  ✏️
+                </Link>
+                {session.status === 'draft' && (
+                  <Button
+                    type="button"
+                    variant="softDanger"
+                    size="sm"
+                    onClick={() => setDeleteTarget(session)}
+                    title="Удалить"
+                  >
+                    🗑️
+                  </Button>
+                )}
+              </>
+            )}
+          />
         )}
       </div>
+
+      <ConfirmModal
+        open={!!deleteTarget}
+        onClose={() => setDeleteTarget(null)}
+        onConfirm={handleDelete}
+        title="Удалить сессию?"
+        message={`Сессия «${deleteTarget?.name || 'Без названия'}» будет удалена без возможности восстановления.`}
+        confirmLabel="Удалить"
+        danger
+      />
     </Layout>
   );
 }

@@ -1,6 +1,7 @@
 import { useMemo, useRef, useState } from 'react';
+import { FormLabel, Alert, Button, ConfirmModal, EmptyState, FileButton, IconButton, LoadingOverlay, LocaleEditor, Panel, SectionHeader, Select, SelectableCard, Spinner, TextInput, Textarea } from '@aspectum/ui';
 
-import { getFlag, normalizeId } from './sessionWizardShared.jsx';
+import { normalizeId } from './sessionWizardShared.jsx';
 import { usePasteImageOnHover } from '../../../hooks/usePasteImageOnHover';
 
 const getMultilangDisplay = (value, fallback = '') => {
@@ -226,66 +227,65 @@ function AttractionFeedItemsPanel({
   const currentId = normalizeId(currentAttractionFeedItem?.id);
 
   return (
-    <div className="p-3 border border-gray-200 rounded-xl bg-gray-50">
+    <Panel tone="muted" className="p-3">
       <div className="flex items-center justify-between mb-2 gap-3">
-        <p className="text-sm font-medium text-gray-800">
+        <p className="text-sm font-medium text-aspectum-text-emphasis">
           Элементы ленты
         </p>
 
-        <button
+        <Button
           type="button"
           onClick={() => onAddFeedBlock?.()}
-          className="px-2.5 py-1 text-xs font-medium text-blue-700 bg-blue-100 rounded-md hover:bg-blue-200 transition-colors"
+          variant="softStrong"
+          size="sm"
         >
           + Блок (фото + текст)
-        </button>
+        </Button>
       </div>
 
       <div className="flex flex-wrap gap-2">
         {attractionFeedItems.length === 0 ? (
-          <span className="text-xs text-gray-500">
-            Пока нет элементов ленты
-          </span>
+          <EmptyState title="Пока нет элементов ленты" className="py-3" />
         ) : (
           attractionFeedItems.map((item, index) => {
             const itemId = normalizeId(item.id);
             const isActive = itemId === currentId;
 
             return (
-              <button
+              <SelectableCard
                 key={item.id}
-                type="button"
-                onClick={() => {
+                onSelect={() => {
                   if (!isActive) {
                     onSelectFeedItem?.(item.id);
                   }
                 }}
-                className={`flex items-center gap-1 px-2 py-1 rounded-lg border text-xs transition-colors ${
+                ariaLabel={getFeedItemName(item)}
+                className={`flex items-center gap-1 px-2 py-1 rounded-aspectum-control border text-xs transition-colors ${
                   isActive
-                    ? 'bg-blue-50 border-blue-300 text-blue-700 font-medium'
-                    : 'bg-white border-gray-200 text-gray-700 hover:border-blue-300 hover:bg-blue-50'
+                    ? 'bg-aspectum-primary-soft border-aspectum-primary-border-strong text-aspectum-primary-hover font-medium'
+                    : 'bg-aspectum-surface border-aspectum-border text-aspectum-text-strong hover:border-aspectum-primary-border-strong hover:bg-aspectum-primary-soft'
                 }`}
                 title={getFeedItemName(item)}
               >
-                <span className="text-gray-400">{index + 1}.</span>
+                <span className="text-aspectum-text-disabled">{index + 1}.</span>
 
                 <span
                   className={
                     item.item_type === 'image'
-                      ? 'text-purple-600'
-                      : 'text-blue-600'
+                      ? 'text-aspectum-purple'
+                      : 'text-aspectum-primary'
                   }
                 >
                   {item.item_type === 'image' ? '🖼️' : '💬'}
                 </span>
 
                 <span>{getFeedItemName(item)}</span>
-              </button>
+              </SelectableCard>
             );
           })
         )}
       </div>
-    </div>
+    </Panel>
   );
 }
 
@@ -310,7 +310,7 @@ function FeedImagePanel({
       <div
         {...photoPaste}
         title="Наведите и нажмите Ctrl+V, чтобы вставить фото из буфера"
-        className="relative aspect-[3/4] bg-gray-100 rounded-xl overflow-hidden border border-gray-200 flex items-center justify-center">
+        className="relative aspect-[3/4] bg-aspectum-surface-subtle rounded-aspectum-card overflow-hidden border border-aspectum-border flex items-center justify-center">
         {imagePreview ? (
           <img
             src={imagePreview}
@@ -318,80 +318,53 @@ function FeedImagePanel({
             className="w-full h-full object-cover"
           />
         ) : (
-          <span className="text-gray-400 text-sm text-center px-2">
+          <span className="text-aspectum-text-disabled text-sm text-center px-2">
             Изображение ленты
           </span>
         )}
 
-        {photoUploading && (
-          <div className="absolute inset-0 bg-black/40 flex items-center justify-center">
-            <div className="animate-spin w-6 h-6 border-2 border-white border-t-transparent rounded-full" />
-          </div>
-        )}
+        <LoadingOverlay loading={photoUploading} label="Загрузка фото…" className="absolute inset-0" />
 
-        <button
+        <Button
           type="button"
           onClick={() => onOpenCommonsModal?.(currentItem)}
-          className="absolute top-2 right-2 px-2 py-1 text-xs bg-purple-600 text-white rounded-md hover:bg-purple-700 transition-colors shadow-lg"
           title="Библиотека изображений: Commons, Минкульт, Openverse, Pastvu, Mapillary"
+          variant="purple"
+          size="sm"
+          className="absolute top-2 right-2 shadow-aspectum-elevated"
         >
           ⊞ Библиотека
-        </button>
+        </Button>
       </div>
 
       <div>
-        <label className="block w-full text-center text-xs text-blue-600 bg-blue-50 border border-blue-200 rounded-lg py-1.5 cursor-pointer hover:bg-blue-100 transition-colors">
+        <FileButton
+          inputRef={photoFileRef}
+          accept="image/*"
+          variant="soft"
+          size="md"
+          className="w-full"
+          onChange={(event) => onPhotoFileChange?.(event, currentItem)}
+        >
           + Добавить фото
-
-          <input
-            ref={photoFileRef}
-            type="file"
-            accept="image/*"
-            className="hidden"
-            onChange={(event) => {
-              onPhotoFileChange?.(event, currentItem);
-            }}
-          />
-        </label>
+        </FileButton>
       </div>
 
       <div className="space-y-1.5">
         <div>
-          <label className="block text-xs text-gray-500 mb-0.5">
+          <FormLabel  layout="block" size="xs" tone="muted" spacing="xxs">
             URL
-          </label>
+          </FormLabel>
 
-          <input
-            type="url"
-            value={imageOriginalUrl || ''}
-            onChange={(event) => {
-              onUpdateItemPatch?.({
-                image_original_url: event.target.value,
-                imageOriginalUrl: event.target.value,
-              });
-            }}
-            placeholder="https://upload.wikimedia.org/..."
-            className="w-full px-2 py-1 text-xs border border-gray-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-blue-400"
-          />
+          <TextInput type="url" value={imageOriginalUrl || ''} onChange={(event) => { onUpdateItemPatch?.({ image_original_url: event.target.value, imageOriginalUrl: event.target.value, }); }} placeholder="https://upload.wikimedia.org/..." />
         </div>
 
         <div>
-          <label className="block text-xs text-gray-500 mb-0.5">
+          <FormLabel  layout="block" size="xs" tone="muted" spacing="xxs">
             Авторские права
-          </label>
+          </FormLabel>
 
-          <input
-            type="text"
-            value={imageCopyright || ''}
-            onChange={(event) => {
-              onUpdateItemPatch?.({
-                image_copyright: event.target.value,
-                imageCopyright: event.target.value,
-              });
-            }}
-            placeholder="© Автор / Источник"
-            className="w-full px-2 py-1 text-xs border border-gray-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-blue-400"
-          />
+          <TextInput type="text" value={imageCopyright || ''} onChange={(event) => { onUpdateItemPatch?.({ image_copyright: event.target.value, imageCopyright: event.target.value, }); }} placeholder="© Автор / Источник" />
         </div>
       </div>
     </aside>
@@ -466,25 +439,26 @@ function FeedBlockCard({
   const bindingIncomplete = isFeedItemBindingIncomplete(anchorItem);
 
   return (
-    <div
+    <Panel
+      as="article"
       draggable
       onDragStart={onDragStart}
       onDragOver={onDragOver}
       onDragLeave={onDragLeave}
       onDrop={onDrop}
       onDragEnd={onDragEnd}
-      className={`relative flex gap-3 p-3 bg-white border rounded-xl transition-all select-none ${
+      className={`relative flex gap-3 p-3 transition-all select-none ${
         isDragging
-          ? 'opacity-40 border-blue-400'
+          ? 'opacity-40 border-aspectum-primary-light'
           : isDropTarget
-            ? 'border-blue-500 ring-2 ring-blue-200'
-            : 'border-gray-200 hover:border-blue-300'
+            ? 'border-aspectum-focus ring-2 ring-aspectum-primary-border'
+            : 'border-aspectum-border hover:border-aspectum-primary-border-strong'
       }`}
     >
       {/* Ручка + номер блока */}
-      <div className="flex flex-col items-center gap-1 shrink-0 pt-1 cursor-grab active:cursor-grabbing text-gray-400">
+      <div className="flex flex-col items-center gap-1 shrink-0 pt-1 cursor-grab active:cursor-grabbing text-aspectum-text-disabled">
         <span className="text-base leading-none" title="Перетащите, чтобы изменить порядок">⠿</span>
-        <span className="w-6 h-6 flex items-center justify-center rounded-full bg-gray-100 text-xs font-medium text-gray-600">
+        <span className="w-6 h-6 flex items-center justify-center rounded-full bg-aspectum-surface-subtle text-xs font-medium text-aspectum-text-subtle">
           {position + 1}
         </span>
       </div>
@@ -492,79 +466,87 @@ function FeedBlockCard({
       {/* Фото-половина */}
       <div className="w-32 shrink-0">
         {block.image ? (
-          <button
+          <Button
             type="button"
             onClick={() => onOpenItem?.(block.image.id)}
-            className="relative block w-full aspect-[4/3] bg-gray-100 rounded-lg overflow-hidden border border-gray-200 hover:ring-2 hover:ring-blue-300 transition-shadow"
+            variant="mediaTile"
+            size="sm"
+            className="relative block w-full aspect-[4/3] min-h-0 p-0 overflow-hidden"
             title="Открыть фото"
           >
             {imagePreview ? (
               <img src={imagePreview} alt="" className="w-full h-full object-cover" />
             ) : (
-              <span className="absolute inset-0 flex items-center justify-center text-[11px] text-gray-400 px-1 text-center">
+              <span className="absolute inset-0 flex items-center justify-center text-[11px] text-aspectum-text-disabled px-1 text-center">
                 Фото не выбрано — нажмите, чтобы добавить
               </span>
             )}
-          </button>
+          </Button>
         ) : (
-          <button
+          <Button
             type="button"
             onClick={() => onAddMissingHalf?.(block, 'image')}
-            className="w-full aspect-[4/3] rounded-lg border-2 border-dashed border-gray-300 text-gray-400 text-xs hover:border-blue-400 hover:text-blue-500 transition-colors"
+            variant="dashedTile"
+            size="sm"
+            className="w-full aspect-[4/3] min-h-0"
           >
             + фото
-          </button>
+          </Button>
         )}
       </div>
 
       {/* Текст-половина */}
       <div className="flex-1 min-w-0 flex flex-col">
         {block.text ? (
-          <button
+          <Button
             type="button"
             onClick={() => onOpenItem?.(block.text.id)}
-            className="flex-1 text-left text-sm text-gray-700 leading-snug rounded-lg px-2 py-1.5 -mx-1 hover:bg-blue-50 transition-colors"
+            variant="textTile"
+            size="sm"
+            className="flex-1 min-h-0 text-left text-sm leading-snug -mx-1"
             title="Открыть текст"
           >
             {textPreview ? (
               <span className="line-clamp-4">{textPreview}</span>
             ) : (
-              <span className="text-gray-400 italic">
+              <span className="text-aspectum-text-muted italic">
                 Текст не заполнен — нажмите, чтобы написать
               </span>
             )}
-          </button>
+          </Button>
         ) : (
-          <button
+          <Button
             type="button"
             onClick={() => onAddMissingHalf?.(block, 'text')}
-            className="flex-1 rounded-lg border-2 border-dashed border-gray-300 text-gray-400 text-xs hover:border-blue-400 hover:text-blue-500 transition-colors"
+            variant="dashedTile"
+            size="sm"
+            className="flex-1 min-h-0"
           >
             + текст к этому фото
-          </button>
+          </Button>
         )}
 
-        <div className="flex items-center gap-1.5 text-[11px] text-gray-500 mt-1.5 min-w-0">
+        <div className="flex items-center gap-1.5 text-[11px] text-aspectum-text-muted mt-1.5 min-w-0">
           <span className="truncate">
             {getFeedItemBindingLabel(anchorItem, referenceAttractions, attractions)}
           </span>
           {bindingIncomplete && (
-            <span className="px-1.5 py-0.5 rounded bg-amber-100 text-amber-700 font-medium shrink-0">
+            <span className="px-1.5 py-0.5 rounded-aspectum-control bg-aspectum-warning-soft text-aspectum-warning font-medium shrink-0">
               ⚠ не выбрана
             </span>
           )}
         </div>
       </div>
 
-      <button
-        type="button"
+      <IconButton
         onClick={() => onDeleteBlock?.(block)}
-        className="absolute top-2 right-2 w-6 h-6 flex items-center justify-center rounded-md text-gray-300 hover:text-red-600 hover:bg-red-50 transition-colors"
-        title="Удалить блок"
+        className="absolute top-2 right-2 w-6 h-6 p-0"
+        label="Удалить блок"
+        variant="ghostDanger"
       >
         ✕
-      </button>
-    </div>
+      </IconButton>
+    </Panel>
   );
 }
 
@@ -630,6 +612,7 @@ export default function SessionWizardAttractionFeedStep({
 
   const [dragBlockKey, setDragBlockKey] = useState(null);
   const [dropBlockKey, setDropBlockKey] = useState(null);
+  const [pendingItemType, setPendingItemType] = useState(null);
   // ref — источник истины для drop: state может не успеть обновиться
   // между dragstart и drop (быстрый жест), стейт нужен только для подсветки
   const dragBlockKeyRef = useRef(null);
@@ -648,6 +631,31 @@ export default function SessionWizardAttractionFeedStep({
     next.splice(toIdx, 0, moved);
 
     onReorderAttractionFeedItems?.(flattenBlocksToIds(next));
+  };
+
+  const applyItemType = (nextType) => {
+    if (nextType === 'text') {
+      updateItemPatch({
+        item_type: 'text', image: null, image_id: null, image_url: '', imageUrl: '',
+        image_original_url: '', imageOriginalUrl: '', image_copyright: '', imageCopyright: '',
+      });
+      return;
+    }
+    updateItemPatch({ item_type: 'image', text: {} });
+  };
+
+  const handleItemTypeChange = (event) => {
+    const nextType = event.target.value;
+    if (nextType === itemType) return;
+    const hasText = itemType === 'text' && Object.values(
+      typeof currentAttractionFeedItem?.text === 'object' ? currentAttractionFeedItem.text : {},
+    ).some(Boolean);
+    const hasImage = itemType === 'image' && getFeedImagePreview(currentAttractionFeedItem);
+    if (hasText || hasImage) {
+      setPendingItemType(nextType);
+      return;
+    }
+    applyItemType(nextType);
   };
 
   const handleAddMissingHalf = (block, type) => {
@@ -674,37 +682,23 @@ export default function SessionWizardAttractionFeedStep({
   if (!currentAttractionFeedItem) {
     return (
       <section className="space-y-4">
-        <div className="flex items-center justify-between gap-3">
-          <div>
-            <h2 className="text-lg font-semibold text-gray-900">
-              Лента достопримечательности
-            </h2>
-
-            <p className="text-sm text-gray-500">
-              Блок ленты — это фотография и подпись к ней. Перетаскивайте
-              карточки за ⠿, чтобы изменить порядок показа в приложении.
-            </p>
-          </div>
-
-          <button
+        <SectionHeader title="Лента достопримечательности" description="Блок ленты — это фотография и подпись к ней. Перетаскивайте карточки за ⠿, чтобы изменить порядок показа в приложении." actions={<Button
             type="button"
             onClick={() => onAddAttractionFeedBlock?.()}
-            className="px-3 py-1.5 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors shrink-0"
+            variant="primary"
+            size="md"
           >
             + Добавить блок
-          </button>
-        </div>
+          </Button>} />
 
         {feedBlocks.length === 0 ? (
-          <div className="text-center py-10 text-gray-400 border border-dashed border-gray-200 rounded-xl bg-gray-50">
-            <div className="text-3xl mb-2">🖼️</div>
-
-            <p className="text-sm">
-              {scopedToAttractionId
-                ? 'Для этой достопримечательности пока нет ленты.'
-                : 'Лента пуста. Добавьте первый блок «фото + текст».'}
-            </p>
-          </div>
+          <EmptyState
+            icon="🖼️"
+            title={scopedToAttractionId ? 'Лента пока пуста' : 'Лента пуста'}
+            description={scopedToAttractionId
+              ? 'Для этой достопримечательности пока нет ленты.'
+              : 'Добавьте первый блок «фото + текст».'}
+          />
         ) : (
           <div className="grid gap-2.5 sm:grid-cols-1 lg:grid-cols-2">
             {feedBlocks.map((block, position) => (
@@ -752,21 +746,23 @@ export default function SessionWizardAttractionFeedStep({
 
         {!embedded && (
           <div className="flex justify-between pt-2">
-            <button
+            <Button
               type="button"
               onClick={() => onGoToStep?.(3)}
-              className="px-4 py-2 text-sm text-gray-600 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+              variant="outline"
+              size="md"
             >
               ← Назад
-            </button>
+            </Button>
 
-            <button
+            <Button
               type="button"
               onClick={() => onGoToStep?.(4)}
-              className="px-5 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors"
+              variant="primary"
+              size="md"
             >
               Далее: Публикация →
-            </button>
+            </Button>
           </div>
         )}
       </section>
@@ -776,25 +772,28 @@ export default function SessionWizardAttractionFeedStep({
   return (
     <section className="space-y-4">
       <div className="flex items-center gap-3">
-        <button
-          type="button"
+        <IconButton
           onClick={() => onSetCurrentAttractionFeedItem?.(null)}
-          className="w-8 h-8 flex items-center justify-center border border-gray-300 rounded-lg text-gray-500 hover:bg-gray-50 transition-colors"
+          className="w-8 h-8"
+          label="Назад к списку элементов ленты"
+          variant="outline"
         >
           ←
-        </button>
+        </IconButton>
 
-        <span className="text-base font-semibold text-gray-900">
+        <span className="text-base font-semibold text-aspectum-text">
           {getFeedItemName(currentAttractionFeedItem)}
         </span>
 
-        <button
+        <Button
           type="button"
           onClick={onDeleteCurrentAttractionFeedItem}
-          className="ml-auto px-3 py-1 text-xs font-medium text-red-600 bg-red-50 rounded-lg hover:bg-red-100 transition-colors"
+          variant="softDanger"
+          size="sm"
+          className="ml-auto"
         >
           Удалить
-        </button>
+        </Button>
       </div>
 
       <AttractionFeedItemsPanel
@@ -805,160 +804,60 @@ export default function SessionWizardAttractionFeedStep({
       />
 
       {itemType === 'text' && (
-        <div className="flex items-center gap-1 flex-wrap">
-          {Object.entries(attractionFeedLocaleData || {}).map(([key, locale]) => {
-            const isActive = key === attractionFeedActiveLocale;
-
-            return (
-              <button
-                key={key}
-                type="button"
-                onClick={() => onSetAttractionFeedActiveLocale?.(key)}
-                className={`flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium border transition-all ${
-                  isActive
-                    ? 'bg-blue-600 text-white border-blue-600'
-                    : 'bg-white text-gray-600 border-gray-300 hover:border-blue-400'
-                }`}
-              >
-                <span>{getFlag(locale.code)}</span>
-                <span>{locale.langName}</span>
-              </button>
-            );
-          })}
-        </div>
+        <LocaleEditor
+          localeData={attractionFeedLocaleData}
+          activeLocale={attractionFeedActiveLocale}
+          onSwitch={onSetAttractionFeedActiveLocale}
+          showStatus={false}
+        />
       )}
 
       <main className="space-y-4">
-        <div className="p-3 border border-gray-200 rounded-lg bg-gray-50 space-y-3">
+        <Panel tone="muted" className="p-3 space-y-3">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <FormLabel  layout="block" size="sm" weight="medium" tone="strong" spacing="xs">
               Тип элемента ленты
-            </label>
+            </FormLabel>
 
-            <select
-              value={itemType}
-              onChange={(event) => {
-                const nextType = event.target.value;
-                if (nextType === itemType) return;
-
-                const hasText = itemType === 'text' && Object.values(
-                  (typeof currentAttractionFeedItem?.text === 'object'
-                    ? currentAttractionFeedItem.text : {})
-                ).some(Boolean);
-                const hasImage = itemType === 'image' && getFeedImagePreview(currentAttractionFeedItem);
-
-                if ((hasText || hasImage) && !window.confirm(
-                  nextType === 'text'
-                    ? 'Смена типа на «Текст» сотрёт прикреплённое изображение. Продолжить?'
-                    : 'Смена типа на «Изображение» сотрёт текстовое содержимое. Продолжить?'
-                )) {
-                  event.target.value = itemType;
-                  return;
-                }
-
-                if (nextType === 'text') {
-                  updateItemPatch({
-                    item_type: 'text',
-                    image: null,
-                    image_id: null,
-                    image_url: '',
-                    imageUrl: '',
-                    image_original_url: '',
-                    imageOriginalUrl: '',
-                    image_copyright: '',
-                    imageCopyright: '',
-                  });
-                } else {
-                  updateItemPatch({ item_type: 'image', text: {} });
-                }
-              }}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-            >
+            <Select className="bg-aspectum-surface" value={itemType} onChange={handleItemTypeChange}>
               <option value="text">Текст</option>
               <option value="image">Изображение</option>
-            </select>
+            </Select>
 
-            <p className="mt-1 text-xs text-gray-500">
+            <p className="mt-1 text-xs text-aspectum-text-muted">
               Текст и изображение создаются как отдельные элементы ленты.
             </p>
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <FormLabel  layout="block" size="sm" weight="medium" tone="strong" spacing="xs">
               Индекс
-            </label>
+            </FormLabel>
 
-            <input
-              type="number"
-              value={currentAttractionFeedItem?.index ?? 0}
-              onChange={(event) => {
-                updateItemPatch({
-                  index: Number(event.target.value || 0),
-                });
-              }}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
+            <TextInput type="number" value={currentAttractionFeedItem?.index ?? 0} onChange={(event) => { updateItemPatch({ index: Number(event.target.value || 0), }); }} />
           </div>
-        </div>
+        </Panel>
 
-        <div className="p-3 border border-gray-200 rounded-lg bg-gray-50 space-y-3">
+        <Panel tone="muted" className="p-3 space-y-3">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <FormLabel  layout="block" size="sm" weight="medium" tone="strong" spacing="xs">
               Привязка к достопримечательности
-            </label>
+            </FormLabel>
 
-            <select
-              value={assignedAttractionType}
-              onChange={(event) => {
-                const type = event.target.value;
-
-                updateItemPatch({
-                  assigned_attraction_type: type,
-
-                  event: null,
-                  event_id: null,
-
-                  attraction: null,
-                  attraction_id: null,
-
-                  session_attraction: null,
-                  session_attraction_id: null,
-                });
-              }}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-            >
+            <Select className="bg-aspectum-surface" value={assignedAttractionType} onChange={(event) => { const type = event.target.value; updateItemPatch({ assigned_attraction_type: type, event: null, event_id: null, attraction: null, attraction_id: null, session_attraction: null, session_attraction_id: null, }); }}>
               <option value="none">Без достопримечательности</option>
               <option value="database">Достопримечательность из базы</option>
               <option value="draft">Достопримечательность из сессии</option>
-            </select>
+            </Select>
           </div>
 
           {assignedAttractionType === 'database' && (
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <FormLabel  layout="block" size="sm" weight="medium" tone="strong" spacing="xs">
                 Достопримечательность из базы
-              </label>
+              </FormLabel>
 
-              <select
-                value={selectedDatabaseAttractionId}
-                onChange={(event) => {
-                  const eventId = event.target.value || null;
-
-                  updateItemPatch({
-                    assigned_attraction_type: 'database',
-
-                    event: eventId,
-                    event_id: eventId,
-
-                    attraction: eventId,
-                    attraction_id: eventId,
-
-                    session_attraction: null,
-                    session_attraction_id: null,
-                  });
-                }}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-              >
+              <Select className="bg-aspectum-surface" value={selectedDatabaseAttractionId} onChange={(event) => { const eventId = event.target.value || null; updateItemPatch({ assigned_attraction_type: 'database', event: eventId, event_id: eventId, attraction: eventId, attraction_id: eventId, session_attraction: null, session_attraction_id: null, }); }}>
                 <option value="">Выберите достопримечательность из базы</option>
 
                 {referenceAttractions.map((attraction) => (
@@ -966,10 +865,10 @@ export default function SessionWizardAttractionFeedStep({
                     {getAttractionDisplayName(attraction)}
                   </option>
                 ))}
-              </select>
+              </Select>
 
               {referenceAttractions.length === 0 && (
-                <p className="mt-1 text-xs text-amber-600">
+                <p className="mt-1 text-xs text-aspectum-warning">
                   Список достопримечательностей из базы не загружен.
                 </p>
               )}
@@ -978,30 +877,11 @@ export default function SessionWizardAttractionFeedStep({
 
           {assignedAttractionType === 'draft' && (
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <FormLabel  layout="block" size="sm" weight="medium" tone="strong" spacing="xs">
                 Достопримечательность из сессии
-              </label>
+              </FormLabel>
 
-              <select
-                value={selectedSessionAttractionId}
-                onChange={(event) => {
-                  const attractionId = event.target.value || null;
-
-                  updateItemPatch({
-                    assigned_attraction_type: 'draft',
-
-                    session_attraction: attractionId,
-                    session_attraction_id: attractionId,
-
-                    event: null,
-                    event_id: null,
-
-                    attraction: null,
-                    attraction_id: null,
-                  });
-                }}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-              >
+              <Select className="bg-aspectum-surface" value={selectedSessionAttractionId} onChange={(event) => { const attractionId = event.target.value || null; updateItemPatch({ assigned_attraction_type: 'draft', session_attraction: attractionId, session_attraction_id: attractionId, event: null, event_id: null, attraction: null, attraction_id: null, }); }}>
                 <option value="">Выберите достопримечательность из сессии</option>
 
                 {attractions.map((attraction) => (
@@ -1009,44 +889,36 @@ export default function SessionWizardAttractionFeedStep({
                     {getAttractionDisplayName(attraction)}
                   </option>
                 ))}
-              </select>
+              </Select>
 
               {attractions.length === 0 && (
-                <p className="mt-1 text-xs text-amber-600">
+                <Alert tone="warning" className="mt-1 text-xs">
                   В текущей сессии пока нет достопримечательностей.
-                </p>
+                </Alert>
               )}
             </div>
           )}
 
           {isBindingIncomplete && (
-            <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+            <Alert tone="warning" className="text-xs px-3 py-2">
               ⚠ Выбран тип привязки, но достопримечательность не выбрана. Элемент сохранится без привязки.
-            </p>
+            </Alert>
           )}
-        </div>
+        </Panel>
 
         {itemType === 'text' ? (
           <div>
             <div className="flex items-center gap-2 mb-1">
-              <label className="text-sm font-medium text-gray-700">
+              <FormLabel  size="sm" weight="medium" tone="strong">
                 Текст
-              </label>
+              </FormLabel>
 
-              <span className="px-1.5 py-0.5 bg-blue-100 text-blue-700 text-xs rounded font-mono">
+              <span className="px-1.5 py-0.5 bg-aspectum-primary-muted text-aspectum-primary-hover text-xs rounded font-mono">
                 {currentLocale.lang?.toUpperCase() || 'RU'}
               </span>
             </div>
 
-            <textarea
-              value={currentLocale.text || ''}
-              onChange={(event) =>
-                onUpdateAttractionFeedLocaleField?.('text', event.target.value)
-              }
-              rows={embedded ? 5 : 8}
-              placeholder="Комментарий для ленты достопримечательности..."
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
-            />
+            <Textarea value={currentLocale.text || ''} onChange={(event) => onUpdateAttractionFeedLocaleField?.('text', event.target.value) } rows={embedded ? 5 : 8} placeholder="Комментарий для ленты достопримечательности..." />
           </div>
         ) : (
           <div className="flex gap-5 items-start">
@@ -1066,13 +938,13 @@ export default function SessionWizardAttractionFeedStep({
             <div
               className={`flex items-center gap-1.5 text-xs transition-opacity ${
                 attractionFeedAutoSaved && !attractionFeedAutoSaving
-                  ? 'text-emerald-600'
-                  : 'text-gray-400'
+                  ? 'text-aspectum-success'
+                  : 'text-aspectum-text-disabled'
               }`}
             >
               {attractionFeedAutoSaving ? (
                 <>
-                  <span className="inline-block w-3 h-3 border-2 border-gray-300 border-t-transparent rounded-full animate-spin" />
+                  <Spinner size="xs" className="border-2 border-aspectum-border-strong" />
                   <span>Сохранение...</span>
                 </>
               ) : (
@@ -1096,18 +968,33 @@ export default function SessionWizardAttractionFeedStep({
             </div>
           )}
           {isBindingIncomplete && (
-            <span className="text-xs text-amber-600">Привязка не выбрана</span>
+            <span className="text-xs text-aspectum-warning">Привязка не выбрана</span>
           )}
-          <button
+          <Button
             type="button"
             onClick={onSaveCurrentAttractionFeedItem}
             disabled={attractionFeedSaving}
-            className="px-5 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors"
+            variant="primary"
+            size="md"
           >
             {attractionFeedSaving ? 'Сохранение...' : 'Сохранить'}
-          </button>
+          </Button>
         </div>
       </main>
+      <ConfirmModal
+        open={!!pendingItemType}
+        onClose={() => setPendingItemType(null)}
+        onConfirm={() => {
+          applyItemType(pendingItemType);
+          setPendingItemType(null);
+        }}
+        title="Сменить тип элемента?"
+        message={pendingItemType === 'text'
+          ? 'Смена типа на «Текст» сотрёт прикреплённое изображение.'
+          : 'Смена типа на «Изображение» сотрёт текстовое содержимое.'}
+        confirmLabel="Сменить"
+        danger
+      />
     </section>
   );
 }

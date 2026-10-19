@@ -2,9 +2,9 @@ import { useCallback, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { citiesAPI, eventsAPI } from '../../../api/generation';
 import Layout from '../../../components/Layout';
+import { Alert, Button, ConfirmModal, EmptyState, Heading, IconButton, InlineState, PageHeader, Panel, Select, StatusBadge, Tabs, TextInput } from '@aspectum/ui';
 import { parseApiError } from '../../../utils/apiError';
 import { useCatalogFilters } from '../core/useCatalogFilters';
-import CatalogPageHeader from '../shared/components/CatalogPageHeader';
 import { getMultiLangValue } from '../shared/i18n';
 import { normalizeListResponse } from '../shared/normalize';
 
@@ -17,20 +17,13 @@ const TABS = [
   { id: 'all', label: 'Все', hint: '' },
 ];
 
-const inputClass = 'w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none';
-
 function label(value, fallback = '—') {
   return getMultiLangValue(value) || fallback;
 }
 
 function Badge({ tone, children }) {
-  const tones = {
-    green: 'bg-emerald-100 text-emerald-700',
-    amber: 'bg-amber-100 text-amber-700',
-    sky: 'bg-sky-100 text-sky-700',
-    gray: 'bg-gray-100 text-gray-600',
-  };
-  return <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${tones[tone] || tones.gray}`}>{children}</span>;
+  const tones = { green: 'success', amber: 'warning', info: 'info', gray: 'neutral' };
+  return <StatusBadge tone={tones[tone] || 'neutral'}>{children}</StatusBadge>;
 }
 
 function MergePanel({ product, onMerged, onError }) {
@@ -38,6 +31,7 @@ function MergePanel({ product, onMerged, onError }) {
   const [events, setEvents] = useState([]);
   const [loading, setLoading] = useState(true);
   const [busyId, setBusyId] = useState('');
+  const [mergeTarget, setMergeTarget] = useState(null);
 
   useEffect(() => {
     let active = true;
@@ -56,94 +50,109 @@ function MergePanel({ product, onMerged, onError }) {
     };
   }, [product.id, debouncedSearch, onError]);
 
-  const merge = async (event) => {
-    const moves = product.event_id_replaced;
-    const text = moves
-      ? `Слить с «${label(event.title)}»? Текущее событие продукта («${label(product.linked_event_title)}») будет скрыто.`
-      : `Слить с «${label(event.title)}»? Текст события останется вашим, цены и билеты придут от поставщика.`;
-    if (!window.confirm(text)) return;
+  const merge = async () => {
+    if (!mergeTarget) return;
+    const event = mergeTarget;
     setBusyId(event.id);
     try {
       await eventsAPI.setExternalProduct(event.id, product.id);
+      setMergeTarget(null);
       onMerged();
     } catch (err) {
-      onError(parseApiError(err, 'Не удалось слить с событием'));
+      throw new Error(parseApiError(err, 'Не удалось слить с событием'));
     } finally {
       setBusyId('');
     }
   };
 
   return (
-    <div className="mt-3 rounded-lg border border-blue-100 bg-blue-50/40 p-3">
-      <p className="text-xs text-gray-600 mb-2">
+    <Panel tone="info" className="mt-3 p-3">
+      <p className="text-xs text-aspectum-text-subtle mb-2">
         Выберите ваше существующее событие — оно получит бронирование от поставщика. Сверху события, похожие по названию и
         месту (адрес поставщика). Не нашли? Введите название.
       </p>
-      <input
+      <TextInput
         value={search}
         onChange={(e) => setSearch(e.target.value)}
-        className={inputClass}
         placeholder="Поиск события по названию (все города)…"
       />
-      <div className="mt-2 max-h-60 overflow-y-auto rounded-lg border border-gray-200 bg-white">
-        {loading && <p className="p-2 text-xs text-gray-400">Загрузка…</p>}
+      <div className="mt-2 max-h-60 overflow-y-auto rounded-aspectum-control border border-aspectum-border bg-aspectum-surface">
+        {loading && <InlineState loading size="xs" tone="disabled" className="p-2">Загрузка…</InlineState>}
         {!loading && events.length === 0 && (
-          <p className="p-2 text-xs text-gray-400">Подходящих событий нет. Можно создать новое из продукта.</p>
+          <EmptyState
+            title="Подходящих событий нет"
+            description="Можно создать новое событие из продукта."
+            className="py-4"
+          />
         )}
         {!loading &&
           events.map((event) => (
-            <div key={event.id} className="flex items-center justify-between gap-2 border-b border-gray-100 px-3 py-2 last:border-0">
+            <div key={event.id} className="flex items-center justify-between gap-2 border-b border-aspectum-border-subtle px-3 py-2 last:border-0">
               <div className="min-w-0">
-                <p className="truncate text-sm text-gray-900">{label(event.title, event.id)}</p>
-                <p className="flex items-center gap-1.5 text-xs text-gray-400">
+                <p className="truncate text-sm text-aspectum-text">{label(event.title, event.id)}</p>
+                <p className="flex items-center gap-1.5 text-xs text-aspectum-text-disabled">
                   {event.city_display_name || 'без города'}
                   {event.suggested && <Badge tone="green">похоже</Badge>}
                   {!event.is_show && <Badge tone="gray">скрыто</Badge>}
                 </p>
               </div>
-              <button
+              <Button
                 type="button"
+                variant="primary"
+                size="sm"
+                className="shrink-0"
                 disabled={Boolean(busyId)}
-                onClick={() => merge(event)}
-                className="shrink-0 rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-blue-700 disabled:opacity-50"
+                onClick={() => setMergeTarget(event)}
               >
                 {busyId === event.id ? 'Сливаем…' : 'Слить'}
-              </button>
+              </Button>
             </div>
           ))}
       </div>
-    </div>
+      <ConfirmModal
+        open={!!mergeTarget}
+        onClose={() => setMergeTarget(null)}
+        onConfirm={merge}
+        title="Слить с событием?"
+        message={mergeTarget && (product.event_id_replaced
+          ? `Слить с «${label(mergeTarget.title)}»? Текущее событие продукта («${label(product.linked_event_title)}») будет скрыто.`
+          : `Слить с «${label(mergeTarget.title)}»? Текст события останется вашим, цены и билеты придут от поставщика.`)}
+        confirmLabel="Слить"
+        loading={Boolean(busyId)}
+      />
+    </Panel>
   );
 }
 
 function CreatePanel({ product, cities, creating, onCreate, onCancel }) {
   const [cityId, setCityId] = useState(product.suggested_city_id || '');
   return (
-    <div className="mt-3 rounded-lg border border-gray-200 bg-gray-50 p-3">
-      <p className="mb-2 text-xs text-gray-600">
+    <Panel tone="muted" className="mt-3 p-3">
+      <p className="mb-2 text-xs text-aspectum-text-subtle">
         Поставщик — не город: выберите город Aspectum, где находится это место
         {product.location_text ? <> (адрес поставщика: <b>{product.location_text}</b>)</> : null}.
         {product.suggested_city_id ? ' Город подобран по адресу — проверьте.' : ' По адресу город определить не удалось.'}
         {' '}Без города событие будет скрыто.
       </p>
       <div className="flex flex-wrap items-center gap-2">
-        <select value={cityId} onChange={(e) => setCityId(e.target.value)} className={`${inputClass} sm:max-w-xs`}>
+        <Select value={cityId} onChange={(e) => setCityId(e.target.value)} className="sm:max-w-xs">
           <option value="">— город не выбран —</option>
           {cities.map((city) => (
             <option key={city.id} value={city.id}>{label(city.name, city.id)}</option>
           ))}
-        </select>
-        <button
+        </Select>
+        <Button
           type="button"
+          variant="primary"
+          size="sm"
           disabled={creating}
           onClick={() => onCreate(product, cityId)}
-          className="rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-blue-700 disabled:opacity-50"
         >
           {creating ? 'Создаём…' : 'Создать событие'}
-        </button>
-        <button type="button" onClick={onCancel} className="text-xs text-gray-500 hover:text-gray-700">Отмена</button>
+        </Button>
+        <Button type="button" variant="ghost" size="sm" onClick={onCancel}>Отмена</Button>
       </div>
-    </div>
+    </Panel>
   );
 }
 
@@ -151,11 +160,11 @@ function ProductCard({ product, cities, mergeOpen, onToggleMerge, createOpen, on
   const linked = Boolean(product.linked_event_id);
   const supplierOwned = linked && product.sync_event_content;
   return (
-    <article className="rounded-xl border border-gray-200 bg-white p-4">
+    <Panel as="article" className="p-4">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">
-          <h3 className="text-sm font-semibold text-gray-900 truncate">{label(product.title, product.external_id)}</h3>
-          <p className="mt-1 flex flex-wrap items-center gap-1.5 text-xs text-gray-500">
+          <Heading level={3} size="xs" className="truncate">{label(product.title, product.external_id)}</Heading>
+          <p className="mt-1 flex flex-wrap items-center gap-1.5 text-xs text-aspectum-text-muted">
             <span>{product.location_text || product.city_display_name || 'место не указано'}</span>
             <span>·</span>
             <span>{product.connection_name}</span>
@@ -163,11 +172,11 @@ function ProductCard({ product, cities, mergeOpen, onToggleMerge, createOpen, on
               {product.is_enabled ? 'продажи включены' : 'продажи выключены'}
             </Badge>
             {!linked && <Badge tone="gray">нет события</Badge>}
-            {supplierOwned && <Badge tone="sky">событие от поставщика</Badge>}
+            {supplierOwned && <Badge tone="info">событие от поставщика</Badge>}
             {linked && !supplierOwned && <Badge tone="green">слит с вашим событием</Badge>}
           </p>
           {linked && (
-            <p className="mt-1 text-xs text-gray-500">
+            <p className="mt-1 text-xs text-aspectum-text-muted">
               Событие: «{label(product.linked_event_title, product.linked_event_id)}»
             </p>
           )}
@@ -175,28 +184,20 @@ function ProductCard({ product, cities, mergeOpen, onToggleMerge, createOpen, on
 
         <div className="flex shrink-0 gap-2">
           {!linked && (
-            <button
-              type="button"
-              onClick={onToggleCreate}
-              className="rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50"
-            >
+            <Button type="button" variant="outline" size="sm" onClick={onToggleCreate}>
               {createOpen ? 'Закрыть' : 'Создать событие…'}
-            </button>
+            </Button>
           )}
           {(!linked || supplierOwned) && (
-            <button
-              type="button"
-              onClick={onToggleMerge}
-              className="rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-blue-700"
-            >
+            <Button type="button" variant="primary" size="sm" onClick={onToggleMerge}>
               {mergeOpen ? 'Закрыть' : 'Слить с существующим…'}
-            </button>
+            </Button>
           )}
         </div>
       </div>
 
       {linked && !supplierOwned && (
-        <p className="mt-2 text-xs text-gray-400">
+        <p className="mt-2 text-xs text-aspectum-text-disabled">
           Чтобы отвязать или вернуть текст поставщику, откройте это событие в каталоге событий → вкладка «Мета» → «Бронирование у поставщика».
         </p>
       )}
@@ -210,7 +211,7 @@ function ProductCard({ product, cities, mergeOpen, onToggleMerge, createOpen, on
           onError={onError}
         />
       )}
-    </article>
+    </Panel>
   );
 }
 
@@ -291,13 +292,13 @@ export default function ExternalProductsLinkingPage() {
 
   return (
     <Layout>
-      <CatalogPageHeader
+      <PageHeader
         title="Внешние продукты → Привязка к событиям"
         description="Продукты поставщика (Ventrata) приходят сюда сами. Здесь вы решаете, какому событию каталога они принадлежат."
       />
 
-      <section className="mb-5 rounded-xl border border-blue-100 bg-blue-50/50 p-4 text-sm text-gray-700">
-        <p className="font-semibold text-gray-900">Как это работает — что куда нажимать</p>
+      <Panel tone="info" className="mb-5 p-4 text-sm text-aspectum-text-strong">
+        <p className="font-semibold text-aspectum-text">Как это работает — что куда нажимать</p>
         <ol className="mt-2 list-decimal space-y-1 pl-5">
           <li>
             Синхронизация поставщика приносит продукты на вкладку <b>«Без события»</b>. В каталог приложения они сами
@@ -321,67 +322,61 @@ export default function ExternalProductsLinkingPage() {
             без кнопки бронирования.
           </li>
         </ol>
-        <p className="mt-2 text-xs text-gray-500">
+        <p className="mt-2 text-xs text-aspectum-text-muted">
           Отвязать продукт или вернуть текст поставщику: каталог событий → нужное событие → вкладка «Мета».{' '}
-          <Link to="/catalog/external-products" className="text-blue-700 underline">
+          <Link to="/catalog/external-products" className="text-aspectum-primary-hover underline">
             Тест брони и availability
           </Link>
         </p>
-      </section>
+      </Panel>
 
       {error && (
-        <div className="mb-4 flex items-start justify-between gap-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+        <Alert tone="error" className="mb-4 flex items-start justify-between gap-3">
           <span>{error}</span>
-          <button type="button" onClick={() => setError(null)} className="text-red-500">×</button>
-        </div>
+          <IconButton label="Закрыть ошибку" onClick={() => setError(null)} variant="ghostDanger">×</IconButton>
+        </Alert>
       )}
       {notice && (
-        <div className="mb-4 flex items-start justify-between gap-3 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-800">
+        <Alert tone="success" className="mb-4 flex items-start justify-between gap-3">
           <span>{notice}</span>
-          <button type="button" onClick={() => setNotice(null)} className="text-emerald-600">×</button>
-        </div>
+          <IconButton label="Закрыть уведомление" onClick={() => setNotice(null)} variant="ghostSuccess">×</IconButton>
+        </Alert>
       )}
 
-      <div className="mb-3 flex flex-wrap gap-2">
-        {TABS.map((item) => (
-          <button
-            key={item.id}
-            type="button"
-            onClick={() => {
-              setTab(item.id);
-              setMergeOpenId('');
-            }}
-            className={`rounded-lg px-3 py-1.5 text-sm font-medium transition ${
-              tab === item.id ? 'bg-blue-600 text-white' : 'border border-gray-300 bg-white text-gray-700 hover:bg-gray-50'
-            }`}
-          >
-            {item.label}
-          </button>
-        ))}
-      </div>
-      {activeTab?.hint && <p className="mb-3 text-xs text-gray-500">{activeTab.hint}</p>}
+      <Tabs
+        items={TABS}
+        value={tab}
+        onChange={(nextTab) => {
+          setTab(nextTab);
+          setMergeOpenId('');
+        }}
+        className="mb-3"
+      />
+      {activeTab?.hint && <p className="mb-3 text-xs text-aspectum-text-muted">{activeTab.hint}</p>}
 
       <div className="mb-4 grid gap-3 sm:grid-cols-2">
-        <input
+        <TextInput
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          className={inputClass}
           placeholder="Поиск по названию, адресу, ID поставщика…"
         />
-        <select value={cityId} onChange={(e) => setCityId(e.target.value)} className={inputClass}>
+        <Select value={cityId} onChange={(e) => setCityId(e.target.value)}>
           <option value="">Все города (назначенные в Aspectum)</option>
           {cities.map((city) => (
             <option key={city.id} value={city.id}>{label(city.name, city.id)}</option>
           ))}
-        </select>
+        </Select>
       </div>
 
       <div className="space-y-3">
-        {loading && <p className="text-sm text-gray-400">Загрузка…</p>}
+        {loading && <EmptyState icon={null} title="Загрузка…" spacing="sm" />}
         {!loading && data.external_products.length === 0 && (
-          <p className="rounded-lg border border-dashed border-gray-300 p-6 text-center text-sm text-gray-400">
-            {tab === 'unlinked' ? 'Все продукты привязаны к событиям.' : 'Продуктов не найдено.'}
-          </p>
+          <EmptyState
+            icon={null}
+            title={tab === 'unlinked' ? 'Все продукты привязаны к событиям.' : 'Продуктов не найдено.'}
+            spacing="md"
+            className="rounded-aspectum-control border border-dashed border-aspectum-border-strong"
+          />
         )}
         {data.external_products.map((product) => (
           <ProductCard
@@ -401,24 +396,26 @@ export default function ExternalProductsLinkingPage() {
       </div>
 
       {data.total_pages > 1 && (
-        <div className="mt-4 flex items-center justify-between text-sm text-gray-600">
-          <button
+        <div className="mt-4 flex items-center justify-between text-sm text-aspectum-text-subtle">
+          <Button
             type="button"
+            variant="outline"
+            size="sm"
             disabled={page <= 1}
             onClick={() => setPage((n) => n - 1)}
-            className="rounded-lg border border-gray-300 bg-white px-3 py-1.5 disabled:opacity-50"
           >
             ← Назад
-          </button>
+          </Button>
           <span>Страница {page} из {data.total_pages} · всего {data.total}</span>
-          <button
+          <Button
             type="button"
+            variant="outline"
+            size="sm"
             disabled={page >= data.total_pages}
             onClick={() => setPage((n) => n + 1)}
-            className="rounded-lg border border-gray-300 bg-white px-3 py-1.5 disabled:opacity-50"
           >
             Вперёд →
-          </button>
+          </Button>
         </div>
       )}
     </Layout>

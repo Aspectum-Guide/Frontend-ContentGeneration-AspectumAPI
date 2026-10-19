@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { FormLabel, Button, Heading, RangeInput, Select, Switch, TextInput } from '@aspectum/ui';
 
 import { ttsAPI } from '../../api/generation';
 
@@ -54,26 +55,7 @@ const cloneSettings = (value) =>
   JSON.parse(JSON.stringify(value || DEFAULT_AUDIO_PROCESSING_SETTINGS));
 
 function Toggle({ checked, onChange, disabled = false, label }) {
-  return (
-    <button
-      type="button"
-      role="switch"
-      aria-checked={checked}
-      aria-label={label}
-      title={label}
-      disabled={disabled}
-      onClick={() => onChange(!checked)}
-      className={`relative h-6 w-11 shrink-0 rounded-full transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${
-        checked ? 'bg-blue-600' : 'bg-gray-300'
-      }`}
-    >
-      <span
-        className={`absolute top-0.5 h-5 w-5 rounded-full bg-white shadow-sm transition-transform ${
-          checked ? 'translate-x-5' : 'translate-x-0.5'
-        }`}
-      />
-    </button>
-  );
+  return <Switch checked={checked} onChange={onChange} disabled={disabled} aria-label={label} />;
 }
 
 function RangeField({ label, value, min, max, step, unit = '', onChange, disabled }) {
@@ -83,20 +65,18 @@ function RangeField({ label, value, min, max, step, unit = '', onChange, disable
   };
 
   return (
-    <label className="grid grid-cols-[minmax(130px,1fr)_minmax(120px,1.5fr)_88px] items-center gap-3 text-xs">
-      <span className="text-gray-600">{label}</span>
-      <input
-        type="range"
+    <FormLabel  size="xs" className="grid grid-cols-[minmax(130px,1fr)_minmax(120px,1.5fr)_88px] items-center gap-3">
+      <span className="text-aspectum-text-subtle">{label}</span>
+      <RangeInput
         value={value}
         min={min}
         max={max}
         step={step}
         disabled={disabled}
         onChange={(event) => commit(event.target.value)}
-        className="w-full accent-blue-600 disabled:opacity-40"
       />
       <span className="flex items-center gap-1">
-        <input
+        <TextInput
           type="number"
           value={value}
           min={min}
@@ -104,19 +84,19 @@ function RangeField({ label, value, min, max, step, unit = '', onChange, disable
           step={step}
           disabled={disabled}
           onChange={(event) => commit(event.target.value)}
-          className="w-16 rounded-md border border-gray-300 px-2 py-1 text-right text-xs disabled:bg-gray-100"
+          className="w-16 px-2 py-1 text-right text-xs"
         />
-        <span className="w-5 text-gray-400">{unit}</span>
+        <span className="w-5 text-aspectum-text-disabled">{unit}</span>
       </span>
-    </label>
+    </FormLabel>
   );
 }
 
 function Module({ title, enabled, onToggle, disabled, children }) {
   return (
-    <div className="border-t border-gray-100 py-4 first:border-t-0 first:pt-0">
+    <div className="border-t border-aspectum-border-subtle py-4 first:border-t-0 first:pt-0">
       <div className="mb-3 flex items-center justify-between gap-3">
-        <h3 className="text-sm font-medium text-gray-800">{title}</h3>
+        <Heading level={3} size="xs" weight="medium" tone="emphasis">{title}</Heading>
         <Toggle
           checked={enabled}
           onChange={onToggle}
@@ -190,16 +170,16 @@ export default function AudioProcessingMixer({ value, onSaved }) {
   const masterDisabled = !draft.enabled;
 
   return (
-    <details className="bg-white rounded-lg border border-gray-200">
-      <summary className="cursor-pointer select-none px-5 py-4 text-base font-semibold text-gray-900">
+    <details className="bg-aspectum-surface rounded-aspectum-control border border-aspectum-border">
+      <summary className="cursor-pointer select-none px-5 py-4 text-base font-semibold text-aspectum-text">
         Обработка звука
       </summary>
 
-      <div className="border-t border-gray-200 px-5 pb-5 pt-4">
+      <div className="border-t border-aspectum-border px-5 pb-5 pt-4">
         <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
           <div>
-            <p className="text-sm font-medium text-gray-800">Применять профиль после TTS</p>
-            <p className="mt-0.5 text-xs text-gray-500">
+            <p className="text-sm font-medium text-aspectum-text-emphasis">Применять профиль после TTS</p>
+            <p className="mt-0.5 text-xs text-aspectum-text-muted">
               {SOURCE_LABELS[value?.source] || value?.source || 'Значения по умолчанию'}
             </p>
           </div>
@@ -211,20 +191,20 @@ export default function AudioProcessingMixer({ value, onSaved }) {
         </div>
 
         {value?.legacy_filter_active ? (
-          <div className="mb-4 border-l-4 border-amber-400 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+          <div className="mb-4 border-l-4 border-aspectum-warning-light bg-aspectum-warning-soft px-3 py-2 text-xs text-aspectum-warning-emphasis">
             После сохранения этот профиль заменит прежнюю серверную FFmpeg-цепочку.
           </div>
         ) : null}
 
         {value?.warning ? (
-          <div className="mb-4 border-l-4 border-red-400 bg-red-50 px-3 py-2 text-xs text-red-700">
+          <div className="mb-4 border-l-4 border-aspectum-danger-light bg-aspectum-danger-soft px-3 py-2 text-xs text-aspectum-danger-strong">
             {value.warning}
           </div>
         ) : null}
 
         <div className="grid grid-cols-1 gap-x-8 lg:grid-cols-2">
           <div>
-            <p className="mb-3 text-xs font-semibold uppercase text-gray-400">Очистка</p>
+            <p className="mb-3 text-xs font-semibold uppercase text-aspectum-text-disabled">Очистка</p>
 
             <Module
               title="Обрезка тишины по краям"
@@ -254,7 +234,7 @@ export default function AudioProcessingMixer({ value, onSaved }) {
             >
               <RangeField label="Подавление" value={draft.noise_reduction.amount_db} min={0.01} max={30} step={0.01} unit="dB" disabled={masterDisabled || !draft.noise_reduction.enabled} onChange={(next) => update(['noise_reduction', 'amount_db'], next)} />
               <RangeField label="Уровень шума" value={draft.noise_reduction.noise_floor_db} min={-80} max={-20} step={1} unit="dB" disabled={masterDisabled || !draft.noise_reduction.enabled} onChange={(next) => update(['noise_reduction', 'noise_floor_db'], next)} />
-              <div className="flex items-center justify-between text-xs text-gray-600">
+              <div className="flex items-center justify-between text-xs text-aspectum-text-subtle">
                 <span>Адаптивно отслеживать шум</span>
                 <Toggle checked={draft.noise_reduction.track_noise} disabled={masterDisabled || !draft.noise_reduction.enabled} onChange={(next) => update(['noise_reduction', 'track_noise'], next)} label="Адаптивное отслеживание шума" />
               </div>
@@ -275,7 +255,7 @@ export default function AudioProcessingMixer({ value, onSaved }) {
           </div>
 
           <div>
-            <p className="mb-3 text-xs font-semibold uppercase text-gray-400">Динамика</p>
+            <p className="mb-3 text-xs font-semibold uppercase text-aspectum-text-disabled">Динамика</p>
 
             <Module
               title="Компрессор"
@@ -313,30 +293,30 @@ export default function AudioProcessingMixer({ value, onSaved }) {
               <RangeField label="Диапазон" value={draft.loudness.range_lu} min={1} max={20} step={0.5} unit="LU" disabled={masterDisabled || !draft.loudness.enabled} onChange={(next) => update(['loudness', 'range_lu'], next)} />
             </Module>
 
-            <div className="border-t border-gray-100 py-4">
-              <h3 className="mb-3 text-sm font-medium text-gray-800">Выходной файл</h3>
+            <div className="border-t border-aspectum-border-subtle py-4">
+              <Heading level={3} size="xs" weight="medium" tone="emphasis" className="mb-3">Выходной файл</Heading>
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-                <label className="text-xs text-gray-600">
+                <FormLabel  size="xs" tone="subtle">
                   Частота
-                  <select value={draft.output.sample_rate_hz} disabled={masterDisabled} onChange={(event) => update(['output', 'sample_rate_hz'], Number(event.target.value))} className="mt-1 w-full rounded-md border border-gray-300 px-2 py-1.5 text-xs disabled:bg-gray-100">
+                  <Select value={draft.output.sample_rate_hz} disabled={masterDisabled} onChange={(event) => update(['output', 'sample_rate_hz'], Number(event.target.value))} className="mt-1 text-xs">
                     <option value={22050}>22 050 Гц</option>
                     <option value={44100}>44 100 Гц</option>
                     <option value={48000}>48 000 Гц</option>
-                  </select>
-                </label>
-                <label className="text-xs text-gray-600">
+                  </Select>
+                </FormLabel>
+                <FormLabel  size="xs" tone="subtle">
                   Битрейт
-                  <select value={draft.output.bitrate_kbps} disabled={masterDisabled} onChange={(event) => update(['output', 'bitrate_kbps'], Number(event.target.value))} className="mt-1 w-full rounded-md border border-gray-300 px-2 py-1.5 text-xs disabled:bg-gray-100">
+                  <Select value={draft.output.bitrate_kbps} disabled={masterDisabled} onChange={(event) => update(['output', 'bitrate_kbps'], Number(event.target.value))} className="mt-1 text-xs">
                     {[64, 96, 128, 192].map((value) => <option key={value} value={value}>{value} кбит/с</option>)}
-                  </select>
-                </label>
-                <label className="text-xs text-gray-600">
+                  </Select>
+                </FormLabel>
+                <FormLabel  size="xs" tone="subtle">
                   Каналы
-                  <select value={draft.output.channels} disabled={masterDisabled} onChange={(event) => update(['output', 'channels'], Number(event.target.value))} className="mt-1 w-full rounded-md border border-gray-300 px-2 py-1.5 text-xs disabled:bg-gray-100">
+                  <Select value={draft.output.channels} disabled={masterDisabled} onChange={(event) => update(['output', 'channels'], Number(event.target.value))} className="mt-1 text-xs">
                     <option value={1}>Моно</option>
                     <option value={2}>Стерео</option>
-                  </select>
-                </label>
+                  </Select>
+                </FormLabel>
               </div>
               <div className="mt-3">
                 <RangeField label="Пауза между главами" value={draft.chapter_gap_seconds} min={0} max={5} step={0.05} unit="с" onChange={(next) => update(['chapter_gap_seconds'], next)} />
@@ -345,18 +325,18 @@ export default function AudioProcessingMixer({ value, onSaved }) {
           </div>
         </div>
 
-        <div className="mt-2 flex flex-wrap items-center justify-between gap-3 border-t border-gray-200 pt-4">
+        <div className="mt-2 flex flex-wrap items-center justify-between gap-3 border-t border-aspectum-border pt-4">
           <div className="text-xs">
-            {error ? <span className="text-red-600">{error}</span> : null}
-            {saved ? <span className="text-green-700">Настройки сохранены</span> : null}
+            {error ? <span className="text-aspectum-danger">{error}</span> : null}
+            {saved ? <span className="text-aspectum-positive-strong">Настройки сохранены</span> : null}
           </div>
           <div className="flex items-center gap-2">
-            <button type="button" disabled={saving} onClick={() => { setDraft(cloneSettings(DEFAULT_AUDIO_PROCESSING_SETTINGS)); setSaved(false); setError(''); }} className="rounded-md border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50">
+            <Button type="button" disabled={saving} onClick={() => { setDraft(cloneSettings(DEFAULT_AUDIO_PROCESSING_SETTINGS)); setSaved(false); setError(''); }} variant="outline" size="md">
               По умолчанию
-            </button>
-            <button type="button" disabled={saving} onClick={save} className="rounded-md bg-blue-600 px-3 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50">
+            </Button>
+            <Button type="button" disabled={saving} onClick={save} variant="primary" size="md">
               {saving ? 'Сохранение...' : 'Сохранить профиль'}
-            </button>
+            </Button>
           </div>
         </div>
       </div>

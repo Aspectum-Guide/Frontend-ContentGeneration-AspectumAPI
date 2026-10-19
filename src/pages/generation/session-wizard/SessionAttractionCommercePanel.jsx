@@ -1,5 +1,6 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { attractionCommerceAPI } from '../../../api/generation';
+import { Button, IconButton, Panel, TextInput } from '@aspectum/ui';
 
 function CommerceItemRow({ label, isDragging, isDropTarget, onDragStart, onDragOver, onDragLeave, onDrop, onDragEnd, onDelete }) {
   return (
@@ -10,18 +11,20 @@ function CommerceItemRow({ label, isDragging, isDropTarget, onDragStart, onDragO
       onDragLeave={onDragLeave}
       onDrop={onDrop}
       onDragEnd={onDragEnd}
-      className={`flex items-center gap-2 rounded px-1 py-0.5 text-sm text-gray-600 ${isDragging ? 'opacity-40' : ''} ${isDropTarget ? 'bg-blue-50' : ''}`}
+      className={`flex items-center gap-2 rounded px-1 py-0.5 text-sm text-aspectum-text-subtle ${isDragging ? 'opacity-40' : ''} ${isDropTarget ? 'bg-aspectum-primary-soft' : ''}`}
     >
-      <span className="cursor-grab select-none text-gray-300" title="Перетащить">⠿</span>
+      <span className="cursor-grab select-none text-aspectum-text-faint" title="Перетащить">⠿</span>
       <span className="min-w-0 flex-1 truncate">{label}</span>
-      <button
+      <IconButton
+        label="Удалить"
         type="button"
         onClick={onDelete}
-        className="shrink-0 rounded px-1.5 text-gray-400 hover:bg-red-50 hover:text-red-600"
-        title="Удалить"
+        variant="ghostDanger"
+        size="iconXs"
+        className="shrink-0"
       >
         ×
-      </button>
+      </IconButton>
     </div>
   );
 }
@@ -38,7 +41,7 @@ export default function SessionAttractionCommercePanel({ sessionId, attractionId
   const dragItineraryIdRef = useRef(null);
   const dragInclusionIdRef = useRef(null);
 
-  const load = async () => {
+  const load = useCallback(async () => {
     if (!sessionId || !attractionId) return;
     const [a, b] = await Promise.all([
       attractionCommerceAPI.listItinerary(sessionId, attractionId),
@@ -46,9 +49,9 @@ export default function SessionAttractionCommercePanel({ sessionId, attractionId
     ]);
     setItinerary(a.data?.results || []);
     setInclusions(b.data?.results || []);
-  };
+  }, [sessionId, attractionId]);
 
-  useEffect(() => { load().catch(() => {}); }, [sessionId, attractionId]);
+  useEffect(() => { load().catch(() => {}); }, [load]);
 
   const deleteItinerary = async (id) => {
     await attractionCommerceAPI.deleteItinerary(sessionId, attractionId, id);
@@ -92,7 +95,7 @@ export default function SessionAttractionCommercePanel({ sessionId, attractionId
 
   return (
     <div className="grid gap-3 md:grid-cols-2">
-      <div className="rounded-lg border border-gray-200 p-3">
+      <Panel className="p-3">
         <p className="mb-2 text-sm font-semibold">Маршрут гида</p>
 
         {itinerary.map((x) => (
@@ -111,23 +114,24 @@ export default function SessionAttractionCommercePanel({ sessionId, attractionId
         ))}
 
         <div className="mt-2 flex gap-2">
-          <input
+          <TextInput
             value={name}
             onChange={(e) => setName(e.target.value)}
             placeholder="Новая точка"
-            className="min-w-0 flex-1 rounded border px-2 py-1 text-sm"
+            className="min-w-0 flex-1"
           />
-          <button
+          <Button
             type="button"
             onClick={async () => { if (name.trim()) { await attractionCommerceAPI.addItinerary(sessionId, attractionId, { name: { ru: name } }); setName(''); load(); } }}
-            className="rounded bg-blue-600 px-2 text-sm text-white"
+            variant="primary"
+            size="md"
           >
             +
-          </button>
+          </Button>
         </div>
-      </div>
+      </Panel>
 
-      <div className="rounded-lg border border-gray-200 p-3">
+      <Panel className="p-3">
         <p className="mb-2 text-sm font-semibold">Что включено</p>
 
         {inclusions.map((x) => (
@@ -146,21 +150,22 @@ export default function SessionAttractionCommercePanel({ sessionId, attractionId
         ))}
 
         <div className="mt-2 flex gap-2">
-          <input
+          <TextInput
             value={included}
             onChange={(e) => setIncluded(e.target.value)}
             placeholder="Новый пункт"
-            className="min-w-0 flex-1 rounded border px-2 py-1 text-sm"
+            className="min-w-0 flex-1"
           />
-          <button
+          <Button
             type="button"
             onClick={async () => { if (included.trim()) { await attractionCommerceAPI.addInclusion(sessionId, attractionId, { kind: 'included', text: { ru: included } }); setIncluded(''); load(); } }}
-            className="rounded bg-blue-600 px-2 text-sm text-white"
+            variant="primary"
+            size="md"
           >
             +
-          </button>
+          </Button>
         </div>
-      </div>
+      </Panel>
     </div>
   );
 }

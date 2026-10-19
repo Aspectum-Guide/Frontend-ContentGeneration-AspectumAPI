@@ -2,20 +2,19 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { tasksAPI, aiAPI } from '../../api/generation';
 import Layout from '../../components/Layout';
-import DataTable from '../../components/ui/DataTable';
-import Modal from '../../components/ui/Modal';
+import { Button, Alert, DataTable, Heading, Modal, PageHeader, Panel, ProgressBar, Spinner, formGridClassName } from '@aspectum/ui';
 import { useLayoutActions } from '../../context/useLayoutActions';
 import { parseApiError } from '../../utils/apiError';
 
 const POLL_INTERVAL = 8000;
 
 const STATUS_STYLES = {
-  pending: 'bg-yellow-100 text-yellow-800',
-  processing: 'bg-blue-100 text-blue-800',
-  running: 'bg-blue-100 text-blue-800',
-  completed: 'bg-green-100 text-green-800',
-  failed: 'bg-red-100 text-red-800',
-  cancelled: 'bg-gray-100 text-gray-500',
+  pending: 'bg-aspectum-caution-muted text-aspectum-caution-emphasis',
+  processing: 'bg-aspectum-primary-muted text-aspectum-primary-strong',
+  running: 'bg-aspectum-primary-muted text-aspectum-primary-strong',
+  completed: 'bg-aspectum-positive-muted text-aspectum-positive-emphasis',
+  failed: 'bg-aspectum-danger-muted text-aspectum-danger-emphasis',
+  cancelled: 'bg-aspectum-surface-subtle text-aspectum-text-muted',
 };
 
 const STATUS_LABELS = {
@@ -219,11 +218,11 @@ export default function MyTasks() {
       label: 'Тип задачи',
       render: (type, row) => (
         <div>
-          <div className="text-sm font-medium text-gray-900">
+          <div className="text-sm font-medium text-aspectum-text">
             {row.task_type_display || type || '—'}
           </div>
           {row.session_id && (
-            <div className="text-xs text-gray-400 font-mono mt-0.5">
+            <div className="text-xs text-aspectum-text-disabled font-mono mt-0.5">
               Сессия: {String(row.session_id).slice(0, 12)}…
             </div>
           )}
@@ -234,9 +233,9 @@ export default function MyTasks() {
       key: 'status',
       label: 'Статус',
       render: (status, row) => (
-        <span className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold ${STATUS_STYLES[status] || 'bg-gray-100 text-gray-600'}`}>
+        <span className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold ${STATUS_STYLES[status] || 'bg-aspectum-surface-subtle text-aspectum-text-subtle'}`}>
           {(status === 'running' || status === 'processing') && (
-            <span className="animate-spin w-2.5 h-2.5 border-2 border-current border-t-transparent rounded-full inline-block" />
+            <Spinner size="xs" className="w-2.5 h-2.5 border-2 border-current" />
           )}
           {row.status_display || STATUS_LABELS[status] || status}
         </span>
@@ -248,25 +247,23 @@ export default function MyTasks() {
       render: (progress) =>
         progress != null ? (
           <div className="flex items-center gap-2 min-w-[100px]">
-            <div className="flex-1 bg-gray-200 rounded-full h-1.5">
-              <div className="bg-blue-500 h-1.5 rounded-full transition-all" style={{ width: `${progress}%` }} />
-            </div>
-            <span className="text-xs text-gray-500 shrink-0">{progress}%</span>
+            <ProgressBar value={progress} size="sm" tone="focus" label="Прогресс задачи" className="flex-1" />
+            <span className="text-xs text-aspectum-text-muted shrink-0">{progress}%</span>
           </div>
-        ) : <span className="text-gray-300">—</span>,
+        ) : <span className="text-aspectum-text-faint">—</span>,
     },
     {
       key: 'current_step',
       label: 'Текущий шаг',
-      className: 'text-xs text-gray-500 max-w-xs',
+      className: 'text-xs text-aspectum-text-muted max-w-xs',
       render: (step) => step
         ? <span className="truncate block" title={step}>{step}</span>
-        : <span className="text-gray-300">—</span>,
+        : <span className="text-aspectum-text-faint">—</span>,
     },
     {
       key: 'created_at',
       label: 'Создана',
-      className: 'whitespace-nowrap text-xs text-gray-500',
+      className: 'whitespace-nowrap text-xs text-aspectum-text-muted',
       render: (v) => v ? new Date(v).toLocaleString('ru-RU') : '—',
     },
   ];
@@ -302,31 +299,30 @@ export default function MyTasks() {
 
   return (
     <Layout>
-      <div className="mb-6 flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Задачи генерации</h1>
-          <p className="mt-1 text-sm text-gray-500">
+      <PageHeader
+        title="Задачи генерации"
+        description={(
+          <>
             Автообновление каждые {POLL_INTERVAL / 1000} сек.
             {hasActive && (
-              <span className="ml-2 inline-flex items-center gap-1 text-blue-600">
-                <span className="w-1.5 h-1.5 bg-blue-500 rounded-full animate-pulse inline-block" />
+              <span className="ml-2 inline-flex items-center gap-1 text-aspectum-primary">
+                <span className="w-1.5 h-1.5 bg-aspectum-focus rounded-full animate-pulse inline-block" />
                 Есть активные
               </span>
             )}
             {lastUpdated && (
-              <span className="ml-2 text-gray-400">
+              <span className="ml-2 text-aspectum-text-disabled">
                 · {lastUpdated.toLocaleTimeString('ru-RU')}
               </span>
             )}
-          </p>
-        </div>
-        <button
-          onClick={() => loadTasks()}
-          className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
-        >
-          ↻ Обновить
-        </button>
-      </div>
+          </>
+        )}
+        secondaryActions={[{
+          key: 'refresh',
+          label: '↻ Обновить',
+          onClick: () => loadTasks(),
+        }]}
+      />
 
       <DataTable
         columns={columns}
@@ -340,16 +336,17 @@ export default function MyTasks() {
         searchPlaceholder="Поиск по типу, шагу..."
         onRowClick={openDetails}
         actions={(row) => (
-          <button
+          <Button
             type="button"
             onClick={(e) => {
               e.stopPropagation();
               openDetails(row);
             }}
-            className="px-3 py-1.5 text-xs font-medium text-blue-700 bg-blue-50 hover:bg-blue-100 rounded-md transition-colors"
+            variant="softStrong"
+            size="sm"
           >
             Подробнее
-          </button>
+          </Button>
         )}
       />
 
@@ -360,19 +357,17 @@ export default function MyTasks() {
         size="xl"
       >
         {detailsError && (
-          <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">
-            {detailsError}
-          </div>
+          <Alert tone="error" className="mb-4">{detailsError}</Alert>
         )}
 
         {detailsLoading && !taskDetails ? (
-          <div className="py-8 flex items-center justify-center text-sm text-gray-500">
-            <span className="animate-spin inline-block w-4 h-4 border-2 border-gray-400 border-t-transparent rounded-full mr-2" />
+          <div className="py-8 flex items-center justify-center text-sm text-aspectum-text-muted gap-2">
+            <Spinner />
             Загрузка информации о задаче...
           </div>
         ) : taskDetails ? (
           <div className="space-y-4 text-sm">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <div className={formGridClassName()}>
               <InfoRow label="ID задачи" value={taskDetails.id || '—'} mono />
               <InfoRow label="Celery Task ID" value={taskDetails.celery_task_id || '—'} mono />
               <InfoRow label="ID сессии" value={taskDetails.session_id || '—'} mono />
@@ -387,81 +382,83 @@ export default function MyTasks() {
             </div>
 
             {taskDetails.error_message && (
-              <section className="rounded-lg border border-red-200 bg-red-50 p-3">
-                <h3 className="text-sm font-semibold text-red-800 mb-2">Ошибка</h3>
-                <pre className="text-xs text-red-700 whitespace-pre-wrap break-words">{taskDetails.error_message}</pre>
-              </section>
+              <Alert tone="error">
+                <Heading level={3} size="xs" className="mb-2">Ошибка</Heading>
+                <pre className="text-xs whitespace-pre-wrap break-words">{taskDetails.error_message}</pre>
+              </Alert>
             )}
 
-            <section className="rounded-lg border border-gray-200 p-3">
-              <h3 className="text-sm font-semibold text-gray-900 mb-2">Логи / шаги выполнения</h3>
+            <Panel as="section" className="p-3">
+              <Heading level={3} size="xs" className="mb-2">Логи / шаги выполнения</Heading>
               {extractTaskLogs(taskDetails).length > 0 ? (
-                <div className="max-h-56 overflow-auto rounded border border-gray-200 bg-gray-50 p-2">
+                <div className="max-h-56 overflow-auto rounded border border-aspectum-border bg-aspectum-surface-muted p-2">
                   {extractTaskLogs(taskDetails).map((line, idx) => (
-                    <div key={`${idx}-${line.slice(0, 20)}`} className="font-mono text-xs text-gray-700 py-0.5">
+                    <div key={`${idx}-${line.slice(0, 20)}`} className="font-mono text-xs text-aspectum-text-strong py-0.5">
                       {line}
                     </div>
                   ))}
                 </div>
               ) : (
-                <p className="text-xs text-gray-500">Логи не были переданы сервером для этой задачи.</p>
+                <p className="text-xs text-aspectum-text-muted">Логи не были переданы сервером для этой задачи.</p>
               )}
-            </section>
+            </Panel>
 
-            <section className="rounded-lg border border-gray-200 p-3">
-              <h3 className="text-sm font-semibold text-gray-900 mb-2">result_data (полный JSON)</h3>
-              <pre className="text-xs text-gray-700 whitespace-pre-wrap break-words bg-gray-50 rounded border border-gray-200 p-2 max-h-64 overflow-auto">
+            <Panel as="section" className="p-3">
+              <Heading level={3} size="xs" className="mb-2">result_data (полный JSON)</Heading>
+              <pre className="text-xs text-aspectum-text-strong whitespace-pre-wrap break-words bg-aspectum-surface-muted rounded border border-aspectum-border p-2 max-h-64 overflow-auto">
                 {JSON.stringify(taskDetails.result_data ?? null, null, 2)}
               </pre>
-            </section>
+            </Panel>
 
             {taskDetails.status === 'completed' && APPLY_TASK_TYPES[taskDetails.task_type] && (
-              <section className="rounded-lg border border-blue-200 bg-blue-50 p-3 space-y-2">
-                <h3 className="text-sm font-semibold text-blue-900">Применить к сессии</h3>
-                <p className="text-xs text-blue-800">
+              <Panel as="section" tone="info" className="p-3 space-y-2">
+                <Heading level={3} size="xs" tone="primary">Применить к сессии</Heading>
+                <p className="text-xs text-aspectum-primary-strong">
                   Генерация только сохраняет JSON в задачу. Чтобы записи появились в сессии,
                   нажмите кнопку ниже (в визарде это происходит автоматически после генерации).
                 </p>
                 {applyMessage && (
                   <div
-                    className={`text-xs rounded-md px-3 py-2 ${
+                    className={`text-xs rounded-aspectum-compact px-3 py-2 ${
                       applyMessage.type === 'error'
-                        ? 'bg-red-100 text-red-800 border border-red-200'
-                        : 'bg-green-100 text-green-800 border border-green-200'
+                        ? 'bg-aspectum-danger-muted text-aspectum-danger-emphasis border border-aspectum-danger-border'
+                        : 'bg-aspectum-positive-muted text-aspectum-positive-emphasis border border-aspectum-positive-border'
                     }`}
                   >
                     {applyMessage.text}
                   </div>
                 )}
                 <div className="flex flex-wrap gap-2">
-                  <button
+                  <Button
                     type="button"
                     onClick={applyTaskResultToSession}
                     disabled={applyingTask}
-                    className="px-3 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 disabled:opacity-60"
+                    variant="primary"
+                    size="md"
                   >
                     {applyingTask ? 'Применение…' : APPLY_TASK_TYPES[taskDetails.task_type].label}
-                  </button>
+                  </Button>
                   {taskDetails.session_id && (
                     <Link
                       to={`/generation/${taskDetails.session_id}`}
-                      className="px-3 py-2 text-sm font-medium text-blue-700 border border-blue-300 rounded-md hover:bg-blue-100"
+                      className="px-3 py-2 text-sm font-medium text-aspectum-primary-hover border border-aspectum-primary-border-strong rounded-aspectum-compact hover:bg-aspectum-primary-muted"
                     >
                       Открыть сессию
                     </Link>
                   )}
                 </div>
-              </section>
+              </Panel>
             )}
 
             <div className="flex justify-end pt-1">
-              <button
+              <Button
                 type="button"
                 onClick={() => loadTaskDetails(selectedTaskId)}
-                className="px-3 py-2 text-sm font-medium text-gray-700 border border-gray-300 rounded-md hover:bg-gray-50"
+                variant="outline"
+                size="md"
               >
                 Обновить детали
-              </button>
+              </Button>
             </div>
           </div>
         ) : null}
@@ -472,9 +469,9 @@ export default function MyTasks() {
 
 function InfoRow({ label, value, mono = false }) {
   return (
-    <div className="rounded-md border border-gray-200 px-3 py-2 bg-gray-50">
-      <div className="text-xs text-gray-500 mb-1">{label}</div>
-      <div className={`text-sm text-gray-900 break-all ${mono ? 'font-mono text-xs' : ''}`}>
+    <div className="rounded-aspectum-compact border border-aspectum-border px-3 py-2 bg-aspectum-surface-muted">
+      <div className="text-xs text-aspectum-text-muted mb-1">{label}</div>
+      <div className={`text-sm text-aspectum-text break-all ${mono ? 'font-mono text-xs' : ''}`}>
         {value}
       </div>
     </div>

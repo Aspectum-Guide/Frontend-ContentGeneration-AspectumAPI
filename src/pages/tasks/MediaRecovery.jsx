@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import Layout from '../../components/Layout';
 import { mediaRecoveryAPI } from '../../api/mediaRecovery';
 import { parseApiError } from '../../utils/apiError';
+import { Alert, Button, ConfirmModal, EmptyState, PageContainer, PageHeader, SectionHeader, Spinner, Tabs } from '@aspectum/ui';
 
 const KIND_LABELS = {
   event_audio_guide_track: 'Опубликовано',
@@ -48,33 +49,34 @@ function TrackCard({ track, onAttached }) {
     : `сессия ${track.context.session_uuid?.slice(0, 8)}…`;
 
   return (
-    <div className="border border-gray-200 rounded-lg p-4 mb-3 bg-white">
+    <div className="border border-aspectum-border rounded-aspectum-control p-4 mb-3 bg-aspectum-surface">
       <div className="flex items-center justify-between mb-2">
         <div>
-          <span className="text-xs font-medium px-2 py-0.5 rounded bg-gray-100 text-gray-700 mr-2">
+          <span className="text-xs font-medium px-2 py-0.5 rounded bg-aspectum-surface-subtle text-aspectum-text-strong mr-2">
             {KIND_LABELS[track.kind]}
           </span>
           <span className="font-medium">{contextLabel}</span>
-          <span className="text-gray-500 ml-2">язык: {langLabel(track.language)}</span>
+          <span className="text-aspectum-text-muted ml-2">язык: {langLabel(track.language)}</span>
         </div>
-        <span className="text-xs text-gray-400">трек {track.track_id.slice(0, 8)}…</span>
+        <span className="text-xs text-aspectum-text-disabled">трек {track.track_id.slice(0, 8)}…</span>
       </div>
 
-      {error && <div className="text-red-600 text-sm mb-2">{error}</div>}
+      {error && <div className="text-aspectum-danger text-sm mb-2">{error}</div>}
 
       <div className="space-y-2">
         {track.candidates.map((c) => (
           <div key={c.id} className="flex items-center gap-3">
             <audio controls src={c.url} className="h-8" style={{ maxWidth: 300 }} />
-            <button
+            <Button
               type="button"
               disabled={attaching !== null}
               onClick={() => handleAttach(c.id)}
-              className="text-sm px-3 py-1 rounded bg-blue-600 text-white disabled:opacity-50 hover:bg-blue-700"
+              variant="primary"
+              size="md"
             >
               {attaching === c.id ? 'Привязываю…' : 'Это оно — привязать'}
-            </button>
-            <span className="text-xs text-gray-400 truncate" style={{ maxWidth: 260 }}>
+            </Button>
+            <span className="text-xs text-aspectum-text-disabled truncate" style={{ maxWidth: 260 }}>
               {c.path}
             </span>
           </div>
@@ -100,10 +102,10 @@ function FilePlayer({ file }) {
   return (
     <div className="flex items-center gap-3">
       <audio controls src={file.url} className="h-8" style={{ maxWidth: 280 }} />
-      <span className="text-xs px-2 py-0.5 rounded bg-gray-100 text-gray-700">
+      <span className="text-xs px-2 py-0.5 rounded bg-aspectum-surface-subtle text-aspectum-text-strong">
         {langLabel(file.language)}
       </span>
-      <span className="text-xs text-gray-400 truncate" style={{ maxWidth: 220 }}>
+      <span className="text-xs text-aspectum-text-disabled truncate" style={{ maxWidth: 220 }}>
         {file.path}
       </span>
     </div>
@@ -134,33 +136,34 @@ function RecoverableGroup({ group, onChanged }) {
   if (tracks.length === 0 || files.length === 0) return null;
 
   return (
-    <div className="border border-amber-200 bg-amber-50 rounded-lg p-4 mb-3">
+    <div className="border border-aspectum-warning-border bg-aspectum-warning-soft rounded-aspectum-control p-4 mb-3">
       <div className="font-medium mb-1">{groupTitle(group)}</div>
-      <p className="text-xs text-gray-500 mb-3">
+      <p className="text-xs text-aspectum-text-muted mb-3">
         В этой {group.kind === 'event' ? 'публикации' : 'сессии'} есть недостающие треки и
         неслинкованные файлы рядом — послушай и привяжи нужный файл к нужному языку.
       </p>
 
-      {error && <div className="text-red-600 text-sm mb-2">{error}</div>}
+      {error && <div className="text-aspectum-danger text-sm mb-2">{error}</div>}
 
       <div className="space-y-3">
         {tracks.map((t) => (
-          <div key={t.track_id} className="flex flex-wrap items-center gap-2 bg-white border border-gray-200 rounded p-2">
-            <span className="text-xs font-medium px-2 py-0.5 rounded bg-gray-100 text-gray-700">
+          <div key={t.track_id} className="flex flex-wrap items-center gap-2 bg-aspectum-surface border border-aspectum-border rounded p-2">
+            <span className="text-xs font-medium px-2 py-0.5 rounded bg-aspectum-surface-subtle text-aspectum-text-strong">
               {langLabel(t.language)}
             </span>
-            <span className="text-xs text-gray-400">трек {t.track_id.slice(0, 8)}…</span>
-            <span className="text-xs text-gray-400">→</span>
+            <span className="text-xs text-aspectum-text-disabled">трек {t.track_id.slice(0, 8)}…</span>
+            <span className="text-xs text-aspectum-text-disabled">→</span>
             {files.map((f) => (
-              <button
+              <Button
                 key={f.id}
                 type="button"
                 disabled={attachingFile !== null}
                 onClick={() => handleAttach(f.id, t)}
-                className="text-xs px-2 py-1 rounded bg-blue-600 text-white disabled:opacity-50 hover:bg-blue-700"
+                variant="primary"
+                size="sm"
               >
                 {attachingFile === f.id ? 'Привязываю…' : `привязать ${langLabel(f.language)}`}
-              </button>
+              </Button>
             ))}
           </div>
         ))}
@@ -174,53 +177,57 @@ function RecoverableGroup({ group, onChanged }) {
 }
 
 function CleanupGroup({ group, onDeleted }) {
-  const [deleting, setDeleting] = useState(null);
-  const [error, setError] = useState(null);
   const [files, setFiles] = useState(group.files);
+  const [deleteTarget, setDeleteTarget] = useState(null);
 
-  const handleDelete = async (fileId) => {
-    if (!window.confirm('Удалить этот файл насовсем? Отменить нельзя.')) return;
-    setDeleting(fileId);
-    setError(null);
+  const handleDelete = async () => {
+    if (!deleteTarget) return;
     try {
-      await mediaRecoveryAPI.deleteOrphanAudio(fileId);
-      setFiles((prev) => prev.filter((f) => f.id !== fileId));
+      await mediaRecoveryAPI.deleteOrphanAudio(deleteTarget.id);
+      setFiles((prev) => prev.filter((f) => f.id !== deleteTarget.id));
+      setDeleteTarget(null);
       onDeleted();
     } catch (err) {
-      setError(parseApiError(err, 'Не удалось удалить файл'));
-    } finally {
-      setDeleting(null);
+      throw new Error(parseApiError(err, 'Не удалось удалить файл'));
     }
   };
 
   if (files.length === 0) return null;
 
   return (
-    <div className="border border-gray-200 rounded-lg p-4 mb-3 bg-white">
+    <div className="border border-aspectum-border rounded-aspectum-control p-4 mb-3 bg-aspectum-surface">
       <div className="font-medium mb-1">{groupTitle(group)}</div>
-      <p className="text-xs text-gray-500 mb-3">
+      <p className="text-xs text-aspectum-text-muted mb-3">
         {group.kind === 'session' && group.context.session_exists === false
           ? 'Сессия удалена — эти файлы больше некуда привязывать.'
           : 'Сломанных треков в этой группе нет — файлы, судя по всему, старые/лишние копии.'}
       </p>
 
-      {error && <div className="text-red-600 text-sm mb-2">{error}</div>}
-
       <div className="space-y-2">
         {files.map((f) => (
           <div key={f.id} className="flex items-center gap-3">
             <FilePlayer file={f} />
-            <button
+            <Button
+              variant="danger"
+              size="sm"
               type="button"
-              disabled={deleting !== null}
-              onClick={() => handleDelete(f.id)}
-              className="text-xs px-2 py-1 rounded bg-red-600 text-white disabled:opacity-50 hover:bg-red-700 ml-auto"
+              onClick={() => setDeleteTarget(f)}
+              className="ml-auto"
             >
-              {deleting === f.id ? 'Удаляю…' : 'Удалить'}
-            </button>
+              Удалить
+            </Button>
           </div>
         ))}
       </div>
+      <ConfirmModal
+        open={!!deleteTarget}
+        onClose={() => setDeleteTarget(null)}
+        onConfirm={handleDelete}
+        title="Удалить файл?"
+        message="Файл будет удалён без возможности восстановления."
+        confirmLabel="Удалить"
+        danger
+      />
     </div>
   );
 }
@@ -251,7 +258,7 @@ function BrokenTracksTab() {
 
   return (
     <div>
-      <p className="text-sm text-gray-500 mb-4">
+      <p className="text-sm text-aspectum-text-muted mb-4">
         Треки аудиогидов, у которых сломалась ссылка на файл при инциденте 04.09.2026
         (см. docs/INCIDENT_2026-09-04_dedupe_media_fk_loss.md) и которые нельзя было
         восстановить автоматически — несколько языков одного гида сломались разом,
@@ -259,12 +266,10 @@ function BrokenTracksTab() {
         и нажми «Это оно» на правильном.
       </p>
 
-      {loading && <div className="text-gray-500">Загрузка…</div>}
-      {error && <div className="text-red-600 mb-4">{error}</div>}
+      {loading && <EmptyState icon={<Spinner size="sm" />} title="Загрузка…" spacing="sm" />}
+      {error && <div className="text-aspectum-danger mb-4">{error}</div>}
       {!loading && !error && tracks.length === 0 && (
-        <div className="text-green-700 bg-green-50 border border-green-200 rounded-lg p-4">
-          Сломанных треков не осталось.
-        </div>
+        <Alert tone="success">Сломанных треков не осталось.</Alert>
       )}
 
       {tracks.map((track) => (
@@ -294,28 +299,26 @@ function UnlinkedAudioTab() {
 
   useEffect(() => { load(); }, [load]);
 
-  if (loading) return <div className="text-gray-500">Загрузка…</div>;
-  if (error) return <div className="text-red-600">{error}</div>;
+  if (loading) return <EmptyState icon={<Spinner size="sm" />} title="Загрузка…" spacing="sm" />;
+  if (error) return <div className="text-aspectum-danger">{error}</div>;
   if (!data) return null;
 
   const { recoverable, cleanup, recoverable_file_count: recCount, cleanup_file_count: cleanupCount } = data;
 
   return (
     <div>
-      <p className="text-sm text-gray-500 mb-4">
+      <p className="text-sm text-aspectum-text-muted mb-4">
         Аудиофайлы, на которые не ссылается ни один трек/гид/пост — они пережили инцидент
         04.09.2026 (или просто остались от старых версий), но потерялись со стороны БД.
         «Можно восстановить» — рядом есть трек без аудио, которому этот файл, возможно,
         принадлежит. «Мусор» — привязывать некуда, кандидат на удаление.
       </p>
 
-      {error && <div className="text-red-600 mb-4">{error}</div>}
+      {error && <div className="text-aspectum-danger mb-4">{error}</div>}
 
-      <h2 className="text-sm font-semibold text-gray-700 mt-4 mb-2">
-        Можно восстановить {recCount ? `(${recCount} файлов)` : ''}
-      </h2>
+      <SectionHeader title={`Можно восстановить ${recCount ? `(${recCount} файлов)` : ''}`} size="xs" className="mt-4 mb-2" />
       {(!recoverable || recoverable.length === 0) && (
-        <div className="text-gray-500 text-sm mb-4">Групп с недостающими треками рядом нет.</div>
+        <div className="text-aspectum-text-muted text-sm mb-4">Групп с недостающими треками рядом нет.</div>
       )}
       {recoverable?.map((group) => (
         <RecoverableGroup
@@ -325,11 +328,9 @@ function UnlinkedAudioTab() {
         />
       ))}
 
-      <h2 className="text-sm font-semibold text-gray-700 mt-6 mb-2">
-        Мусор — можно удалить {cleanupCount ? `(${cleanupCount} файлов)` : ''}
-      </h2>
+      <SectionHeader title={`Мусор — можно удалить ${cleanupCount ? `(${cleanupCount} файлов)` : ''}`} size="xs" className="mt-6 mb-2" />
       {(!cleanup || cleanup.length === 0) && (
-        <div className="text-gray-500 text-sm">Лишних файлов нет.</div>
+        <div className="text-aspectum-text-muted text-sm">Лишних файлов нет.</div>
       )}
       {cleanup?.map((group) => (
         <CleanupGroup
@@ -353,28 +354,18 @@ export default function MediaRecovery() {
 
   return (
     <Layout>
-      <div className="max-w-4xl mx-auto py-6">
-        <h1 className="text-xl font-semibold mb-1">Восстановление аудио</h1>
+      <PageContainer maxWidth="wide" centered className="py-6">
+        <PageHeader title="Восстановление аудио" titleSize="sm" spacing="none" />
 
-        <div className="flex gap-1 border-b border-gray-200 mb-4 mt-3">
-          {TABS.map((t) => (
-            <button
-              key={t.key}
-              type="button"
-              onClick={() => setActiveTab(t.key)}
-              className={`text-sm px-3 py-2 border-b-2 -mb-px ${
-                activeTab === t.key
-                  ? 'border-blue-600 text-blue-700 font-medium'
-                  : 'border-transparent text-gray-500 hover:text-gray-700'
-              }`}
-            >
-              {t.label}
-            </button>
-          ))}
-        </div>
+        <Tabs
+          className="mb-4 mt-3 border-b border-aspectum-border"
+          items={TABS.map(({ key, label }) => ({ id: key, label }))}
+          value={activeTab}
+          onChange={setActiveTab}
+        />
 
         {tab.render()}
-      </div>
+      </PageContainer>
     </Layout>
   );
 }

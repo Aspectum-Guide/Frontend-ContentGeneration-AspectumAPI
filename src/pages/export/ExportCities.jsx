@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import Layout from '../../components/Layout';
 import { exportAPI } from '../../api/generation';
+import { Button, Alert, PageContainer, PageHeader, Panel, SectionHeader, Spinner } from '@aspectum/ui';
 
 export default function ExportCities() {
   const [loading, setLoading] = useState(false);
@@ -38,56 +39,48 @@ export default function ExportCities() {
 
   return (
     <Layout>
-      <div className="max-w-lg">
-        <div className="mb-6">
-          <h1 className="text-2xl font-bold text-gray-900">Экспорт городов</h1>
-          <p className="mt-1 text-sm text-gray-500">
-            Скачать данные всех городов в формате JSON
-          </p>
-        </div>
+      <PageContainer maxWidth="narrow">
+        <PageHeader
+          title="Экспорт городов"
+          description="Скачать данные всех городов в формате JSON"
+        />
 
-        <div className="bg-white rounded-xl border border-gray-200 p-6">
-          <div className="mb-6">
-            <div className="flex items-start gap-4">
-              <div className="text-4xl">🏙️</div>
-              <div>
-                <h3 className="font-semibold text-gray-900">Экспорт городов (JSON)</h3>
-                <p className="text-sm text-gray-500 mt-1">
-                  Экспортирует все города с многоязычными названиями, описаниями,
-                  координатами и тегами.
-                </p>
-              </div>
-            </div>
-          </div>
+        <Panel className="p-6">
+          <SectionHeader
+            title="Экспорт городов (JSON)"
+            description="Экспортирует все города с многоязычными названиями, описаниями, координатами и тегами."
+            icon={<span className="text-4xl" aria-hidden="true">🏙️</span>}
+            level={3}
+            size="sm"
+            className="mb-6"
+          />
 
           {error && (
-            <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">
-              {error}
-            </div>
+            <Alert tone="error">{error}</Alert>
           )}
 
           {success && (
-            <div className="mb-4 p-3 bg-green-50 border border-green-200 rounded-lg text-sm text-green-700">
-              ✅ Файл успешно скачан
-            </div>
+            <Alert tone="success" className="mb-4">Файл успешно скачан</Alert>
           )}
 
-          <button
+          <Button type="button"
             onClick={handleExport}
             disabled={loading}
-            className="w-full py-3 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            variant="primary"
+            size="md"
+            className="w-full"
           >
             {loading ? (
               <span className="flex items-center justify-center gap-2">
-                <span className="animate-spin inline-block w-4 h-4 border-2 border-white border-t-transparent rounded-full" />
+                <Spinner size="sm" className="border-aspectum-on-accent" />
                 Подготовка...
               </span>
             ) : (
               '⬇ Скачать города (JSON)'
             )}
-          </button>
-        </div>
-      </div>
+          </Button>
+        </Panel>
+      </PageContainer>
     </Layout>
   );
 }

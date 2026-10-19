@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import Modal from '../../../components/ui/Modal';
+import { FormLabel, Alert, Button, Checkbox, Heading, InlineState, Modal } from '@aspectum/ui';
 import { eventSlotAvailabilitiesAPI } from '../../../api/booking';
 import { getTicketTypeLabel } from '../shared/labels';
 import { formatSlotLabel } from './bookingSetupPricingHelpers';
@@ -125,129 +125,111 @@ export default function SyncSlotTicketTypesModal({
       size="lg"
     >
       <div className="space-y-4">
-        <p className="text-sm text-gray-600">
+        <p className="text-sm text-aspectum-text-subtle">
           Отмеченным слотам будут проставлены отмеченные типы билетов
           (текущая привязка на слоте заменяется целиком).
         </p>
 
         {error && (
-          <div className="text-sm text-red-600 bg-red-50 rounded-lg px-3 py-2">{error}</div>
+          <Alert tone="error">{error}</Alert>
         )}
         {result && !result.fail && (
-          <div className="text-sm text-emerald-700 bg-emerald-50 rounded-lg px-3 py-2">
+          <Alert tone="success" className="text-sm">
             Готово — обновлено {result.ok} слот(ов).
-          </div>
+          </Alert>
         )}
 
         <div>
-          <h3 className="text-sm font-semibold text-gray-800 mb-1.5">Типы билетов</h3>
+          <Heading level={3} size="xs" tone="emphasis" className="mb-1.5">Типы билетов</Heading>
           {ticketTypeOptions?.length ? (
             <div className="flex flex-wrap gap-2">
               {ticketTypeOptions.map((tt) => {
                 const id = String(tt.id);
                 const checked = selectedTypeIds.has(id);
                 return (
-                  <label
+                  <FormLabel
                     key={id}
-                    className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg border text-sm cursor-pointer transition-colors ${
+                    className={`flex items-center gap-1.5 px-2.5 py-1 rounded-aspectum-control border text-sm cursor-pointer transition-colors ${
                       checked
-                        ? 'bg-blue-50 border-blue-300 text-blue-700'
-                        : 'bg-white border-gray-200 text-gray-600 hover:bg-gray-50'
+                        ? 'bg-aspectum-primary-soft border-aspectum-primary-border-strong text-aspectum-primary-hover'
+                        : 'bg-aspectum-surface border-aspectum-border text-aspectum-text-subtle hover:bg-aspectum-surface-muted'
                     }`}
                   >
-                    <input
-                      type="checkbox"
+                    <Checkbox
                       checked={checked}
                       onChange={() => toggleType(id)}
-                      className="w-3.5 h-3.5 rounded border-gray-300 text-blue-600"
+                      className="w-3.5 h-3.5 rounded border-aspectum-border-strong text-aspectum-primary"
                     />
                     {getTicketTypeLabel(tt)}
-                  </label>
+                  </FormLabel>
                 );
               })}
             </div>
           ) : (
-            <p className="text-sm text-gray-400">Нет доступных глобальных типов билетов для этого события</p>
+            <InlineState tone="disabled">Нет доступных глобальных типов билетов для этого события</InlineState>
           )}
         </div>
 
         <div>
           <div className="flex items-center justify-between mb-1.5">
-            <h3 className="text-sm font-semibold text-gray-800">
+            <Heading level={3} size="xs" tone="emphasis">
               Слоты без типов ({sortedSlots.length})
-            </h3>
+            </Heading>
             <div className="flex gap-3 text-xs">
-              <button
-                type="button"
-                onClick={() => setSelectedSlotIds(new Set(sortedSlots.map((s) => String(s.id))))}
-                className="text-blue-600 hover:underline"
-              >
+              <Button type="button" variant="link" size="sm" onClick={() => setSelectedSlotIds(new Set(sortedSlots.map((s) => String(s.id))))}>
                 Все
-              </button>
-              <button
-                type="button"
-                onClick={() => setSelectedSlotIds(new Set())}
-                className="text-blue-600 hover:underline"
-              >
+              </Button>
+              <Button type="button" variant="link" size="sm" onClick={() => setSelectedSlotIds(new Set())}>
                 Ничего
-              </button>
+              </Button>
             </div>
           </div>
           {sortedSlots.length ? (
             <>
-              <div className="max-h-64 overflow-y-auto divide-y divide-gray-100 border border-gray-200 rounded-lg">
+              <div className="max-h-64 overflow-y-auto divide-y divide-aspectum-border-subtle border border-aspectum-border rounded-aspectum-control">
                 {sortedSlots.map((s) => {
                   const id = String(s.id);
                   const checked = selectedSlotIds.has(id);
                   return (
-                    <label
+                    <FormLabel
                       key={id}
-                      className="flex items-center gap-3 px-3 py-2 text-sm cursor-pointer hover:bg-gray-50"
+                       size="sm" interactive  layout="rowLoose" className="px-3 py-2 hover:bg-aspectum-surface-muted"
                     >
-                      <input
-                        type="checkbox"
+                      <Checkbox
                         checked={checked}
                         onChange={() => toggleSlot(id)}
-                        className="w-4 h-4 rounded border-gray-300 text-blue-600"
+                        className="w-4 h-4 rounded border-aspectum-border-strong text-aspectum-primary"
                       />
-                      <span className="text-gray-800">{formatSlotLabel(s.slot_datetime)}</span>
+                      <span className="text-aspectum-text-emphasis">{formatSlotLabel(s.slot_datetime)}</span>
                       {s.available_seats != null && (
-                        <span className="text-gray-400 ml-auto">{s.available_seats} мест</span>
+                        <span className="text-aspectum-text-disabled ml-auto">{s.available_seats} мест</span>
                       )}
-                    </label>
+                    </FormLabel>
                   );
                 })}
               </div>
-              <div className="text-xs text-gray-400 mt-1">
+              <div className="text-xs text-aspectum-text-disabled mt-1">
                 Отмечено: {selectedSlotIds.size} из {sortedSlots.length}
               </div>
             </>
           ) : (
-            <p className="text-sm text-gray-400">Все открытые слоты уже с типами</p>
+            <p className="text-sm text-aspectum-text-disabled">Все открытые слоты уже с типами</p>
           )}
         </div>
 
         {saving && (
-          <div className="text-xs text-gray-500">
+          <div className="text-xs text-aspectum-text-muted">
             Синхронизировано {progress} из {selectedSlotIds.size}...
           </div>
         )}
 
         <div className="flex justify-end gap-2 pt-1">
-          <button
-            onClick={onClose}
-            disabled={saving}
-            className="px-4 py-2 text-sm text-gray-600 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors disabled:opacity-50"
-          >
+          <Button type="button" variant="secondary" size="md" onClick={onClose} disabled={saving}>
             {result && !result.fail ? 'Закрыть' : 'Отмена'}
-          </button>
-          <button
-            onClick={handleSync}
-            disabled={saving || !selectedSlotIds.size || !selectedTypeIds.size}
-            className="px-4 py-2 text-sm text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors"
-          >
+          </Button>
+          <Button type="button" variant="primary" size="md" onClick={handleSync} disabled={saving || !selectedSlotIds.size || !selectedTypeIds.size}>
             {saving ? 'Синхронизация...' : `Синхронизировать (${selectedSlotIds.size})`}
-          </button>
+          </Button>
         </div>
       </div>
     </Modal>

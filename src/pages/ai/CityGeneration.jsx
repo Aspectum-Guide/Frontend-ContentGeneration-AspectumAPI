@@ -2,12 +2,27 @@ import { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Layout from '../../components/Layout';
 import { aiAPI, tasksAPI } from '../../api/generation';
-import AiGenerationQualitySettings, {
+import AiGenerationQualitySettings from '../../components/generation/AiGenerationQualitySettings.jsx';
+import {
   DEFAULT_GENERATION_MODE,
   buildGenerationPayloadFields,
-} from '../../components/generation/AiGenerationQualitySettings.jsx';
+  clampGenerationCount,
+} from '../../components/generation/generationUtils';
+import {
+  Alert,
+  Button,
+  Field,
+  Modal,
+  PageHeader,
+  Panel,
+  ProgressBar,
+  SectionHeader,
+  Select,
+  Spinner,
+  Textarea,
+} from '@aspectum/ui';
 import AiGenerationCountField from '../../components/generation/AiGenerationCountField.jsx';
-import { clampGenerationCount } from '../../components/generation/AiGenerationCountField.jsx';
+import { useAppLanguages } from '../../hooks/useAppLanguages';
 import {
   pollGenerationTask,
   isPollCancelledError,
@@ -16,15 +31,6 @@ import {
 
 const POLL_INTERVAL = 4000;
 const POLL_MAX_WAIT_MS = 20 * 60 * 1000;
-
-const SOURCE_LANGUAGES = [
-  { value: 'ru', label: 'Русский' },
-  { value: 'en', label: 'English' },
-  { value: 'it', label: 'Italiano' },
-  { value: 'fr', label: 'Français' },
-  { value: 'de', label: 'Deutsch' },
-  { value: 'es', label: 'Español' },
-];
 
 function getLocalizedText(value, preferredLanguage = 'ru', fallback = '—') {
   if (value == null) return fallback;
@@ -61,6 +67,7 @@ function getLocalizedText(value, preferredLanguage = 'ru', fallback = '—') {
 
 export default function CityGeneration() {
   const navigate = useNavigate();
+  const { languages: appLanguages } = useAppLanguages();
 
   const [prompt, setPrompt] = useState('');
   const [requestedCount, setRequestedCount] = useState(5);
@@ -243,39 +250,26 @@ export default function CityGeneration() {
 
   return (
     <Layout>
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold text-gray-900">Генерация городов</h1>
-        <p className="mt-1 text-sm text-gray-500">
-          Первичная генерация данных городов с помощью ИИ на одном исходном языке
-        </p>
-      </div>
+      <PageHeader
+        title="Генерация городов"
+        description="Первичная генерация данных городов с помощью ИИ на одном исходном языке"
+      />
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Form */}
-        <div className="bg-white rounded-xl border border-gray-200 p-6">
-          <h2 className="text-base font-semibold text-gray-900 mb-4">
-            Параметры генерации
-          </h2>
+        <Panel className="p-6">
+          <SectionHeader title="Параметры генерации" size="sm" className="mb-4" />
 
           <form onSubmit={handleStart} className="space-y-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Промпт для генерации
-              </label>
-
-              <textarea
+            <Field label="Промпт для генерации" hint="Количество задаётся отдельным полем ниже — не нужно писать число в промпте.">
+              <Textarea
                 value={prompt}
                 onChange={(e) => setPrompt(e.target.value)}
                 rows={8}
                 placeholder="Например: города Италии для культурного туризма с кратким описанием"
                 disabled={isRunning}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm resize-none focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none disabled:bg-gray-50"
               />
-
-              <p className="text-xs text-gray-400 mt-1">
-                Количество задаётся отдельным полем ниже — не нужно писать число в промпте.
-              </p>
-            </div>
+            </Field>
 
             <AiGenerationCountField
               id="city-gen-count"
@@ -286,28 +280,19 @@ export default function CityGeneration() {
               disabled={isRunning}
             />
 
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Язык первичной генерации
-              </label>
-
-              <select
+            <Field label="Язык первичной генерации" hint="Модель должна вернуть поля name, description и country только с этим языковым ключом.">
+              <Select
                 value={sourceLanguage}
                 onChange={(e) => setSourceLanguage(e.target.value)}
                 disabled={isRunning}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none"
               >
-                {SOURCE_LANGUAGES.map((language) => (
-                  <option key={language.value} value={language.value}>
-                    {language.label}
+                {appLanguages.map((language) => (
+                  <option key={language.code} value={language.code}>
+                    {language.label || language.name || language.code}
                   </option>
                 ))}
-              </select>
-
-              <p className="text-xs text-gray-400 mt-1">
-                Модель должна вернуть поля name, description и country только с этим языковым ключом.
-              </p>
-            </div>
+              </Select>
+            </Field>
 
             <AiGenerationQualitySettings
               generationMode={generationMode}
@@ -318,155 +303,163 @@ export default function CityGeneration() {
               advancedDisabled={!advancedGenerationAvailable}
             />
 
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Провайдер ИИ <span className="text-gray-400 font-normal">(по умолчанию)</span>
-              </label>
-
-              <select
+            <Field label="Провайдер ИИ (по умолчанию)">
+              <Select
                 value={provider}
                 onChange={(e) => setProvider(e.target.value)}
                 disabled={isRunning}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none"
               >
                 <option value="">По умолчанию</option>
                 <option value="openai">OpenAI</option>
                 <option value="ollama">Ollama (локально)</option>
-              </select>
-            </div>
+              </Select>
+            </Field>
 
             {error && (
-              <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">
-                {error}
-              </div>
+              <Alert tone="error">{error}</Alert>
             )}
 
             {saveSuccess && (
-              <div className="p-3 bg-green-50 border border-green-200 rounded-lg text-sm text-green-700">
-                {saveSuccess}
-              </div>
+              <Alert tone="success">{saveSuccess}</Alert>
             )}
 
-            <button
+            <Button
               type="submit"
               disabled={isRunning || !prompt.trim()}
-              className="w-full py-3 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              variant="primary"
+              size="md"
+              className="w-full"
             >
               {isRunning ? (
                 <span className="flex items-center justify-center gap-2">
-                  <span className="animate-spin inline-block w-4 h-4 border-2 border-white border-t-transparent rounded-full" />
+                  <Spinner size="sm" className="border-aspectum-on-accent" />
                   Генерация...
                 </span>
               ) : (
                 '🤖 Запустить генерацию'
               )}
-            </button>
+            </Button>
           </form>
-        </div>
+        </Panel>
 
         {/* Status & Result */}
         <div className="space-y-4">
           {taskStatus && (
-            <div className="bg-white rounded-xl border border-gray-200 p-6">
-              <h2 className="text-base font-semibold text-gray-900 mb-4">
-                Статус задачи
-              </h2>
+            <Panel className="p-6">
+              <SectionHeader title="Статус задачи" size="sm" className="mb-4" />
 
               <div className="flex items-center justify-between mb-2">
                 <span
                   className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold ${
                     isDone
-                      ? 'bg-green-100 text-green-800'
+                      ? 'bg-aspectum-positive-muted text-aspectum-positive-emphasis'
                       : isFailed
-                        ? 'bg-red-100 text-red-800'
-                        : 'bg-blue-100 text-blue-800'
+                        ? 'bg-aspectum-danger-muted text-aspectum-danger-emphasis'
+                        : 'bg-aspectum-primary-muted text-aspectum-primary-strong'
                   }`}
                 >
                   {isRunning && (
-                    <span className="animate-spin inline-block w-2.5 h-2.5 border-2 border-current border-t-transparent rounded-full" />
+                    <Spinner size="xs" className="w-2.5 h-2.5 border-2 border-current" />
                   )}
                   {isDone ? '✅ Завершено' : isFailed ? '❌ Ошибка' : '⏳ Выполняется'}
                 </span>
 
                 {progress != null && (
-                  <span className="text-sm text-gray-500">{progress}%</span>
+                  <span className="text-sm text-aspectum-text-muted">{progress}%</span>
                 )}
               </div>
 
               {progress != null && (
-                <div className="w-full bg-gray-200 rounded-full h-2 mb-3">
-                  <div
-                    className="bg-blue-500 h-2 rounded-full transition-all duration-300"
-                    style={{ width: `${progress}%` }}
-                  />
-                </div>
+                <ProgressBar value={progress} tone="focus" label="Прогресс генерации города" className="mb-3" />
               )}
 
               {taskStatus.current_step && (
-                <p className="text-sm text-gray-600">{taskStatus.current_step}</p>
+                <p className="text-sm text-aspectum-text-subtle">{taskStatus.current_step}</p>
               )}
 
               {taskStatus.error_message && (
-                <p className="text-sm text-red-600 mt-2">{taskStatus.error_message}</p>
+                <p className="text-sm text-aspectum-danger mt-2">{taskStatus.error_message}</p>
               )}
-            </div>
+            </Panel>
           )}
 
           {result && (
-            <div className="bg-white rounded-xl border border-gray-200 p-6">
-              <div className="flex items-center justify-between mb-3">
-                <h2 className="text-base font-semibold text-gray-900">Результат</h2>
+            <Panel className="p-6">
+              <SectionHeader
+                title="Результат"
+                size="sm"
+                className="mb-3"
+                actions={(
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    size="sm"
+                    onClick={() => {
+                      const json = JSON.stringify(result, null, 2);
+                      const blob = new Blob([json], { type: 'application/json' });
+                      const url = URL.createObjectURL(blob);
+                      const a = document.createElement('a');
+                      a.href = url;
+                      a.download = `cities-${Date.now()}.json`;
+                      a.click();
+                      URL.revokeObjectURL(url);
+                    }}
+                  >
+                    ⬇ Скачать JSON
+                  </Button>
+                )}
+              />
 
-                <button
-                  onClick={() => {
-                    const json = JSON.stringify(result, null, 2);
-                    const blob = new Blob([json], { type: 'application/json' });
-                    const url = URL.createObjectURL(blob);
-                    const a = document.createElement('a');
-                    a.href = url;
-                    a.download = `cities-${Date.now()}.json`;
-                    a.click();
-                    URL.revokeObjectURL(url);
-                  }}
-                  className="px-3 py-1.5 text-xs font-medium text-gray-600 bg-gray-100 rounded-md hover:bg-gray-200"
-                >
-                  ⬇ Скачать JSON
-                </button>
-              </div>
-
-              <pre className="text-xs bg-gray-50 rounded-lg p-3 overflow-auto max-h-64 text-gray-700">
+              <pre className="text-xs bg-aspectum-surface-muted rounded-aspectum-control p-3 overflow-auto max-h-64 text-aspectum-text-strong">
                 {JSON.stringify(result, null, 2)}
               </pre>
-            </div>
+            </Panel>
           )}
         </div>
       </div>
 
-      {resultModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center">
-          <div
-            className="absolute inset-0 bg-black/50"
-            onClick={() => !creatingSessions && setResultModalOpen(false)}
-          />
-
-          <div className="relative bg-white rounded-xl shadow-xl w-full max-w-2xl p-6 space-y-4">
-            <h3 className="text-lg font-semibold text-gray-900">
-              Результат генерации
-            </h3>
-
-            <p className="text-sm text-gray-700">
+      <Modal
+        open={resultModalOpen}
+        onClose={creatingSessions ? undefined : () => setResultModalOpen(false)}
+        title="Результат генерации"
+        size="lg"
+        footer={(
+          <>
+            <Button
+              type="button"
+              disabled={creatingSessions}
+              onClick={() => setResultModalOpen(false)}
+              variant="outline"
+              size="md"
+            >
+              Отмена
+            </Button>
+            <Button
+              type="button"
+              disabled={creatingSessions || cityCount === 0}
+              onClick={handleCreateSessions}
+              variant="primary"
+              size="md"
+            >
+              {creatingSessions ? 'Создание...' : 'Создать черновики в сессии'}
+            </Button>
+          </>
+        )}
+      >
+        <div className="space-y-4">
+            <p className="text-sm text-aspectum-text-strong">
               Города найдены: <span className="font-semibold">{cityCount}</span>
             </p>
 
-            <p className="text-xs text-gray-500">
+            <p className="text-xs text-aspectum-text-muted">
               Язык первичной генерации: <span className="font-semibold">{resultSourceLanguage}</span>
             </p>
 
-            <div className="max-h-56 overflow-auto border border-gray-200 rounded-lg p-3 bg-gray-50">
+            <div className="max-h-56 overflow-auto border border-aspectum-border rounded-aspectum-control p-3 bg-aspectum-surface-muted">
               {resultCities.length === 0 ? (
-                <p className="text-sm text-gray-500">Список городов пуст</p>
+                <p className="text-sm text-aspectum-text-muted">Список городов пуст</p>
               ) : (
-                <ul className="text-sm text-gray-700 space-y-1">
+                <ul className="text-sm text-aspectum-text-strong space-y-1">
                   {resultCities.map((item, idx) => {
                     const city = item?.city || item || {};
                     const name = getLocalizedText(city?.name, resultSourceLanguage);
@@ -481,29 +474,8 @@ export default function CityGeneration() {
                 </ul>
               )}
             </div>
-
-            <div className="flex justify-end gap-2">
-              <button
-                type="button"
-                disabled={creatingSessions}
-                onClick={() => setResultModalOpen(false)}
-                className="px-4 py-2 text-sm border border-gray-300 rounded-lg hover:bg-gray-50"
-              >
-                Отмена
-              </button>
-
-              <button
-                type="button"
-                disabled={creatingSessions || cityCount === 0}
-                onClick={handleCreateSessions}
-                className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-50"
-              >
-                {creatingSessions ? 'Создание...' : 'Создать черновики в сессии'}
-              </button>
-            </div>
-          </div>
         </div>
-      )}
+      </Modal>
     </Layout>
   );
 }

@@ -1,10 +1,12 @@
 import { useEffect, useRef, useState } from 'react';
+import { FormLabel, Alert, Button, ConfirmModal, EmptyState, EntityDraftsPanel, FileButton, IconButton, LocaleEditor, Panel, SectionHeader, Select, SelectableCard, Spinner, Textarea, TextInput } from '@aspectum/ui';
 
 import { audioAPI } from '../../../api/generation';
-import AiGenerationModal, { WizardGenerationActionFooter } from '../../../components/generation/AiGenerationModal.jsx';
+import AiGenerationModal from '../../../components/generation/AiGenerationModal.jsx';
+import { WizardActionFooter as WizardGenerationActionFooter } from '@aspectum/ui';
 import AiGenerationQualitySettings from '../../../components/generation/AiGenerationQualitySettings.jsx';
 
-import { getAttrName, getFlag, normalizeId } from './sessionWizardShared.jsx';
+import { getAttrName, normalizeId } from './sessionWizardShared.jsx';
 
 const getAttractionDisplayName = (attraction) => {
   if (!attraction) return 'Без названия';
@@ -229,13 +231,13 @@ function AttractionAudioTrackPreview({
   if (trackAudioUrl && !trackAudioId) {
     return (
       <div className="space-y-2">
-        <p className="text-xs text-amber-600">
+        <Alert tone="warning" className="text-xs">
           Не удалось загрузить аудио для прослушивания (нет audio_id; защищённое
           воспроизведение недоступно).
-        </p>
+        </Alert>
 
-        <p className="text-xs text-gray-500 break-all">
-          <span className="text-gray-400">URL:</span> {trackAudioUrl}
+        <p className="text-xs text-aspectum-text-muted break-all">
+          <span className="text-aspectum-text-disabled">URL:</span> {trackAudioUrl}
         </p>
       </div>
     );
@@ -244,14 +246,14 @@ function AttractionAudioTrackPreview({
   return (
     <div className="space-y-2">
       {durationLabel ? (
-        <p className="text-xs font-medium text-gray-600">
+        <p className="text-xs font-medium text-aspectum-text-subtle">
           Итоговый аудиофайл: {durationLabel}
         </p>
       ) : null}
 
       {normalizedChapters.length > 0 ? (
-        <div className="space-y-1 rounded-lg border border-gray-200 bg-gray-50 p-2">
-          <p className="text-xs font-medium text-gray-600">Главы и тайм-коды</p>
+        <Panel tone="muted" className="space-y-1 p-2">
+          <p className="text-xs font-medium text-aspectum-text-subtle">Главы и тайм-коды</p>
           <div className="flex flex-wrap gap-2">
             {normalizedChapters.map((chapter, index) => {
               const startLabel = formatAudioDuration(chapter.start_seconds);
@@ -265,50 +267,52 @@ function AttractionAudioTrackPreview({
               return (
                 <div
                   key={`${planItemId || index}-${chapter.start_seconds}`}
-                  className="flex items-stretch overflow-hidden rounded-md border border-blue-100 bg-white shadow-sm"
+                  className="flex items-stretch overflow-hidden rounded-aspectum-compact border border-aspectum-primary-muted bg-aspectum-surface shadow-aspectum-card"
                 >
-                  <button
+                  <Button
                     type="button"
                     onClick={() => seekToChapter(chapter)}
-                    className="px-2 py-1 text-left text-xs text-blue-700 transition hover:bg-blue-50"
                     title={`Перейти к главе: ${title}`}
+                    variant="soft"
+                    size="sm"
                   >
                     <span className="font-semibold">{startLabel}</span>
-                    {endLabel ? <span className="text-blue-400">-{endLabel}</span> : null}
-                    <span className="ml-1 text-gray-700">{title}</span>
-                  </button>
+                    {endLabel ? <span className="text-aspectum-primary-light">-{endLabel}</span> : null}
+                    <span className="ml-1 text-aspectum-text-strong">{title}</span>
+                  </Button>
 
                   {onRegenerateChapter && planItemId ? (
-                    <button
+                    <Button
                       type="button"
                       onClick={() => onRegenerateChapter(planItemId)}
                       disabled={regenBusy}
                       title="Перегенерировать эту главу"
-                      className="border-l border-blue-100 px-2 text-xs text-gray-500 transition hover:bg-blue-50 hover:text-blue-700 disabled:opacity-40 disabled:cursor-not-allowed"
+                      variant="joinedGhost"
+                      size="sm"
                     >
                       {isRegenerating ? '…' : '↻'}
-                    </button>
+                    </Button>
                   ) : null}
                 </div>
               );
             })}
           </div>
-        </div>
+        </Panel>
       ) : (
-        <p className="text-xs text-gray-500">
+        <p className="text-xs text-aspectum-text-muted">
           Тайминги глав пока не сохранены. После перегенерации аудио здесь
           появятся кликабельные переходы по главам.
         </p>
       )}
 
       {loading ? (
-        <p className="text-xs text-gray-600">Загрузка аудио...</p>
+        <p className="text-xs text-aspectum-text-subtle">Загрузка аудио...</p>
       ) : null}
 
       {loadError ? (
-        <p className="text-xs text-red-600">
+        <Alert tone="error" className="text-xs">
           Не удалось загрузить аудио для прослушивания
-        </p>
+        </Alert>
       ) : null}
 
       {!loading && !loadError && previewUrl ? (
@@ -325,7 +329,7 @@ function AttractionAudioTrackPreview({
           <a
             href={previewUrl}
             download={downloadName}
-            className="inline-flex items-center gap-1 text-xs font-medium text-blue-700 hover:text-blue-900"
+            className="inline-flex items-center gap-1 text-xs font-medium text-aspectum-primary-hover hover:text-aspectum-primary-emphasis"
           >
             ⬇ Скачать MP3
           </a>
@@ -344,53 +348,40 @@ function AudioGuideDraftsPanel({
   const currentId = normalizeId(currentAttractionAudioGuide?.id);
 
   return (
-    <div className="p-3 border border-gray-200 rounded-xl bg-gray-50">
-      <div className="flex items-center justify-between mb-2">
-        <p className="text-sm font-medium text-gray-800">
-          Черновики аудиогидов
-        </p>
-
-        <button
-          type="button"
-          onClick={onAddAudioGuide}
-          className="px-2.5 py-1 text-xs font-medium text-blue-700 bg-blue-100 rounded-md hover:bg-blue-200 transition-colors"
-        >
+    <EntityDraftsPanel
+      title="Черновики аудиогидов"
+      items={attractionAudioGuides}
+      emptyText="Пока нет аудиогидов"
+      actions={(
+        <Button type="button" onClick={onAddAudioGuide} variant="softStrong" size="sm">
           + Добавить
-        </button>
-      </div>
-
-      <div className="flex flex-wrap gap-2">
-        {attractionAudioGuides.length === 0 ? (
-          <span className="text-xs text-gray-500">Пока нет аудиогидов</span>
-        ) : (
-          attractionAudioGuides.map((guide, index) => {
-            const guideId = normalizeId(guide.id);
-            const isActive = guideId === currentId;
-
-            return (
-              <button
+        </Button>
+      )}
+      renderItem={(guide, index) => {
+        const guideId = normalizeId(guide.id);
+        const isActive = guideId === currentId;
+        return (
+              <SelectableCard
                 key={guide.id}
-                type="button"
-                onClick={() => {
+                onSelect={() => {
                   if (!isActive) {
                     onSelectAudioGuide?.(guide.id);
                   }
                 }}
-                className={`flex items-center gap-1 px-2 py-1 rounded-lg border text-xs transition-colors ${
+                ariaLabel={getAudioGuideName(guide)}
+                className={`flex items-center gap-1 px-2 py-1 rounded-aspectum-control border text-xs transition-colors ${
                   isActive
-                    ? 'bg-blue-50 border-blue-300 text-blue-700 font-medium'
-                    : 'bg-white border-gray-200 text-gray-700 hover:border-blue-300 hover:bg-blue-50'
+                    ? 'bg-aspectum-primary-soft border-aspectum-primary-border-strong text-aspectum-primary-hover font-medium'
+                    : 'bg-aspectum-surface border-aspectum-border text-aspectum-text-strong hover:border-aspectum-primary-border-strong hover:bg-aspectum-primary-soft'
                 }`}
                 title={getAudioGuideName(guide)}
               >
-                <span className="text-gray-400">{index + 1}.</span>
+                <span className="text-aspectum-text-disabled">{index + 1}.</span>
                 <span>{getAudioGuideName(guide)}</span>
-              </button>
-            );
-          })
-        )}
-      </div>
-    </div>
+              </SelectableCard>
+        );
+      }}
+    />
   );
 }
 
@@ -541,57 +532,47 @@ export function TTSProviderSettingsPanel({
   };
 
   return (
-    <div className="space-y-3 rounded-lg border border-gray-200 bg-white px-3 py-3">
+    <Panel className="space-y-3 px-3 py-3">
       <div>
-        <label className="mb-1 block text-sm font-medium text-gray-800">
+        <FormLabel  layout="block" size="sm" weight="medium" tone="emphasis" spacing="xs">
           Провайдер озвучки
-        </label>
-        <select
-          value={provider}
-          onChange={(event) => onProviderChange?.(event.target.value)}
-          disabled={disabled || providerSettingsLoading}
-          className="w-full rounded-lg border border-gray-300 px-2 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50"
-        >
+        </FormLabel>
+        <Select className="disabled:opacity-50" value={provider} onChange={(event) => onProviderChange?.(event.target.value)} disabled={disabled || providerSettingsLoading}>
           <option value="fish_audio">Fish Audio — S2.1 Pro Free (по умолчанию)</option>
           <option value="elevenlabs">ElevenLabs</option>
-        </select>
+        </Select>
       </div>
 
       {providerSettingsLoading ? (
-        <p className="text-xs text-gray-500">Загружаем настройки TTS…</p>
+        <p className="text-xs text-aspectum-text-muted">Загружаем настройки TTS…</p>
       ) : null}
       {providerSettingsError ? (
-        <p className="text-xs text-amber-700">{providerSettingsError}</p>
+        <Alert tone="warning" className="text-xs">{providerSettingsError}</Alert>
       ) : null}
       {providerConfig?.configured === false ? (
-        <p className="text-xs text-red-600">
+        <Alert tone="error" className="text-xs">
           Ключ этого провайдера не настроен на сервере.
-        </p>
+        </Alert>
       ) : null}
       {provider === 'fish_audio' &&
       modelId !== 's2.1-pro-free' &&
       providerConfig?.credit &&
       Number(providerConfig.credit.credit || 0) <= 0 &&
       !providerConfig.credit.has_free_credit ? (
-        <p className="text-xs text-red-600">
+        <Alert tone="error" className="text-xs">
           На Fish Audio нет доступного API-кредита. Активируйте промо или пополните
           API credit в кабинете Fish Audio.
-        </p>
+        </Alert>
       ) : null}
       {providerConfig?.warning ? (
-        <p className="text-xs text-amber-700">{providerConfig.warning}</p>
+        <Alert tone="warning" className="text-xs">{providerConfig.warning}</Alert>
       ) : null}
 
       {provider === 'fish_audio' ? (
         <>
           <div>
-            <label className="mb-1 block text-sm font-medium text-gray-800">Модель</label>
-            <select
-              value={modelId || 's2.1-pro-free'}
-              onChange={(event) => onModelChange?.(event.target.value)}
-              disabled={disabled}
-              className="w-full rounded-lg border border-gray-300 px-2 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50"
-            >
+            <FormLabel  layout="block" size="sm" weight="medium" tone="emphasis" spacing="xs">Модель</FormLabel>
+            <Select className="disabled:opacity-50" value={modelId || 's2.1-pro-free'} onChange={(event) => onModelChange?.(event.target.value)} disabled={disabled}>
               {(models.length ? models : [
                 { model_id: 's2.1-pro-free', name: 'S2.1 Pro Free', recommended: true },
                 { model_id: 's2-pro', name: 'S2-Pro' },
@@ -602,66 +583,44 @@ export function TTSProviderSettingsPanel({
                   {model.recommended ? ' — рекомендуется' : ''}
                 </option>
               ))}
-            </select>
+            </Select>
           </div>
           <div>
-            <label className="mb-1 block text-sm font-medium text-gray-800">Голос</label>
-            <select
-              value={fishVoiceMode}
-              onChange={(event) => {
-                const nextMode = event.target.value;
-                setFishVoiceMode(nextMode);
-                if (nextMode === 'default') {
-                  onVoiceChange?.('');
-                }
-              }}
-              disabled={disabled}
-              className="w-full rounded-lg border border-gray-300 px-2 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50"
-            >
+            <FormLabel  layout="block" size="sm" weight="medium" tone="emphasis" spacing="xs">Голос</FormLabel>
+            <Select className="disabled:opacity-50" value={fishVoiceMode} onChange={(event) => { const nextMode = event.target.value; setFishVoiceMode(nextMode); if (nextMode === 'default') { onVoiceChange?.(''); } }} disabled={disabled}>
               <option value="default">
                 {projectVoiceLanguages.length
                   ? 'Голос проекта для каждого языка'
                   : 'Стандартный голос Fish Audio'}
               </option>
               <option value="custom">Конкретный голос по Reference ID</option>
-            </select>
+            </Select>
             {fishVoiceMode === 'default' && projectVoiceLanguages.length ? (
-              <p className="mt-1 text-xs text-gray-500">
+              <p className="mt-1 text-xs text-aspectum-text-muted">
                 Сервер сам подберёт голос по языку дорожки:{' '}
                 {projectVoiceLanguages.map((lang) => lang.toUpperCase()).join(', ')}.
               </p>
             ) : null}
             {fishVoiceMode === 'custom' && projectVoiceLanguages.length ? (
-              <p className="mt-1 text-xs text-amber-700">
+              <Alert tone="warning" className="mt-1 text-xs">
                 Этот голос уйдёт на все выбранные языки.
-              </p>
+              </Alert>
             ) : null}
           </div>
           {fishVoiceMode === 'custom' ? (
             <div>
-              <label className="mb-1 block text-sm font-medium text-gray-800">
+              <FormLabel  layout="block" size="sm" weight="medium" tone="emphasis" spacing="xs">
                 Reference ID голоса
-              </label>
-              <input
-                value={voiceId}
-                onChange={(event) => onVoiceChange?.(event.target.value)}
-                disabled={disabled}
-                placeholder="Введите Reference ID из Fish Audio"
-                className="w-full rounded-lg border border-gray-300 px-2 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50"
-              />
+              </FormLabel>
+              <TextInput className="disabled:opacity-50" value={voiceId} onChange={(event) => onVoiceChange?.(event.target.value)} disabled={disabled} placeholder="Введите Reference ID из Fish Audio" />
             </div>
           ) : null}
         </>
       ) : (
         <>
           <div>
-            <label className="mb-1 block text-sm font-medium text-gray-800">Модель</label>
-            <select
-              value={modelId || ''}
-              onChange={(event) => onModelChange?.(event.target.value)}
-              disabled={disabled || elevenLabsLoading}
-              className="w-full rounded-lg border border-gray-300 px-2 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50"
-            >
+            <FormLabel  layout="block" size="sm" weight="medium" tone="emphasis" spacing="xs">Модель</FormLabel>
+            <Select className="disabled:opacity-50" value={modelId || ''} onChange={(event) => onModelChange?.(event.target.value)} disabled={disabled || elevenLabsLoading}>
               {models.length ? (
                 models.map((model) => (
                   <option key={model.model_id} value={model.model_id}>
@@ -671,22 +630,17 @@ export function TTSProviderSettingsPanel({
               ) : (
                 <option value="">Модель ElevenLabs по умолчанию</option>
               )}
-            </select>
+            </Select>
           </div>
-          <label className="block text-sm font-medium text-gray-800">Голос</label>
+          <FormLabel  layout="block" size="sm" weight="medium" tone="emphasis">Голос</FormLabel>
           {elevenLabsLoading ? (
-            <p className="text-xs text-gray-500">Загружаем голоса…</p>
+            <p className="text-xs text-aspectum-text-muted">Загружаем голоса…</p>
           ) : null}
           {displayMessage ? (
-            <p className="text-xs text-amber-700">{displayMessage}</p>
+            <Alert tone="warning" className="text-xs">{displayMessage}</Alert>
           ) : null}
           <div className="flex flex-wrap items-center gap-2">
-            <select
-              value={voiceId || ''}
-              onChange={(event) => onVoiceChange?.(event.target.value)}
-              disabled={voiceSelectDisabledState}
-              className="min-w-[220px] flex-1 rounded-lg border border-gray-300 px-2 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50"
-            >
+            <Select className="min-w-[220px] flex-1 disabled:opacity-50" value={voiceId || ''} onChange={(event) => onVoiceChange?.(event.target.value)} disabled={voiceSelectDisabledState}>
               {!hasVoices ? (
                 <option value="">Голоса недоступны</option>
               ) : (
@@ -696,19 +650,20 @@ export function TTSProviderSettingsPanel({
                   </option>
                 ))
               )}
-            </select>
-            <button
+            </Select>
+            <Button
               type="button"
               onClick={handlePreview}
               disabled={!previewUrl || voiceSelectDisabledState}
-              className="rounded-md border border-gray-200 bg-white px-2.5 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
+              variant="outline"
+              size="sm"
             >
               ▶ Прослушать
-            </button>
+            </Button>
           </div>
         </>
       )}
-    </div>
+    </Panel>
   );
 }
 
@@ -805,6 +760,7 @@ export default function SessionWizardAttractionAudioGuidesBlock({
 }) {
   const audioFileRef = useRef(null);
   const [planImportText, setPlanImportText] = useState('');
+  const [planImportConfirmOpen, setPlanImportConfirmOpen] = useState(false);
   // Провайдер для расстановки ударений: '' = по настройке AI_PROVIDER
   const [stressProvider, setStressProvider] = useState('');
 
@@ -831,10 +787,6 @@ export default function SessionWizardAttractionAudioGuidesBlock({
     onUpdateCurrentAttractionAudioGuidePatch?.(patch);
   };
 
-  const handlePickAudioFile = () => {
-    audioFileRef.current?.click();
-  };
-
   const handleAudioFileChange = (event) => {
     const file = event.target.files?.[0];
     event.target.value = '';
@@ -847,55 +799,43 @@ export default function SessionWizardAttractionAudioGuidesBlock({
   if (!currentAttractionAudioGuide) {
     return (
       <section className="space-y-4">
-        <div className="flex items-center justify-between gap-3">
-          <div>
-            <h2 className="text-lg font-semibold text-gray-900">
-              Аудиогид к достопримечательности
-            </h2>
-
-            <p className="text-sm text-gray-500">
-              Загружайте мультиязычные аудиогиды к достопримечательностям.
-            </p>
-          </div>
-
-          <button
+        <SectionHeader title="Аудиогид к достопримечательности" description="Загружайте мультиязычные аудиогиды к достопримечательностям." actions={<Button
             type="button"
             onClick={onAddAttractionAudioGuide}
-            className="px-3 py-1.5 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors shrink-0"
+            variant="primary"
+            size="md"
           >
             + Добавить
-          </button>
-        </div>
+          </Button>} />
 
         {attractionAudioGuides.length === 0 ? (
-          <div className="text-center py-10 text-gray-400 border border-dashed border-gray-200 rounded-xl bg-gray-50">
-            <div className="text-3xl mb-2">🎧</div>
-
-            <p className="text-sm">
-              {scopedToAttractionId
-                ? 'Для этой достопримечательности пока нет аудиогидов.'
-                : 'Нет аудиогидов. Нажмите «+ Добавить»'}
-            </p>
-          </div>
+          <EmptyState
+            icon="🎧"
+            title={scopedToAttractionId
+              ? 'Для этой достопримечательности пока нет аудиогидов.'
+              : 'Нет аудиогидов'}
+            description={scopedToAttractionId ? 'Добавьте первый аудиогид.' : 'Нажмите «+ Добавить», чтобы начать.'}
+            className="py-10"
+          />
         ) : (
           <div className="space-y-2">
             {attractionAudioGuides.map((guide, idx) => (
               <div
                 key={guide.id}
                 onClick={() => onOpenAttractionAudioGuideDetail?.(guide.id)}
-                className="flex items-center justify-between p-3 bg-white border border-gray-200 rounded-lg hover:border-blue-300 hover:bg-blue-50 cursor-pointer transition-colors"
+                className="flex items-center justify-between p-3 bg-aspectum-surface border border-aspectum-border rounded-aspectum-control hover:border-aspectum-primary-border-strong hover:bg-aspectum-primary-soft cursor-pointer transition-colors"
               >
                 <div className="flex items-center gap-3 min-w-0">
-                  <span className="w-6 h-6 flex items-center justify-center rounded-full bg-gray-100 text-xs font-medium text-gray-600 shrink-0">
+                  <span className="w-6 h-6 flex items-center justify-center rounded-full bg-aspectum-surface-subtle text-xs font-medium text-aspectum-text-subtle shrink-0">
                     {idx + 1}
                   </span>
 
                   <div className="min-w-0">
-                    <div className="text-sm font-medium text-gray-900 truncate">
+                    <div className="text-sm font-medium text-aspectum-text truncate">
                       {getAudioGuideName(guide)}
                     </div>
 
-                    <div className="text-xs text-gray-500">
+                    <div className="text-xs text-aspectum-text-muted">
                       {getAudioGuideBindingLabel(
                         guide,
                         referenceAttractions,
@@ -905,7 +845,7 @@ export default function SessionWizardAttractionAudioGuidesBlock({
                   </div>
                 </div>
 
-                <span className="text-xs text-blue-600 font-medium shrink-0">
+                <span className="text-xs text-aspectum-primary font-medium shrink-0">
                   Открыть →
                 </span>
               </div>
@@ -915,21 +855,23 @@ export default function SessionWizardAttractionAudioGuidesBlock({
 
         {!embedded && (
           <div className="flex justify-between pt-2">
-            <button
+            <Button
               type="button"
               onClick={() => onGoToStep?.(3)}
-              className="px-4 py-2 text-sm text-gray-600 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+              variant="outline"
+              size="md"
             >
               ← Назад
-            </button>
+            </Button>
 
-            <button
+            <Button
               type="button"
               onClick={() => onGoToStep?.(4)}
-              className="px-5 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors"
+              variant="primary"
+              size="md"
             >
               Далее: Публикация →
-            </button>
+            </Button>
           </div>
         )}
       </section>
@@ -977,17 +919,9 @@ export default function SessionWizardAttractionAudioGuidesBlock({
     !attractionAudioGuideSaving &&
     !attractionAudioUploading;
 
-  const handleImportPlanFromText = () => {
+  const importPlanFromText = () => {
     const raw = planImportText.trim();
     if (!raw) return;
-
-    if (planPoints.length > 0) {
-      const confirmed = window.confirm(
-        `Текущий план (${planPoints.length} пункт(ов)) и тексты пунктов для этого языка ` +
-          'будут заменены содержимым из вставленного текста. Продолжить?',
-      );
-      if (!confirmed) return;
-    }
 
     const created = onImportAttractionAudioGuidePlanFromText?.(
       currentLocale.lang,
@@ -1006,28 +940,40 @@ export default function SessionWizardAttractionAudioGuidesBlock({
     onShowNote?.(`Импортировано пунктов плана: ${created}`, 'success');
   };
 
+  const handleImportPlanFromText = () => {
+    if (planPoints.length > 0) {
+      setPlanImportConfirmOpen(true);
+      return;
+    }
+    importPlanFromText();
+  };
+
   return (
     <section className="space-y-4">
       <div className="flex items-center gap-3">
-        <button
+        <IconButton
+          label="Вернуться к списку аудиогидов"
           type="button"
           onClick={() => onSetCurrentAttractionAudioGuide?.(null)}
-          className="w-8 h-8 flex items-center justify-center border border-gray-300 rounded-lg text-gray-500 hover:bg-gray-50 transition-colors"
+          variant="outline"
+          className="w-8 h-8"
         >
           ←
-        </button>
+        </IconButton>
 
-        <span className="text-base font-semibold text-gray-900">
+        <span className="text-base font-semibold text-aspectum-text">
           {getAudioGuideName(currentAttractionAudioGuide)}
         </span>
 
-        <button
+        <Button
           type="button"
           onClick={onDeleteCurrentAttractionAudioGuide}
-          className="ml-auto px-3 py-1 text-xs font-medium text-red-600 bg-red-50 rounded-lg hover:bg-red-100 transition-colors"
+          variant="softDanger"
+          size="sm"
+          className="ml-auto"
         >
           Удалить
-        </button>
+        </Button>
       </div>
 
       <AudioGuideDraftsPanel
@@ -1037,107 +983,42 @@ export default function SessionWizardAttractionAudioGuidesBlock({
         onAddAudioGuide={onAddAttractionAudioGuide}
       />
 
-      <div className="flex items-center gap-1 flex-wrap">
-        {Object.entries(attractionAudioGuideLocaleData || {}).map(
-          ([key, loc]) => {
-            const isActive = key === attractionAudioGuideActiveLocale;
-
-            return (
-              <button
-                key={key}
-                type="button"
-                onClick={() =>
-                  onSetAttractionAudioGuideActiveLocale?.(key)
-                }
-                className={`flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium border transition-all ${
-                  isActive
-                    ? 'bg-blue-600 text-white border-blue-600'
-                    : 'bg-white text-gray-600 border-gray-300 hover:border-blue-400'
-                }`}
-              >
-                <span>{getFlag(loc.code)}</span>
-                <span>{loc.langName}</span>
-              </button>
-            );
-          }
-        )}
-      </div>
+      <LocaleEditor
+        localeData={attractionAudioGuideLocaleData}
+        activeLocale={attractionAudioGuideActiveLocale}
+        onSwitch={onSetAttractionAudioGuideActiveLocale}
+        showStatus={false}
+      />
 
       <main className="space-y-4">
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
+          <FormLabel  layout="block" size="sm" weight="medium" tone="strong" spacing="xs">
             Название ({currentLocale.lang?.toUpperCase() || 'RU'})
-          </label>
+          </FormLabel>
 
-          <input
-            type="text"
-            value={currentLocale.title || ''}
-            onChange={(e) =>
-              onUpdateAttractionAudioGuideLocaleField?.('title', e.target.value)
-            }
-            placeholder="Например: Аудиогид по Колизею"
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-          />
+          <TextInput type="text" value={currentLocale.title || ''} onChange={(e) => onUpdateAttractionAudioGuideLocaleField?.('title', e.target.value) } placeholder="Например: Аудиогид по Колизею" />
         </div>
 
-        <div className="p-3 border border-gray-200 rounded-lg bg-gray-50 space-y-3">
+        <Panel tone="muted" className="p-3 space-y-3">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <FormLabel  layout="block" size="sm" weight="medium" tone="strong" spacing="xs">
               Привязка к достопримечательности
-            </label>
+            </FormLabel>
 
-            <select
-              value={assignedAttractionType}
-              onChange={(e) => {
-                const type = e.target.value;
-
-                updatePatch({
-                  assigned_attraction_type: type,
-
-                  event: null,
-                  event_id: null,
-
-                  attraction: null,
-                  attraction_id: null,
-
-                  session_attraction: null,
-                  session_attraction_id: null,
-                });
-              }}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-            >
+            <Select className="bg-aspectum-surface" value={assignedAttractionType} onChange={(e) => { const type = e.target.value; updatePatch({ assigned_attraction_type: type, event: null, event_id: null, attraction: null, attraction_id: null, session_attraction: null, session_attraction_id: null, }); }}>
               <option value="none">Без достопримечательности</option>
               <option value="database">Достопримечательность из базы</option>
               <option value="draft">Достопримечательность из сессии</option>
-            </select>
+            </Select>
           </div>
 
           {assignedAttractionType === 'database' && (
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <FormLabel  layout="block" size="sm" weight="medium" tone="strong" spacing="xs">
                 Достопримечательность из базы
-              </label>
+              </FormLabel>
 
-              <select
-                value={selectedDatabaseAttractionId}
-                onChange={(e) => {
-                  const attractionId = e.target.value || null;
-
-                  updatePatch({
-                    assigned_attraction_type: 'database',
-
-                    event: attractionId,
-                    event_id: attractionId,
-
-                    attraction: attractionId,
-                    attraction_id: attractionId,
-
-                    session_attraction: null,
-                    session_attraction_id: null,
-                  });
-                }}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-              >
+              <Select className="bg-aspectum-surface" value={selectedDatabaseAttractionId} onChange={(e) => { const attractionId = e.target.value || null; updatePatch({ assigned_attraction_type: 'database', event: attractionId, event_id: attractionId, attraction: attractionId, attraction_id: attractionId, session_attraction: null, session_attraction_id: null, }); }}>
                 <option value="">Выберите достопримечательность из базы</option>
 
                 {referenceAttractions.map((attraction) => (
@@ -1145,42 +1026,23 @@ export default function SessionWizardAttractionAudioGuidesBlock({
                     {getAttractionDisplayName(attraction)}
                   </option>
                 ))}
-              </select>
+              </Select>
 
               {referenceAttractions.length === 0 && (
-                <p className="mt-1 text-xs text-amber-600">
+                <Alert tone="warning" className="mt-1 text-xs">
                   Список достопримечательностей из базы не загружен.
-                </p>
+                </Alert>
               )}
             </div>
           )}
 
           {assignedAttractionType === 'draft' && (
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <FormLabel  layout="block" size="sm" weight="medium" tone="strong" spacing="xs">
                 Достопримечательность из сессии
-              </label>
+              </FormLabel>
 
-              <select
-                value={selectedSessionAttractionId}
-                onChange={(e) => {
-                  const attractionId = e.target.value || null;
-
-                  updatePatch({
-                    assigned_attraction_type: 'draft',
-
-                    session_attraction: attractionId,
-                    session_attraction_id: attractionId,
-
-                    event: null,
-                    event_id: null,
-
-                    attraction: null,
-                    attraction_id: null,
-                  });
-                }}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-              >
+              <Select className="bg-aspectum-surface" value={selectedSessionAttractionId} onChange={(e) => { const attractionId = e.target.value || null; updatePatch({ assigned_attraction_type: 'draft', session_attraction: attractionId, session_attraction_id: attractionId, event: null, event_id: null, attraction: null, attraction_id: null, }); }}>
                 <option value="">Выберите достопримечательность из сессии</option>
 
                 {attractions.map((attraction) => (
@@ -1188,92 +1050,72 @@ export default function SessionWizardAttractionAudioGuidesBlock({
                     {getAttractionDisplayName(attraction)}
                   </option>
                 ))}
-              </select>
+              </Select>
 
               {attractions.length === 0 && (
-                <p className="mt-1 text-xs text-amber-600">
+                <Alert tone="warning" className="mt-1 text-xs">
                   В текущей сессии пока нет достопримечательностей.
-                </p>
+                </Alert>
               )}
             </div>
           )}
-        </div>
+        </Panel>
 
         <div>
           <div className="flex items-center justify-between mb-1">
-            <label className="text-sm font-medium text-gray-700">
+            <FormLabel  size="sm" weight="medium" tone="strong">
               План содержания ({currentLocale.lang?.toUpperCase() || 'RU'})
-            </label>
+            </FormLabel>
 
           </div>
 
           <div className="space-y-2 mb-3">
             <div>
-              <label className="block text-xs font-medium text-gray-600 mb-1">
+              <FormLabel  layout="block" size="xs" weight="medium" tone="subtle" spacing="xs">
                 Количество пунктов плана
-              </label>
-              <input
-                type="number"
-                min={1}
-                max={20}
-                value={planItemsCountRaw ?? 6}
-                onChange={(e) =>
-                  onSetAttractionAudioGuidePlanItemsCount?.(
-                    currentGuideId,
-                    planContentLang,
-                    e.target.value,
-                  )
-                }
-                disabled={planGenerationControlsDisabled}
-                className="block w-24 px-3 py-1.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
-              />
+              </FormLabel>
+              <TextInput className="block w-24 disabled:opacity-50 disabled:cursor-not-allowed" type="number" min={1} max={20} value={planItemsCountRaw ?? 6} onChange={(e) => onSetAttractionAudioGuidePlanItemsCount?.( currentGuideId, planContentLang, e.target.value, ) } disabled={planGenerationControlsDisabled} />
             </div>
 
-            <div className="rounded-lg border border-gray-200 bg-white p-3 space-y-2">
+            <Panel className="p-3 space-y-2">
               <div>
-                <label
+                <FormLabel
                   htmlFor="audio-guide-plan-import"
-                  className="block text-xs font-medium text-gray-700"
+                   layout="block" size="xs" weight="medium" tone="strong"
                 >
                   Вставить готовый план и тексты
-                </label>
-                <p className="mt-0.5 text-[11px] leading-snug text-gray-500">
+                </FormLabel>
+                <p className="mt-0.5 text-[11px] leading-snug text-aspectum-text-muted">
                   Строки с «# Заголовок» станут пунктами плана, а текст под каждым
                   заголовком — основным текстом соответствующего пункта. Заполнит план
                   для текущего языка ({currentLocale.lang?.toUpperCase() || 'RU'}).
                 </p>
               </div>
 
-              <textarea
-                id="audio-guide-plan-import"
-                rows={5}
-                value={planImportText}
-                onChange={(e) => setPlanImportText(e.target.value)}
-                disabled={planGenerationControlsDisabled}
-                placeholder={
-                  '# Красный песчаник фасада\n\nТекст первого пункта…\n\n# От выставки к коллекции\n\nТекст второго пункта…'
-                }
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 resize-y"
-              />
+              <Textarea className="disabled:bg-aspectum-surface-subtle" id="audio-guide-plan-import" rows={5} value={planImportText} onChange={(e) => setPlanImportText(e.target.value)} disabled={planGenerationControlsDisabled} placeholder={ '# Красный песчаник фасада\n\nТекст первого пункта…\n\n# От выставки к коллекции\n\nТекст второго пункта…' } />
 
-              <button
+              <Button
                 type="button"
                 onClick={handleImportPlanFromText}
                 disabled={planGenerationControlsDisabled || !planImportText.trim()}
-                className="w-fit px-3 py-1.5 text-xs font-medium text-blue-700 bg-blue-100 border border-blue-200 rounded-lg hover:bg-blue-200 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                variant="softStrong"
+                size="sm"
+                className="w-fit"
               >
                 Заполнить план из текста
-              </button>
-            </div>
+              </Button>
+            </Panel>
 
-            <button
+            <Button
               type="button"
               onClick={() => onOpenAttractionAudioGuidePlanGenerateModal?.()}
               disabled={planGenerationControlsDisabled}
-              className="w-fit px-3 py-1.5 text-xs font-medium text-gray-700 bg-gray-100 border border-gray-200 rounded-lg hover:bg-gray-200 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              variant="secondary"
+              size="sm"
+              className="w-fit"
             >
               {audioGuideGeneratingPlan ? 'Генерация...' : 'Сгенерировать план'}
-            </button>
+            </Button>
           </div>
 
           <AiGenerationModal
@@ -1288,40 +1130,35 @@ export default function SessionWizardAttractionAudioGuidesBlock({
             busyLabel="Генерация плана…"
             footer={(
               <WizardGenerationActionFooter>
-                <button
+                <Button
                   type="button"
                   onClick={() => onCloseAttractionAudioGuidePlanGenerateModal?.()}
                   disabled={audioGuideGeneratingPlan}
-                  className="px-4 py-2 text-sm font-medium text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50"
+                  variant="outline"
+                  size="md"
                 >
                   Отмена
-                </button>
-                <button
+                </Button>
+                <Button
                   type="button"
                   onClick={() => onGenerateAttractionAudioGuidePlan?.()}
                   disabled={audioGuideGeneratingPlan}
-                  className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-50"
+                  variant="primary"
+                  size="md"
                 >
                   Сгенерировать
-                </button>
+                </Button>
               </WizardGenerationActionFooter>
             )}
           >
-            <h2
-              id="audio-guide-plan-gen-title"
-              className="text-lg font-semibold text-gray-900"
-            >
-              Настройки генерации плана аудиогида
-            </h2>
+            <SectionHeader headingId="audio-guide-plan-gen-title" title="Настройки генерации плана аудиогида" />
 
-            <p className="text-sm text-gray-600">
+            <p className="text-sm text-aspectum-text-subtle">
               Выберите качество генерации и добавьте указания для структуры плана.
             </p>
 
             {audioGuidePlanGenerationError ? (
-              <div className="text-sm text-red-700 bg-red-50 border border-red-200 rounded-lg p-3">
-                {audioGuidePlanGenerationError}
-              </div>
+              <Alert tone="error">{audioGuidePlanGenerationError}</Alert>
             ) : null}
 
             <AiGenerationQualitySettings
@@ -1334,30 +1171,25 @@ export default function SessionWizardAttractionAudioGuidesBlock({
             />
 
             <div>
-              <label
+              <FormLabel
                 htmlFor="audio-guide-plan-gen-prompt"
-                className="block text-sm font-medium text-gray-700 mb-1"
+                 layout="block" size="sm" weight="medium" tone="strong" spacing="xs"
               >
                 Дополнительный промпт
-              </label>
+              </FormLabel>
 
-              <textarea
-                id="audio-guide-plan-gen-prompt"
-                rows={4}
-                value={audioGuidePlanGeneratePrompt}
-                onChange={(e) =>
-                  onSetAudioGuidePlanGeneratePrompt?.(e.target.value)
-                }
-                disabled={audioGuideGeneratingPlan}
-                placeholder="Например: Сделай план на 6 пунктов, с акцентом на архитектуру и ключевые экспонаты."
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 resize-none"
-              />
+              <Textarea className="disabled:bg-aspectum-surface-subtle" id="audio-guide-plan-gen-prompt" rows={4} value={audioGuidePlanGeneratePrompt} onChange={(e) => onSetAudioGuidePlanGeneratePrompt?.(e.target.value) } disabled={audioGuideGeneratingPlan} placeholder="Например: Сделай план на 6 пунктов, с акцентом на архитектуру и ключевые экспонаты." />
             </div>
           </AiGenerationModal>
 
           <div className="space-y-2">
             {planPoints.length === 0 ? (
-              <p className="text-xs text-gray-500">Пока нет пунктов плана</p>
+            <EmptyState
+              icon="📝"
+              title="Пока нет пунктов плана"
+              description="Добавьте пункт вручную или сгенерируйте план аудиогида."
+              className="py-4"
+            />
             ) : (
               planPoints.map((point, index) => {
                 const itemId = point?.id;
@@ -1368,26 +1200,16 @@ export default function SessionWizardAttractionAudioGuidesBlock({
                     key={point.id}
                     className="flex items-center gap-2"
                   >
-                    <span className="w-6 text-xs text-gray-500 text-right">
+                    <span className="w-6 text-xs text-aspectum-text-muted text-right">
                       {index + 1}.
                     </span>
 
-                    <input
-                      type="text"
-                      value={title}
-                      onChange={(e) =>
-                        onUpdateAttractionAudioGuidePlanPoint?.(
-                          currentLocale.lang,
-                          itemId,
-                          e.target.value
-                        )
-                      }
-                      placeholder="Например: История строительства"
-                      className="flex-1 px-3 py-1.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    />
+                    <TextInput className="flex-1" type="text" value={title} onChange={(e) => onUpdateAttractionAudioGuidePlanPoint?.( currentLocale.lang, itemId, e.target.value ) } placeholder="Например: История строительства" />
 
-                    <button
+                    <Button
                       type="button"
+                      variant="softDanger"
+                      size="sm"
                       onClick={() =>
                         onRemoveAttractionAudioGuidePlanPoint?.(
                           currentLocale.lang,
@@ -1395,49 +1217,50 @@ export default function SessionWizardAttractionAudioGuidesBlock({
                         )
                       }
                       title="Удалить пункт"
-                      className="text-xs text-red-600 hover:bg-red-50 rounded-md px-2 py-1 shrink-0"
                     >
                       Удалить
-                    </button>
+                    </Button>
                   </div>
                 );
               })
             )}
 
-            <button
+            <Button
               type="button"
               onClick={() =>
                 onAddAttractionAudioGuidePlanPoint?.(currentLocale.lang)
               }
-              className="text-xs font-medium text-blue-700 bg-blue-100 hover:bg-blue-200 rounded-md px-2.5 py-1"
+              variant="softStrong"
+              size="sm"
             >
               + Добавить пункт
-            </button>
+            </Button>
           </div>
         </div>
 
         <div>
           <div className="flex flex-wrap items-center justify-between gap-2 mb-1">
-            <label className="text-sm font-medium text-gray-700">
+            <FormLabel  size="sm" weight="medium" tone="strong">
               Основной текст аудиогида ({currentLocale.lang?.toUpperCase() || 'RU'})
-            </label>
+            </FormLabel>
 
           </div>
 
-          <button
+          <Button
             type="button"
+            variant="soft"
+            size="sm"
             onClick={() => onOpenAttractionAudioGuideMainTextGenerateModal?.()}
             disabled={
               audioGuideGeneratingAllMainText ||
               audioGuideGeneratingPlan ||
               attractionAudioGuideSaving
             }
-            className="mb-3 px-3 py-1.5 text-xs font-medium text-gray-700 bg-gray-100 border border-gray-200 rounded-lg hover:bg-gray-200 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {audioGuideGeneratingAllMainText
               ? 'Генерация...'
               : 'Сгенерировать весь основной текст'}
-          </button>
+          </Button>
 
           <AiGenerationModal
             open={audioGuideMainTextGenerateModalOpen}
@@ -1451,40 +1274,35 @@ export default function SessionWizardAttractionAudioGuidesBlock({
             busyLabel="Генерация основного текста…"
             footer={(
               <WizardGenerationActionFooter>
-                <button
+                <Button
                   type="button"
                   onClick={() => onCloseAttractionAudioGuideMainTextGenerateModal?.()}
                   disabled={audioGuideGeneratingAllMainText}
-                  className="px-4 py-2 text-sm font-medium text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50"
+                  variant="outline"
+                  size="md"
                 >
                   Отмена
-                </button>
-                <button
+                </Button>
+                <Button
                   type="button"
                   onClick={() => onGenerateAttractionAudioGuideMainText?.()}
                   disabled={audioGuideGeneratingAllMainText}
-                  className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-50"
+                  variant="primary"
+                  size="md"
                 >
                   Сгенерировать
-                </button>
+                </Button>
               </WizardGenerationActionFooter>
             )}
           >
-            <h2
-              id="audio-guide-main-text-gen-title"
-              className="text-lg font-semibold text-gray-900"
-            >
-              Сгенерировать весь основной текст
-            </h2>
+            <SectionHeader headingId="audio-guide-main-text-gen-title" title="Сгенерировать весь основной текст" />
 
-            <p className="text-sm text-gray-600">
+            <p className="text-sm text-aspectum-text-subtle">
               Будет сгенерирован основной текст для всех пунктов плана текущего языка.
             </p>
 
             {audioGuideMainTextGenerationError ? (
-              <div className="text-sm text-red-700 bg-red-50 border border-red-200 rounded-lg p-3">
-                {audioGuideMainTextGenerationError}
-              </div>
+              <Alert tone="error">{audioGuideMainTextGenerationError}</Alert>
             ) : null}
 
             <AiGenerationQualitySettings
@@ -1497,61 +1315,49 @@ export default function SessionWizardAttractionAudioGuidesBlock({
             />
 
             <div>
-              <label
+              <FormLabel
                 htmlFor="audio-guide-main-text-gen-prompt"
-                className="block text-sm font-medium text-gray-700 mb-1"
+                 layout="block" size="sm" weight="medium" tone="strong" spacing="xs"
               >
                 Дополнительный промпт
-              </label>
+              </FormLabel>
 
-              <textarea
-                id="audio-guide-main-text-gen-prompt"
-                rows={4}
-                value={audioGuideMainTextGeneratePrompt}
-                onChange={(e) =>
-                  onSetAudioGuideMainTextGeneratePrompt?.(e.target.value)
-                }
-                disabled={audioGuideGeneratingAllMainText}
-                placeholder="Например: сделай стиль спокойным, как профессиональный аудиогид"
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 resize-none"
-              />
+              <Textarea className="disabled:bg-aspectum-surface-subtle" id="audio-guide-main-text-gen-prompt" rows={4} value={audioGuideMainTextGeneratePrompt} onChange={(e) => onSetAudioGuideMainTextGeneratePrompt?.(e.target.value) } disabled={audioGuideGeneratingAllMainText} placeholder="Например: сделай стиль спокойным, как профессиональный аудиогид" />
             </div>
           </AiGenerationModal>
 
           {planPoints.length > 0 && onGenerateAttractionAudioGuideTtsStress ? (
-            <div className="flex flex-wrap items-center justify-between gap-2 p-2.5 bg-purple-50/60 border border-purple-200 rounded-lg">
-              <span className="text-xs text-purple-800">
+            <Panel tone="accentPurple" className="flex flex-wrap items-center justify-between gap-2 p-2.5">
+              <span className="text-xs text-aspectum-purple-emphasis">
                 Произносимая версия для TTS с ударениями (U+0301).
               </span>
               <div className="flex items-center gap-2">
                 {onBuildSessionStressDictionary ? (
-                  <button
+                  <Button
                     type="button"
+                    variant="outlinePurple"
+                    size="sm"
                     onClick={() =>
                       onBuildSessionStressDictionary(currentLocale.lang)
                     }
                     disabled={buildingStressDictionary}
                     title="Найти правильные ударения в названиях города и достопримечательностей (Викисловарь + веб) и пополнить словарь"
-                    className="shrink-0 px-3 py-1.5 text-xs font-medium text-purple-700 bg-white border border-purple-300 rounded-lg hover:bg-purple-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="shrink-0"
                   >
                     {buildingStressDictionary
                       ? 'Сбор...'
                       : '📖 Собрать ударения города'}
-                  </button>
+                  </Button>
                 ) : null}
-                <select
-                  value={stressProvider}
-                  onChange={(e) => setStressProvider(e.target.value)}
-                  disabled={audioGuideStressBusyId != null}
-                  title="Провайдер ИИ для расстановки ударений"
-                  className="px-2 py-1.5 text-xs border border-purple-200 rounded-lg bg-white text-purple-800 focus:outline-none focus:ring-2 focus:ring-purple-500 disabled:opacity-50"
-                >
+                <Select className="bg-aspectum-surface text-aspectum-purple-emphasis disabled:opacity-50" value={stressProvider} onChange={(e) => setStressProvider(e.target.value)} disabled={audioGuideStressBusyId != null} title="Провайдер ИИ для расстановки ударений">
                   <option value="">Провайдер: по умолчанию</option>
                   <option value="deepseek">DeepSeek (дёшево)</option>
                   <option value="openai">OpenAI</option>
-                </select>
-                <button
+                </Select>
+                <Button
                   type="button"
+                  variant="purple"
+                  size="sm"
                   onClick={() =>
                     onGenerateAttractionAudioGuideTtsStress(
                       currentAttractionAudioGuide,
@@ -1563,20 +1369,23 @@ export default function SessionWizardAttractionAudioGuidesBlock({
                   disabled={
                     audioGuideStressBusyId != null || attractionAudioGuideSaving
                   }
-                  className="shrink-0 px-3 py-1.5 text-xs font-medium text-white bg-purple-600 rounded-lg hover:bg-purple-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="shrink-0"
                 >
                   {audioGuideStressBusyId === 'all'
                     ? 'Расстановка...'
                     : '↻ Расставить ударения во всех пунктах'}
-                </button>
+                </Button>
               </div>
-            </div>
+            </Panel>
           ) : null}
 
           {planPoints.length === 0 ? (
-            <p className="text-xs text-gray-500">
-              Сначала добавьте или сгенерируйте план аудиогида.
-            </p>
+            <EmptyState
+              icon="📝"
+              title="План аудиогида пока пуст"
+              description="Сначала добавьте или сгенерируйте пункты плана."
+              className="py-4"
+            />
           ) : (
             <div className="space-y-4">
               {planPoints.map((point, index) => {
@@ -1609,34 +1418,25 @@ export default function SessionWizardAttractionAudioGuidesBlock({
                   audioGuideStressBusyId === itemId ||
                   audioGuideStressBusyId === 'all';
                 return (
-                  <div
+                  <Panel
                     key={`ag-main-text-${point.id}`}
-                    className="p-3 border border-gray-200 rounded-lg bg-gray-50/80 space-y-2"
+                    tone="muted"
+                    className="p-3 space-y-2"
                   >
-                    <div className="text-sm font-medium text-gray-800">
+                    <div className="text-sm font-medium text-aspectum-text">
                       {index + 1}. {headerLabel}
                     </div>
 
-                    <label className="block text-xs font-medium text-gray-600">
+                    <FormLabel  layout="block" size="xs" weight="medium" tone="muted">
                       Основной текст для озвучки ({currentLocale.lang?.toUpperCase() || 'RU'})
-                    </label>
+                    </FormLabel>
 
-                    <textarea
-                      value={spokenText}
-                      onChange={(e) =>
-                        onUpdateAttractionAudioGuidePlanItemText?.(
-                          planLang,
-                          itemId,
-                          e.target.value,
-                        )
-                      }
-                      rows={4}
-                      placeholder="Текст, который будет озвучен для этого пункта плана"
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-y min-h-[88px]"
-                    />
+                    <Textarea className="min-h-[88px]" value={spokenText} onChange={(e) => onUpdateAttractionAudioGuidePlanItemText?.( planLang, itemId, e.target.value, ) } rows={4} placeholder="Текст, который будет озвучен для этого пункта плана" />
 
-                    <button
+                    <Button
                       type="button"
+                      variant="soft"
+                      size="sm"
                       onClick={() =>
                         onOpenAttractionAudioGuideMainTextItemGenerateModal?.(point)
                       }
@@ -1646,19 +1446,20 @@ export default function SessionWizardAttractionAudioGuidesBlock({
                         audioGuideGeneratingAllMainText ||
                         attractionAudioGuideSaving
                       }
-                      className="w-fit px-3 py-1.5 text-xs font-medium text-gray-700 bg-gray-100 border border-gray-200 rounded-lg hover:bg-gray-200 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                       {itemGenerating ? 'Генерация...' : 'Сгенерировать этот пункт'}
-                    </button>
+                    </Button>
 
                     {onGenerateAttractionAudioGuideTtsStress ? (
-                      <div className="mt-2 pt-2 border-t border-dashed border-gray-200 space-y-1.5">
+                      <div className="mt-2 pt-2 border-t border-dashed border-aspectum-border space-y-1.5">
                         <div className="flex items-center justify-between gap-2">
-                          <label className="block text-xs font-medium text-purple-700">
+                          <FormLabel  layout="block" size="xs" weight="medium" tone="violet">
                             Текст с ударениями (для TTS)
-                          </label>
-                          <button
+                          </FormLabel>
+                          <Button
                             type="button"
+                            variant="softPurple"
+                            size="sm"
                             onClick={() =>
                               onGenerateAttractionAudioGuideTtsStress(
                                 currentAttractionAudioGuide,
@@ -1673,28 +1474,15 @@ export default function SessionWizardAttractionAudioGuidesBlock({
                               attractionAudioGuideSaving
                             }
                             title="Расставить ударения на основе основного текста"
-                            className="shrink-0 px-2 py-1 text-xs font-medium text-purple-700 bg-purple-50 border border-purple-200 rounded-md hover:bg-purple-100 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                            className="shrink-0"
                           >
                             {stressBusy ? 'Расстановка...' : '↻ Расставить ударения'}
-                          </button>
+                          </Button>
                         </div>
-                        <textarea
-                          value={stressValue}
-                          onChange={(e) =>
-                            onSetAttractionAudioGuideStressText?.(
-                              currentAttractionAudioGuide,
-                              planLang,
-                              itemId,
-                              e.target.value,
-                            )
-                          }
-                          rows={3}
-                          placeholder="Версия с ударениями (U+0301). Если пусто — озвучка возьмёт основной текст."
-                          className="w-full px-3 py-2 border border-purple-200 rounded-lg text-sm bg-purple-50/40 focus:outline-none focus:ring-2 focus:ring-purple-500 resize-y min-h-[72px]"
-                        />
+                        <Textarea className="bg-aspectum-violet/10 min-h-[72px]" value={stressValue} onChange={(e) => onSetAttractionAudioGuideStressText?.( currentAttractionAudioGuide, planLang, itemId, e.target.value, ) } rows={3} placeholder="Версия с ударениями (U+0301). Если пусто — озвучка возьмёт основной текст." />
                       </div>
                     ) : null}
-                  </div>
+                  </Panel>
                 );
               })}
             </div>
@@ -1712,46 +1500,41 @@ export default function SessionWizardAttractionAudioGuidesBlock({
             busyLabel="Генерация текста пункта…"
             footer={(
               <WizardGenerationActionFooter>
-                <button
+                <Button
                   type="button"
                   onClick={() => onCloseAttractionAudioGuideMainTextItemGenerateModal?.()}
                   disabled={itemTextModalGenerating}
-                  className="px-4 py-2 text-sm font-medium text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50"
+                  variant="outline"
+                  size="md"
                 >
                   Отмена
-                </button>
-                <button
+                </Button>
+                <Button
                   type="button"
                   onClick={() => onGenerateAttractionAudioGuideMainTextItem?.()}
                   disabled={itemTextModalGenerating}
-                  className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-50"
+                  variant="primary"
+                  size="md"
                 >
                   Сгенерировать
-                </button>
+                </Button>
               </WizardGenerationActionFooter>
             )}
           >
-            <h2
-              id="audio-guide-item-text-gen-title"
-              className="text-lg font-semibold text-gray-900"
-            >
-              Настройки генерации пункта аудиогида
-            </h2>
+            <SectionHeader headingId="audio-guide-item-text-gen-title" title="Настройки генерации пункта аудиогида" />
 
-            <p className="text-sm text-gray-600">
+            <p className="text-sm text-aspectum-text-subtle">
               Выберите качество генерации и добавьте указания для текста этого пункта.
             </p>
 
             {audioGuideItemTextGenerateItemTitle ? (
-              <p className="text-sm text-gray-800 bg-gray-50 border border-gray-200 rounded-lg px-3 py-2">
+              <p className="text-sm text-aspectum-text-emphasis bg-aspectum-surface-muted border border-aspectum-border rounded-aspectum-control px-3 py-2">
                 {audioGuideItemTextGenerateItemTitle}
               </p>
             ) : null}
 
             {audioGuideItemTextGenerationError ? (
-              <div className="text-sm text-red-700 bg-red-50 border border-red-200 rounded-lg p-3">
-                {audioGuideItemTextGenerationError}
-              </div>
+              <Alert tone="error">{audioGuideItemTextGenerationError}</Alert>
             ) : null}
 
             <AiGenerationQualitySettings
@@ -1764,44 +1547,32 @@ export default function SessionWizardAttractionAudioGuidesBlock({
             />
 
             <div>
-              <label
+              <FormLabel
                 htmlFor="audio-guide-item-text-gen-prompt"
-                className="block text-sm font-medium text-gray-700 mb-1"
+                 layout="block" size="sm" weight="medium" tone="strong" spacing="xs"
               >
                 Дополнительный промпт
-              </label>
+              </FormLabel>
 
-              <textarea
-                id="audio-guide-item-text-gen-prompt"
-                rows={4}
-                value={audioGuideItemTextGeneratePrompt}
-                onChange={(e) =>
-                  onSetAudioGuideItemTextGeneratePrompt?.(e.target.value)
-                }
-                disabled={itemTextModalGenerating}
-                placeholder="Например: добавь больше дат и исторических деталей"
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 resize-none"
-              />
+              <Textarea className="disabled:bg-aspectum-surface-subtle" id="audio-guide-item-text-gen-prompt" rows={4} value={audioGuideItemTextGeneratePrompt} onChange={(e) => onSetAudioGuideItemTextGeneratePrompt?.(e.target.value) } disabled={itemTextModalGenerating} placeholder="Например: добавь больше дат и исторических деталей" />
             </div>
           </AiGenerationModal>
 
-          <div className="mt-4 p-3 border border-gray-200 rounded-lg bg-gray-50 space-y-2">
-            <label className="block text-sm font-medium text-gray-800">
+          <Panel tone="muted" className="mt-4 p-3 space-y-2">
+            <FormLabel  layout="block" size="sm" weight="medium" tone="emphasis">
               Аудиофайл аудиогида ({currentLocale.lang?.toUpperCase() || 'RU'})
-            </label>
+            </FormLabel>
 
-            <p className="text-xs text-gray-600">
+            <p className="text-xs text-aspectum-text-subtle">
               Аудио будет создано из всех пунктов основного текста в порядке плана.
             </p>
 
             {planPoints.length > 0 && !hasTextForEveryPlanItem ? (
-              <p className="text-xs text-amber-700">
-                Сначала заполните тексты всех пунктов аудиогида.
-              </p>
+              <Alert tone="warning">Сначала заполните тексты всех пунктов аудиогида.</Alert>
             ) : null}
 
             {audioGuideTrackGenerationError ? (
-              <p className="text-xs text-red-600">{audioGuideTrackGenerationError}</p>
+              <Alert tone="error">{audioGuideTrackGenerationError}</Alert>
             ) : null}
 
             <TTSProviderSettingsPanel
@@ -1846,7 +1617,7 @@ export default function SessionWizardAttractionAudioGuidesBlock({
             ) : null}
 
             <div className="flex flex-wrap items-center gap-2">
-              <button
+              <Button
                 type="button"
                 onClick={() =>
                   onGenerateAttractionAudioGuideTrackAudio?.({
@@ -1855,18 +1626,21 @@ export default function SessionWizardAttractionAudioGuidesBlock({
                   })
                 }
                 disabled={!canGenerateFullAudio}
-                className="px-3 py-1.5 text-xs font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors"
+                variant="primary"
+                size="sm"
               >
                 {generatingAudioGuideTrack
                   ? 'Генерируем аудио...'
                   : hasTrackAudio
                     ? 'Перегенерировать аудиофайл'
                     : 'Сгенерировать аудиофайл'}
-              </button>
+              </Button>
 
               {hasTrackAudio ? (
-                <button
+                <Button
                   type="button"
+                  variant="outline"
+                  size="sm"
                   onClick={() =>
                     onGenerateAttractionAudioGuideTrackAudio?.({
                       languageCode: planLang,
@@ -1876,64 +1650,58 @@ export default function SessionWizardAttractionAudioGuidesBlock({
                   }
                   disabled={!canGenerateFullAudio}
                   title="Переозвучить все главы заново, даже если текст не менялся"
-                  className="px-3 py-1.5 text-xs font-medium text-blue-700 bg-white border border-blue-300 rounded-lg hover:bg-blue-50 disabled:opacity-50 transition-colors"
                 >
                   ↻ Заново, без кэша
-                </button>
+                </Button>
               ) : null}
             </div>
-          </div>
+          </Panel>
         </div>
 
-        <div className="p-3 border border-gray-200 rounded-lg bg-gray-50 space-y-2">
-          <label className="block text-sm font-medium text-gray-700">
+        <Panel tone="muted" className="p-3 space-y-2">
+          <FormLabel  layout="block" size="sm" weight="medium" tone="strong">
             Загрузить аудиофайл вручную ({currentLocale.lang?.toUpperCase() || 'RU'})
-          </label>
+          </FormLabel>
 
           {trackAudioUrl || trackAudioId ? (
-            <p className="text-xs text-gray-500">
+            <p className="text-xs text-aspectum-text-muted">
               Можно заменить текущий файл загрузкой с диска.
             </p>
           ) : (
-            <p className="text-xs text-gray-500">
+            <p className="text-xs text-aspectum-text-muted">
               Альтернатива генерации: загрузите готовый mp3.
             </p>
           )}
 
-          <input
-            ref={audioFileRef}
-            type="file"
-            accept="audio/*"
-            onChange={handleAudioFileChange}
-            className="hidden"
-          />
-
           <div className="flex flex-wrap items-center gap-2">
-            <button
-              type="button"
-              onClick={handlePickAudioFile}
+            <FileButton
+              inputRef={audioFileRef}
+              accept="audio/*"
+              onChange={handleAudioFileChange}
               disabled={attractionAudioUploading || generatingAudioGuideTrack}
-              className="px-3 py-1.5 text-xs font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors"
+              variant="primary"
+              size="sm"
             >
               {attractionAudioUploading
                 ? 'Загрузка…'
                 : trackAudioUrl || trackAudioId
                   ? 'Заменить файл'
                   : 'Загрузить аудио'}
-            </button>
+            </FileButton>
 
             {trackAudioUrl || trackAudioId ? (
-              <button
+              <Button
                 type="button"
+                variant="softDanger"
+                size="sm"
                 onClick={() => onRemoveAttractionAudioGuideTrack?.()}
                 disabled={attractionAudioUploading || generatingAudioGuideTrack}
-                className="px-3 py-1.5 text-xs font-medium text-red-700 bg-red-50 border border-red-200 rounded-lg hover:bg-red-100 disabled:opacity-50 transition-colors"
               >
                 Удалить аудио
-              </button>
+              </Button>
             ) : null}
           </div>
-        </div>
+        </Panel>
 
         <div className="flex items-center justify-end gap-3">
           {(attractionAudioGuideAutoSaving || attractionAudioGuideAutoSaved) &&
@@ -1941,13 +1709,13 @@ export default function SessionWizardAttractionAudioGuidesBlock({
               <div
                 className={`flex items-center gap-1.5 text-xs transition-opacity ${
                   attractionAudioGuideAutoSaved && !attractionAudioGuideAutoSaving
-                    ? 'text-emerald-600'
-                    : 'text-gray-400'
+                    ? 'text-aspectum-success'
+                    : 'text-aspectum-text-disabled'
                 }`}
               >
                 {attractionAudioGuideAutoSaving ? (
                   <>
-                    <span className="inline-block w-3 h-3 border-2 border-gray-300 border-t-transparent rounded-full animate-spin" />
+                    <Spinner size="xs" className="border-2 border-aspectum-border-strong" />
                     <span>Сохранение...</span>
                   </>
                 ) : (
@@ -1970,16 +1738,29 @@ export default function SessionWizardAttractionAudioGuidesBlock({
                 )}
               </div>
             )}
-          <button
+          <Button
             type="button"
             onClick={onSaveCurrentAttractionAudioGuide}
             disabled={attractionAudioGuideSaving}
-            className="px-5 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors"
+            variant="primary"
+            size="md"
           >
             {attractionAudioGuideSaving ? 'Сохранение...' : 'Сохранить'}
-          </button>
+          </Button>
         </div>
       </main>
+      <ConfirmModal
+        open={planImportConfirmOpen}
+        onClose={() => setPlanImportConfirmOpen(false)}
+        onConfirm={() => {
+          importPlanFromText();
+          setPlanImportConfirmOpen(false);
+        }}
+        title="Заменить текущий план?"
+        message={`Текущий план (${planPoints.length} пункт(ов)) и тексты пунктов для этого языка будут заменены содержимым из вставленного текста.`}
+        confirmLabel="Заменить"
+        danger
+      />
     </section>
   );
 }

@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import Layout from '../../components/Layout';
+import { Alert, Button, PageContainer, PageHeader, Panel, ProgressBar, SectionHeader, Spinner, TextInput } from '@aspectum/ui';
 import { ttsAPI } from '../../api/generation';
 import AudioProcessingMixer from '../../components/tts/AudioProcessingMixer';
 
@@ -15,20 +16,20 @@ const CATEGORY_MESSAGES = {
 function StatusBadge({ configured, externalAvailable, stale, cached }) {
   if (!configured) {
     return (
-      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-red-100 text-red-700">
+      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-aspectum-danger-muted text-aspectum-danger-strong">
         Не настроен
       </span>
     );
   }
   if (externalAvailable) {
     return (
-      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-green-100 text-green-700">
+      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-aspectum-positive-muted text-aspectum-positive-strong">
         {stale ? 'Кеш устарел' : cached ? 'Кеш' : 'Подключён'}
       </span>
     );
   }
   return (
-    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-amber-100 text-amber-700">
+    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-aspectum-warning-muted text-aspectum-warning-strong">
       API недоступен
     </span>
   );
@@ -39,31 +40,33 @@ function VoiceCard({ voice, isDefault, onPreview }) {
   const labelParts = [labels.gender, labels.accent, labels.language, labels.age].filter(Boolean);
 
   return (
-    <div className={`rounded-lg border p-3 ${isDefault ? 'border-blue-400 bg-blue-50' : 'border-gray-200 bg-white'}`}>
+    <div className={`rounded-aspectum-control border p-3 ${isDefault ? 'border-aspectum-primary-light bg-aspectum-primary-soft' : 'border-aspectum-border bg-aspectum-surface'}`}>
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
-            <span className="font-medium text-sm text-gray-900">{voice.name}</span>
+            <span className="font-medium text-sm text-aspectum-text">{voice.name}</span>
             {isDefault && (
-              <span className="text-xs px-1.5 py-0.5 rounded bg-blue-600 text-white">по умолчанию</span>
+              <span className="text-xs px-1.5 py-0.5 rounded bg-aspectum-primary text-aspectum-on-accent">по умолчанию</span>
             )}
             {voice.category && (
-              <span className="text-xs px-1.5 py-0.5 rounded bg-gray-100 text-gray-600">{voice.category}</span>
+              <span className="text-xs px-1.5 py-0.5 rounded bg-aspectum-surface-subtle text-aspectum-text-subtle">{voice.category}</span>
             )}
           </div>
           {labelParts.length > 0 && (
-            <p className="text-xs text-gray-500 mt-0.5">{labelParts.join(' · ')}</p>
+            <p className="text-xs text-aspectum-text-muted mt-0.5">{labelParts.join(' · ')}</p>
           )}
-          <p className="text-xs text-gray-400 font-mono mt-0.5">{voice.voice_id}</p>
+          <p className="text-xs text-aspectum-text-disabled font-mono mt-0.5">{voice.voice_id}</p>
         </div>
         {voice.preview_url && (
-          <button
+          <Button
             type="button"
             onClick={() => onPreview(voice)}
-            className="shrink-0 text-xs px-2.5 py-1 rounded-md border border-gray-200 hover:bg-gray-50 text-gray-600"
+            variant="outline"
+            size="sm"
+            className="shrink-0"
           >
             ▶ Слушать
-          </button>
+          </Button>
         )}
       </div>
     </div>
@@ -144,7 +147,7 @@ export default function TTSSettings() {
   if (loading) {
     return (
       <Layout>
-        <div className="flex items-center justify-center min-h-96 text-gray-400 text-sm">
+        <div className="flex items-center justify-center min-h-96 text-aspectum-text-disabled text-sm">
           Загрузка настроек TTS...
         </div>
       </Layout>
@@ -153,35 +156,31 @@ export default function TTSSettings() {
 
   return (
     <Layout>
-      <div className="space-y-6 max-w-4xl">
+      <PageContainer maxWidth="wide" spacing="lg">
 
-        {/* Заголовок */}
-        <div className="flex items-start justify-between gap-4">
-          <div>
-            <h1 className="text-2xl font-bold text-gray-900">Настройки TTS</h1>
-            <p className="text-sm text-gray-500 mt-1">
-              Fish Audio используется по умолчанию, ElevenLabs остаётся доступен для выбора.
-              Общий профиль обработки хранится в базе.
-            </p>
-          </div>
-          <button
+        <PageHeader
+          title="Настройки TTS"
+          description="Fish Audio используется по умолчанию, ElevenLabs остаётся доступен для выбора. Общий профиль обработки хранится в базе."
+          spacing="none"
+          actions={<Button
             type="button"
             onClick={() => load({ refresh: true })}
             disabled={refreshing}
-            className="shrink-0 flex items-center gap-1.5 px-3 py-2 text-sm font-medium border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 transition-colors"
+            variant="outline"
+            size="md"
           >
             {refreshing ? (
-              <span className="animate-spin w-3.5 h-3.5 border border-gray-400 border-t-transparent rounded-full" />
+              <Spinner size="xs" className="w-3.5 h-3.5 border border-aspectum-border-disabled" />
             ) : '↻'}
             Обновить кеш
-          </button>
-        </div>
+          </Button>}
+        />
 
         {error && (
-          <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm">
+          <Alert tone="error">
             {error}
-            <button onClick={() => load()} className="ml-3 underline">Повторить</button>
-          </div>
+            <Button variant="link" size="sm" onClick={() => load()} className="ml-3">Повторить</Button>
+          </Alert>
         )}
 
         {providerData?.providers?.find((item) => item.id === 'fish_audio') ? (() => {
@@ -190,58 +189,50 @@ export default function TTSSettings() {
           const noCredit = !usesFreeModel && fish.credit &&
             Number(fish.credit.credit || 0) <= 0 && !fish.credit.has_free_credit;
           return (
-            <div className="bg-white rounded-xl border border-gray-200 p-5 space-y-2">
-              <div className="flex items-center justify-between gap-3">
-                <h2 className="font-semibold text-gray-900">Fish Audio — S2.1 Pro Free</h2>
-                <span className={`text-xs font-medium ${fish.configured && !noCredit ? 'text-green-700' : 'text-red-700'}`}>
+            <Panel className="p-5 space-y-2">
+              <SectionHeader size="sm" title="Fish Audio — S2.1 Pro Free" actions={<span className={`text-xs font-medium ${fish.configured && !noCredit ? 'text-aspectum-positive-strong' : 'text-aspectum-danger-strong'}`}>
                   {!fish.configured ? 'Ключ не настроен' : noCredit ? 'Нет API-кредита' : 'Готов'}
-                </span>
-              </div>
-              <p className="text-sm text-gray-500">
+                </span>} />
+              <p className="text-sm text-aspectum-text-muted">
                 Провайдер по умолчанию: {providerData.default_provider === 'fish_audio' ? 'да' : 'нет'}.
                 Модель: {fish.defaults?.model_id || 's2.1-pro-free'}. Голос можно оставить
                 стандартным или указать Reference ID в аудиогиде.
               </p>
               {noCredit ? (
-                <p className="text-sm text-red-700">
+                <p className="text-sm text-aspectum-danger-strong">
                   Fish API сообщает нулевой баланс без бесплатного кредита. Активируйте промо
                   или API credit в кабинете Fish Audio.
                 </p>
               ) : null}
-              {fish.warning ? <p className="text-sm text-amber-700">{fish.warning}</p> : null}
-            </div>
+              {fish.warning ? <p className="text-sm text-aspectum-warning-strong">{fish.warning}</p> : null}
+            </Panel>
           );
         })() : null}
 
         {/* Статус подключения ElevenLabs */}
-        <div className="bg-white rounded-xl border border-gray-200 p-5 space-y-4">
-          <div className="flex items-center justify-between">
-            <h2 className="font-semibold text-gray-900">Статус подключения</h2>
-            {data && (
+        <Panel className="p-5 space-y-4">
+          <SectionHeader size="sm" title="Статус подключения" actions={data ? (
               <StatusBadge
                 configured={data.configured}
                 externalAvailable={data.external_available}
                 stale={data.stale}
                 cached={data.cached}
               />
-            )}
-          </div>
+            ) : null} />
 
           {!data?.configured && (
-            <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 text-sm text-amber-800">
+            <Alert tone="warning">
               <p className="font-medium">ELEVENLABS_API_KEY не задан</p>
               <p className="mt-1 text-xs">Добавьте ключ в переменные окружения сервера и перезапустите его.</p>
-            </div>
+            </Alert>
           )}
 
           {warningMessage && data?.configured && (
-            <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 text-sm text-amber-800">
-              {warningMessage}
-            </div>
+            <Alert tone="warning">{warningMessage}</Alert>
           )}
 
           {data?.refresh_throttled && (
-            <p className="text-xs text-gray-400">
+            <p className="text-xs text-aspectum-text-disabled">
               Кеш обновлялся недавно — данные актуальны. Следующее обновление доступно через несколько минут.
             </p>
           )}
@@ -254,19 +245,19 @@ export default function TTSSettings() {
                 { label: 'Модель по умолчанию', value: defaults.model_id },
                 { label: 'Формат', value: defaults.output_format },
               ].map(({ label, value }) => (
-                <div key={label} className="rounded-lg bg-gray-50 border border-gray-100 px-3 py-2">
-                  <p className="text-xs text-gray-500">{label}</p>
-                  <p className="text-sm font-mono text-gray-900 mt-0.5 truncate">{value || '—'}</p>
+                <div key={label} className="rounded-aspectum-control bg-aspectum-surface-muted border border-aspectum-border-subtle px-3 py-2">
+                  <p className="text-xs text-aspectum-text-muted">{label}</p>
+                  <p className="text-sm font-mono text-aspectum-text mt-0.5 truncate">{value || '—'}</p>
                 </div>
               ))}
             </div>
           )}
-        </div>
+        </Panel>
 
         {/* Подписка */}
         {subscription && (
-          <div className="bg-white rounded-xl border border-gray-200 p-5 space-y-3">
-            <h2 className="font-semibold text-gray-900">Подписка</h2>
+          <Panel className="p-5 space-y-3">
+            <SectionHeader size="sm" title="Подписка" />
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
               {[
                 { label: 'Тариф', value: subscription.tier || '—' },
@@ -283,34 +274,30 @@ export default function TTSSettings() {
                   value: subscription.remaining_characters?.toLocaleString('ru-RU') ?? '—',
                 },
               ].map(({ label, value }) => (
-                <div key={label} className="rounded-lg bg-gray-50 border border-gray-100 px-3 py-2">
-                  <p className="text-xs text-gray-500">{label}</p>
-                  <p className="text-sm font-semibold text-gray-900 mt-0.5">{value}</p>
+                <div key={label} className="rounded-aspectum-control bg-aspectum-surface-muted border border-aspectum-border-subtle px-3 py-2">
+                  <p className="text-xs text-aspectum-text-muted">{label}</p>
+                  <p className="text-sm font-semibold text-aspectum-text mt-0.5">{value}</p>
                 </div>
               ))}
             </div>
             {subscription.character_limit && subscription.character_count != null && (
               <div>
-                <div className="flex justify-between text-xs text-gray-500 mb-1">
+                <div className="flex justify-between text-xs text-aspectum-text-muted mb-1">
                   <span>Использование</span>
                   <span>
                     {Math.round((subscription.character_count / subscription.character_limit) * 100)}%
                   </span>
                 </div>
-                <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
-                  <div
-                    className="h-full bg-blue-500 rounded-full transition-all"
-                    style={{
-                      width: `${Math.min(
-                        (subscription.character_count / subscription.character_limit) * 100,
-                        100,
-                      )}%`,
-                    }}
-                  />
-                </div>
+                <ProgressBar
+                  value={subscription.character_count}
+                  max={subscription.character_limit}
+                  tone="focus"
+                  track="surface"
+                  label="Использование символов"
+                />
               </div>
             )}
-          </div>
+          </Panel>
         )}
 
         <AudioProcessingMixer
@@ -325,36 +312,36 @@ export default function TTSSettings() {
 
         {/* Модели */}
         {models.length > 0 && (
-          <div className="bg-white rounded-xl border border-gray-200 p-5 space-y-3">
-            <h2 className="font-semibold text-gray-900">Доступные модели</h2>
+          <Panel className="p-5 space-y-3">
+            <SectionHeader size="sm" title="Доступные модели" />
             <div className="space-y-2">
               {models.map((model) => (
                 <div
                   key={model.model_id}
-                  className={`rounded-lg border px-3 py-2 flex items-start justify-between gap-3 ${
+                  className={`rounded-aspectum-control border px-3 py-2 flex items-start justify-between gap-3 ${
                     model.model_id === defaults.model_id
-                      ? 'border-blue-400 bg-blue-50'
-                      : 'border-gray-200'
+                      ? 'border-aspectum-primary-light bg-aspectum-primary-soft'
+                      : 'border-aspectum-border'
                   }`}
                 >
                   <div>
                     <div className="flex items-center gap-2 flex-wrap">
-                      <span className="text-sm font-medium text-gray-900">{model.name}</span>
+                      <span className="text-sm font-medium text-aspectum-text">{model.name}</span>
                       {model.model_id === defaults.model_id && (
-                        <span className="text-xs px-1.5 py-0.5 rounded bg-blue-600 text-white">
+                        <span className="text-xs px-1.5 py-0.5 rounded bg-aspectum-primary text-aspectum-on-accent">
                           по умолчанию
                         </span>
                       )}
                     </div>
-                    <p className="text-xs font-mono text-gray-400 mt-0.5">{model.model_id}</p>
+                    <p className="text-xs font-mono text-aspectum-text-disabled mt-0.5">{model.model_id}</p>
                     {model.languages?.length > 0 && (
-                      <p className="text-xs text-gray-500 mt-0.5">
+                      <p className="text-xs text-aspectum-text-muted mt-0.5">
                         Языки: {model.languages.slice(0, 8).map((l) => l.language_id || l).join(', ')}
                         {model.languages.length > 8 && ` +${model.languages.length - 8}`}
                       </p>
                     )}
                   </div>
-                  <div className="text-right text-xs text-gray-400 shrink-0">
+                  <div className="text-right text-xs text-aspectum-text-disabled shrink-0">
                     {model.max_characters_request_subscribed_user
                       ? `${model.max_characters_request_subscribed_user.toLocaleString()} симв./запрос`
                       : null}
@@ -362,24 +349,19 @@ export default function TTSSettings() {
                 </div>
               ))}
             </div>
-          </div>
+          </Panel>
         )}
 
         {/* Голоса */}
         {voices.length > 0 && (
-          <div className="bg-white rounded-xl border border-gray-200 p-5 space-y-3">
-            <div className="flex items-center justify-between gap-3">
-              <h2 className="font-semibold text-gray-900">
-                Голоса <span className="text-gray-400 font-normal text-sm">({voices.length})</span>
-              </h2>
-              <input
+          <Panel className="p-5 space-y-3">
+            <SectionHeader size="sm" title="Голоса" aside={<span className="text-aspectum-text-disabled font-normal text-sm">({voices.length})</span>} actions={<TextInput
                 type="search"
                 value={voiceSearch}
                 onChange={(e) => setVoiceSearch(e.target.value)}
                 placeholder="Поиск по имени, категории..."
-                className="w-56 px-3 py-1.5 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
-            </div>
+                className="w-56 px-3 py-1.5 text-sm border border-aspectum-border-strong rounded-aspectum-control focus:outline-none focus:ring-2 focus:ring-aspectum-focus"
+              />} />
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-[480px] overflow-y-auto pr-1">
               {filteredVoices.map((voice) => (
                 <VoiceCard
@@ -390,39 +372,39 @@ export default function TTSSettings() {
                 />
               ))}
               {filteredVoices.length === 0 && (
-                <p className="text-sm text-gray-400 col-span-2 py-4 text-center">
+                <p className="text-sm text-aspectum-text-disabled col-span-2 py-4 text-center">
                   Голоса не найдены
                 </p>
               )}
             </div>
-          </div>
+          </Panel>
         )}
 
         {/* Кеш */}
         {data?.configured && (
-          <div className="bg-white rounded-xl border border-gray-200 p-5 space-y-2">
-            <h2 className="font-semibold text-gray-900 mb-3">Кеш</h2>
+          <Panel className="p-5 space-y-2">
+            <SectionHeader size="sm" title="Кеш" className="mb-3" />
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-sm">
               {[
                 { label: 'Голоса', updated: cacheInfo.voices_updated_at, ttl: cacheInfo.voices_ttl_seconds },
                 { label: 'Модели', updated: cacheInfo.models_updated_at, ttl: cacheInfo.models_ttl_seconds },
                 { label: 'Подписка', updated: cacheInfo.subscription_updated_at, ttl: cacheInfo.subscription_ttl_seconds },
               ].map(({ label, updated, ttl }) => (
-                <div key={label} className="rounded-lg bg-gray-50 border border-gray-100 px-3 py-2">
-                  <p className="text-xs text-gray-500">{label}</p>
-                  <p className="text-xs text-gray-700 mt-0.5">
+                <div key={label} className="rounded-aspectum-control bg-aspectum-surface-muted border border-aspectum-border-subtle px-3 py-2">
+                  <p className="text-xs text-aspectum-text-muted">{label}</p>
+                  <p className="text-xs text-aspectum-text-strong mt-0.5">
                     {updated
                       ? new Date(updated).toLocaleString('ru-RU', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })
                       : 'Не загружено'}
                   </p>
-                  <p className="text-xs text-gray-400">TTL: {ttl ? `${Math.round(ttl / 3600)} ч` : '—'}</p>
+                  <p className="text-xs text-aspectum-text-disabled">TTL: {ttl ? `${Math.round(ttl / 3600)} ч` : '—'}</p>
                 </div>
               ))}
             </div>
-          </div>
+          </Panel>
         )}
 
-      </div>
+      </PageContainer>
     </Layout>
   );
 }

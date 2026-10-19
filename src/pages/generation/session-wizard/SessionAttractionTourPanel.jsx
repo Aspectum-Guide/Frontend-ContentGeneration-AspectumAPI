@@ -1,9 +1,8 @@
 import { useEffect, useState } from 'react';
 import { attractionCommerceAPI, eventsAPI } from '../../../api/generation';
+import { Alert, Button, DropdownPanel, InlineState, Panel, SelectableCard, StatusBadge, TextInput } from '@aspectum/ui';
 import { getMultiLangValue } from '../../../features/catalog/shared/i18n';
 import { parseApiError } from '../../../utils/apiError';
-
-const inputClass = 'w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none';
 
 /**
  * «Привязать тур»: продукт поставщика (Ventrata), который продаётся на событии
@@ -27,7 +26,7 @@ export default function SessionAttractionTourPanel({ sessionId, attractionId, at
     setSearch('');
     setError('');
     setNotice('');
-  }, [attractionId, externalProduct?.id]);
+  }, [attractionId, externalProduct]);
 
   useEffect(() => {
     if (!open) return undefined;
@@ -77,104 +76,91 @@ export default function SessionAttractionTourPanel({ sessionId, attractionId, at
   };
 
   return (
-    <div className="p-3 border border-gray-200 rounded-lg bg-white space-y-2">
+    <Panel className="p-3 space-y-2">
       <div className="flex items-center justify-between gap-2">
-        <p className="text-sm font-medium text-gray-800">Бронирование у поставщика (тур)</p>
+        <p className="text-sm font-medium text-aspectum-text-emphasis">Бронирование у поставщика (тур)</p>
         {!open && (
-          <button
-            type="button"
-            onClick={() => setOpen(true)}
-            className="rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-blue-700"
-          >
+          <Button type="button" variant="primary" size="sm" onClick={() => setOpen(true)}>
             {tour ? 'Заменить тур' : 'Привязать тур'}
-          </button>
+          </Button>
         )}
       </div>
 
-      <p className="text-xs text-gray-500">
+      <p className="text-xs text-aspectum-text-muted">
         Тур — продукт поставщика (Ventrata): цены, билеты и места. Текст, фото и аудиогид остаются вашими.{' '}
         {publishedEventId
           ? 'Место уже опубликовано — тур привяжется к его событию сразу.'
           : 'Место ещё не опубликовано — тур привяжется к событию при публикации сессии.'}
       </p>
 
-      {error && <p className="text-xs text-red-600">{error}</p>}
-      {notice && <p className="text-xs text-emerald-700">{notice}</p>}
+      {error && <Alert tone="error" className="text-xs">{error}</Alert>}
+      {notice && <Alert tone="success" className="text-xs">{notice}</Alert>}
 
       {tour && (
-        <div className="flex items-start justify-between gap-2 rounded-lg border border-purple-200 bg-purple-50/40 p-2">
+        <Panel tone="accentPurple" className="flex items-start justify-between gap-2 p-2">
           <div className="min-w-0">
-            <p className="truncate text-sm text-gray-900">{getMultiLangValue(tour.title) || tour.external_id || tour.id}</p>
-            {tour.location_text && <p className="truncate text-xs text-gray-500">{tour.location_text}</p>}
+            <p className="truncate text-sm text-aspectum-text">{getMultiLangValue(tour.title) || tour.external_id || tour.id}</p>
+            {tour.location_text && <p className="truncate text-xs text-aspectum-text-muted">{tour.location_text}</p>}
             <p className="mt-1 text-xs">
-              <span className={`rounded-full px-2 py-0.5 font-medium ${tour.is_enabled ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}>
-                {tour.is_enabled ? 'Продажи включены' : 'Продажи выключены'}
-              </span>
+              <StatusBadge tone={tour.is_enabled ? 'success' : 'warning'} label={tour.is_enabled ? 'Продажи включены' : 'Продажи выключены'} />
             </p>
           </div>
-          <button
-            type="button"
-            disabled={saving}
-            onClick={() => save(null)}
-            className="shrink-0 text-xs text-red-600 hover:text-red-700 disabled:opacity-50"
-          >
+          <Button type="button" variant="linkDanger" size="sm" disabled={saving} onClick={() => save(null)} className="shrink-0">
             Отвязать
-          </button>
-        </div>
+          </Button>
+        </Panel>
       )}
 
       {open && (
         <div>
-          <input
+          <TextInput
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className={inputClass}
             placeholder="Название или адрес тура поставщика…"
             disabled={saving}
           />
-          <p className="mt-1 text-xs text-gray-400">
+          <p className="mt-1 text-xs text-aspectum-text-disabled">
             {search.trim() ? 'Результаты поиска' : 'Подсказки по названию места — похожие сверху'}
           </p>
-          <div className="mt-1 max-h-56 overflow-y-auto rounded-lg border border-gray-200 bg-white">
-            {loading && <p className="p-2 text-xs text-gray-400">Поиск…</p>}
-            {!loading && results.length === 0 && <p className="p-2 text-xs text-gray-400">Ничего не найдено</p>}
+          <DropdownPanel className="mt-1 max-h-56 overflow-y-auto p-0">
+            {loading && <InlineState loading size="xs" tone="disabled" className="p-2">Поиск…</InlineState>}
+            {!loading && results.length === 0 && <InlineState size="xs" tone="disabled" className="p-2">Ничего не найдено</InlineState>}
             {!loading &&
               results.map((row) => {
                 const blocked = Boolean(row.already_linked_event_id);
                 return (
-                  <button
+                  <SelectableCard
                     key={row.id}
-                    type="button"
                     disabled={blocked || saving}
-                    onClick={() => save(row)}
-                    className="flex w-full flex-col px-3 py-2 text-left text-sm hover:bg-purple-50 border-b border-gray-100 last:border-0 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-transparent"
+                    onSelect={() => save(row)}
+                    className="flex w-full flex-col px-3 py-2 text-left text-sm hover:bg-aspectum-purple-soft border-b border-aspectum-border-subtle last:border-0 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-transparent"
                   >
                     <span className="flex items-center gap-2">
                       <span className="truncate">{getMultiLangValue(row.title) || row.external_id || row.id}</span>
                       {row.suggested && (
-                        <span className="shrink-0 rounded bg-emerald-100 px-1.5 py-0.5 text-[11px] font-medium text-emerald-700">похоже</span>
+                        <span className="shrink-0 rounded bg-aspectum-success-muted px-1.5 py-0.5 text-[11px] font-medium text-aspectum-success-strong">похоже</span>
                       )}
                     </span>
-                    {row.location_text && <span className="truncate text-xs text-gray-400">{row.location_text}</span>}
+                    {row.location_text && <span className="truncate text-xs text-aspectum-text-disabled">{row.location_text}</span>}
                     {blocked && (
-                      <span className="text-xs text-gray-400">
+                      <span className="text-xs text-aspectum-text-disabled">
                         Уже привязан к другому событию: {getMultiLangValue(row.already_linked_event_title) || row.already_linked_event_id}
                       </span>
                     )}
                     {row.replaces_event_id && !blocked && (
-                      <span className="text-xs text-amber-600">
+                      <span className="text-xs text-aspectum-warning">
                         Сейчас на событии «{getMultiLangValue(row.replaces_event_title) || row.replaces_event_id}» — оно будет скрыто, тур переедет к месту
                       </span>
                     )}
-                  </button>
+                  </SelectableCard>
                 );
               })}
-          </div>
-          <button type="button" onClick={() => setOpen(false)} className="mt-2 text-xs text-gray-500 hover:text-gray-700">
+          </DropdownPanel>
+          <Button type="button" variant="ghost" size="sm" onClick={() => setOpen(false)} className="mt-2">
             Отмена
-          </button>
+          </Button>
         </div>
       )}
-    </div>
+    </Panel>
   );
 }

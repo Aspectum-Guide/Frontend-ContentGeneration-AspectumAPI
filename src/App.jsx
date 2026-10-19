@@ -1,61 +1,65 @@
+/* eslint-disable react-refresh/only-export-components -- route config is exported for Router smoke tests */
+import { lazy, Suspense } from 'react';
 import { createBrowserRouter, Navigate, RouterProvider } from 'react-router-dom';
 import ErrorBoundary, { SessionWizardErrorBoundary } from './components/ErrorBoundary';
 import ProtectedRoute from './components/ProtectedRoute';
 import { LayoutActionsProvider } from './context/LayoutActionsContext';
 import NotFound from './pages/NotFound';
-import AISettings from './pages/ai/AISettings';
-import PromptSettings from './pages/ai/PromptSettings';
-import TTSSettings from './pages/ai/TTSSettings';
-import CityGeneration from './pages/ai/CityGeneration';
-import ImageGeneration from './pages/ai/ImageGeneration';
-import Playground from './pages/ai/Playground';
-import CatalogHome from './pages/catalog/CatalogHome';
-import BookingCatalogHome from './pages/catalog/BookingCatalogHome';
-import CitiesCatalog from './pages/catalog/CitiesCatalog';
-import EventsCatalog from './pages/catalog/EventsCatalog';
-import OrphanEvents from './pages/catalog/OrphanEvents';
-import PhotosCatalog from './pages/catalog/PhotosCatalog';
-import TagsFilters from './pages/catalog/TagsFilters';
-import TicketTypesCatalog from './pages/catalog/TicketTypesCatalog';
-import SlotAvailabilitiesCatalog from './pages/catalog/SlotAvailabilitiesCatalog';
-import TicketPricesCatalog from './pages/catalog/TicketPricesCatalog';
-import BookingSetupWorkbench from './pages/catalog/BookingSetupWorkbench';
-import CityPricingWorkbench from './pages/catalog/CityPricingWorkbench';
-import SubscriptionTypesCatalog from './pages/catalog/SubscriptionTypesCatalog';
-import ActivationCodesCatalog from './pages/catalog/ActivationCodesCatalog';
-import UserSubscriptionsWorkbench from './pages/catalog/UserSubscriptionsWorkbench';
-import CodeUsageLogsCatalog from './pages/catalog/CodeUsageLogsCatalog';
-import CitySubscriptionsCatalog from './pages/catalog/CitySubscriptionsCatalog';
-import IAPPurchasesCatalog from './pages/catalog/IAPPurchasesCatalog';
-import BookingReservationsCatalog from './pages/catalog/BookingReservationsCatalog';
-import BasePricesCatalog from './pages/catalog/BasePricesCatalog';
-import PricingRulesCatalog from './pages/catalog/PricingRulesCatalog';
-import BookingAnalytics from './pages/catalog/BookingAnalytics';
-import ExternalProductsCatalog from './pages/catalog/ExternalProductsCatalog';
-import ExternalProductsLinking from './pages/catalog/ExternalProductsLinking';
-import ProductAnalytics from './pages/catalog/ProductAnalytics';
-import AudioGuidesCatalog from './pages/catalog/AudioGuidesCatalog';
-import InteractiveLocationsCatalog from './pages/catalog/InteractiveLocationsCatalog';
-import LLMKeysCatalog from './pages/catalog/LLMKeysCatalog';
-import LLMUsageCatalog from './pages/catalog/LLMUsageCatalog';
-import ContentAuthorsCatalog from './pages/catalog/ContentAuthorsCatalog';
-import ExportCities from './pages/export/ExportCities';
-import ExportEvents from './pages/export/ExportEvents';
-import ExportZip from './pages/export/ExportZip';
-import GenerationList from './pages/generation/GenerationList';
-import NewSession from './pages/generation/NewSession';
-import SessionsList from './pages/generation/SessionsList';
-import SessionWizard from './pages/generation/SessionWizard';
-import UploadFile from './pages/generation/UploadFile';
 import Home from './pages/Home';
-import ImportGoogleSheet from './pages/import/ImportGoogleSheet';
-import MyTasks from './pages/tasks/MyTasks';
-import MediaRecovery from './pages/tasks/MediaRecovery';
 import TokenAuth from './pages/TokenAuth';
-import AccountSettings from './pages/AccountSettings';
 import { registerAuthNavigate } from './utils/authRedirect';
+import { EmptyState, Spinner, UiProvider } from '@aspectum/ui';
 
-const routes = [
+const AISettings = lazy(() => import('./pages/ai/AISettings'));
+const PromptSettings = lazy(() => import('./pages/ai/PromptSettings'));
+const TTSSettings = lazy(() => import('./pages/ai/TTSSettings'));
+const CityGeneration = lazy(() => import('./pages/ai/CityGeneration'));
+const ImageGeneration = lazy(() => import('./pages/ai/ImageGeneration'));
+const Playground = lazy(() => import('./pages/ai/Playground'));
+const CatalogHome = lazy(() => import('./pages/catalog/CatalogHome'));
+const BookingCatalogHome = lazy(() => import('./pages/catalog/BookingCatalogHome'));
+const CitiesCatalog = lazy(() => import('./pages/catalog/CitiesCatalog'));
+const EventsCatalog = lazy(() => import('./pages/catalog/EventsCatalog'));
+const OrphanEvents = lazy(() => import('./pages/catalog/OrphanEvents'));
+const PhotosCatalog = lazy(() => import('./pages/catalog/PhotosCatalog'));
+const TagsFilters = lazy(() => import('./pages/catalog/TagsFilters'));
+const TicketTypesCatalog = lazy(() => import('./pages/catalog/TicketTypesCatalog'));
+const SlotAvailabilitiesCatalog = lazy(() => import('./pages/catalog/SlotAvailabilitiesCatalog'));
+const TicketPricesCatalog = lazy(() => import('./pages/catalog/TicketPricesCatalog'));
+const BookingSetupWorkbench = lazy(() => import('./pages/catalog/BookingSetupWorkbench'));
+const CityPricingWorkbench = lazy(() => import('./pages/catalog/CityPricingWorkbench'));
+const SubscriptionTypesCatalog = lazy(() => import('./pages/catalog/SubscriptionTypesCatalog'));
+const ActivationCodesCatalog = lazy(() => import('./pages/catalog/ActivationCodesCatalog'));
+const UserSubscriptionsWorkbench = lazy(() => import('./pages/catalog/UserSubscriptionsWorkbench'));
+const CodeUsageLogsCatalog = lazy(() => import('./pages/catalog/CodeUsageLogsCatalog'));
+const CitySubscriptionsCatalog = lazy(() => import('./pages/catalog/CitySubscriptionsCatalog'));
+const IAPPurchasesCatalog = lazy(() => import('./pages/catalog/IAPPurchasesCatalog'));
+const BookingReservationsCatalog = lazy(() => import('./pages/catalog/BookingReservationsCatalog'));
+const BasePricesCatalog = lazy(() => import('./pages/catalog/BasePricesCatalog'));
+const PricingRulesCatalog = lazy(() => import('./pages/catalog/PricingRulesCatalog'));
+const BookingAnalytics = lazy(() => import('./pages/catalog/BookingAnalytics'));
+const ExternalProductsCatalog = lazy(() => import('./pages/catalog/ExternalProductsCatalog'));
+const ExternalProductsLinking = lazy(() => import('./pages/catalog/ExternalProductsLinking'));
+const ProductAnalytics = lazy(() => import('./pages/catalog/ProductAnalytics'));
+const AudioGuidesCatalog = lazy(() => import('./pages/catalog/AudioGuidesCatalog'));
+const InteractiveLocationsCatalog = lazy(() => import('./pages/catalog/InteractiveLocationsCatalog'));
+const LLMKeysCatalog = lazy(() => import('./pages/catalog/LLMKeysCatalog'));
+const LLMUsageCatalog = lazy(() => import('./pages/catalog/LLMUsageCatalog'));
+const ContentAuthorsCatalog = lazy(() => import('./pages/catalog/ContentAuthorsCatalog'));
+const ExportCities = lazy(() => import('./pages/export/ExportCities'));
+const ExportEvents = lazy(() => import('./pages/export/ExportEvents'));
+const ExportZip = lazy(() => import('./pages/export/ExportZip'));
+const GenerationList = lazy(() => import('./pages/generation/GenerationList'));
+const NewSession = lazy(() => import('./pages/generation/NewSession'));
+const SessionsList = lazy(() => import('./pages/generation/SessionsList'));
+const SessionWizard = lazy(() => import('./pages/generation/SessionWizard'));
+const UploadFile = lazy(() => import('./pages/generation/UploadFile'));
+const ImportGoogleSheet = lazy(() => import('./pages/import/ImportGoogleSheet'));
+const MyTasks = lazy(() => import('./pages/tasks/MyTasks'));
+const MediaRecovery = lazy(() => import('./pages/tasks/MediaRecovery'));
+const AccountSettings = lazy(() => import('./pages/AccountSettings'));
+
+export const routes = [
   {
     path: '/token-auth',
     element: <ErrorBoundary><TokenAuth /></ErrorBoundary>,
@@ -86,7 +90,15 @@ const routes = [
   },
   {
     path: '/generation/:sessionId',
-    element: <ProtectedRoute><SessionWizardErrorBoundary><SessionWizard /></SessionWizardErrorBoundary></ProtectedRoute>,
+    element: (
+      <ProtectedRoute>
+        <SessionWizardErrorBoundary>
+          <Suspense fallback={<EmptyState icon={<Spinner size="md" />} title="Загрузка сессии…" spacing="md" />}>
+            <SessionWizard />
+          </Suspense>
+        </SessionWizardErrorBoundary>
+      </ProtectedRoute>
+    ),
   },
   {
     path: '/ai/settings',
@@ -279,11 +291,15 @@ registerAuthNavigate((path, opts) => router.navigate(path, opts));
 
 function App() {
   return (
-    <ErrorBoundary>
-      <LayoutActionsProvider>
-        <RouterProvider router={router} />
-      </LayoutActionsProvider>
-    </ErrorBoundary>
+    <UiProvider>
+      <ErrorBoundary>
+        <LayoutActionsProvider>
+          <Suspense fallback={<EmptyState icon={<Spinner size="md" />} title="Загрузка…" spacing="md" />}>
+            <RouterProvider router={router} />
+          </Suspense>
+        </LayoutActionsProvider>
+      </ErrorBoundary>
+    </UiProvider>
   );
 }
 

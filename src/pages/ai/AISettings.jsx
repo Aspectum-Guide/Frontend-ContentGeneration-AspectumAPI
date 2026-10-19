@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import Layout from '../../components/Layout';
 import apiClient from '../../api/client';
-import Button from '../../components/ui/Button';
+import { FormLabel, Alert, Button, Checkbox, EmptyState, Heading, PageHeader, Panel, SectionHeader, Select, Spinner, TextInput } from '@aspectum/ui';
 
 export default function AISettings() {
   const [settings, setSettings] = useState(null);
@@ -62,7 +62,7 @@ export default function AISettings() {
     return (
       <Layout>
         <div className="flex items-center justify-center min-h-96">
-          <p className="text-gray-500">Загрузка настроек...</p>
+          <EmptyState icon={<Spinner size="md" />} title="Загрузка настроек..." spacing="md" />
         </div>
       </Layout>
     );
@@ -71,68 +71,63 @@ export default function AISettings() {
   if (!settings) {
     return (
       <Layout>
-        <div className="bg-white rounded-lg shadow-sm p-6">
-          <h1 className="text-2xl font-bold mb-6">Настройки ИИ</h1>
-          <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg mb-6">
-            <p className="font-medium">⚠️ Ошибка загрузки настроек</p>
+        <Panel className="p-6 shadow-aspectum-card">
+          <PageHeader title="Настройки ИИ" />
+          <Alert tone="error" className="mb-6">
+            <p className="font-medium">Ошибка загрузки настроек</p>
             <p className="text-sm mt-2">{error || 'Не удалось загрузить настройки ИИ. Проверьте соединение или перезагрузитесь.'}</p>
-          </div>
+          </Alert>
           <Button 
             variant="primary" 
             onClick={loadSettings}
           >
             ↻ Повторить
           </Button>
-        </div>
+        </Panel>
       </Layout>
     );
   }
 
   return (
     <Layout>
-      <div className="bg-white rounded-lg shadow-sm p-6">
-      <h1 className="text-2xl font-bold mb-6">Настройки ИИ</h1>
+      <Panel className="p-6 shadow-aspectum-card">
+      <PageHeader title="Настройки ИИ" />
 
       {error && (
-        <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg mb-6">
-          {error}
-        </div>
+        <Alert tone="error">{error}</Alert>
       )}
 
       {successMessage && (
-        <div className="bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded-lg mb-6">
-          {successMessage}
-        </div>
+        <Alert tone="success" className="mb-6">{successMessage}</Alert>
       )}
 
       <form onSubmit={handleSave} className="space-y-6">
         {/* Provider Selection */}
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
+          <FormLabel  layout="block" size="sm" weight="medium" tone="strong" spacing="sm">
             Поставщик ИИ
-          </label>
-          <select
+          </FormLabel>
+          <Select
             value={settings.provider}
             onChange={(e) =>
               setSettings({ ...settings, provider: e.target.value })
             }
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
           >
             <option value="openai">OpenAI (GPT-4)</option>
             <option value="ollama">Ollama (локально)</option>
-          </select>
+          </Select>
         </div>
 
         {/* OpenAI Settings */}
         {settings.provider === 'openai' && (
-          <div className="border-l-4 border-blue-500 pl-4 space-y-4">
-            <h3 className="font-semibold text-gray-900">OpenAI Settings</h3>
+          <div className="border-l-4 border-aspectum-focus pl-4 space-y-4">
+            <Heading level={3} size="sm">OpenAI Settings</Heading>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
+              <FormLabel  layout="block" size="sm" weight="medium" tone="strong" spacing="sm">
                 Модель
-              </label>
-              <input
+              </FormLabel>
+              <TextInput
                 type="text"
                 value={settings.openai?.model || ''}
                 onChange={(e) =>
@@ -141,19 +136,18 @@ export default function AISettings() {
                     openai: { ...settings.openai, model: e.target.value },
                   })
                 }
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 placeholder="gpt-4-turbo-preview"
               />
-              <p className="text-xs text-gray-500 mt-1">
+              <p className="text-xs text-aspectum-text-muted mt-1">
                 Например: gpt-4-turbo-preview, gpt-4o, gpt-3.5-turbo
               </p>
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
+              <FormLabel  layout="block" size="sm" weight="medium" tone="strong" spacing="sm">
                 API Ключ
-              </label>
-              <input
+              </FormLabel>
+              <TextInput
                 type="password"
                 placeholder="sk-..."
                 onChange={(e) =>
@@ -162,9 +156,8 @@ export default function AISettings() {
                     openai: { ...settings.openai, api_key: e.target.value },
                   })
                 }
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               />
-              <p className="text-xs text-gray-500 mt-1">
+              <p className="text-xs text-aspectum-text-muted mt-1">
                 {settings.openai?.has_api_key
                   ? '✅ API ключ сохранен'
                   : '⚠️ API ключ не установлен'}
@@ -175,14 +168,14 @@ export default function AISettings() {
 
         {/* Ollama Settings */}
         {settings.provider === 'ollama' && (
-          <div className="border-l-4 border-orange-500 pl-4 space-y-4">
-            <h3 className="font-semibold text-gray-900">Ollama Settings</h3>
+          <div className="border-l-4 border-aspectum-orange-subtle pl-4 space-y-4">
+            <Heading level={3} size="sm">Ollama Settings</Heading>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
+              <FormLabel  layout="block" size="sm" weight="medium" tone="strong" spacing="sm">
                 Base URL
-              </label>
-              <input
+              </FormLabel>
+              <TextInput
                 type="text"
                 value={settings.ollama?.base_url || ''}
                 onChange={(e) =>
@@ -191,16 +184,15 @@ export default function AISettings() {
                     ollama: { ...settings.ollama, base_url: e.target.value },
                   })
                 }
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 placeholder="http://localhost:11434"
               />
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
+              <FormLabel  layout="block" size="sm" weight="medium" tone="strong" spacing="sm">
                 Модель
-              </label>
-              <select
+              </FormLabel>
+              <Select
                 value={settings.ollama?.model || ''}
                 onChange={(e) =>
                   setSettings({
@@ -208,7 +200,6 @@ export default function AISettings() {
                     ollama: { ...settings.ollama, model: e.target.value },
                   })
                 }
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               >
                 <option value="">Выбрать модель...</option>
                 {settings.ollama?.models?.map((model) => (
@@ -216,8 +207,8 @@ export default function AISettings() {
                     {model}
                   </option>
                 ))}
-              </select>
-              <p className="text-xs text-gray-500 mt-1">
+              </Select>
+              <p className="text-xs text-aspectum-text-muted mt-1">
                 {settings.ollama?.available
                   ? '✅ Ollama доступна'
                   : '❌ Ollama не доступна'}
@@ -226,10 +217,10 @@ export default function AISettings() {
 
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <FormLabel  layout="block" size="sm" weight="medium" tone="strong" spacing="sm">
                   Timeout (сек)
-                </label>
-                <input
+                </FormLabel>
+                <TextInput
                   type="number"
                   min="1"
                   value={settings.ollama?.timeout || 300}
@@ -242,15 +233,14 @@ export default function AISettings() {
                       },
                     })
                   }
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <FormLabel  layout="block" size="sm" weight="medium" tone="strong" spacing="sm">
                   Temperature (0-1)
-                </label>
-                <input
+                </FormLabel>
+                <TextInput
                   type="number"
                   min="0"
                   max="1"
@@ -265,7 +255,6 @@ export default function AISettings() {
                       },
                     })
                   }
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 />
               </div>
             </div>
@@ -289,7 +278,7 @@ export default function AISettings() {
           </Button>
         </div>
       </form>
-    </div>
+    </Panel>
 
     <SourceToggles />
     </Layout>
@@ -342,23 +331,21 @@ function SourceToggles() {
   if (!sources) return null;
 
   return (
-    <div className="bg-white rounded-lg shadow-sm p-6 mt-6">
-      <h2 className="text-xl font-bold mb-1">Источники данных</h2>
-      <p className="text-sm text-gray-500 mb-4">
-        Откуда конвейер берёт фото, факты и кандидатов достопримечательностей.
-        Региональные источники срабатывают только для своих городов; серые —
-        на сервере нет нужного API-ключа.
-      </p>
+    <Panel className="mt-6 p-6 shadow-aspectum-card">
+      <SectionHeader
+        title="Источники данных"
+        description="Откуда конвейер берёт фото, факты и кандидатов достопримечательностей. Региональные источники срабатывают только для своих городов; серые — на сервере нет нужного API-ключа."
+        size="lg"
+        className="mb-4"
+      />
 
       {error && (
-        <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-2 rounded-lg mb-4 text-sm">
-          {error}
-        </div>
+        <Alert tone="error">{error}</Alert>
       )}
 
       {SOURCE_GROUPS.map((group) => (
         <div key={group.key} className="mb-5 last:mb-0">
-          <h3 className="text-sm font-semibold text-gray-700 mb-2">{group.title}</h3>
+          <SectionHeader title={group.title} level={3} size="xs" className="mb-2" />
           <div className="grid md:grid-cols-2 gap-2">
             {sources
               .filter((s) => s.group === group.key)
@@ -366,58 +353,58 @@ function SourceToggles() {
                 const checked = s.operator_toggle ?? s.default_on;
                 const disabled = !s.env_ok || busyKey === s.key;
                 return (
-                  <label
+                  <FormLabel
                     key={s.key}
-                    className={`flex items-start gap-2 p-2.5 rounded-lg border cursor-pointer ${
+                    className={`flex items-start gap-2 p-2.5 rounded-aspectum-control border cursor-pointer ${
                       disabled
-                        ? 'border-gray-100 bg-gray-50 opacity-60 cursor-not-allowed'
-                        : 'border-gray-200 hover:border-blue-300'
+                        ? 'border-aspectum-border-subtle bg-aspectum-surface-muted opacity-60 cursor-not-allowed'
+                        : 'border-aspectum-border hover:border-aspectum-primary-border-strong'
                     }`}
                   >
-                    <input
-                      type="checkbox"
+                    <Checkbox
                       className="mt-1"
                       checked={checked}
                       disabled={disabled}
                       onChange={(e) => setToggle(s.key, e.target.checked)}
                     />
                     <span className="min-w-0 flex-1">
-                      <span className="text-sm font-medium text-gray-900">{s.title}</span>
-                      <span className="block text-xs text-gray-500">{s.description}</span>
+                      <span className="text-sm font-medium text-aspectum-text">{s.title}</span>
+                      <span className="block text-xs text-aspectum-text-muted">{s.description}</span>
                       <span className="flex gap-1 mt-1 flex-wrap items-center">
                         {s.regions.map((r) => (
                           <span
                             key={r}
-                            className="px-1.5 py-0.5 rounded bg-amber-50 text-amber-700 text-[10px]"
+                            className="px-1.5 py-0.5 rounded bg-aspectum-warning-soft text-aspectum-warning-strong text-[10px]"
                           >
                             {REGION_LABELS[r] || r}
                           </span>
                         ))}
                         {!s.env_ok && (
-                          <span className="px-1.5 py-0.5 rounded bg-red-50 text-red-600 text-[10px]">
+                          <span className="px-1.5 py-0.5 rounded bg-aspectum-danger-soft text-aspectum-danger text-[10px]">
                             нужен ключ: {(s.requires_env || []).join(', ')}
                           </span>
                         )}
                         {s.operator_toggle != null && (
-                          <button
+                          <Button
                             type="button"
-                            className="px-1.5 py-0.5 rounded bg-gray-100 text-gray-500 text-[10px] hover:bg-gray-200"
+                            variant="ghost"
+                            size="xxs"
                             onClick={(e) => {
                               e.preventDefault();
                               setToggle(s.key, null);
                             }}
                           >
                             {s.operator_toggle ? 'включён вручную' : 'выключен вручную'} — сбросить
-                          </button>
+                          </Button>
                         )}
                       </span>
                     </span>
-                  </label>
+                  </FormLabel>
                 );
               })}
           </div>
         </div>
       ))}
-    </div>
+    </Panel>
   );
 }

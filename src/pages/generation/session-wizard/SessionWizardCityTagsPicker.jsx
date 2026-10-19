@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { normalizeId } from './sessionWizardShared.jsx';
+import { FormLabel, Alert, Button, CheckboxTree, Chip, DropdownPanel, EmptyState, InlineState, SectionHeader, TextInput } from '@aspectum/ui';
 
 function getMultilangDisplay(value, fallback = '') {
   if (!value) return fallback;
@@ -226,58 +227,55 @@ export default function SessionWizardCityTagsPicker({
   );
 
   return (
-    <div className="space-y-3 pt-2 border-t border-gray-100">
-      <div>
-        <h3 className="text-base font-semibold text-gray-900">Теги города</h3>
-        <p className="text-xs text-gray-500 mt-0.5">
-          Только выбор из справочника. Управление — во вкладке «Теги».
-        </p>
-      </div>
+    <div className="space-y-3 pt-2 border-t border-aspectum-border-subtle">
+      <SectionHeader level={3} size="sm" descriptionSize="xs" title="Теги города" description="Только выбор из справочника. Управление — во вкладке «Теги»." />
 
       {listLoading && (
-        <div className="text-sm text-gray-500 py-4 text-center border border-dashed border-gray-200 rounded-lg">
+        <div className="text-sm text-aspectum-text-muted py-4 text-center border border-dashed border-aspectum-border rounded-aspectum-control">
           Загрузка тегов…
         </div>
       )}
 
       {listError && (
-        <div className="p-3 rounded-lg border border-red-200 bg-red-50 text-sm text-red-800 space-y-2">
+        <Alert tone="error" className="text-sm space-y-2">
           <p>{cityTagCatalogError}</p>
-          <button
-            type="button"
+          <Button
             onClick={() => onReloadCityTagCatalog?.()}
-            className="px-3 py-1.5 text-xs font-medium text-red-800 bg-white border border-red-200 rounded-lg hover:bg-red-100"
+            variant="outlineDanger"
+            size="sm"
           >
             Повторить
-          </button>
-        </div>
+          </Button>
+        </Alert>
       )}
 
       {!listLoading && !listError && cityFilterTreeError && tagItems.length === 0 && (
-        <div className="p-3 rounded-lg border border-red-200 bg-red-50 text-sm text-red-800 space-y-2">
+        <Alert tone="error" className="text-sm space-y-2">
           <p>{cityFilterTreeError}</p>
-          <button
-            type="button"
+          <Button
             onClick={() => onReloadCityFilters?.()}
-            className="px-3 py-1.5 text-xs font-medium text-red-800 bg-white border border-red-200 rounded-lg hover:bg-red-100"
+            variant="outlineDanger"
+            size="sm"
           >
             Повторить
-          </button>
-        </div>
+          </Button>
+        </Alert>
       )}
 
       {!listLoading && !listError && tagItems.length === 0 && (
-        <div className="text-sm text-gray-600 py-4 px-3 border border-dashed border-gray-200 rounded-lg bg-gray-50">
-          Теги пока не созданы. Создайте их во вкладке «Теги».
-        </div>
+        <EmptyState
+          title="Теги пока не созданы"
+          description="Создайте их во вкладке «Теги»."
+          className="py-4"
+        />
       )}
 
       {!listLoading && !listError && tagItems.length > 0 && (
         <>
           <div>
-            <p className="text-xs font-medium text-gray-600 mb-2">Выбранные:</p>
+            <p className="text-xs font-medium text-aspectum-text-subtle mb-2">Выбранные:</p>
             {selectedTagIds.size === 0 ? (
-              <p className="text-xs text-gray-400">Пока ни одного тега</p>
+              <p className="text-xs text-aspectum-text-disabled">Пока ни одного тега</p>
             ) : (
               <div className="flex flex-wrap gap-2">
                 {cityTags.map((rawId) => {
@@ -285,21 +283,15 @@ export default function SessionWizardCityTagsPicker({
                   if (!id) return null;
                   const label = pillLabelForId(id, tagById);
                   return (
-                    <span
+                    <Chip
                       key={id}
                       title={id}
-                      className="inline-flex items-center gap-1 pl-2.5 pr-1 py-1 rounded-full text-xs font-medium bg-blue-50 text-blue-800 border border-blue-200"
+                      variant="primary"
+                      removable
+                      onRemove={() => toggle(id)}
                     >
                       <span className="max-w-[200px] truncate">{label}</span>
-                      <button
-                        type="button"
-                        onClick={() => toggle(id)}
-                        className="w-5 h-5 flex items-center justify-center rounded-full hover:bg-blue-100 text-blue-700"
-                        aria-label="Убрать тег"
-                      >
-                        ×
-                      </button>
-                    </span>
+                    </Chip>
                   );
                 })}
               </div>
@@ -307,51 +299,33 @@ export default function SessionWizardCityTagsPicker({
           </div>
 
           <div className="relative" ref={wrapRef}>
-            <button
+            <Button
               type="button"
               onClick={() => setMenuOpen((o) => !o)}
-              className="px-3 py-2 text-sm font-medium text-blue-700 bg-blue-50 border border-blue-200 rounded-lg hover:bg-blue-100"
+              variant="softStrong"
+              size="sm"
             >
               + Добавить тег
-            </button>
+            </Button>
 
             {menuOpen ? (
-              <div className="absolute z-50 left-0 top-full mt-2 w-full max-w-md rounded-xl border border-gray-200 bg-white shadow-lg p-3 space-y-2">
-                <label className="block text-xs font-medium text-gray-600">Поиск</label>
-                <input
-                  type="search"
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
-                  placeholder="Название, описание…"
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  autoFocus
-                />
+              <DropdownPanel className="absolute z-50 left-0 top-full mt-2 w-full max-w-md p-3 space-y-2">
+                <FormLabel  layout="block" size="xs" weight="medium" tone="subtle">Поиск</FormLabel>
+                <TextInput type="search" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Название, описание…" autoFocus />
 
-                <div className="max-h-56 overflow-y-auto border border-gray-100 rounded-lg divide-y divide-gray-100">
+                <div className="max-h-56 overflow-y-auto rounded-aspectum-control border border-aspectum-border-subtle">
                   {filteredTags.length === 0 ? (
-                    <p className="text-xs text-gray-500 p-3">Ничего не найдено</p>
+                    <InlineState size="xs" className="p-3">Ничего не найдено</InlineState>
                   ) : (
-                    filteredTags.map((node) => {
-                      const id = normalizeId(node.id);
-                      const checked = selectedTagIds.has(id);
-                      const label = pillLabelForNode(node) || id;
-                      return (
-                        <label
-                          key={id}
-                          className="flex items-center gap-2 px-3 py-2 text-sm cursor-pointer hover:bg-gray-50"
-                        >
-                          <input
-                            type="checkbox"
-                            checked={checked}
-                            onChange={() => toggle(id)}
-                          />
-                          <span className="truncate">{label}</span>
-                        </label>
-                      );
-                    })
+                    <CheckboxTree
+                      groups={[{ id: 'search-results', label: 'Результаты', items: filteredTags }]}
+                      selected={[...selectedTagIds]}
+                      onToggle={toggle}
+                      getItemLabel={(node) => pillLabelForNode(node) || normalizeId(node.id)}
+                    />
                   )}
                 </div>
-              </div>
+              </DropdownPanel>
             ) : null}
           </div>
         </>

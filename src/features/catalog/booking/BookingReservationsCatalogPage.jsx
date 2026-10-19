@@ -1,16 +1,13 @@
 import { useCallback, useEffect, useState } from 'react';
 import { bookingReservationsAPI, eventSlotAvailabilitiesAPI } from '../../../api/booking';
 import Layout from '../../../components/Layout';
-import DataTable from '../../../components/ui/DataTable';
-import { Field } from '../../../components/ui/FormField';
-import Modal from '../../../components/ui/Modal';
+import { Select, PageHeader, DataTable, Field, Modal, formGridClassName } from '@aspectum/ui';
 import { useLayoutActions } from '../../../context/useLayoutActions';
 import { parseApiError } from '../../../utils/apiError';
 import { useCatalogFilters } from '../core/useCatalogFilters';
 import { useCatalogPagedReload } from '../core/useCatalogPagedReload';
 import { useCatalogResource } from '../core/useCatalogResource';
 import { useEventOptions, useTicketTypeMap, useTicketTypeOptions } from '../shared/bookingOptions';
-import CatalogPageHeader from '../shared/components/CatalogPageHeader';
 import EventSelect from '../shared/components/EventSelect';
 import TicketTypeSelect from '../shared/components/TicketTypeSelect';
 import { formatMoney } from '../shared/currencies';
@@ -89,8 +86,9 @@ export default function BookingReservationsCatalogPage() {
     setSlotOptions([]);
   }, [eventFilter]);
 
+  const loadReservations = reservations.load;
   const reload = useCallback(async (pageNum) => {
-    await reservations.load(
+    await loadReservations(
       {
         page: pageNum,
         page_size: PAGE_SIZE,
@@ -103,7 +101,7 @@ export default function BookingReservationsCatalogPage() {
       },
       (err) => parseApiError(err, 'Ошибка загрузки резервов')
     );
-  }, [reservations.load, eventFilter, statusFilter, ticketTypeFilter, slotFilter, debouncedSearch]);
+  }, [loadReservations, eventFilter, statusFilter, ticketTypeFilter, slotFilter, debouncedSearch]);
 
   useCatalogPagedReload({
     page,
@@ -118,22 +116,22 @@ export default function BookingReservationsCatalogPage() {
   }, [setMobileActions]);
 
   const STATUS_STYLE = {
-    reserved:  'bg-green-100 text-green-700',
-    cancelled: 'bg-red-100 text-red-600',
-    expired:   'bg-gray-100 text-gray-500',
+    reserved:  'bg-aspectum-positive-muted text-aspectum-positive-strong',
+    cancelled: 'bg-aspectum-danger-muted text-aspectum-danger',
+    expired:   'bg-aspectum-surface-subtle text-aspectum-text-muted',
   };
 
   const columns = [
     {
       key: 'created_at',
       label: 'Создан',
-      render: (v) => <span className="text-sm text-gray-700">{formatDateTime(v)}</span>,
+      render: (v) => <span className="text-sm text-aspectum-text-strong">{formatDateTime(v)}</span>,
     },
     {
       key: 'status',
       label: 'Статус',
       render: (v) => (
-        <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${STATUS_STYLE[v] || 'bg-gray-100 text-gray-500'}`}>
+        <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${STATUS_STYLE[v] || 'bg-aspectum-surface-subtle text-aspectum-text-muted'}`}>
           {v || '—'}
         </span>
       ),
@@ -141,13 +139,13 @@ export default function BookingReservationsCatalogPage() {
     {
       key: 'event',
       label: 'Событие',
-      render: (id) => <span className="text-sm text-gray-700">{getEventLabelById(eventOptions, id) || id || '—'}</span>,
+      render: (id) => <span className="text-sm text-aspectum-text-strong">{getEventLabelById(eventOptions, id) || id || '—'}</span>,
     },
     {
       key: 'ticket_type',
       label: 'Тип',
       render: (id) => (
-        <span className="text-sm text-gray-700">
+        <span className="text-sm text-aspectum-text-strong">
           {id ? (ticketTypeLabelById.get(String(id))?.title || String(id)) : '—'}
         </span>
       ),
@@ -155,13 +153,13 @@ export default function BookingReservationsCatalogPage() {
     {
       key: 'qty',
       label: 'Кол-во',
-      render: (v) => <span className="text-sm text-gray-700">{Number.isFinite(v) ? v : Number(v || 0)}</span>,
+      render: (v) => <span className="text-sm text-aspectum-text-strong">{Number.isFinite(v) ? v : Number(v || 0)}</span>,
     },
     {
       key: 'total_price',
       label: 'Сумма',
       render: (v, row) => (
-        <span className="text-sm font-medium text-gray-900">
+        <span className="text-sm font-medium text-aspectum-text">
           {v != null ? formatMoney(Number(v).toFixed(2), row.currency) : '—'}
         </span>
       ),
@@ -169,13 +167,13 @@ export default function BookingReservationsCatalogPage() {
     {
       key: 'guest_email',
       label: 'Гость',
-      render: (v) => <span className="text-xs text-gray-500 font-mono">{v || '—'}</span>,
+      render: (v) => <span className="text-xs text-aspectum-text-muted font-mono">{v || '—'}</span>,
     },
   ];
 
   return (
     <Layout>
-      <CatalogPageHeader
+      <PageHeader
         title="Резервы (люди)"
         description="История резервов: user/guest, слот, типы и клиенты"
       />
@@ -204,19 +202,14 @@ export default function BookingReservationsCatalogPage() {
               options={eventOptions}
               disabled={eventsLoading}
               placeholder="Все события"
-              className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none"
             />
 
-            <select
-              value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value)}
-              className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none"
-            >
+            <Select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
               <option value="">Любой статус</option>
               <option value="reserved">reserved</option>
               <option value="cancelled">cancelled</option>
               <option value="expired">expired</option>
-            </select>
+            </Select>
 
             <TicketTypeSelect
               value={ticketTypeFilter}
@@ -224,22 +217,16 @@ export default function BookingReservationsCatalogPage() {
               options={ticketTypeOptions}
               disabled={!eventFilter || ticketTypesLoading}
               placeholder={eventFilter ? 'Все типы' : 'Сначала выберите событие'}
-              className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none"
             />
 
-            <select
-              value={slotFilter}
-              onChange={(e) => setSlotFilter(e.target.value)}
-              className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none"
-              disabled={!eventFilter || slotsLoading || !slotOptions.length}
-            >
+            <Select value={slotFilter} onChange={(e) => setSlotFilter(e.target.value)} disabled={!eventFilter || slotsLoading || !slotOptions.length}>
               <option value="">{eventFilter ? 'Все слоты' : 'Сначала выберите событие'}</option>
               {slotOptions.map((s) => (
                 <option key={s.id} value={s.id}>
                   {s.label || s.id}
                 </option>
               ))}
-            </select>
+            </Select>
           </>
         )}
       />
@@ -252,39 +239,39 @@ export default function BookingReservationsCatalogPage() {
       >
         {detail ? (
           <div className="space-y-3">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <div className={formGridClassName()}>
               <Field label="Создан">
-                <div className="text-sm text-gray-700">{formatDateTime(detail.created_at)}</div>
+                <div className="text-sm text-aspectum-text-strong">{formatDateTime(detail.created_at)}</div>
               </Field>
               <Field label="Статус">
-                <div className="text-sm text-gray-700">{detail.status || '—'}</div>
+                <div className="text-sm text-aspectum-text-strong">{detail.status || '—'}</div>
               </Field>
               <Field label="Событие">
-                <div className="text-sm text-gray-700">{getEventLabelById(eventOptions, detail.event) || detail.event || '—'}</div>
+                <div className="text-sm text-aspectum-text-strong">{getEventLabelById(eventOptions, detail.event) || detail.event || '—'}</div>
               </Field>
               <Field label="Слот">
-                <div className="text-sm text-gray-700 font-mono">{detail.slot || '—'}</div>
+                <div className="text-sm text-aspectum-text-strong font-mono">{detail.slot || '—'}</div>
               </Field>
               <Field label="Тип (single)">
-                <div className="text-sm text-gray-700">{detail.ticket_type ? (ticketTypeLabelById.get(String(detail.ticket_type))?.title || detail.ticket_type) : '—'}</div>
+                <div className="text-sm text-aspectum-text-strong">{detail.ticket_type ? (ticketTypeLabelById.get(String(detail.ticket_type))?.title || detail.ticket_type) : '—'}</div>
               </Field>
               <Field label="Кол-во">
-                <div className="text-sm text-gray-700">{detail.qty ?? '—'}</div>
+                <div className="text-sm text-aspectum-text-strong">{detail.qty ?? '—'}</div>
               </Field>
               <Field label="Гость email">
-                <div className="text-sm text-gray-700">{detail.guest_email || '—'}</div>
+                <div className="text-sm text-aspectum-text-strong">{detail.guest_email || '—'}</div>
               </Field>
               <Field label="User">
-                <div className="text-sm text-gray-700 font-mono">{detail.user || '—'}</div>
+                <div className="text-sm text-aspectum-text-strong font-mono">{detail.user || '—'}</div>
               </Field>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <div className={formGridClassName()}>
               <Field label="Items (JSON)">
-                <pre className="text-xs bg-gray-50 border border-gray-200 rounded-lg p-3 overflow-auto max-h-64">{stringifyJson(detail.items)}</pre>
+                <pre className="text-xs bg-aspectum-surface-muted border border-aspectum-border rounded-aspectum-control p-3 overflow-auto max-h-64">{stringifyJson(detail.items)}</pre>
               </Field>
               <Field label="Clients (JSON)">
-                <pre className="text-xs bg-gray-50 border border-gray-200 rounded-lg p-3 overflow-auto max-h-64">{stringifyJson(detail.clients)}</pre>
+                <pre className="text-xs bg-aspectum-surface-muted border border-aspectum-border rounded-aspectum-control p-3 overflow-auto max-h-64">{stringifyJson(detail.clients)}</pre>
               </Field>
             </div>
           </div>
@@ -293,4 +280,3 @@ export default function BookingReservationsCatalogPage() {
     </Layout>
   );
 }
-

@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { Select } from '../../../components/ui/FormField';
-import { ConfirmModal } from '../../../components/ui/Modal';
+import { Alert, Button, ConfirmModal, EmptyState, Heading, IconButton, Panel, Select } from '@aspectum/ui';
 import { parseApiError } from '../../../utils/apiError';
 import { eventsCatalogAPI } from './api';
 import { LangBlock } from '../shared/LangFields';
@@ -116,28 +115,32 @@ export default function EventInclusionsTab({ eventId, activeLang }) {
   };
 
   if (!activeLang) {
-    return <p className="text-sm text-gray-400">Сначала укажите название события хотя бы на одном языке.</p>;
+    return <p className="text-sm text-aspectum-text-disabled">Сначала укажите название события хотя бы на одном языке.</p>;
   }
 
   return (
     <div className="space-y-3">
-      {error && <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">{error}</div>}
+      {error && <Alert tone="error">{error}</Alert>}
 
       {loading ? (
-        <div className="text-sm text-gray-400">Загрузка...</div>
+        <EmptyState icon={null} title="Загрузка..." spacing="sm" />
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {KIND_OPTIONS.map(({ value: kind, label, icon }) => {
             const group = items.filter((it) => it.kind === kind).sort((a, b) => a.index - b.index);
             return (
               <div key={kind}>
-                <h4 className="text-sm font-semibold text-gray-700 mb-2">{icon} {label}</h4>
+                <Heading level={4} size="xs" tone="strong" className="mb-2">{icon} {label}</Heading>
                 <div className="space-y-2">
                   {group.length === 0 && addKind !== kind && (
-                    <p className="text-xs text-gray-400">Пунктов пока нет.</p>
+                    <EmptyState
+                      icon={icon}
+                      title="Пунктов пока нет"
+                      className="py-3"
+                    />
                   )}
                   {group.map((item, i) => (
-                    <div key={item.id} className="border border-gray-200 rounded-lg p-2.5">
+                    <div key={item.id} className="border border-aspectum-border rounded-aspectum-control p-2.5">
                       {editingId === item.id ? (
                         <div className="space-y-2">
                           <Select
@@ -152,32 +155,28 @@ export default function EventInclusionsTab({ eventId, activeLang }) {
                             onChange={(v) => setEditDraft((p) => ({ ...p, text: v }))}
                             activeLang={activeLang}
                           />
-                          {saveError && <p className="text-xs text-red-600">{saveError}</p>}
+                          {saveError && <p className="text-xs text-aspectum-danger">{saveError}</p>}
                           <div className="flex gap-2">
-                            <button type="button" onClick={saveEdit} disabled={saving}
-                              className="px-2.5 py-1 text-xs font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-50">
+                            <Button type="button" variant="primary" size="sm" onClick={saveEdit} disabled={saving}>
                               {saving ? '...' : 'Сохранить'}
-                            </button>
-                            <button type="button" onClick={cancelEdit}
-                              className="px-2.5 py-1 text-xs font-medium text-gray-600 bg-gray-100 rounded-lg hover:bg-gray-200">
+                            </Button>
+                            <Button type="button" variant="secondary" size="sm" onClick={cancelEdit}>
                               Отмена
-                            </button>
+                            </Button>
                           </div>
                         </div>
                       ) : (
                         <div className="flex items-start justify-between gap-2">
-                          <p className="text-sm text-gray-700 min-w-0 truncate">
+                          <p className="text-sm text-aspectum-text-strong min-w-0 truncate">
                             {item.text?.[activeLang] || '(без текста)'}
                           </p>
                           <div className="flex items-center gap-1 shrink-0">
-                            <button type="button" onClick={() => move(item, -1, group)} disabled={i === 0}
-                              className="w-6 h-6 text-gray-500 hover:text-gray-800 disabled:opacity-30 text-xs" title="Выше">↑</button>
-                            <button type="button" onClick={() => move(item, 1, group)} disabled={i === group.length - 1}
-                              className="w-6 h-6 text-gray-500 hover:text-gray-800 disabled:opacity-30 text-xs" title="Ниже">↓</button>
-                            <button type="button" onClick={() => startEdit(item)}
-                              className="px-2 py-0.5 text-xs font-medium text-blue-700 bg-blue-50 rounded hover:bg-blue-100">✎</button>
-                            <button type="button" onClick={() => setDeleteTarget(item)}
-                              className="px-2 py-0.5 text-xs font-medium text-red-700 bg-red-50 rounded hover:bg-red-100">✕</button>
+                            <IconButton label="Переместить выше" type="button" onClick={() => move(item, -1, group)} disabled={i === 0}
+                              className="w-6 h-6 p-0 text-xs">↑</IconButton>
+                            <IconButton label="Переместить ниже" type="button" onClick={() => move(item, 1, group)} disabled={i === group.length - 1}
+                              className="w-6 h-6 p-0 text-xs">↓</IconButton>
+                            <Button type="button" variant="soft" size="sm" onClick={() => startEdit(item)}>✎</Button>
+                            <Button type="button" variant="softDanger" size="sm" onClick={() => setDeleteTarget(item)}>✕</Button>
                           </div>
                         </div>
                       )}
@@ -185,30 +184,37 @@ export default function EventInclusionsTab({ eventId, activeLang }) {
                   ))}
 
                   {addKind === kind ? (
-                    <div className="border border-dashed border-blue-300 rounded-lg p-2.5 space-y-2 bg-blue-50/30">
+                    <Panel tone="info" className="border-dashed p-2.5 space-y-2">
                       <LangBlock
                         label="Текст"
                         value={addDraft?.text || {}}
                         onChange={(v) => setAddDraft((p) => ({ ...p, text: v }))}
                         activeLang={activeLang}
                       />
-                      {saveError && <p className="text-xs text-red-600">{saveError}</p>}
+                      {saveError && <p className="text-xs text-aspectum-danger">{saveError}</p>}
                       <div className="flex gap-2">
-                        <button type="button" onClick={submitAdd} disabled={saving}
-                          className="px-2.5 py-1 text-xs font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-50">
+                        <Button type="button" variant="primary" size="sm" onClick={submitAdd} disabled={saving}>
                           {saving ? '...' : 'Добавить'}
-                        </button>
-                        <button type="button" onClick={() => { setAddKind(null); setAddDraft(null); setSaveError(null); }}
-                          className="px-2.5 py-1 text-xs font-medium text-gray-600 bg-gray-100 rounded-lg hover:bg-gray-200">
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="secondary"
+                          size="sm"
+                          onClick={() => { setAddKind(null); setAddDraft(null); setSaveError(null); }}
+                        >
                           Отмена
-                        </button>
+                        </Button>
                       </div>
-                    </div>
+                    </Panel>
                   ) : (
-                    <button type="button" onClick={() => { setAddKind(kind); setAddDraft(emptyItem(kind)); }}
-                      className="px-2.5 py-1.5 text-xs font-medium text-blue-700 bg-blue-50 rounded-lg hover:bg-blue-100">
+                    <Button
+                      type="button"
+                      variant="soft"
+                      size="sm"
+                      onClick={() => { setAddKind(kind); setAddDraft(emptyItem(kind)); }}
+                    >
                       + Добавить
-                    </button>
+                    </Button>
                   )}
                 </div>
               </div>

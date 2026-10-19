@@ -2,16 +2,9 @@ import { useCallback, useEffect, useState } from 'react';
 import { citiesAPI, eventsAPI } from '../../../api/generation';
 import { subscriptionTypesAPI } from '../../../api/subscription';
 import Layout from '../../../components/Layout';
-import DataTable from '../../../components/ui/DataTable';
-import { Field, FormActions, TextInput, Textarea } from '../../../components/ui/FormField';
-import Modal, { ConfirmModal } from '../../../components/ui/Modal';
+import { Select, Alert, CheckboxField, PageHeader, ConfirmModal, DataTable, Field, FormActions, Modal, StatusBadge, TableRowActions, Textarea, TextInput } from '@aspectum/ui';
 import { useLayoutActions } from '../../../context/useLayoutActions';
 import { parseApiError } from '../../../utils/apiError';
-import ActiveCheckboxField from '../shared/components/ActiveCheckboxField';
-import CatalogPageHeader from '../shared/components/CatalogPageHeader';
-import FormErrorAlert from '../shared/components/FormErrorAlert';
-import StatusBadge from '../shared/components/StatusBadge';
-import TableRowActions from '../shared/components/TableRowActions';
 import { getCityLabel, getEventLabel } from './subscriptionLabels';
 
 const PAGE_SIZE = 20;
@@ -199,27 +192,27 @@ export default function SubscriptionTypesCatalogPage() {
     {
       key: 'name',
       label: 'Название',
-      render: (value) => <span className="text-sm font-medium text-gray-900">{value || '—'}</span>,
+      render: (value) => <span className="text-sm font-medium text-aspectum-text">{value || '—'}</span>,
     },
     {
       key: 'description',
       label: 'Описание',
-      render: (value) => <span className="text-sm text-gray-700">{value || '—'}</span>,
+      render: (value) => <span className="text-sm text-aspectum-text-strong">{value || '—'}</span>,
     },
     {
       key: 'cities',
       label: 'Города',
-      render: (value) => <span className="text-sm text-gray-700">{Array.isArray(value) ? value.length : 0}</span>,
+      render: (value) => <span className="text-sm text-aspectum-text-strong">{Array.isArray(value) ? value.length : 0}</span>,
     },
     {
       key: 'events',
       label: 'События',
-      render: (value) => <span className="text-sm text-gray-700">{Array.isArray(value) ? value.length : 0}</span>,
+      render: (value) => <span className="text-sm text-aspectum-text-strong">{Array.isArray(value) ? value.length : 0}</span>,
     },
     {
       key: 'ai_prompts',
       label: 'Запросов ИИ',
-      render: (value) => <span className="text-sm text-gray-700">{value > 0 ? value : 'только гид'}</span>,
+      render: (value) => <span className="text-sm text-aspectum-text-strong">{value > 0 ? value : 'только гид'}</span>,
     },
     {
       key: 'is_active',
@@ -230,7 +223,7 @@ export default function SubscriptionTypesCatalogPage() {
 
   return (
     <Layout>
-      <CatalogPageHeader
+      <PageHeader
         title="Справочник типов подписки"
         description="Типы подписок: название, города, события, запросы ИИ, статус"
         createLabel="Создать тип подписки"
@@ -256,15 +249,11 @@ export default function SubscriptionTypesCatalogPage() {
         pageSize={PAGE_SIZE}
         onPage={setPage}
         filters={(
-          <select
-            value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value)}
-            className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none"
-          >
+          <Select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
             <option value="">Любой статус</option>
             <option value="active">Активные</option>
             <option value="inactive">Отключенные</option>
-          </select>
+          </Select>
         )}
         actions={(row) => (
           <TableRowActions
@@ -293,7 +282,7 @@ export default function SubscriptionTypesCatalogPage() {
       >
         {editingItem && (
           <form onSubmit={handleSave} className="space-y-4">
-            <FormErrorAlert message={saveError} />
+            <Alert tone="error">{saveError}</Alert>
 
             <Field label="Название" required>
               <TextInput
@@ -322,46 +311,26 @@ export default function SubscriptionTypesCatalogPage() {
               />
             </Field>
 
-            <ActiveCheckboxField
+            <CheckboxField
               checked={editingItem.is_active}
               onChange={(next) => setEditingItem((prev) => ({ ...prev, is_active: next }))}
               text="Активный тип подписки"
             />
 
             <Field label="Города" hint="Ctrl/Cmd + click для множественного выбора">
-              <select
-                multiple
-                size={8}
-                disabled={refsLoading}
-                value={normalizeIdList(editingItem.cities)}
-                onChange={(e) => {
-                  const selected = Array.from(e.target.selectedOptions).map((o) => o.value);
-                  setEditingItem((prev) => ({ ...prev, cities: selected }));
-                }}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none"
-              >
+              <Select multiple size={8} disabled={refsLoading} value={normalizeIdList(editingItem.cities)} onChange={(e) => { const selected = Array.from(e.target.selectedOptions).map((o) => o.value); setEditingItem((prev) => ({ ...prev, cities: selected })); }}>
                 {cities.map((city) => (
                   <option key={city.id} value={city.id}>{getCityLabel(city)}</option>
                 ))}
-              </select>
+              </Select>
             </Field>
 
             <Field label="События" hint="Ctrl/Cmd + click для множественного выбора">
-              <select
-                multiple
-                size={8}
-                disabled={refsLoading}
-                value={normalizeIdList(editingItem.events)}
-                onChange={(e) => {
-                  const selected = Array.from(e.target.selectedOptions).map((o) => o.value);
-                  setEditingItem((prev) => ({ ...prev, events: selected }));
-                }}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none"
-              >
+              <Select multiple size={8} disabled={refsLoading} value={normalizeIdList(editingItem.events)} onChange={(e) => { const selected = Array.from(e.target.selectedOptions).map((o) => o.value); setEditingItem((prev) => ({ ...prev, events: selected })); }}>
                 {events.map((event) => (
                   <option key={event.id} value={event.id}>{getEventLabel(event)}</option>
                 ))}
-              </select>
+              </Select>
             </Field>
 
             <FormActions

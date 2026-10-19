@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { Button } from '@aspectum/ui';
 import { audioAPI } from '../../../../api/generation';
 
 export default function AudioPlayer({ audioId }) {
@@ -28,17 +29,18 @@ export default function AudioPlayer({ audioId }) {
     if (blobRef.current) URL.revokeObjectURL(blobRef.current);
   }, []);
 
-  if (error) return <span className="text-xs text-red-500">{error}</span>;
+  if (error) return <span className="text-xs text-aspectum-danger-subtle">{error}</span>;
   if (!blobUrl) {
     return (
-      <button
+      <Button
         type="button"
         onClick={load}
         disabled={loading}
-        className="px-3 py-1.5 text-xs font-medium text-blue-600 bg-blue-50 rounded-lg hover:bg-blue-100 disabled:opacity-50 transition-colors"
+        variant="soft"
+        size="sm"
       >
         {loading ? '⏳' : '▶ Слушать'}
-      </button>
+      </Button>
     );
   }
   return <audio controls src={blobUrl} className="h-8 flex-1 min-w-0" />;

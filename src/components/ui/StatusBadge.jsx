@@ -1,11 +1,19 @@
 const DEFAULT_SESSION_STATUS_MAP = {
-  draft: { label: 'Черновик', cls: 'bg-gray-100 text-gray-700' },
-  in_progress: { label: 'В процессе', cls: 'bg-yellow-100 text-yellow-800' },
-  completed: { label: 'Завершена', cls: 'bg-green-100 text-green-800' },
-  published: { label: 'Опубликована', cls: 'bg-blue-100 text-blue-800' },
-  closed_saved: { label: 'Закрыта (сохранена)', cls: 'bg-purple-100 text-purple-700' },
-  closed_discarded: { label: 'Закрыта (отменена)', cls: 'bg-red-100 text-red-700' },
-  corrected: { label: 'Скорректирована', cls: 'bg-teal-100 text-teal-700' },
+  draft: { label: 'Черновик', cls: 'bg-aspectum-surface-muted text-aspectum-text' },
+  in_progress: { label: 'В процессе', cls: 'bg-aspectum-warning-soft text-aspectum-warning' },
+  completed: { label: 'Завершена', cls: 'bg-aspectum-success-soft text-aspectum-success' },
+  published: { label: 'Опубликована', cls: 'bg-aspectum-primary-soft text-aspectum-primary-hover' },
+  closed_saved: { label: 'Закрыта (сохранена)', cls: 'bg-aspectum-violet/10 text-aspectum-violet' },
+  closed_discarded: { label: 'Закрыта (отменена)', cls: 'bg-aspectum-danger-soft text-aspectum-danger' },
+  corrected: { label: 'Скорректирована', cls: 'bg-aspectum-teal/10 text-aspectum-teal' },
+};
+
+const TONE_CLASSES = {
+  neutral: 'bg-aspectum-surface-muted text-aspectum-text-muted',
+  success: 'bg-aspectum-success-muted text-aspectum-success-strong',
+  warning: 'bg-aspectum-warning-muted text-aspectum-warning-strong',
+  info: 'bg-aspectum-info-muted text-aspectum-info-strong',
+  danger: 'bg-aspectum-danger-muted text-aspectum-danger-strong',
 };
 
 function isDefined(value) {
@@ -13,6 +21,16 @@ function isDefined(value) {
 }
 
 export default function StatusBadge(props) {
+  // Mode C: generic semantic status (tone + label/children).
+  if (isDefined(props?.tone)) {
+    const { tone = 'neutral', label, children, className = '' } = props;
+    return (
+      <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium whitespace-nowrap ${TONE_CLASSES[tone] || TONE_CLASSES.neutral} ${className}`.trim()}>
+        {label ?? children}
+      </span>
+    );
+  }
+
   // Mode A: session status badge (status + optional label).
   if (isDefined(props?.status)) {
     const {
@@ -22,7 +40,7 @@ export default function StatusBadge(props) {
       className = '',
     } = props;
 
-    const state = statusMap?.[status] || { label: label || status, cls: 'bg-gray-100 text-gray-600' };
+    const state = statusMap?.[status] || { label: label || status, cls: 'bg-aspectum-surface-muted text-aspectum-text-muted' };
 
     return (
       <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold whitespace-nowrap ${state.cls} ${className}`.trim()}>
@@ -41,11 +59,11 @@ export default function StatusBadge(props) {
   } = props || {};
 
   const inactiveClass = inactiveTone === 'red'
-    ? 'bg-red-100 text-red-700'
-    : 'bg-gray-100 text-gray-500';
+    ? 'bg-aspectum-danger-soft text-aspectum-danger'
+    : 'bg-aspectum-surface-muted text-aspectum-text-muted';
 
   return (
-    <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${active ? 'bg-green-100 text-green-700' : inactiveClass} ${className}`.trim()}>
+    <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${active ? 'bg-aspectum-success-soft text-aspectum-success' : inactiveClass} ${className}`.trim()}>
       {active ? activeLabel : inactiveLabel}
     </span>
   );
@@ -53,8 +71,4 @@ export default function StatusBadge(props) {
 
 export function SessionStatusBadge({ status, label, className = '' }) {
   return <StatusBadge status={status} label={label} statusMap={DEFAULT_SESSION_STATUS_MAP} className={className} />;
-}
-
-export function getDefaultSessionStatusMap() {
-  return DEFAULT_SESSION_STATUS_MAP;
 }
