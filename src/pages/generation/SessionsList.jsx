@@ -1,9 +1,11 @@
 /**
- * SessionsList — grouped admin table for generation sessions.
+ * SessionsList — одна строка на сессию.
  *
- * Each session is rendered as a compact group header with its single city row.
+ * Сессия — это рабочий город. Автоназвание «Сессия от …» не занимает отдельную
+ * полосу: город стоит в строке, служебное имя остаётся подписью, только если
+ * оно осмысленное.
  */
-import { Fragment, useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { sessionsAPI } from '../../api/generation';
@@ -120,6 +122,37 @@ function summarizeCities(cityRows) {
   return `${names.slice(0, 3).join(', ')} +${names.length - 3}`;
 }
 
+function isGenericCityName(value) {
+  const name = (value || '').trim();
+  return !name || name === '—' || name === 'без названия';
+}
+
+function isAutoSessionName(value) {
+  return /^Сессия от \d{2}\.\d{2}\.\d{4}/.test((value || '').trim());
+}
+
+function rowTitle(row, session) {
+  if (!isGenericCityName(row?.cityName)) return row.cityName;
+  const sessionName = (session?.name || '').trim();
+  return sessionName || 'Сессия без города';
+}
+
+function rowSubtitle(row, session) {
+  const sessionName = (session?.name || '').trim();
+  const title = rowTitle(row, session);
+  if (!sessionName || sessionName === title || isAutoSessionName(sessionName)) return '';
+  return sessionName;
+}
+
+function extraCityWord(count) {
+  const n = Math.abs(count) % 100;
+  const n1 = n % 10;
+  if (n > 10 && n < 20) return 'городов';
+  if (n1 === 1) return 'город';
+  if (n1 >= 2 && n1 <= 4) return 'города';
+  return 'городов';
+}
+
 function buildCityRows(session) {
   const drafts = Array.isArray(session.city_drafts) && session.city_drafts.length > 0
     ? [...session.city_drafts].sort((a, b) => (a.order ?? a.upload_batch_order ?? 0) - (b.order ?? b.upload_batch_order ?? 0))
@@ -190,20 +223,6 @@ function parseSelectionKey(key) {
   }
 
   return null;
-}
-
-function buildRowDeleteTarget(group, row) {
-  const shouldDeleteOnlyDraft =
-    group.totalRowsCount > 1 &&
-    row.cityDraftId &&
-    row.cityDraftId !== 'legacy';
-
-  return {
-    type: shouldDeleteOnlyDraft ? 'draft' : 'session',
-    session: group.session,
-    cityRow: row,
-    totalRowsCount: group.totalRowsCount,
-  };
 }
 
 function getGroupDraftSelectionKeys(group) {
@@ -650,54 +669,21 @@ export default function SessionsList({ components = {} } = {}) {
     });
   };
 
-  const toggleDraftDelete = useCallback((group, row) => {
-    const sessionKey = buildSessionSelectionKey(group.session.id);
-    const draftKey = buildDraftSelectionKey(group.session.id, row.cityDraftId);
-    const allDraftKeys = getGroupDraftSelectionKeys(group);
-
-    setSelected((prev) => {
-      const next = new Set(prev);
-
-      if (next.has(draftKey)) {
-        next.delete(draftKey);
-      } else {
-        next.add(draftKey);
-      }
-
-      const allDraftsSelected =
-        allDraftKeys.length > 0 &&
-        allDraftKeys.every((key) => next.has(key));
-
-      if (allDraftsSelected) {
-        next.add(sessionKey);
-      } else {
-        next.delete(sessionKey);
-      }
-
-      return next;
-    });
-  }, []);
-
   useEffect(() => {
     setMobileActions([
       {
         id: 'create-session',
-        label: creating ? 'Создание...' : 'Создать сессию',
+        label: creating ? 'Создание...' : 'Новая сессия',
         onClick: () => {
           if (!creating) handleCreate();
         },
         disabled: creating,
         variant: 'primary',
       },
-      {
-        id: 'refresh-sessions',
-        label: 'Обновить список',
-        onClick: () => refetchSessions(),
-      },
     ]);
 
     return () => setMobileActions([]);
-  }, [setMobileActions, creating, refetchSessions, handleCreate]);
+  }, [setMobileActions, creating, handleCreate]);
 
   const isDeleteDraftTarget = deleteTarget?.type === 'draft';
   const deleteTargetSession = deleteTarget?.session;
@@ -707,11 +693,11 @@ export default function SessionsList({ components = {} } = {}) {
     <Layout
       pageHeader={{
         title: 'Сессии генерации',
-        description: 'Одна сессия — один рабочий город',
+        description: 'Каждая строка — один рабочий город',
         actions: [
           {
-            id: 'create-session-header',
-            label: creating ? 'Создание...' : '+ Новая сессия',
+            id: 'create-session',
+            label: creating ? 'Создание...' : 'Новая сессия',
             onClick: () => {
               if (!creating) handleCreate();
             },
@@ -854,119 +840,100 @@ export default function SessionsList({ components = {} } = {}) {
                     )}
                   </td>
                 </tr>
-              ) : filteredGroups.map((group) => (
-                <Fragment key={group.session.id}>
-                  <tr className="bg-aspectum-ink-soft border-y border-aspectum-ink-border">
-                    <td colSpan={7} className="px-3 py-3">
-                      <div className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
-                        <div className="flex items-start gap-3 min-w-0">
-                          <div className="pt-0.5">
-                            <Checkbox
-                              checked={isGroupFullySelected(group, selected)}
-                              onChange={() => toggleSelect(group)}
-                              className="w-4 h-4 rounded border-aspectum-border-strong text-aspectum-primary focus:ring-aspectum-focus"
-                            />
-                          </div>
+              ) : filteredGroups.map((group) => {
+                const row = group.cityRows[0];
+                const title = rowTitle(row, group.session);
+                const subtitle = rowSubtitle(row, group.session);
+                const extraCities = Math.max(0, group.totalRowsCount - 1);
+                const rowDeleteTarget = {
+                  type: 'session',
+                  session: group.session,
+                  cityRow: row,
+                  totalRowsCount: group.totalRowsCount,
+                };
 
-                          <div className="min-w-0">
-                            <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm">
-                              <span className="font-semibold text-aspectum-ink">
-                                {group.session.name || 'Сессия без названия'}
-                              </span>
-                            </div>
+                return (
+                  <tr
+                    key={group.session.id}
+                    onClick={() => openSession(group.session, row, 'row')}
+                    className="cursor-pointer bg-aspectum-surface hover:bg-aspectum-primary-soft transition-colors"
+                  >
+                    <td className="w-10 px-3 py-2.5" onClick={(e) => e.stopPropagation()}>
+                      <Checkbox
+                        checked={isGroupFullySelected(group, selected)}
+                        onChange={() => toggleSelect(group)}
+                        title="Выбрать сессию"
+                      />
+                    </td>
 
-                          </div>
+                    <td className="px-3 py-2.5">
+                      <div className="font-medium text-aspectum-text">{title}</div>
+                      {(subtitle || extraCities > 0) && (
+                        <div className="mt-0.5 text-xs text-aspectum-text-disabled truncate">
+                          {subtitle}
+                          {subtitle && extraCities > 0 ? ' · ' : ''}
+                          {extraCities > 0 ? `ещё ${extraCities} ${extraCityWord(extraCities)}` : ''}
                         </div>
+                      )}
+                    </td>
 
-                        <div className="text-xs text-aspectum-ink-muted">
-                          Один город
-                        </div>
+                    <td className="px-3 py-2.5 text-aspectum-text-subtle">
+                      {row.country}
+                    </td>
+
+                    <td className="px-3 py-2.5 text-aspectum-text-subtle whitespace-nowrap">
+                      {formatDateTime(row.createdAt)}
+                    </td>
+
+                    <td className="px-3 py-2.5">
+                      <StatusBadge status={row.status} label={row.statusDisplay} />
+                    </td>
+
+                    <td className="px-3 py-2.5 text-aspectum-text-subtle">
+                      {row.assignee || '—'}
+                    </td>
+
+                    <td className="px-3 py-2.5 text-right" onClick={(e) => e.stopPropagation()}>
+                      <div className="flex items-center justify-end gap-1">
+                        <Button
+                          type="button"
+                          variant="soft"
+                          size="sm"
+                          onClick={() => openSession(group.session, row, 'action')}
+                        >
+                          Открыть
+                        </Button>
+
+                        {isActive(group.session) && (
+                          <Button
+                            type="button"
+                            variant="softOrange"
+                            size="sm"
+                            onClick={() => {
+                              setCloseMode('save');
+                              setCloseTarget(group.session);
+                            }}
+                          >
+                            Закрыть
+                          </Button>
+                        )}
+
+                        {group.session.status === 'draft' && (
+                          <Button
+                            type="button"
+                            variant="softDanger"
+                            size="sm"
+                            onClick={() => setDeleteTarget(rowDeleteTarget)}
+                            title="Удалить сессию"
+                          >
+                            Удалить
+                          </Button>
+                        )}
                       </div>
                     </td>
                   </tr>
-
-                  {group.cityRows.map((row) => {
-                    const rowDeleteTarget = buildRowDeleteTarget(group, row);
-                    const deletesOnlyDraft = rowDeleteTarget.type === 'draft';
-
-                    return (
-                      <tr
-                        key={row.rowKey}
-                        onClick={() => openSession(group.session, row, 'row')}
-                        className="cursor-pointer bg-aspectum-surface hover:bg-aspectum-primary-soft transition-colors group"
-                      >
-                        <td className="w-10 px-3 py-3" onClick={(e) => e.stopPropagation()}>
-                          <Checkbox
-                            checked={selected.has(buildDraftSelectionKey(group.session.id, row.cityDraftId))}
-                            onChange={() => toggleDraftDelete(group, row)}
-                            title={deletesOnlyDraft ? 'Удалить город из сессии' : 'Удалить сессию'}
-                            className="w-4 h-4 rounded border-aspectum-border-strong text-aspectum-primary focus:ring-aspectum-focus"
-                          />
-                        </td>
-
-                        <td className="px-3 py-3">
-                          <div className="font-medium text-aspectum-text">{row.cityName}</div>
-                        </td>
-
-                        <td className="px-3 py-3 text-aspectum-text-subtle">
-                          {row.country}
-                        </td>
-
-                        <td className="px-3 py-3 text-aspectum-text-subtle whitespace-nowrap">
-                          {formatDateTime(row.createdAt)}
-                        </td>
-
-                        <td className="px-3 py-3">
-                          <StatusBadge status={row.status} label={row.statusDisplay} />
-                        </td>
-
-                        <td className="px-3 py-3 text-aspectum-text-subtle">
-                          {row.assignee || '—'}
-                        </td>
-
-                        <td className="px-3 py-3 text-right" onClick={(e) => e.stopPropagation()}>
-                          <div className="flex items-center justify-end gap-1 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
-                            <Button
-                              type="button"
-                              variant="soft"
-                              size="sm"
-                              onClick={() => openSession(group.session, row, 'action')}
-                            >
-                              Открыть
-                            </Button>
-
-                            {isActive(group.session) && (
-                              <Button
-                                type="button"
-                                variant="softOrange"
-                                size="sm"
-                                onClick={() => {
-                                  setCloseMode('save');
-                                  setCloseTarget(group.session);
-                                }}
-                              >
-                                Закрыть
-                              </Button>
-                            )}
-
-                            {group.session.status === 'draft' && (
-                              <Button
-                                type="button"
-                                variant="softDanger"
-                                size="sm"
-                                onClick={() => setDeleteTarget(rowDeleteTarget)}
-                                title={deletesOnlyDraft ? 'Удалить только этот город' : 'Удалить всю сессию'}
-                              >
-                                Удалить
-                              </Button>
-                            )}
-                          </div>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </Fragment>
-              ))}
+                );
+              })}
             </tbody>
           </table>
         </DataTableSurface>
