@@ -3,7 +3,7 @@
 // flash of the other theme.
 //   ?theme=default   old look, remembered in this browser
 //   ?theme=cs        new look, remembered (also clears a previous opt-out)
-//   ?mode=dark|light dark mode (cs theme only), remembered
+//   ?mode=dark|light|auto color mode, remembered
 const KEY_THEME = 'aspectum-theme'
 const KEY_MODE = 'aspectum-mode'
 
@@ -24,13 +24,42 @@ function write(key, value) {
   }
 }
 
+const isMode = (mode) => ['light', 'dark', 'auto'].includes(mode)
+let currentMode
+let systemTheme
+
+export function getThemeMode() {
+  return currentMode ?? (isMode(read(KEY_MODE)) ? read(KEY_MODE) : 'auto')
+}
+
+function renderMode() {
+  const mode = getThemeMode()
+  document.documentElement.classList.toggle('dark',
+    document.documentElement.dataset.theme === 'cs' &&
+    (mode === 'dark' || (mode === 'auto' && systemTheme?.matches)))
+}
+
+export function setThemeMode(mode) {
+  if (!isMode(mode)) return
+  currentMode = mode
+  write(KEY_MODE, mode)
+  write(KEY_THEME, null)
+  document.documentElement.setAttribute('data-theme', 'cs')
+  renderMode()
+}
+
 export function applyTheme() {
   const params = new URLSearchParams(window.location.search)
   const themeParam = params.get('theme')
   const modeParam = params.get('mode')
   if (themeParam === 'default') write(KEY_THEME, 'default')
   else if (themeParam === 'cs') write(KEY_THEME, null)
-  if (modeParam === 'dark' || modeParam === 'light') write(KEY_MODE, modeParam)
+  currentMode = isMode(modeParam) ? modeParam : undefined
+  if (isMode(modeParam)) write(KEY_MODE, modeParam)
+  if (!systemTheme && typeof window.matchMedia === 'function') {
+    systemTheme = window.matchMedia('(prefers-color-scheme: dark)')
+    systemTheme.addEventListener('change', renderMode)
+  }
 
   const root = document.documentElement
   const useDefaultLook = themeParam === 'default' || (themeParam !== 'cs' && read(KEY_THEME) === 'default')
@@ -40,6 +69,5 @@ export function applyTheme() {
     return
   }
   root.setAttribute('data-theme', 'cs')
-  const mode = modeParam === 'dark' || modeParam === 'light' ? modeParam : read(KEY_MODE)
-  root.classList.toggle('dark', mode === 'dark')
+  renderMode()
 }

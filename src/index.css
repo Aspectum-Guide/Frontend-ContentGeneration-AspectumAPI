@@ -13,6 +13,12 @@ body {
   min-height: 100vh;
 }
 
+select,
+select option {
+  background-color: var(--aspectum-color-surface);
+  color: var(--aspectum-color-text);
+}
+
 :where(button, [role='button'], input, select, textarea):focus-visible {
   outline: 2px solid var(--aspectum-color-primary);
   outline-offset: 2px;

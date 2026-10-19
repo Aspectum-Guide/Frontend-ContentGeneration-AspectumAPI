@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { authAPI } from '../api/auth.ts';
+import { getThemeMode, setThemeMode } from '../theme/themeBootstrap';
 import { Alert, Button, ConfirmModal, EmptyState, PageContainer, PageHeader, Panel, SectionHeader, Spinner } from '@aspectum/ui';
 
 const fromBase64Url = (value) => {
@@ -15,6 +16,7 @@ const toBase64Url = (buffer) => {
 };
 
 export default function AccountSettings() {
+  const [themeMode, updateThemeMode] = useState(getThemeMode);
   const [passkeys, setPasskeys] = useState([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -79,8 +81,26 @@ export default function AccountSettings() {
     <PageContainer maxWidth="comfortable" centered className="p-4 md:p-8">
     <PageHeader
       title="Настройки аккаунта"
-      description="Управляйте безопасным входом в контент-админку."
+      description="Настройте внешний вид и безопасный вход в контент-админку."
     />
+    <Panel className="p-5 mb-5 shadow-aspectum-card">
+      <SectionHeader title="Внешний вид" description="Выбор сохраняется в этом браузере и применяется сразу." size="sm" />
+      <label htmlFor="theme-mode" className="block mt-4 mb-2 text-sm font-medium text-aspectum-text-emphasis">Тема оформления</label>
+      <select
+        id="theme-mode"
+        className="w-full sm:w-64 rounded-lg border border-aspectum-border-subtle bg-aspectum-surface p-3 text-sm text-aspectum-text-emphasis"
+        value={themeMode}
+        onChange={(event) => {
+          const mode = event.target.value;
+          setThemeMode(mode);
+          updateThemeMode(mode);
+        }}
+      >
+        <option value="light">Светлая</option>
+        <option value="dark">Тёмная</option>
+        <option value="auto">Авто — как в системе</option>
+      </select>
+    </Panel>
     <Panel className="p-5 shadow-aspectum-card">
       <SectionHeader
         title="Passkeys"

@@ -88,7 +88,7 @@ export function Select({ className = '', children, ...props }) {
   return (
     <select
       {...controlProps}
-      className={`w-full px-3 py-2 border border-aspectum-border rounded-aspectum-control text-base sm:text-sm min-h-[44px] focus:ring-2 focus:ring-aspectum-primary focus:border-transparent outline-none disabled:bg-aspectum-surface-muted ${className}`}
+      className={`w-full bg-aspectum-surface px-3 py-2 border border-aspectum-border rounded-aspectum-control text-base text-aspectum-text sm:text-sm min-h-[44px] focus:ring-2 focus:ring-aspectum-primary focus:border-transparent outline-none disabled:bg-aspectum-surface-muted ${className}`}
     >
       {children}
     </select>
