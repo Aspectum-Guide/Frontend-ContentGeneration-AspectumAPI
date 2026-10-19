@@ -3,7 +3,7 @@ import {
   ChartColumn, ChartLine, ClipboardCheck, Download, FileText, FlaskConical, FolderKanban, Globe,
   Headphones, Image, Images, KeyRound, Layers, LifeBuoy, Library, List, ListChecks, ListTodo,
   MapPin, MapPinOff, MessageSquareText, Mic, ScrollText, SlidersHorizontal, Smartphone, Sparkles,
-  Table, Tags, Ticket, Upload, UserCheck, Users,
+  Table, Tags, Ticket, UserCheck, Users,
 } from 'lucide-react';
 
 /**
@@ -22,7 +22,6 @@ export const NAV_GROUPS = [
     scopes: ['studio'],
     items: [
       { label: 'Все сессии', to: '/generation', icon: List },
-      { label: 'Загрузить из файла', to: '/generation/upload', icon: Upload },
     ],
   },
   {
@@ -135,7 +134,6 @@ export function findActiveGroupId(pathname, groups = NAV_GROUPS) {
 }
 
 export const PAGE_TITLES = [
-  { startsWith: '/generation/upload', title: 'Загрузка из файла' },
   { startsWith: '/generation/new', title: 'Новая сессия' },
   { startsWith: '/generation/list', title: 'Список генерации' },
   { startsWith: '/generation/', title: 'Редактор сессии' },

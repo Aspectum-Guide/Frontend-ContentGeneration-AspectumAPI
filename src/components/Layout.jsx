@@ -1,13 +1,15 @@
 import { useEffect, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { sessionsAPI, workspacesAPI } from '../api/generation';
+import { PanelLeft } from 'lucide-react';
+import { workspacesAPI } from '../api/generation';
 import { useLayoutActions } from '../context/useLayoutActions';
 import useTokenValidation from '../hooks/useTokenValidation';
 import TokenManager from '../utils/TokenManager';
 import { getWorkspace, setWorkspace, workspaceTitle } from '../utils/workspace';
 import { FormLabel, Button, Heading, IconButton, Panel, Select, Sidebar, SidebarActions, SidebarFooter, SidebarHeader, SidebarIconButton, SidebarOverlay } from './ui';
 import AppNav from './AppNav';
-import { pageTitleFor } from '../config/nav';
+import SessionsPanel from './SessionsPanel';
+import { getNavGroups, pageTitleFor } from '../config/nav';
 
 /**
  * Переключатель рабочего пространства (Россия / Европа / …). Сужает списки
@@ -63,19 +65,19 @@ function WorkspaceSwitcher({ compact }) {
   );
 }
 
-function getActiveSessions(sessions) {
-  return sessions.filter(
-    (s) => s.status === 'draft' || s.status === 'in_progress'
-  );
-}
-
 export default function Layout({ children, pageHeader = null, pageHeaderMode = 'desktop' }) {
   const { mobileActions } = useLayoutActions();
   const location = useLocation();
   const navigate = useNavigate();
-  const [activeSessions, setActiveSessions] = useState([]);
   const [sidebarExpanded, setSidebarExpanded] = useState(true);
-  const [rightPanelOpen, setRightPanelOpen] = useState(
+  const hasSessionsPanel = getNavGroups().some((group) => group.id === 'sessions');
+  const [sessionsPanelOpen, setSessionsPanelOpen] = useState(
+    () => localStorage.getItem('sessionsPanelOpen') !== 'false'
+  );
+  const setSessionsPanel = (open) => {
+    setSessionsPanelOpen(open);
+    localStorage.setItem('sessionsPanelOpen', String(open));
+  };  const [rightPanelOpen, setRightPanelOpen] = useState(
     () => localStorage.getItem('rightPanelOpen') !== 'false'
   );
   const [isMobile, setIsMobile] = useState(false);
@@ -97,15 +99,6 @@ export default function Layout({ children, pageHeader = null, pageHeaderMode = '
       }
     }
   }, []);
-
-  useEffect(() => {
-    sessionsAPI.list().then((r) => {
-      const data = r?.data;
-      const list = Array.isArray(data?.results) ? data.results
-        : Array.isArray(data) ? data : [];
-      setActiveSessions(getActiveSessions(list));
-    }).catch(() => { });
-  }, [location.pathname]);
 
   useEffect(() => {
     const updateMobile = () => {
@@ -133,12 +126,10 @@ export default function Layout({ children, pageHeader = null, pageHeaderMode = '
     navigate('/token-auth');
   };
 
-  const sessionNavItems = activeSessions.slice(0, 3).map((s) => ({
-    label: s.name || s.uuid?.slice(0, 12) + '…',
-    to: `/generation/${s.id}`,
-    badge: s.status === 'in_progress' ? 'Active' : null,
-    badgeColor: 'bg-aspectum-orange-subtle',
-  }));
+  const showSessionsPanel = hasSessionsPanel && !isMobile && sessionsPanelOpen;
+  const sidebarWidth = sidebarExpanded ? 'var(--aspectum-layout-sidebar-expanded)' : 'var(--aspectum-layout-sidebar-collapsed)';
+  const mainOffset = isMobile ? 0
+    : `calc(${sidebarWidth} + ${showSessionsPanel ? 'var(--aspectum-layout-sessions-panel)' : '0rem'})`;
 
   const routePageTitle = pageTitleFor(location.pathname);
   const mobilePageTitle = pageHeader?.mobileTitle || pageHeader?.title || routePageTitle;
@@ -189,6 +180,15 @@ export default function Layout({ children, pageHeader = null, pageHeaderMode = '
                 </svg>
               </SidebarIconButton>
             ) : (
+              <div className={`flex items-center gap-1 ${sidebarExpanded ? '' : 'flex-col'}`}>
+              {hasSessionsPanel && (
+                <SidebarIconButton
+                  label={sessionsPanelOpen ? 'Скрыть панель сессий' : 'Показать панель сессий'}
+                  onClick={() => setSessionsPanel(!sessionsPanelOpen)}
+                >
+                  <PanelLeft className="w-5 h-5" aria-hidden="true" />
+                </SidebarIconButton>
+              )}
               <SidebarIconButton
                 label={sidebarExpanded ? 'Свернуть меню' : 'Развернуть меню'}
                 title={sidebarExpanded ? 'Collapse' : 'Expand'}
@@ -198,6 +198,7 @@ export default function Layout({ children, pageHeader = null, pageHeaderMode = '
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
                 </svg>
               </SidebarIconButton>
+              </div>
             )}
           </div>
           <WorkspaceSwitcher compact={!sidebarExpanded && !isMobile} />
@@ -205,7 +206,12 @@ export default function Layout({ children, pageHeader = null, pageHeaderMode = '
 
         {/* Navigation */}
         <div className="flex-1 overflow-y-auto p-3">
-          <AppNav pathname={location.pathname} collapsed={!sidebarExpanded && !isMobile} extraItems={{ sessions: sessionNavItems }} onNavigate={isMobile ? () => setMobileSidebarOpen(false) : undefined} />
+          <AppNav pathname={location.pathname} collapsed={!sidebarExpanded && !isMobile} onNavigate={isMobile ? () => setMobileSidebarOpen(false) : undefined} />
+          {isMobile && hasSessionsPanel && (
+            <div className="mt-4 border-t border-aspectum-border pt-1">
+              <SessionsPanel embedded />
+            </div>
+          )}
         </div>
 
         {/* User Actions */}
@@ -239,6 +245,16 @@ export default function Layout({ children, pageHeader = null, pageHeaderMode = '
         </SidebarFooter>
       </Sidebar>
 
+      {/* Sessions column (studio): every session, next to the navigation rail */}
+      {showSessionsPanel && (
+        <aside
+          aria-label="Панель сессий"
+          className="fixed inset-y-0 z-30 w-[var(--aspectum-layout-sessions-panel)] border-r border-aspectum-border bg-aspectum-surface transition-[left] duration-300"
+          style={{ left: sidebarWidth }}
+        >
+          <SessionsPanel onCollapse={() => setSessionsPanel(false)} />
+        </aside>
+      )}
       {isMobile && (
         <Sidebar
           side="right"
@@ -273,7 +289,7 @@ export default function Layout({ children, pageHeader = null, pageHeaderMode = '
                   setMobileActionsOpen(false);
                   action.onClick?.();
                 }}
-                onRefresh={mobileActions.length === 0 ? () => window.location.reload() : undefined}
+                onRefresh={() => window.location.reload()}
               />
 
             </div>
@@ -282,8 +298,7 @@ export default function Layout({ children, pageHeader = null, pageHeaderMode = '
       )}
 
       {/* Main Content */}
-      <main className={`flex-1 overflow-auto transition-all duration-300 ${isMobile ? 'ml-0' : sidebarExpanded ? 'ml-[var(--aspectum-layout-sidebar-expanded)]' : 'ml-[var(--aspectum-layout-sidebar-collapsed)]'
-        }`}>
+      <main className="flex-1 overflow-auto transition-all duration-300" style={{ marginLeft: mainOffset }}>
         {isMobile && (
           <div className="sticky top-0 z-20 bg-aspectum-surface-muted/95 backdrop-blur border-b border-aspectum-border px-4 py-3">
             <div className="flex items-center justify-between gap-2">

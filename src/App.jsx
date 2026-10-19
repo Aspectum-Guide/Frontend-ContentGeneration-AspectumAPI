@@ -53,7 +53,6 @@ const GenerationList = lazy(() => import('./pages/generation/GenerationList'));
 const NewSession = lazy(() => import('./pages/generation/NewSession'));
 const SessionsList = lazy(() => import('./pages/generation/SessionsList'));
 const SessionWizard = lazy(() => import('./pages/generation/SessionWizard'));
-const UploadFile = lazy(() => import('./pages/generation/UploadFile'));
 const ImportGoogleSheet = lazy(() => import('./pages/import/ImportGoogleSheet'));
 const MyTasks = lazy(() => import('./pages/tasks/MyTasks'));
 const AudioQueue = lazy(() => import('./pages/tasks/AudioQueue'));
@@ -80,10 +79,6 @@ export const routes = [
   {
     path: '/generation/list',
     element: <ProtectedRoute><ErrorBoundary><GenerationList /></ErrorBoundary></ProtectedRoute>,
-  },
-  {
-    path: '/generation/upload',
-    element: <ProtectedRoute><ErrorBoundary><UploadFile /></ErrorBoundary></ProtectedRoute>,
   },
   {
     path: '/generation/new',
