@@ -126,6 +126,52 @@
   --aspectum-color-ink-muted: #a3a3a3;
   --aspectum-color-ink: #fafafa;
 
+  --aspectum-color-positive: #4ade80;
+  --aspectum-color-positive-soft: #0b2415;
+  --aspectum-color-positive-muted: #123a22;
+  --aspectum-color-positive-border: #1c5a35;
+  --aspectum-color-positive-light: #86efac;
+  --aspectum-color-positive-strong: #86efac;
+  --aspectum-color-positive-emphasis: #bbf7d0;
+  --aspectum-color-caution-soft: #231f07;
+  --aspectum-color-caution-muted: #352d0a;
+  --aspectum-color-caution-border: #54480f;
+  --aspectum-color-caution-strong: #facc15;
+  --aspectum-color-caution-emphasis: #fde047;
+  --aspectum-color-danger-border-strong: #7a2a2d;
+  --aspectum-color-danger-light: #ff8a8c;
+  --aspectum-color-danger-subtle: #ff6467;
+  --aspectum-color-warning-light: #fcd34d;
+  --aspectum-color-warning-deep: #fde68a;
+
+  --aspectum-color-purple: #c084fc;
+  --aspectum-color-purple-soft: #1f1230;
+  --aspectum-color-purple-muted: #2c1a44;
+  --aspectum-color-purple-border: #432a66;
+  --aspectum-color-purple-border-strong: #5b3a8a;
+  --aspectum-color-purple-light: #d8b4fe;
+  --aspectum-color-purple-strong: #d8b4fe;
+  --aspectum-color-purple-emphasis: #e9d5ff;
+  --aspectum-color-indigo: #818cf8;
+  --aspectum-color-indigo-soft: #151833;
+  --aspectum-color-indigo-muted: #1f2350;
+  --aspectum-color-indigo-border: #2f3680;
+  --aspectum-color-indigo-light: #a5b4fc;
+  --aspectum-color-indigo-subtle: #818cf8;
+  --aspectum-color-indigo-strong: #a5b4fc;
+  --aspectum-color-indigo-emphasis: #c7d2fe;
+  --aspectum-color-indigo-deep: #e0e7ff;
+  --aspectum-color-violet: #a78bfa;
+  --aspectum-color-violet-soft: #1a1530;
+  --aspectum-color-violet-muted: #261d45;
+  --aspectum-color-orange: #fb923c;
+  --aspectum-color-orange-soft: #2a1608;
+  --aspectum-color-orange-border: #5c3010;
+  --aspectum-color-orange-subtle: #fb923c;
+  --aspectum-color-orange-emphasis: #fdba74;
+  --aspectum-color-teal: #2dd4bf;
+
+  --aspectum-color-overlay: rgb(0 0 0 / 0.65);
   --aspectum-shadow-card: 0 1px 2px 0 rgb(0 0 0 / 0.4);
   --aspectum-shadow-modal: 0 16px 32px -8px rgb(0 0 0 / 0.6);
 
