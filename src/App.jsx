@@ -56,6 +56,7 @@ const SessionWizard = lazy(() => import('./pages/generation/SessionWizard'));
 const UploadFile = lazy(() => import('./pages/generation/UploadFile'));
 const ImportGoogleSheet = lazy(() => import('./pages/import/ImportGoogleSheet'));
 const MyTasks = lazy(() => import('./pages/tasks/MyTasks'));
+const AudioQueue = lazy(() => import('./pages/tasks/AudioQueue'));
 const MediaRecovery = lazy(() => import('./pages/tasks/MediaRecovery'));
 const AccountSettings = lazy(() => import('./pages/AccountSettings'));
 
@@ -131,6 +132,10 @@ export const routes = [
   {
     path: '/tasks',
     element: <ProtectedRoute><ErrorBoundary><MyTasks /></ErrorBoundary></ProtectedRoute>,
+  },
+  {
+    path: '/tasks/audio-queue',
+    element: <ProtectedRoute><ErrorBoundary><AudioQueue /></ErrorBoundary></ProtectedRoute>,
   },
   {
     path: '/tasks/media-recovery',

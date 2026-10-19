@@ -362,6 +362,11 @@ export const imagesAPI = {
     apiClient.get(`${BASE}/photo-library/`, { params }),
 };
 
+// ─── Очередь пакетной озвучки (все сессии) ────────────────────────────────────
+export const audioQueueAPI = {
+  overview: (params) => apiClient.get(`${BASE}/audio-queue/`, { params }),
+};
+
 // ─── Generation Tasks ─────────────────────────────────────────────────────────
 export const tasksAPI = {
   list: () => apiClient.get(`${BASE}/tasks/`),

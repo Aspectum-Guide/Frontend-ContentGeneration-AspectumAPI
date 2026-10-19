@@ -2584,7 +2584,10 @@ export function useAudioGuides({
     const provider = audioGuideTtsProviderRef.current || DEFAULT_TTS_PROVIDER;
     const voiceId = (audioGuideTtsVoiceIdRef.current || '').trim();
     const modelId = (audioGuideTtsModelIdRef.current || '').trim();
-    await Promise.all(languages.map(async (languageCode) => {
+    // По одному, а не разом: сервер ставит языки в очередь в порядке запросов,
+    // и при параллельной отправке первым шёл случайный язык — а окно ниже
+    // показывало ход по порядку выбора и долго висело на ждущем «EN (1/5)».
+    for (const languageCode of languages) {
       try {
         const payload = { provider, language_code: languageCode };
         if (options.replaceExisting) payload.replace_existing = true;
@@ -2595,10 +2598,11 @@ export function useAudioGuides({
         // Язык, который не удалось поставить в очередь, получит ту же ошибку
         // ниже, когда дойдёт его очередь в этом окне.
       }
-    }));
+    }
     showNote(
       `Озвучка ${languages.length} языков поставлена в очередь на сервере: ` +
-      'её можно не ждать, она идёт сама, даже если закрыть вкладку',
+      'она идёт сама, даже если закрыть вкладку. Ход всех языков — в меню ' +
+      '«Задачи → Очередь озвучки»',
       'success',
     );
     for (let index = 0; index < languages.length; index += 1) {
