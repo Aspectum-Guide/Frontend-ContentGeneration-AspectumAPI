@@ -13,7 +13,7 @@ import {
 } from './session-wizard/sessionWizardShared.jsx';
 import { useSessionWizardController } from './session-wizard/useSessionWizardController.ts';
 import { aiAPI } from '../../api/generation';
-import { FormLabel, Button, ConfirmModal as DefaultConfirmModal, DetailHeader, EmptyState, InlineAction, InlineProgressBanner as DefaultInlineProgressBanner, Modal, ProgressBar, SessionStatusBadge as DefaultStatusBadge, Spinner, TextInput, Toast as DefaultToast, WizardStepButton, useConfirmModal } from '@aspectum/ui';
+import { FormLabel, Button, ConfirmModal as DefaultConfirmModal, DetailHeader, EmptyState, InlineAction, InlineProgressBanner as DefaultInlineProgressBanner, Modal, SessionStatusBadge as DefaultStatusBadge, Spinner, TextInput, Toast as DefaultToast, WizardStepButton, useConfirmModal } from '@aspectum/ui';
 import DefaultSessionCloseDialog from '../../components/generation/SessionCloseDialog.jsx';
 import { sessionWizardStepLoaders } from './session-wizard/sessionWizardStepLoaders';
 import useUnsavedChangesWarning from './session-wizard/useUnsavedChangesWarning';
@@ -43,6 +43,26 @@ const STEP_LABELS = [
   'Интерактивные локации',
   'Публикация',
 ];
+
+function isAutoSessionName(value) {
+  return /^Сессия от \d{2}\.\d{2}\.\d{4}/.test(String(value || '').trim());
+}
+
+function wizardTitle({ session, cityDrafts, activeCityDraftId, localeData, activeLocale, defaultLocale }) {
+  const typed = String(localeData?.[defaultLocale]?.name || localeData?.[activeLocale]?.name || '').trim();
+  if (typed) return typed;
+
+  const draft = (cityDrafts || []).find((item) => String(item?.id) === String(activeCityDraftId));
+  const fromDraft = normalizeCommonsQuery(draft?.display_name || draft?.name);
+  if (fromDraft) return fromDraft;
+
+  const fromSession = normalizeCommonsQuery(session?.city_display_name);
+  if (fromSession) return fromSession;
+
+  const name = String(session?.name || '').trim();
+  if (name && !isAutoSessionName(name)) return name;
+  return 'Новый город';
+}
 
 function normalizeCommonsQuery(value) {
   if (value == null) return '';
@@ -893,7 +913,8 @@ export default function SessionWizard({ components = {} } = {}) {
             </svg>
           </Button>
         )}
-        title={session.name || 'Сессия генерации контента'}
+        className="mb-3 pb-3"
+        title={wizardTitle({ session, cityDrafts, activeCityDraftId, localeData, activeLocale, defaultLocale })}
         titleAdornment={<StatusBadge status={session.status} label={session.status_display} />}
         metadata={session.created_at ? (
           <>
@@ -934,6 +955,8 @@ export default function SessionWizard({ components = {} } = {}) {
           </div>
         ) : null}
         actions={(
+          <div className="flex items-center gap-2">
+          {currentStep !== 2 && currentStep !== 5 && (
           <Button
             type="button"
             variant="primary"
@@ -993,12 +1016,8 @@ export default function SessionWizard({ components = {} } = {}) {
                 return;
               }
 
-              if (currentStep === 5) {
-                return;
-              }
             }}
             disabled={
-              currentStep === 2 || currentStep === 5 ||
               saving ||
               cityInfoSaving ||
               attrSaving ||
@@ -1007,8 +1026,7 @@ export default function SessionWizard({ components = {} } = {}) {
               attractionFeedSaving ||
               attractionAudioGuideSaving
             }
-            style={currentStep === 2 || currentStep === 5 ? { visibility: 'hidden' } : undefined}
-            title={currentStep === 2 || currentStep === 5 ? '' : 'Сохранить текущие данные'}
+            title="Сохранить текущие данные"
           >
             {saving ||
             cityInfoSaving ||
@@ -1020,13 +1038,34 @@ export default function SessionWizard({ components = {} } = {}) {
               ? 'Сохранение...'
               : 'Сохранить'}
           </Button>
+          )}
+          {!session.closed_with_save && (
+            <Button
+              type="button"
+              variant="outline"
+              size="md"
+              disabled={publishing}
+              onClick={() => { if (!publishing) handlePublish(); }}
+            >
+              {publishing ? 'Публикация...' : 'Опубликовать'}
+            </Button>
+          )}
+          {(session.status === 'draft' || session.status === 'in_progress') && (
+            <Button
+              type="button"
+              variant="outlineDanger"
+              size="md"
+              onClick={() => { setCloseMode('save'); setCloseOpen(true); }}
+            >
+              Закрыть
+            </Button>
+          )}
+          </div>
         )}
       />
 
       <main className="min-w-0 w-full">
-        <div className="mb-5">
-          <ProgressBar value={currentStep - 1} max={STEP_LABELS.length - 1} size="sm" label="Прогресс заполнения сессии" className="mb-3" />
-
+        <div className="mb-4">
           <div className="flex">
             {STEP_LABELS.map((label, index) => {
               const step = index + 1;
@@ -1051,14 +1090,15 @@ export default function SessionWizard({ components = {} } = {}) {
         {currentStep === 1 && (
           /* onBlur: сейв города при уходе фокуса из формы — вместо таймера
              2.5с, который дёргал сервер и сбрасывал курсор при наборе */
-          <div className="space-y-6" onBlur={onCityFormBlur}>
-            <SessionWizardGenerateCityFull
-              sessionId={sessionId}
-              defaultLang={defaultLocale || 'ru'}
-              onDone={() => controller.loadSession(activeCityDraftId)}
-            />
-
+          <div onBlur={onCityFormBlur}>
             <SessionWizardCityStep
+              headerEnd={(
+                <SessionWizardGenerateCityFull
+                  sessionId={sessionId}
+                  defaultLang={defaultLocale || 'ru'}
+                  onDone={() => controller.loadSession(activeCityDraftId)}
+                />
+              )}
               cityDrafts={cityDrafts}
               referenceCities={referenceCities || []}
               parentCityId={parentCityId}

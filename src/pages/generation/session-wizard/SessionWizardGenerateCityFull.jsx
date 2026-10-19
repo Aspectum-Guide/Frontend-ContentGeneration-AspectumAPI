@@ -2,9 +2,9 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { aiAPI, tasksAPI } from '../../../api/generation';
 import apiClient from '../../../api/client';
 import { pollGenerationTask } from '../../../utils/generationTaskPoll';
-import { FormLabel, Alert, Button, Checkbox, Heading, InlineState, Panel, ProgressBar, Textarea, TextInput } from '@aspectum/ui';
+import { FormLabel, Alert, Button, Checkbox, InlineState, Modal, Panel, ProgressBar, Textarea, TextInput, Glyph } from '@aspectum/ui';
 
-const SOURCE_GROUP_TITLES = { photo: '📷 Фото', facts: '📚 Фактура', discovery: '🔎 Поиск мест' };
+const SOURCE_GROUP_TITLES = { photo: 'Фото', facts: 'Фактура', discovery: 'Поиск мест' };
 const SOURCE_REGION_LABELS = { RU: 'RU', 'RU-SPB': 'СПб' };
 
 /**
@@ -67,10 +67,10 @@ function SourcesDropdown({ disabled }) {
         size="sm"
         title="Какие источники конвейер использует для фото, фактов и поиска мест. Глобальные переключатели (те же, что в «Настройки ИИ»)"
       >
-        Источники{offCount ? ` (выкл: ${offCount})` : ''} ▾
+        Источники{offCount ? ` (выкл: ${offCount})` : ''} <Glyph name="▾" />
       </Button>
       {open && (
-        <div className="absolute left-0 top-full z-20 mt-1 max-h-72 w-80 overflow-y-auto rounded-aspectum-compact border border-aspectum-border bg-aspectum-surface p-2 shadow-aspectum-elevated">
+        <div className="mt-1 max-h-72 w-full max-w-md overflow-y-auto rounded-aspectum-compact border border-aspectum-border bg-aspectum-surface p-2 shadow-aspectum-elevated">
           <p className="mb-1.5 text-[10px] leading-snug text-aspectum-text-disabled">
             Глобальные переключатели — действуют на все генерации, региональные
             источники сами включаются только в своих городах.
@@ -134,8 +134,8 @@ function SourcesDropdown({ disabled }) {
 }
 
 /**
- * Панель «Сгенерировать город целиком» — одно действие вместо ручной беготни
- * по шагам визарда. Дёргает оркестратор (parent GenerationTask + ThreadPool DAG).
+ * «Сгенерировать город целиком» открывается модалкой, чтобы не занимать шаг города.
+ * Дёргает оркестратор (parent GenerationTask + ThreadPool DAG).
  *
  * Устойчивость: генерация живёт на бэкенде и НЕ зависит от вкладки. После
  * обновления страницы панель сама находит активную задачу (cityFullActive)
@@ -149,6 +149,7 @@ function SourcesDropdown({ disabled }) {
  *   onDone      — вызывается после успешной генерации (перезагрузить сессию)
  */
 export default function SessionWizardGenerateCityFull({ sessionId, defaultLang = 'ru', onDone }) {
+  const [open, setOpen] = useState(false);
   const [prompt, setPrompt] = useState('');
   const [testMode, setTestMode] = useState(false);
   // Максимальные пороги (не план!): система собирает полный пул и выбирает
@@ -254,6 +255,7 @@ export default function SessionWizardGenerateCityFull({ sessionId, defaultLang =
         if (t.request?.generate_icons) setGenIcons(true);
         if (t.status === 'pending' || t.status === 'processing') {
           setTask(t);
+          setOpen(true);
           attach(t.id);
         } else if (t.status === 'completed') {
           setDoneSummary({
@@ -328,23 +330,42 @@ export default function SessionWizardGenerateCityFull({ sessionId, defaultLang =
   const summary = task?.result_data?.summary || {};
   const issues = task?.result_data?.issues || [];
 
+  const triggerLabel = running
+    ? `Генерация · ${progress}%`
+    : 'Сгенерировать город целиком';
+
   return (
-    <Panel tone="accentIndigo" className="p-4">
-      <div className="flex items-center justify-between gap-3">
-        <div>
-          <Heading level={3} size="xs" tone="indigo">
-            ⚡ Сгенерировать город целиком
-          </Heading>
-          <p className="mt-0.5 text-xs text-aspectum-indigo-strong/80">
-            Одно действие: research → база города → полезная инфа +
-            достопримечательности → теги/координаты/описания → интерактивные
-            локации → текст аудиогида → фото → перевод. Объём система подбирает сама.
-            Идёт в фоне — страницу можно обновлять и закрывать.
-          </p>
-        </div>
+    <>
+      <div className="flex flex-wrap items-center gap-3">
+        <Button type="button" variant="indigo" size="md" onClick={() => setOpen(true)}>
+          {triggerLabel}
+        </Button>
+        {running && (
+          <span className="text-xs text-aspectum-text-muted">
+            {stopping ? 'Останавливаем…' : (task?.current_step || 'Идёт в фоне')}
+          </span>
+        )}
+        {doneSummary && !running && (
+          <span className="text-xs text-aspectum-success">
+            Готово{doneSummary.children_failed ? `, с ошибками: ${doneSummary.children_failed}` : ''}
+          </span>
+        )}
+        {notice && !running && !doneSummary && (
+          <span className="text-xs text-aspectum-text-muted">{notice}</span>
+        )}
+        {error && !open && (
+          <span className="text-xs text-aspectum-danger">{error}</span>
+        )}
       </div>
 
-      <div className="mt-3 space-y-3">
+      <Modal
+        open={open}
+        onClose={() => setOpen(false)}
+        size="lg"
+        title="Сгенерировать город целиком"
+        description="Research, город, достопримечательности, локации, аудиогид, фото и перевод. Идёт в фоне: окно и страницу можно закрыть."
+      >
+      <div className="space-y-3">
         <Textarea className="disabled:bg-aspectum-surface-subtle" value={prompt} onChange={(e) => setPrompt(e.target.value)} disabled={running} rows={2} placeholder="Напр.: Суздаль, Владимирская область, Россия — исторический туристический город" />
 
         <div className="flex flex-wrap items-center gap-3">
@@ -381,7 +402,7 @@ export default function SessionWizardGenerateCityFull({ sessionId, defaultLang =
               disabled={stopping}
               className="ml-auto"
             >
-              {stopping ? 'Останавливаем…' : '⏹ Стоп'}
+              {stopping ? 'Останавливаем…' : <><Glyph name="⏹" /> Стоп</>}
             </Button>
           ) : (
             <Button
@@ -416,7 +437,7 @@ export default function SessionWizardGenerateCityFull({ sessionId, defaultLang =
         {cost && cost.total_usd != null && (cost.total_usd > 0 || running) && (
           <Alert tone="warning" className="flex items-center justify-between px-3 py-1.5 text-xs">
             <span>
-              💰 Расход сессии: <b>${Number(cost.total_usd).toFixed(4)}</b>
+              <Glyph name="💰" /> Расход сессии: <b>${Number(cost.total_usd).toFixed(4)}</b>
               {cost.total_tokens
                 ? ` · ${Number(cost.total_tokens).toLocaleString()} токенов`
                 : ''}
@@ -446,7 +467,7 @@ export default function SessionWizardGenerateCityFull({ sessionId, defaultLang =
           return (
             <Panel as="details" tone="accentOrange" className="rounded-aspectum-compact px-3 py-2 text-xs text-aspectum-orange-emphasis">
               <summary className="cursor-pointer font-medium">
-                ⚠ Журнал генерации ({list.length})
+                <Glyph name="⚠" /> Журнал генерации ({list.length})
               </summary>
               <ul className="mt-1.5 space-y-0.5">
                 {list.map((it, i) => (
@@ -468,6 +489,7 @@ export default function SessionWizardGenerateCityFull({ sessionId, defaultLang =
           <Alert tone="error">{error}</Alert>
         )}
       </div>
-    </Panel>
+      </Modal>
+    </>
   );
 }

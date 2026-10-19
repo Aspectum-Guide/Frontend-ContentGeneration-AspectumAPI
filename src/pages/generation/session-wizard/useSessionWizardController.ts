@@ -10,7 +10,6 @@ import {
   sessionsAPI,
   imagesAPI,
 } from '../../../api/generation';
-import { useLayoutActions } from '../../../context/useLayoutActions';
 import { trackEvent } from '../../../utils/analytics';
 import { parseApiError } from '../../../utils/apiError';
 import { useToast } from '@aspectum/ui';
@@ -27,7 +26,6 @@ import { useAttractionsStep } from './useAttractionsStep.js';
 import useInteractiveLocationsStep from './useInteractiveLocationsStep.js';
 import { useAudioGuides } from './useAudioGuides.js';
 import usePublishStep from './usePublishStep.js';
-import { buildSessionWizardMobileActions } from './sessionWizardMobileActions.js';
 import { persistBeforeStepChange } from './sessionWizardNavigation.js';
 
 import type {
@@ -61,7 +59,6 @@ export function useSessionWizardController({
   sessionId,
   confirm: confirmProp,
 }: UseSessionWizardControllerProps = {}) {
-  const { setMobileActions } = useLayoutActions();
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -597,25 +594,6 @@ export function useSessionWizardController({
     saveCurrentAttractionInfoIfDirty,
     saveCurrentAttractionAudioGuideIfDirty,
   ]);
-
-  const citySaving = cityStep.saving;
-  const saveCityForStep1 = cityStep.saveCityForStep1;
-  const publishing = publishStep.publishing;
-  const handlePublish = publishStep.handlePublish;
-  const setCloseMode = publishStep.setCloseMode;
-  const setCloseOpen = publishStep.setCloseOpen;
-  useEffect(() => {
-    setMobileActions(buildSessionWizardMobileActions({
-      session,
-      citySaving,
-      saveCityForStep1,
-      publishing,
-      handlePublish,
-      setCloseMode,
-      setCloseOpen,
-    }));
-    return () => setMobileActions([]);
-  }, [setMobileActions, citySaving, publishing, saveCityForStep1, handlePublish, session, setCloseMode, setCloseOpen]);
 
   return {
     note, showNote,

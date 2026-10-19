@@ -6,6 +6,16 @@ import { FormLabel, Button, Chip, FileButton, LoadingOverlay, LocaleEditor, Pane
 
 // ─── helpers ──────────────────────────────────────────────────────────────────
 
+function cityOptionLabel(city) {
+  if (!city) return 'Без названия';
+  if (typeof city.name === 'string' && city.name.trim()) return city.name.trim();
+  if (city.name && typeof city.name === 'object') {
+    const value = city.name.ru || city.name.en || city.name.it || Object.values(city.name).find((item) => typeof item === 'string' && item.trim());
+    if (value) return value;
+  }
+  return city.display_name || city.title || 'Без названия';
+}
+
 function localeStatus(loc) {
   const filled = [loc?.name, loc?.description, loc?.country].filter(v => (v || '').trim()).length;
   if (filled === 3) return 'complete';
@@ -227,7 +237,7 @@ export default function SessionWizardCityStep({
           <span className="text-xs font-semibold uppercase tracking-wide text-aspectum-text-muted">Спецгид</span>
           <Select value={parentCityId || ''} onChange={(e) => setParentCityId(e.target.value)} className="max-w-xs">
             <option value="">Обычный город</option>
-            {referenceCities.filter((city) => !city.parent_city).map((city) => <option key={city.id} value={city.id}>{city.name?.ru || city.name?.en || city.id}</option>)}
+            {referenceCities.filter((city) => !city.parent_city).map((city) => <option key={city.id} value={city.id}>{cityOptionLabel(city)}</option>)}
           </Select>
           <span className="text-xs text-aspectum-text-muted">Родительский город, если сессия — спецгид.</span>
         </div>
