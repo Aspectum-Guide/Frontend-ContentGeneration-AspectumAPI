@@ -6,9 +6,10 @@ import { useLayoutActions } from '../context/useLayoutActions';
 import useTokenValidation from '../hooks/useTokenValidation';
 import TokenManager from '../utils/TokenManager';
 import { getWorkspace, setWorkspace, workspaceTitle } from '../utils/workspace';
-import { FormLabel, Button, Heading, IconButton, Panel, Select, Sidebar, SidebarActions, SidebarFooter, SidebarHeader, SidebarIconButton, SidebarOverlay } from './ui';
+import { FormLabel, Button, Heading, Select, Sidebar, SidebarFooter, SidebarHeader, SidebarIconButton, SidebarOverlay } from './ui';
 import AppNav from './AppNav';
 import SessionsPanel from './SessionsPanel';
+import PageActionBar from './PageActionBar';
 import { getNavGroups, pageTitleFor } from '../config/nav';
 
 /**
@@ -84,12 +85,9 @@ export default function Layout({ children, pageHeader = null, pageHeaderMode = '
   const setSessionsPanel = (open) => {
     setSessionsPanelOpen(open);
     localStorage.setItem('sessionsPanelOpen', String(open));
-  };  const [rightPanelOpen, setRightPanelOpen] = useState(
-    () => localStorage.getItem('rightPanelOpen') !== 'false'
-  );
+  };
   const [isMobile, setIsMobile] = useState(false);
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
-  const [mobileActionsOpen, setMobileActionsOpen] = useState(false);
   const [user, setUser] = useState(null);
   useTokenValidation();
 
@@ -124,7 +122,6 @@ export default function Layout({ children, pageHeader = null, pageHeaderMode = '
   useEffect(() => {
     if (isMobile) {
       setMobileSidebarOpen(false);
-      setMobileActionsOpen(false);
     }
   }, [location.pathname, isMobile]);
 
@@ -160,10 +157,6 @@ export default function Layout({ children, pageHeader = null, pageHeaderMode = '
         <SidebarOverlay
           onClick={() => setMobileSidebarOpen(false)}
         />
-      )}
-
-      {isMobile && mobileActionsOpen && (
-        <SidebarOverlay onClick={() => setMobileActionsOpen(false)} label="Закрыть панель действий" />
       )}
 
       {/* Left Sidebar */}
@@ -262,48 +255,6 @@ export default function Layout({ children, pageHeader = null, pageHeaderMode = '
           <SessionsPanel onCollapse={() => setSessionsPanel(false)} />
         </aside>
       )}
-      {isMobile && (
-        <Sidebar
-          side="right"
-          mobile
-          expanded={mobileActionsOpen}
-          label="Панель действий"
-          className={`fixed inset-y-0 z-40 w-[var(--aspectum-layout-sidebar-mobile)] max-w-[85vw] bg-aspectum-surface border-aspectum-border shadow-aspectum-modal transform transition-transform duration-300 ${mobileActionsOpen ? 'translate-x-0' : 'translate-x-full'}`}
-        >
-          <div className="h-full flex flex-col">
-            <div className="border-b border-aspectum-border p-4 flex items-start justify-between gap-3">
-              <div>
-                <p className="text-sm font-semibold text-aspectum-text">Кнопки формы</p>
-                <p className="text-xs text-aspectum-text-muted mt-0.5">{mobilePageTitle}</p>
-              </div>
-              <IconButton
-                onClick={() => setMobileActionsOpen(false)}
-                label="Закрыть панель действий"
-                variant="ghost"
-              >
-                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </IconButton>
-            </div>
-
-            <div className="flex-1 overflow-y-auto p-4">
-              <div className="text-xs uppercase tracking-wide text-aspectum-text-muted mb-2">Кнопки формы</div>
-              <SidebarActions
-                actions={mobileActions}
-                emptyText="Для этой страницы дополнительных кнопок пока нет."
-                onAction={(action) => {
-                  setMobileActionsOpen(false);
-                  action.onClick?.();
-                }}
-                onRefresh={() => window.location.reload()}
-              />
-
-            </div>
-          </div>
-        </Sidebar>
-      )}
-
       {/* Main Content */}
       <main className="flex-1 overflow-auto transition-all duration-300" style={{ marginLeft: mainOffset }}>
         {isMobile && (
@@ -320,82 +271,22 @@ export default function Layout({ children, pageHeader = null, pageHeaderMode = '
                 <div className="text-sm font-semibold text-aspectum-text truncate">{mobilePageTitle}</div>
                 <div className="text-[11px] text-aspectum-text-muted truncate">{location.pathname}</div>
               </div>
-
-              <Button type="button" variant="outline" size="md" onClick={() => setMobileActionsOpen(true)} className="gap-1">
-                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 12h.01M12 12h.01M19 12h.01" />
-                </svg>
-                Действия
-              </Button>
             </div>
+            <PageActionBar actions={formActions} maxInline={1} sticky={false} className="mt-2" />
           </div>
         )}
+        {!isMobile && <PageActionBar actions={formActions} onRefresh={() => window.location.reload()} />}
         <div className="px-[var(--aspectum-space-page-x)] py-[var(--aspectum-space-page-y)] md:px-[var(--aspectum-space-page-x-lg)]">
-          <div className="flex items-start gap-[var(--aspectum-space-layout-gap)]">
-            <div className="min-w-0 flex-1">
-              {shouldRenderPageHeader && (
-                <div className="mb-4 md:mb-5">
-                  <Heading level={1} size="lg" weight="bold">{pageHeader.title}</Heading>
-                  {pageHeader.description && (
-                    <p className="mt-0.5 text-sm text-aspectum-text-muted">{pageHeader.description}</p>
-                  )}
-                </div>
-              )}
-              {children}
-            </div>
-
-            {!isMobile && (
-              <aside className="hidden lg:block shrink-0">
-                {rightPanelOpen ? (
-                  <Panel as="div" className="w-[var(--aspectum-layout-actions-panel)] sticky top-6 shadow-aspectum-card overflow-hidden">
-                    <div className="flex items-center justify-between px-3 py-2 border-b border-aspectum-border">
-                      <span className="text-xs uppercase tracking-wide font-semibold text-aspectum-text-muted">
-                        Действия
-                      </span>
-                      <IconButton
-                        type="button"
-                        onClick={() => {
-                          setRightPanelOpen(false);
-                          localStorage.setItem('rightPanelOpen', 'false');
-                        }}
-                        label="Скрыть панель"
-                      >
-                        <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                          <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
-                        </svg>
-                      </IconButton>
-                    </div>
-                    <div className="p-3">
-                      <SidebarActions
-                        actions={formActions}
-                        onAction={(action) => action.onClick?.()}
-                        onRefresh={() => window.location.reload()}
-                      />
-                    </div>
-                  </Panel>
-                ) : (
-                  <div className="sticky top-6">
-                    <Button
-                      type="button"
-                      onClick={() => {
-                        setRightPanelOpen(true);
-                        localStorage.setItem('rightPanelOpen', 'true');
-                      }}
-                      title="Показать панель действий"
-                      variant="outline"
-                      size="sidebarRail"
-                    >
-                      <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
-                      </svg>
-                      {formActions.length > 0 && (
-                        <span className="w-1.5 h-1.5 rounded-full bg-aspectum-primary" title={`${formActions.length} действий`} />
-                      )}
-                    </Button>
-                  </div>
+          <div className="min-w-0">
+            {shouldRenderPageHeader && (
+              <div className="mb-4 md:mb-5">
+                <Heading level={1} size="lg" weight="bold">{pageHeader.title}</Heading>
+                {pageHeader.description && (
+                  <p className="mt-0.5 text-sm text-aspectum-text-muted">{pageHeader.description}</p>
                 )}
-              </aside>
+              </div>
             )}
+            {children}
           </div>
         </div>
       </main>
