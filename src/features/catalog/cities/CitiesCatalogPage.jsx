@@ -4,6 +4,7 @@ import { Button, Checkbox, ConfirmModal, DataTable, Switch, TableRowActions, Toa
 import { useLayoutActions } from '../../../context/useLayoutActions';
 import { iapAdminAPI } from '../../../api/generation';
 import { parseApiError } from '../../../utils/apiError';
+import { resolveNavScope } from '../../../config/nav';
 import { getMultiLangValue } from '../shared/i18n';
 import CityEditorModal from './CityEditorModal';
 import { useCitiesCatalog } from './useCitiesCatalog';
@@ -144,13 +145,15 @@ export default function CitiesCatalogPage() {
   const setCommonsModalOpen = c.setCommonsModalOpen;
   useEffect(() => {
     if (c.editingCity) return;
+    // Sessions live in the studio deployment; the catalog build has no such pages to open.
+    const hasSessions = resolveNavScope() !== 'catalog';
     setMobileActions([
       { id: 'create-city', label: 'Создать город', onClick: c.openCreate, variant: 'primary' },
-      { id: 'create-city-session', label: 'Через сессию', onClick: c.openNewSession, variant: 'secondary' },
+      hasSessions && { id: 'create-city-session', label: 'Через сессию', onClick: c.openNewSession, variant: 'secondary' },
       { id: 'create-city-tag', label: 'Создать тег города', onClick: c.openTags, variant: 'secondary' },
-      { id: 'open-sessions', label: 'Открыть сессии', onClick: c.openSessions },
+      hasSessions && { id: 'open-sessions', label: 'Открыть сессии', onClick: c.openSessions },
       { id: 'refresh-cities', label: 'Обновить справочник', onClick: c.reload },
-    ]);
+    ].filter(Boolean));
     return () => setMobileActions([]);
   }, [c.editingCity, c.openCreate, c.openNewSession, c.openTags, c.openSessions, c.reload, setMobileActions]);
 
