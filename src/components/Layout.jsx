@@ -5,7 +5,9 @@ import { useLayoutActions } from '../context/useLayoutActions';
 import useTokenValidation from '../hooks/useTokenValidation';
 import TokenManager from '../utils/TokenManager';
 import { getWorkspace, setWorkspace, workspaceTitle } from '../utils/workspace';
-import { FormLabel, Button, Heading, IconButton, Panel, Select, Sidebar, SidebarActions, SidebarFooter, SidebarHeader, SidebarIconButton, SidebarNav, SidebarOverlay } from './ui';
+import { FormLabel, Button, Heading, IconButton, Panel, Select, Sidebar, SidebarActions, SidebarFooter, SidebarHeader, SidebarIconButton, SidebarOverlay } from './ui';
+import AppNav from './AppNav';
+import { pageTitleFor } from '../config/nav';
 
 /**
  * Переключатель рабочего пространства (Россия / Европа / …). Сужает списки
@@ -131,133 +133,14 @@ export default function Layout({ children, pageHeader = null, pageHeaderMode = '
     navigate('/token-auth');
   };
 
-  const sidebarSections = [
-    {
-      title: 'Сессии',
-      items: [
-        ...activeSessions.slice(0, 3).map((s) => ({
-          label: s.name || s.uuid?.slice(0, 12) + '…',
-          to: `/generation/${s.id}`,
-          badge: s.status === 'in_progress' ? 'Active' : null,
-          badgeColor: 'bg-aspectum-orange-subtle',
-        })),
-        { label: 'Все сессии', to: '/generation' },
-        { label: 'Загрузить из файла', to: '/generation/upload' },
-      ],
-    },
-    {
-      title: 'Работа с ИИ',
-      items: [
-        { label: 'Настройки ИИ', to: '/ai/settings' },
-        { label: 'Промпты', to: '/ai/prompts' },
-        { label: 'Настройки TTS', to: '/ai/tts' },
-        { label: 'Тестовый стенд', to: '/ai/playground' },
-        { label: 'Поиск картинок', to: '/ai/images' },
-        { label: 'Генерация городов', to: '/ai/cities', badge: 'AI' },
-      ],
-    },
-    {
-      title: 'Задачи',
-      items: [
-        { label: 'Мои задачи', to: '/tasks' },
-        { label: 'Очередь озвучки', to: '/tasks/audio-queue' },
-        { label: 'Восстановление аудио', to: '/tasks/media-recovery' },
-      ],
-    },
-    {
-      title: 'Контент',
-      items: [
-        { label: 'Города', to: '/catalog/cities' },
-        { label: 'Ивенты', to: '/catalog/events' },
-        { label: 'Ивенты без города', to: '/catalog/events/orphans' },
-        { label: 'Авторы', to: '/catalog/authors' },
-        { label: 'Теги и фильтры', to: '/catalog/tags' },
-        { label: 'Аудиогиды', to: '/catalog/audio-guides' },
-        { label: 'Интерактивные локации', to: '/catalog/interactive-locations' },
-        { label: 'Фотографии', to: '/catalog/photos' },
-        { label: 'Продуктовая аналитика', to: '/catalog/product-analytics' },
-      ],
-    },
-    {
-      title: 'Букинг',
-      items: [
-        { label: 'Настройка продаж', to: '/catalog/booking-setup' },
-        { label: 'Цены по городу', to: '/catalog/city-pricing' },
-        { label: 'Справочники', to: '/catalog/booking' },
-        { label: 'Аналитика', to: '/catalog/analytics' },
-        { label: 'Резервации', to: '/catalog/reservations' },
-      ],
-    },
-    {
-      title: 'Подписки',
-      items: [
-        { label: 'Типы подписки', to: '/catalog/subscription-types' },
-        { label: 'Коды активации', to: '/catalog/activation-codes' },
-        { label: 'Логи активации', to: '/catalog/code-usage-logs' },
-        { label: 'Подписки пользователей', to: '/catalog/user-subscriptions' },
-        { label: 'Все подписки на города', to: '/catalog/city-subscriptions' },
-        { label: 'IAP покупки', to: '/catalog/iap-purchases' },
-      ],
-    },
-    {
-      title: 'Экспорт / Импорт',
-      items: [
-        { label: '⬇ Экспорт ZIP (всё)', to: '/export/zip' },
-        { label: '⬇ Только города', to: '/export/cities' },
-        { label: '⬇ Только ивенты', to: '/export/events' },
-        { label: '📊 Импорт', to: '/import/google-sheet' },
-      ],
-    },
-  ];
+  const sessionNavItems = activeSessions.slice(0, 3).map((s) => ({
+    label: s.name || s.uuid?.slice(0, 12) + '…',
+    to: `/generation/${s.id}`,
+    badge: s.status === 'in_progress' ? 'Active' : null,
+    badgeColor: 'bg-aspectum-orange-subtle',
+  }));
 
-  const pageTitles = [
-    { startsWith: '/generation/upload', title: 'Загрузка из файла' },
-    { startsWith: '/generation/new', title: 'Новая сессия' },
-    { startsWith: '/generation/list', title: 'Список генерации' },
-    { startsWith: '/generation/', title: 'Редактор сессии' },
-    { startsWith: '/generation', title: 'Сессии' },
-    { startsWith: '/ai/tts', title: 'Настройки TTS' },
-    { startsWith: '/ai/settings', title: 'Настройки ИИ' },
-    { startsWith: '/ai/prompts', title: 'Промпты генерации' },
-    { startsWith: '/ai/playground', title: 'Тестовый стенд' },
-    { startsWith: '/ai/images', title: 'Поиск картинок' },
-    { startsWith: '/ai/cities', title: 'Генерация городов' },
-    { startsWith: '/tasks/audio-queue', title: 'Очередь озвучки' },
-    { startsWith: '/tasks', title: 'Мои задачи' },
-    { startsWith: '/account/settings', title: 'Настройки аккаунта' },
-    { startsWith: '/catalog/cities', title: 'Справочник городов' },
-    { startsWith: '/catalog/events/orphans', title: 'Ивенты без города' },
-    { startsWith: '/catalog/events', title: 'Справочник ивентов' },
-    { startsWith: '/catalog/authors', title: 'Авторы контента' },
-    { startsWith: '/catalog/ticket-types', title: 'Справочник типов билетов' },
-    { startsWith: '/catalog/slot-availabilities', title: 'Справочник слотов (доступность)' },
-    { startsWith: '/catalog/ticket-prices', title: 'Справочник цен билетов' },
-    { startsWith: '/catalog/base-prices', title: 'Базовые цены' },
-    { startsWith: '/catalog/pricing-rules', title: 'Правила ценообразования' },
-    { startsWith: '/catalog/product-analytics', title: 'Продуктовая аналитика' },
-    { startsWith: '/catalog/analytics', title: 'Аналитика бронирований' },
-    { startsWith: '/catalog/booking-setup', title: 'Booking Setup (мастер)' },
-    { startsWith: '/catalog/city-pricing', title: 'Массовые цены по городу' },
-    { startsWith: '/catalog/booking', title: 'Справочники букинга' },
-    { startsWith: '/catalog/llm/keys', title: 'Ключи LLM API' },
-    { startsWith: '/catalog/llm/usage', title: 'Использование моделей' },
-    { startsWith: '/catalog/reservations', title: 'Резервации' },
-    { startsWith: '/catalog/subscription-types', title: 'Справочник типов подписки' },
-    { startsWith: '/catalog/activation-codes', title: 'Справочник кодов активации' },
-    { startsWith: '/catalog/user-subscriptions', title: 'Подписки пользователей' },
-    { startsWith: '/catalog/city-subscriptions', title: 'Все подписки на города' },
-    { startsWith: '/catalog/code-usage-logs', title: 'Логи активации кодов' },
-    { startsWith: '/catalog/iap-purchases', title: 'IAP покупки' },
-    { startsWith: '/catalog/audio-guides', title: 'Аудиогиды' },
-    { startsWith: '/catalog/interactive-locations', title: 'Интерактивные локации' },
-    { startsWith: '/catalog/photos', title: 'Каталог фото' },
-    { startsWith: '/catalog/tags', title: 'Теги и фильтры' },
-    { startsWith: '/export/zip', title: 'Экспорт ZIP' },
-    { startsWith: '/export/cities', title: 'Экспорт городов' },
-    { startsWith: '/export/events', title: 'Экспорт ивентов' },
-    { startsWith: '/import/google-sheet', title: 'Импорт' },
-  ];
-  const routePageTitle = pageTitles.find((p) => location.pathname.startsWith(p.startsWith))?.title || 'Aspectum Admin';
+  const routePageTitle = pageTitleFor(location.pathname);
   const mobilePageTitle = pageHeader?.mobileTitle || pageHeader?.title || routePageTitle;
   const shouldRenderPageHeader = !!pageHeader && (
     pageHeaderMode === 'always'
@@ -272,34 +155,6 @@ export default function Layout({ children, pageHeader = null, pageHeaderMode = '
       || action.label === existing.label
     ))),
   ];
-
-  const SidebarContent = () => (
-    <SidebarNav
-      sections={sidebarSections}
-      expanded={sidebarExpanded}
-      renderItem={(item, section) => {
-        const isActive = location.pathname === item.to
-          || (item.to !== '/' && location.pathname.startsWith(item.to) && item.to.length > 1
-            && !(item.to === '/catalog/events' && location.pathname.startsWith('/catalog/events/orphans')));
-
-        return (
-          <Link
-            key={`${section.title}-${item.label}`}
-            to={item.to}
-            title={!sidebarExpanded ? item.label : ''}
-            className={`flex items-center justify-between rounded-aspectum-control text-sm font-medium transition-colors ${sidebarExpanded ? 'px-3' : 'px-1 justify-center'} py-2 ${isActive ? 'bg-aspectum-primary-muted text-aspectum-primary-hover' : 'text-aspectum-text-strong hover:bg-aspectum-surface-subtle'}`}
-          >
-            <span className={`truncate ${!sidebarExpanded && 'hidden'}`}>{item.label}</span>
-            {item.badge && sidebarExpanded && (
-              <span className={`ml-2 shrink-0 inline-flex items-center rounded-aspectum-compact px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-aspectum-on-accent ${item.badgeColor || 'bg-aspectum-primary'}`}>
-                {item.badge}
-              </span>
-            )}
-          </Link>
-        );
-      }}
-    />
-  );
 
   return (
     <div className="flex h-screen bg-aspectum-surface-muted">
@@ -350,7 +205,7 @@ export default function Layout({ children, pageHeader = null, pageHeaderMode = '
 
         {/* Navigation */}
         <div className="flex-1 overflow-y-auto p-3">
-          <SidebarContent />
+          <AppNav pathname={location.pathname} collapsed={!sidebarExpanded && !isMobile} extraItems={{ sessions: sessionNavItems }} onNavigate={isMobile ? () => setMobileSidebarOpen(false) : undefined} />
         </div>
 
         {/* User Actions */}
