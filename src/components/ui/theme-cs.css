@@ -1,7 +1,8 @@
 /* "cs" theme: the ContentStudio look (neutral shadcn palette, near-black primary,
    10px radius) expressed as overrides of the existing --aspectum-* tokens.
-   Opt-in: <html data-theme="cs"> (see src/theme/themeBootstrap.js). Without the
-   attribute nothing here applies, so the stable admin is unchanged.
+   Applied by <html data-theme="cs">, which src/theme/themeBootstrap.js sets by
+   default (?theme=default opts a browser out). Without the attribute nothing
+   here applies and the original look is used.
    Dark mode: <html data-theme="cs" class="dark">. Probe quality: only neutral,
    primary and status tokens are remapped; accent hues (indigo/purple/orange) keep
    their light values until the hard-coded colours are swept. */
