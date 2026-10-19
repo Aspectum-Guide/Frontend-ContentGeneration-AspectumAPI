@@ -24,7 +24,9 @@ param(
     [switch]$Force
 )
 
-$ErrorActionPreference = 'Stop'
+# Native tools (npx, ssh, scp) write progress and warnings to stderr; under 'Stop' Windows PowerShell 5.1
+# turns those into terminating errors. Decide by exit code instead (see Check).
+$ErrorActionPreference = 'Continue'
 $repo = Split-Path -Parent $PSScriptRoot
 Set-Location $repo
 
@@ -38,7 +40,7 @@ if ($RemoteDir -ne $defaultDir -and -not $Force) {
 
 $remoteScriptSrc = Join-Path $PSScriptRoot 'deploy-remote.sh'
 $tmp = Join-Path ([IO.Path]::GetTempPath()) ('aspectum-deploy-' + [Guid]::NewGuid().ToString('N'))
-New-Item -ItemType Directory -Path $tmp | Out-Null
+New-Item -ItemType Directory -Path $tmp -ErrorAction Stop | Out-Null
 try {
     # The server runs bash: normalise line endings (git may have checked out CRLF).
     $remoteScript = Join-Path $tmp 'deploy-remote.sh'
@@ -94,7 +96,7 @@ try {
     Step "Verify $Url"
     $index = Get-Content 'dist/index.html' -Raw
     $local = [regex]::Matches($index, 'assets/[^"''\s]+\.(js|css)') | ForEach-Object { $_.Value } | Sort-Object -Unique
-    $live = (Invoke-WebRequest "$Url/generation/" -UseBasicParsing).Content
+    $live = (Invoke-WebRequest "$Url/generation/" -UseBasicParsing -ErrorAction Stop).Content
     $missing = $local | Where-Object { $live -notmatch [regex]::Escape($_) }
     if ($missing) {
         Write-Warning ("Live index.html does not reference: " + ($missing -join ', ') + ' (cache or wrong site?)')
