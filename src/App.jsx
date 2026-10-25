@@ -23,6 +23,8 @@ import BookingSetupWorkbench from './pages/catalog/BookingSetupWorkbench';
 import CityPricingWorkbench from './pages/catalog/CityPricingWorkbench';
 import SubscriptionTypesCatalog from './pages/catalog/SubscriptionTypesCatalog';
 import ActivationCodesCatalog from './pages/catalog/ActivationCodesCatalog';
+import PartnersCatalog from './pages/catalog/PartnersCatalog';
+import PartnerDetail from './pages/catalog/PartnerDetail';
 import UserSubscriptionsWorkbench from './pages/catalog/UserSubscriptionsWorkbench';
 import CodeUsageLogsCatalog from './pages/catalog/CodeUsageLogsCatalog';
 import CitySubscriptionsCatalog from './pages/catalog/CitySubscriptionsCatalog';
@@ -224,6 +226,14 @@ const routes = [
   {
     path: '/catalog/activation-codes',
     element: <ProtectedRoute><ErrorBoundary><ActivationCodesCatalog /></ErrorBoundary></ProtectedRoute>,
+  },
+  {
+    path: '/catalog/partners',
+    element: <ProtectedRoute><ErrorBoundary><PartnersCatalog /></ErrorBoundary></ProtectedRoute>,
+  },
+  {
+    path: '/catalog/partners/:partnerId',
+    element: <ProtectedRoute><ErrorBoundary><PartnerDetail /></ErrorBoundary></ProtectedRoute>,
   },
   {
     path: '/catalog/user-subscriptions',

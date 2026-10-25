@@ -16,11 +16,23 @@ import { getCityLabel, getEventLabel } from './subscriptionLabels';
 
 const PAGE_SIZE = 20;
 
+// Что открывает код этого типа. «Один город на выбор»: человек при активации
+// сам выбирает город — из списка ниже, а пустой список значит «любой город».
+const ACCESS_MODES = [
+  { value: 'fixed', label: 'Набор городов' },
+  { value: 'choose_city', label: 'Один город на выбор' },
+];
+
+function accessModeLabel(value) {
+  return ACCESS_MODES.find((mode) => mode.value === value)?.label || 'Набор городов';
+}
+
 function createEmptyType() {
   return {
     id: null,
     name: '',
     description: '',
+    access_mode: 'fixed',
     ai_prompts: 0,
     is_active: true,
     cities: [],
@@ -157,6 +169,7 @@ export default function SubscriptionTypesCatalogPage() {
     const payload = {
       name: editingItem.name,
       description: editingItem.description || '',
+      access_mode: editingItem.access_mode || 'fixed',
       ai_prompts: normalizeAiPrompts(editingItem.ai_prompts),
       is_active: !!editingItem.is_active,
       cities: normalizeIdList(editingItem.cities),
@@ -207,9 +220,20 @@ export default function SubscriptionTypesCatalogPage() {
       render: (value) => <span className="text-sm text-gray-700">{value || '—'}</span>,
     },
     {
+      key: 'access_mode',
+      label: 'Что открывает',
+      render: (value) => <span className="text-sm text-gray-700">{accessModeLabel(value)}</span>,
+    },
+    {
       key: 'cities',
       label: 'Города',
-      render: (value) => <span className="text-sm text-gray-700">{Array.isArray(value) ? value.length : 0}</span>,
+      render: (value, row) => {
+        const count = Array.isArray(value) ? value.length : 0;
+        if (row.access_mode === 'choose_city') {
+          return <span className="text-sm text-gray-700">{count ? `выбор из ${count}` : 'любой'}</span>;
+        }
+        return <span className="text-sm text-gray-700">{count}</span>;
+      },
     },
     {
       key: 'events',
@@ -274,6 +298,7 @@ export default function SubscriptionTypesCatalogPage() {
                 id: row.id,
                 name: row.name || '',
                 description: row.description || '',
+                access_mode: row.access_mode || 'fixed',
                 ai_prompts: normalizeAiPrompts(row.ai_prompts),
                 is_active: row.is_active !== false,
                 cities: normalizeIdList(row.cities),
@@ -312,6 +337,23 @@ export default function SubscriptionTypesCatalogPage() {
               />
             </Field>
 
+            <Field
+              label="Что открывает код"
+              hint={editingItem.access_mode === 'choose_city'
+                ? 'При активации человек сам выбирает один город. Ниже можно ограничить список городов; пустой список — любой опубликованный город.'
+                : 'Код сразу открывает все города из списка ниже.'}
+            >
+              <select
+                value={editingItem.access_mode || 'fixed'}
+                onChange={(e) => setEditingItem((prev) => ({ ...prev, access_mode: e.target.value }))}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+              >
+                {ACCESS_MODES.map((mode) => (
+                  <option key={mode.value} value={mode.value}>{mode.label}</option>
+                ))}
+              </select>
+            </Field>
+
             <Field label="Запросов ИИ" hint="Сколько запросов ИИ получает пользователь при активации кода. 0 — код открывает только диджитал-гид">
               <TextInput
                 type="number"
@@ -328,7 +370,12 @@ export default function SubscriptionTypesCatalogPage() {
               text="Активный тип подписки"
             />
 
-            <Field label="Города" hint="Ctrl/Cmd + click для множественного выбора">
+            <Field
+              label={editingItem.access_mode === 'choose_city' ? 'Из каких городов выбирать' : 'Города'}
+              hint={editingItem.access_mode === 'choose_city'
+                ? 'Пусто — любой опубликованный город. Ctrl/Cmd + click для множественного выбора'
+                : 'Ctrl/Cmd + click для множественного выбора'}
+            >
               <select
                 multiple
                 size={8}
@@ -378,7 +425,7 @@ export default function SubscriptionTypesCatalogPage() {
         onClose={() => { setDeleteTarget(null); setDeleteError(null); }}
         onConfirm={handleDelete}
         title="Удалить тип подписки?"
-        message={deleteError || `Тип «${deleteTarget?.name || deleteTarget?.id || ''}» будет удален без возможности восстановления.`}
+        message={deleteError || `Тип «${deleteTarget?.name || deleteTarget?.id || ''}» будет удален без возможности восстановления. Тип с кодами удалить нельзя — его можно выключить. Открытые людьми города при удалении сохраняются.`}
         confirmLabel="Удалить"
         danger
         loading={deleting}

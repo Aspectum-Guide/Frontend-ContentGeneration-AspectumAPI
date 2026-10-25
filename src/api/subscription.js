@@ -15,6 +15,16 @@ export const activationCodesAPI = {
   update: (id, data) => apiClient.patch(`/subscription/activation-codes/${id}/`, data),
   delete: (id) => apiClient.delete(`/subscription/activation-codes/${id}/`),
   bulkGenerate: (data) => apiClient.post('/subscription/activation-codes/bulk-generate/', data),
+  // Признаки злоупотреблений: устройства с несколькими аккаунтами, всплески активаций.
+  abuseSignals: (params) => apiClient.get('/subscription/activation-codes/abuse-signals/', { params }),
+};
+
+// Партии кодов (печатные карточки): учёт, выгрузка в Excel, выключение пачки.
+export const codeBatchesAPI = {
+  list: (params) => apiClient.get('/subscription/code-batches/', { params }),
+  deactivate: (id) => apiClient.post(`/subscription/code-batches/${id}/deactivate/`),
+  reactivate: (id) => apiClient.post(`/subscription/code-batches/${id}/reactivate/`),
+  exportXlsx: (id) => apiClient.get(`/subscription/code-batches/${id}/export/`, { responseType: 'blob' }),
 };
 
 export const citySubscriptionsAPI = {

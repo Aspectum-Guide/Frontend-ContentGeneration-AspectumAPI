@@ -1,5 +1,9 @@
 import { useCallback, useEffect, useState } from 'react';
+import { partnersAdminAPI } from '../../../api/partners';
 import { activationCodesAPI, subscriptionTypesAPI } from '../../../api/subscription';
+import AbuseSignalsPanel from '../partners/AbuseSignalsPanel';
+import CodeBatchesPanel from '../partners/CodeBatchesPanel';
+import CodeBatchResult from '../partners/CodeBatchResult';
 import Layout from '../../../components/Layout';
 import DataTable from '../../../components/ui/DataTable';
 import { Field, FormActions, TextInput, Textarea } from '../../../components/ui/FormField';
@@ -23,6 +27,7 @@ function createEmptyCode() {
     id: null,
     code: '',
     subscription_type: '',
+    partner: '',
     product_name: '',
     description: '',
     expiry_date: '',
@@ -33,11 +38,14 @@ function createEmptyCode() {
 
 function createEmptyBulkGenerate() {
   return {
+    name: '',
     prefix: '',
     count: 50,
     subscription_type: '',
+    partner: '',
     max_uses: '',
-    expiry_days: '',
+    // По оферте неактивированный код действует 12 месяцев, если не указано иное.
+    expiry_days: 365,
     product_name: '',
     description: '',
   };
@@ -53,11 +61,23 @@ export default function ActivationCodesCatalogPage() {
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
   const [subscriptionTypeFilter, setSubscriptionTypeFilter] = useState('');
+  const [partnerFilter, setPartnerFilter] = useState('');
   const [page, setPage] = useState(1);
   const [totalCount, setTotalCount] = useState(0);
 
   const [subscriptionTypes, setSubscriptionTypes] = useState([]);
   const [typesLoading, setTypesLoading] = useState(true);
+  const [partners, setPartners] = useState([]);
+
+  const loadPartners = useCallback(async () => {
+    try {
+      const response = await partnersAdminAPI.list();
+      const data = response?.data;
+      setPartners(Array.isArray(data?.results) ? data.results : Array.isArray(data) ? data : []);
+    } catch {
+      setPartners([]);
+    }
+  }, []);
 
   const loadSubscriptionTypes = useCallback(async () => {
     try {
@@ -78,6 +98,7 @@ export default function ActivationCodesCatalogPage() {
       id: row.id,
       code: row.code || '',
       subscription_type: row.subscription_type || '',
+      partner: row.partner || '',
       product_name: row.product_name || '',
       description: row.description || '',
       expiry_date: formatIsoForInput(row.expiry_date),
@@ -91,6 +112,7 @@ export default function ActivationCodesCatalogPage() {
     return {
       code: editingItem.code?.trim() || undefined,
       subscription_type: editingItem.subscription_type || null,
+      partner: editingItem.partner || null,
       product_name: editingItem.product_name || '',
       description: editingItem.description || '',
       expiry_date: parseInputToIso(editingItem.expiry_date) || null,
@@ -102,7 +124,7 @@ export default function ActivationCodesCatalogPage() {
   const parseCrudError = useCallback((err, fallback) => parseApiError(err, fallback), []);
 
   const loadItems = useCallback(async (paramsState) => {
-    const state = paramsState || { search, statusFilter, subscriptionTypeFilter, page };
+    const state = paramsState || { search, statusFilter, subscriptionTypeFilter, partnerFilter, page };
 
     try {
       setLoading(true);
@@ -111,6 +133,9 @@ export default function ActivationCodesCatalogPage() {
         search: state.search || undefined,
         is_active: state.statusFilter === 'active' ? 'true' : state.statusFilter === 'inactive' ? 'false' : undefined,
         subscription_type: state.subscriptionTypeFilter || undefined,
+        partner: state.partnerFilter || undefined,
+        // Коды из партий (тысячи карточек) — в таблице партий; поиском находятся все.
+        without_batch: state.search ? undefined : '1',
         page: state.page,
         page_size: PAGE_SIZE,
         ordering: '-created_at',
@@ -128,7 +153,7 @@ export default function ActivationCodesCatalogPage() {
     } finally {
       setLoading(false);
     }
-  }, [search, statusFilter, subscriptionTypeFilter, page]);
+  }, [search, statusFilter, subscriptionTypeFilter, partnerFilter, page]);
 
   const crud = useCatalogCrud({
     createEmpty: createEmptyCode,
@@ -146,10 +171,12 @@ export default function ActivationCodesCatalogPage() {
   });
 
   const [bulkOpen, setBulkOpen] = useState(false);
+  const [batchesVersion, setBatchesVersion] = useState(0);
 
   useEffect(() => {
     loadSubscriptionTypes();
-  }, [loadSubscriptionTypes]);
+    loadPartners();
+  }, [loadSubscriptionTypes, loadPartners]);
 
   useEffect(() => {
     loadItems();
@@ -158,10 +185,10 @@ export default function ActivationCodesCatalogPage() {
   useEffect(() => {
     const timer = setTimeout(() => {
       setPage(1);
-      loadItems({ search, statusFilter, subscriptionTypeFilter, page: 1 });
+      loadItems({ search, statusFilter, subscriptionTypeFilter, partnerFilter, page: 1 });
     }, 350);
     return () => clearTimeout(timer);
-  }, [search, statusFilter, subscriptionTypeFilter, loadItems]);
+  }, [search, statusFilter, subscriptionTypeFilter, partnerFilter, loadItems]);
 
   useEffect(() => {
     const actions = [
@@ -211,6 +238,11 @@ export default function ActivationCodesCatalogPage() {
       },
     },
     {
+      key: 'partner_name',
+      label: 'Партнёр',
+      render: (value) => <span className="text-sm text-gray-700">{value || '—'}</span>,
+    },
+    {
       key: 'max_uses',
       label: 'Лимит/Использовано',
       render: (_, row) => (
@@ -258,7 +290,7 @@ export default function ActivationCodesCatalogPage() {
         loading={loading}
         error={error}
         emptyIcon="🔐"
-        isFiltered={!!(search || statusFilter || subscriptionTypeFilter)}
+        isFiltered={!!(search || statusFilter || subscriptionTypeFilter || partnerFilter)}
         emptyText="Кодов активации пока нет"
         search={search}
         onSearch={setSearch}
@@ -282,6 +314,17 @@ export default function ActivationCodesCatalogPage() {
             </select>
 
             <select
+              value={partnerFilter}
+              onChange={(e) => setPartnerFilter(e.target.value)}
+              className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+            >
+              <option value="">Все партнёры</option>
+              {partners.map((partner) => (
+                <option key={partner.id} value={partner.id}>{partner.name}</option>
+              ))}
+            </select>
+
+            <select
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value)}
               className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none"
@@ -299,6 +342,11 @@ export default function ActivationCodesCatalogPage() {
           />
         )}
       />
+
+      <div className="mt-6 space-y-4">
+        <CodeBatchesPanel refreshKey={batchesVersion} title="Партии кодов" />
+        <AbuseSignalsPanel />
+      </div>
 
       <Modal
         open={!!crud.editingItem}
@@ -333,6 +381,22 @@ export default function ActivationCodesCatalogPage() {
                 </select>
               </Field>
             </div>
+
+            <Field
+              label="Партнёр"
+              hint="Код партнёра закрепляет активировавшего его человека за партнёром. Партнёрский код можно активировать один раз на аккаунт."
+            >
+              <select
+                value={crud.editingItem.partner || ''}
+                onChange={(e) => crud.setEditingItem((prev) => ({ ...prev, partner: e.target.value }))}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+              >
+                <option value="">Без партнёра</option>
+                {partners.map((partner) => (
+                  <option key={partner.id} value={partner.id}>{partner.name}</option>
+                ))}
+              </select>
+            </Field>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               <Field label="Продукт">
@@ -394,7 +458,7 @@ export default function ActivationCodesCatalogPage() {
         onClose={() => crud.cancelDelete()}
         onConfirm={crud.confirmDelete}
         title="Удалить код активации?"
-        message={crud.deleteError || `Код «${crud.deleteTarget?.code || crud.deleteTarget?.id || ''}» будет удален без возможности восстановления.`}
+        message={crud.deleteError || `Код «${crud.deleteTarget?.code || crud.deleteTarget?.id || ''}» будет удален без возможности восстановления. Код, который уже активировали, удалить нельзя — его можно выключить.`}
         confirmLabel="Удалить"
         danger
         loading={crud.deleting}
@@ -409,21 +473,32 @@ export default function ActivationCodesCatalogPage() {
         parseError={(err) => parseApiError(err, 'Ошибка массовой генерации кодов')}
         onSubmit={async (values) => {
           const payload = {
+            name: values.name?.trim() || '',
             prefix: values.prefix?.trim() || '',
             count: Number(values.count),
             subscription_type: values.subscription_type,
+            partner: values.partner || null,
             max_uses: values.max_uses === '' ? null : Number(values.max_uses),
             expiry_days: values.expiry_days === '' ? null : Number(values.expiry_days),
             product_name: values.product_name || '',
             description: values.description || '',
           };
           const resp = await activationCodesAPI.bulkGenerate(payload);
+          setBatchesVersion((value) => value + 1);
           await loadItems();
           return resp?.data || { success: true };
         }}
         renderFields={({ values, setValues, error }) => (
           <>
             <FormErrorAlert message={error} />
+
+            <Field label="Название партии" hint="Пусто — подставим дату и количество. По партии видно, сколько кодов активировали; её можно выгрузить в Excel и выключить целиком.">
+              <TextInput
+                value={values.name}
+                onChange={(e) => setValues((prev) => ({ ...prev, name: e.target.value }))}
+                maxLength={200}
+              />
+            </Field>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               <Field label="Префикс (опционально)">
@@ -439,7 +514,7 @@ export default function ActivationCodesCatalogPage() {
                 <TextInput
                   type="number"
                   min={1}
-                  max={1000}
+                  max={10000}
                   value={values.count}
                   onChange={(e) => setValues((prev) => ({ ...prev, count: e.target.value }))}
                 />
@@ -457,6 +532,19 @@ export default function ActivationCodesCatalogPage() {
                 <option value="">Выберите тип подписки</option>
                 {subscriptionTypes.map((st) => (
                   <option key={st.id} value={st.id}>{st.name}</option>
+                ))}
+              </select>
+            </Field>
+
+            <Field label="Партнёр (опционально)" hint="Коды партнёра видны ему в кабинете; клиенты, активировавшие их, закрепляются за партнёром.">
+              <select
+                value={values.partner}
+                onChange={(e) => setValues((prev) => ({ ...prev, partner: e.target.value }))}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+              >
+                <option value="">Без партнёра</option>
+                {partners.map((partner) => (
+                  <option key={partner.id} value={partner.id}>{partner.name}</option>
                 ))}
               </select>
             </Field>
@@ -501,23 +589,7 @@ export default function ActivationCodesCatalogPage() {
             </Field>
           </>
         )}
-        renderResult={({ result }) =>
-          result?.examples?.length ? (
-            <div className="rounded-lg border border-gray-200 bg-gray-50 p-3">
-              <div className="text-sm font-medium text-gray-800">Примеры кодов</div>
-              <div className="mt-2 flex flex-wrap gap-2">
-                {result.examples.map((c) => (
-                  <span key={c} className="font-mono text-xs px-2 py-1 rounded bg-white border border-gray-200">
-                    {c}
-                  </span>
-                ))}
-              </div>
-              <div className="mt-2 text-xs text-gray-600">
-                Сгенерировано: {result.count ?? '—'}
-              </div>
-            </div>
-          ) : null
-        }
+        renderResult={({ result }) => <CodeBatchResult result={result} />}
       />
     </Layout>
   );
