@@ -9,6 +9,7 @@ import FormErrorAlert from '../shared/components/FormErrorAlert';
 import AbuseSignalsPanel from './AbuseSignalsPanel';
 import CodeBatchesPanel from './CodeBatchesPanel';
 import CodeBatchResult from './CodeBatchResult';
+import MainCodePanel from './MainCodePanel';
 import PartnerFormModal from './PartnerFormModal';
 import {
   MEMBER_STATUS_LABELS,
@@ -243,6 +244,7 @@ function CodesTab({ partnerId }) {
   return (
     <div className="space-y-4">
       <FormErrorAlert message={error} />
+      <MainCodePanel partnerId={partnerId} codes={codes} types={types} onIssued={load} />
       <form onSubmit={issue} className="rounded-xl border border-gray-200 bg-white p-4 space-y-3">
         <div className="text-sm font-medium text-gray-800">Выпустить партию кодов партнёру</div>
         <p className="text-xs text-gray-500">

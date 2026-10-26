@@ -20,6 +20,12 @@ export const partnerReportsAPI = {
   entries: (id, params) => apiClient.get(`/partners/${id}/entries/`, { params }),
   clients: (id) => apiClient.get(`/partners/${id}/clients/`),
   codes: (id) => apiClient.get(`/partners/${id}/codes/`),
+  // QR ссылки активации кода партнёра: type 'svg' (печать) или 'png'.
+  codeQr: (id, code, type = 'png', download = false) =>
+    apiClient.get(`/partners/${id}/codes/${encodeURIComponent(code)}/qr/`, {
+      params: { type, ...(download ? { download: 1 } : {}) },
+      responseType: 'blob',
+    }),
   entriesCsv: (id, params) =>
     apiClient.get(`/partners/${id}/entries.csv`, { params, responseType: 'blob' }),
 };
