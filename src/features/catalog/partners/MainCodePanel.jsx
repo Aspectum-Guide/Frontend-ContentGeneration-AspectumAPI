@@ -35,14 +35,15 @@ function QrPreview({ partnerId, code }) {
   );
 }
 
-// Основной код партнёра: его партнёр раздаёт клиентам. Ссылка и QR появляются
-// и здесь, и у партнёра в кабинете.
+// Постоянный код партнёра: многоразовый, со своим текстом — как коды для Рима
+// или Углича. Партнёр раздаёт его клиентам; ссылка и QR появляются и здесь,
+// и у партнёра в кабинете.
 export default function MainCodePanel({ partnerId, codes, types, onIssued }) {
   const defaultType = useMemo(
     () => (types.find((type) => type.access_mode === 'choose_city') || types[0] || {}).id || '',
     [types],
   );
-  const [form, setForm] = useState({ code: '', subscription_type: '', max_uses: '', expiry_days: 365 });
+  const [form, setForm] = useState({ code: '', subscription_type: '', max_uses: '', expiry_days: '' });
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(null);
@@ -64,10 +65,10 @@ export default function MainCodePanel({ partnerId, codes, types, onIssued }) {
         partner: partnerId,
         max_uses: form.max_uses === '' ? null : Number(form.max_uses),
         expiry_date: days ? new Date(Date.now() + days * 86400000).toISOString() : null,
-        description: 'Основной код партнёра',
+        description: 'Постоянный код партнёра',
         is_active: true,
       });
-      setForm({ code: '', subscription_type: '', max_uses: '', expiry_days: 365 });
+      setForm({ code: '', subscription_type: '', max_uses: '', expiry_days: '' });
       setOpen(false);
       await onIssued();
     } catch (err) {
@@ -99,16 +100,17 @@ export default function MainCodePanel({ partnerId, codes, types, onIssued }) {
   return (
     <div className="rounded-xl border border-gray-200 bg-white p-4 space-y-3">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <div className="text-sm font-medium text-gray-800">Основной код партнёра</div>
+        <div className="text-sm font-medium text-gray-800">Постоянный код партнёра</div>
         {!open ? (
           <button type="button" className={PRIMARY} onClick={() => setOpen(true)} disabled={!types.length}>
-            Выпустить основной код
+            Создать постоянный код
           </button>
         ) : null}
       </div>
       <p className="text-xs text-gray-500">
-        Код, который партнёр раздаёт клиентам. Ссылка и QR для плакатов появляются у партнёра в кабинете. Обычно
-        многоразовый: на одном телефоне он всё равно активируется один раз.
+        Многоразовый код со своим текстом — как коды для Рима или Углича. Партнёр раздаёт его клиентам: ссылка и
+        QR для плакатов появляются у него в кабинете. Каждый клиент активирует код один раз (и один раз на телефон),
+        клиент закрепляется за партнёром.
       </p>
       <FormErrorAlert message={error} />
 
@@ -142,7 +144,7 @@ export default function MainCodePanel({ partnerId, codes, types, onIssued }) {
         </div>
       ))}
       {!usable.length && !open ? (
-        <p className="text-sm text-amber-700">У партнёра нет действующего кода — в его кабинете пусто. Выпустите основной код.</p>
+        <p className="text-sm text-amber-700">У партнёра нет действующего многоразового кода — в его кабинете нечего раздавать. Создайте постоянный код.</p>
       ) : null}
 
       {open ? (
@@ -157,8 +159,8 @@ export default function MainCodePanel({ partnerId, codes, types, onIssued }) {
                 ))}
               </select>
             </Field>
-            <Field label="Код" hint="Например VOLGA. Пусто — сгенерируем">
-              <TextInput value={form.code} maxLength={40} onChange={set('code')} placeholder="VOLGA" />
+            <Field label="Текст кода" hint="Латиница и цифры, например VOLGA2026. Пусто — сгенерируем">
+              <TextInput value={form.code} maxLength={40} onChange={set('code')} placeholder="VOLGA2026" />
             </Field>
             <Field label="Активаций" hint="Пусто — без ограничения">
               <TextInput type="number" min={1} value={form.max_uses} onChange={set('max_uses')} />
@@ -168,7 +170,7 @@ export default function MainCodePanel({ partnerId, codes, types, onIssued }) {
             </Field>
           </div>
           <div className="flex gap-2">
-            <button type="submit" className={PRIMARY} disabled={busy || !typeId}>{busy ? 'Выпускаю…' : 'Выпустить'}</button>
+            <button type="submit" className={PRIMARY} disabled={busy || !typeId}>{busy ? 'Создаю…' : 'Создать код'}</button>
             <button type="button" className={BUTTON} onClick={() => setOpen(false)} disabled={busy}>Отмена</button>
           </div>
         </form>

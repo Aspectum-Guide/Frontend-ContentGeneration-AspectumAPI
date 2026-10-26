@@ -246,7 +246,7 @@ function CodesTab({ partnerId }) {
       <FormErrorAlert message={error} />
       <MainCodePanel partnerId={partnerId} codes={codes} types={types} onIssued={load} />
       <form onSubmit={issue} className="rounded-xl border border-gray-200 bg-white p-4 space-y-3">
-        <div className="text-sm font-medium text-gray-800">Выпустить партию кодов партнёру</div>
+        <div className="text-sm font-medium text-gray-800">Партия карточек для печати</div>
         <p className="text-xs text-gray-500">
           Например, карточки для печати: каждая — одноразовый код. Для «любого города на выбор» выберите тип подписки
           с режимом «Один город на выбор». Партнёрский код можно активировать один раз на аккаунт; многоразовый код —
@@ -269,8 +269,8 @@ function CodesTab({ partnerId }) {
           <Field label="Сколько кодов" hint="До 10 000 за раз">
             <TextInput type="number" min={1} max={10000} value={form.count} onChange={set('count')} />
           </Field>
-          <Field label="Активаций на код" hint="1 — одноразовые; пусто — без лимита">
-            <TextInput type="number" min={1} value={form.max_uses} onChange={set('max_uses')} />
+          <Field label="Активаций на код" hint="1 — одноразовые карточки. Постоянный многоразовый код — блок выше">
+            <TextInput type="number" min={1} value={form.max_uses} onChange={set('max_uses')} required />
           </Field>
           <Field label="Срок, дней">
             <TextInput type="number" min={1} max={3650} value={form.expiry_days} onChange={set('expiry_days')} />
