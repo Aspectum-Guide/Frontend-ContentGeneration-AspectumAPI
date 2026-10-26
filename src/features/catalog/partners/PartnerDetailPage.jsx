@@ -9,7 +9,10 @@ import FormErrorAlert from '../shared/components/FormErrorAlert';
 import AbuseSignalsPanel from './AbuseSignalsPanel';
 import CodeBatchesPanel from './CodeBatchesPanel';
 import CodeBatchResult from './CodeBatchResult';
+import CodeEditModal, { findCodeRecord } from './CodeEditModal';
+import { ANY_CITY, resolveTypeId } from './codeTypes';
 import MainCodePanel from './MainCodePanel';
+import TypeSelect from './TypeSelect';
 import PartnerFormModal from './PartnerFormModal';
 import {
   MEMBER_STATUS_LABELS,
@@ -28,6 +31,7 @@ const TABS = [
 
 const SELECT_CLASS = 'w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none';
 const BUTTON = 'px-3 py-2 text-sm font-medium rounded-lg border border-gray-300 bg-white hover:bg-gray-50 disabled:opacity-50';
+const SMALL_BUTTON = 'px-2.5 py-1 text-xs font-medium rounded-md border border-gray-300 bg-white hover:bg-gray-50 disabled:opacity-50';
 const PRIMARY = 'px-3 py-2 text-sm font-medium rounded-lg bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50';
 
 function Card({ title, children }) {
@@ -190,11 +194,13 @@ function ReportTab({ partnerId }) {
 function CodesTab({ partnerId }) {
   const [codes, setCodes] = useState([]);
   const [types, setTypes] = useState([]);
-  const [form, setForm] = useState({ name: '', subscription_type: '', count: 10, max_uses: 1, expiry_days: 365, prefix: '' });
+  const [form, setForm] = useState({ name: '', subscription_type: ANY_CITY, count: 10, max_uses: 1, expiry_days: 365, prefix: '' });
   const [result, setResult] = useState(null);
   const [error, setError] = useState(null);
   const [issuing, setIssuing] = useState(false);
   const [batchesVersion, setBatchesVersion] = useState(0);
+  const [editingCode, setEditingCode] = useState(null);
+  const [togglingCode, setTogglingCode] = useState('');
 
   const load = useCallback(async () => {
     try {
@@ -221,7 +227,7 @@ function CodesTab({ partnerId }) {
       setError(null);
       const response = await activationCodesAPI.bulkGenerate({
         name: (form.name || '').trim(),
-        subscription_type: form.subscription_type,
+        subscription_type: await resolveTypeId(form.subscription_type, types),
         partner: partnerId,
         count: Number(form.count),
         max_uses: form.max_uses === '' ? null : Number(form.max_uses),
@@ -241,30 +247,59 @@ function CodesTab({ partnerId }) {
 
   const set = (key) => (e) => setForm((prev) => ({ ...prev, [key]: e.target.value }));
 
+  const toggleCode = async (row) => {
+    try {
+      setTogglingCode(row.code);
+      setError(null);
+      const record = await findCodeRecord(partnerId, row.code);
+      if (!record) throw new Error('Код не найден — обновите страницу.');
+      await activationCodesAPI.update(record.id, { is_active: !record.is_active });
+      await load();
+    } catch (err) {
+      setError(parseApiError(err, 'Не удалось изменить код'));
+    } finally {
+      setTogglingCode('');
+    }
+  };
+
+  const copyLink = async (link) => {
+    try {
+      await navigator.clipboard.writeText(link);
+    } catch {
+      /* без буфера обмена ссылку видно в таблице */
+    }
+  };
+
   return (
     <div className="space-y-4">
       <FormErrorAlert message={error} />
-      <MainCodePanel partnerId={partnerId} codes={codes} types={types} onIssued={load} />
+      <MainCodePanel partnerId={partnerId} codes={codes} types={types} onIssued={load} onEdit={setEditingCode} />
+      <CodeEditModal
+        partnerId={partnerId}
+        codeText={editingCode}
+        types={types}
+        onClose={() => setEditingCode(null)}
+        onSaved={load}
+      />
       <form onSubmit={issue} className="rounded-xl border border-gray-200 bg-white p-4 space-y-3">
         <div className="text-sm font-medium text-gray-800">Партия карточек для печати</div>
         <p className="text-xs text-gray-500">
-          Например, карточки для печати: каждая — одноразовый код. Для «любого города на выбор» выберите тип подписки
-          с режимом «Один город на выбор». Партнёрский код можно активировать один раз на аккаунт; многоразовый код —
-          только в приложении и один раз на устройство. По оферте неактивированный код действует 12 месяцев.
+          Каждая карточка — одноразовый код; Excel для типографии — в таблице партий ниже. «Любой город на выбор»
+          открывает один город, в котором код вводят. Партнёрский код можно активировать один раз на аккаунт.
+          По оферте неактивированный код действует 12 месяцев.
         </p>
         <Field label="Название партии" hint="Например: «Карточки для ресепшена, декабрь». Пусто — подставим дату и количество.">
           <TextInput value={form.name} maxLength={200} onChange={set('name')} />
         </Field>
         <div className="grid grid-cols-1 md:grid-cols-5 gap-3">
-          <Field label="Тип подписки" required>
-            <select className={SELECT_CLASS} value={form.subscription_type} onChange={set('subscription_type')} required>
-              <option value="">Выберите…</option>
-              {types.map((type) => (
-                <option key={type.id} value={type.id}>
-                  {type.name}{type.access_mode === 'choose_city' ? ' (город на выбор)' : ''}
-                </option>
-              ))}
-            </select>
+          <Field label="Что открывает" required>
+            <TypeSelect
+              className={SELECT_CLASS}
+              value={form.subscription_type}
+              onChange={set('subscription_type')}
+              types={types}
+              required
+            />
           </Field>
           <Field label="Сколько кодов" hint="До 10 000 за раз">
             <TextInput type="number" min={1} max={10000} value={form.count} onChange={set('count')} />
@@ -289,7 +324,9 @@ function CodesTab({ partnerId }) {
 
       <div className="rounded-xl border border-gray-200 bg-white p-4 overflow-x-auto">
         <div className="mb-2 text-sm font-medium text-gray-800">Отдельные коды ({codes.length})</div>
-        <p className="mb-2 text-xs text-gray-500">Коды, выпущенные не партией, например для плаката. Коды из партий — в таблице выше.</p>
+        <p className="mb-2 text-xs text-gray-500">
+          Постоянные и многоразовые коды партнёра. Одноразовые карточки из партий — в таблице партий выше.
+        </p>
         <table className="w-full text-sm">
           <thead>
             <tr className="text-left text-gray-500">
@@ -297,17 +334,36 @@ function CodesTab({ partnerId }) {
               <th className="py-1 pr-3">Что открывает</th>
               <th className="py-1 pr-3">Активаций</th>
               <th className="py-1 pr-3">Действует до</th>
-              <th className="py-1">Можно активировать</th>
+              <th className="py-1 pr-3">Состояние</th>
+              <th className="py-1" />
             </tr>
           </thead>
           <tbody>
             {codes.map((code) => (
               <tr key={code.code} className="border-t border-gray-100">
                 <td className="py-1 pr-3 font-mono">{code.code}</td>
-                <td className="py-1 pr-3">{code.access_mode === 'choose_city' ? `Город на выбор (${code.label})` : code.label}</td>
+                <td className="py-1 pr-3">
+                  {code.access_mode === 'choose_city' && !/на выбор/i.test(code.label) ? `Город на выбор (${code.label})` : code.label}
+                </td>
                 <td className="py-1 pr-3">{code.current_uses} / {code.max_uses ?? '∞'}</td>
                 <td className="py-1 pr-3">{code.expiry_date ? formatDate(code.expiry_date) : 'бессрочно'}</td>
-                <td className="py-1">{code.can_be_used ? 'да' : 'нет'}</td>
+                <td className="py-1 pr-3">
+                  {!code.is_active ? 'выключен' : code.can_be_used ? 'работает' : 'не активируется'}
+                </td>
+                <td className="py-1 whitespace-nowrap text-right space-x-2">
+                  {code.link ? (
+                    <button type="button" className={SMALL_BUTTON} onClick={() => copyLink(code.link)}>Ссылка</button>
+                  ) : null}
+                  <button type="button" className={SMALL_BUTTON} onClick={() => setEditingCode(code.code)}>Изменить</button>
+                  <button
+                    type="button"
+                    className={SMALL_BUTTON}
+                    disabled={togglingCode === code.code}
+                    onClick={() => toggleCode(code)}
+                  >
+                    {code.is_active ? 'Выключить' : 'Включить'}
+                  </button>
+                </td>
               </tr>
             ))}
           </tbody>

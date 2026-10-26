@@ -3,6 +3,8 @@ import { partnersAdminAPI } from '../../../api/partners';
 import { activationCodesAPI, subscriptionTypesAPI } from '../../../api/subscription';
 import AbuseSignalsPanel from '../partners/AbuseSignalsPanel';
 import CodeBatchesPanel from '../partners/CodeBatchesPanel';
+import { resolveTypeId, typeToFormValue } from '../partners/codeTypes';
+import TypeSelect from '../partners/TypeSelect';
 import CodeBatchResult from '../partners/CodeBatchResult';
 import Layout from '../../../components/Layout';
 import DataTable from '../../../components/ui/DataTable';
@@ -97,7 +99,7 @@ export default function ActivationCodesCatalogPage() {
     (row) => ({
       id: row.id,
       code: row.code || '',
-      subscription_type: row.subscription_type || '',
+      subscription_type: typeToFormValue(row.subscription_type, subscriptionTypes),
       partner: row.partner || '',
       product_name: row.product_name || '',
       description: row.description || '',
@@ -105,7 +107,7 @@ export default function ActivationCodesCatalogPage() {
       max_uses: row.max_uses ?? '',
       is_active: row.is_active !== false,
     }),
-    []
+    [subscriptionTypes]
   );
 
   const mapEditToPayload = useCallback((editingItem) => {
@@ -157,8 +159,20 @@ export default function ActivationCodesCatalogPage() {
 
   const crud = useCatalogCrud({
     createEmpty: createEmptyCode,
-    createRequest: activationCodesAPI.create,
-    updateRequest: activationCodesAPI.update,
+    createRequest: async (payload) =>
+      activationCodesAPI.create({
+        ...payload,
+        subscription_type: payload.subscription_type
+          ? await resolveTypeId(payload.subscription_type, subscriptionTypes)
+          : null,
+      }),
+    updateRequest: async (id, payload) =>
+      activationCodesAPI.update(id, {
+        ...payload,
+        subscription_type: payload.subscription_type
+          ? await resolveTypeId(payload.subscription_type, subscriptionTypes)
+          : null,
+      }),
     deleteRequest: activationCodesAPI.delete,
     mapRowToEdit,
     mapEditToPayload,
@@ -368,17 +382,14 @@ export default function ActivationCodesCatalogPage() {
                 />
               </Field>
 
-              <Field label="Тип подписки">
-                <select
+              <Field label="Что открывает">
+                <TypeSelect
                   value={crud.editingItem.subscription_type}
                   onChange={(e) => crud.setEditingItem((prev) => ({ ...prev, subscription_type: e.target.value }))}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none"
-                >
-                  <option value="">Не выбрано</option>
-                  {subscriptionTypes.map((st) => (
-                    <option key={st.id} value={st.id}>{st.name}</option>
-                  ))}
-                </select>
+                  types={subscriptionTypes}
+                  placeholder="Не выбрано"
+                />
               </Field>
             </div>
 
@@ -476,7 +487,7 @@ export default function ActivationCodesCatalogPage() {
             name: values.name?.trim() || '',
             prefix: values.prefix?.trim() || '',
             count: Number(values.count),
-            subscription_type: values.subscription_type,
+            subscription_type: await resolveTypeId(values.subscription_type, subscriptionTypes),
             partner: values.partner || null,
             max_uses: values.max_uses === '' ? null : Number(values.max_uses),
             expiry_days: values.expiry_days === '' ? null : Number(values.expiry_days),
@@ -521,19 +532,15 @@ export default function ActivationCodesCatalogPage() {
               </Field>
             </div>
 
-            <Field label="Тип подписки">
-              <select
+            <Field label="Что открывает">
+              <TypeSelect
                 value={values.subscription_type}
                 onChange={(e) => setValues((prev) => ({ ...prev, subscription_type: e.target.value }))}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+                types={subscriptionTypes}
+                placeholder="Выберите…"
                 required
-                disabled={typesLoading}
-              >
-                <option value="">Выберите тип подписки</option>
-                {subscriptionTypes.map((st) => (
-                  <option key={st.id} value={st.id}>{st.name}</option>
-                ))}
-              </select>
+              />
             </Field>
 
             <Field label="Партнёр (опционально)" hint="Коды партнёра видны ему в кабинете; клиенты, активировавшие их, закрепляются за партнёром.">

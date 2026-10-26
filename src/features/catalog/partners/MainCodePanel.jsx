@@ -1,10 +1,12 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { partnerReportsAPI } from '../../../api/partners';
 import { activationCodesAPI } from '../../../api/subscription';
 import { Field, TextInput } from '../../../components/ui/FormField';
 import { parseApiError } from '../../../utils/apiError';
 import FormErrorAlert from '../shared/components/FormErrorAlert';
+import { ANY_CITY, resolveTypeId } from './codeTypes';
 import { downloadBlob, formatDate } from './partnerFormat';
+import TypeSelect from './TypeSelect';
 
 const SELECT_CLASS = 'w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none';
 const BUTTON = 'px-3 py-1.5 text-xs font-medium rounded-md border border-gray-300 bg-white hover:bg-gray-50 disabled:opacity-50';
@@ -38,19 +40,14 @@ function QrPreview({ partnerId, code }) {
 // Постоянный код партнёра: многоразовый, со своим текстом — как коды для Рима
 // или Углича. Партнёр раздаёт его клиентам; ссылка и QR появляются и здесь,
 // и у партнёра в кабинете.
-export default function MainCodePanel({ partnerId, codes, types, onIssued }) {
-  const defaultType = useMemo(
-    () => (types.find((type) => type.access_mode === 'choose_city') || types[0] || {}).id || '',
-    [types],
-  );
-  const [form, setForm] = useState({ code: '', subscription_type: '', max_uses: '', expiry_days: '' });
+export default function MainCodePanel({ partnerId, codes, types, onIssued, onEdit }) {
+  const [form, setForm] = useState({ code: '', subscription_type: ANY_CITY, max_uses: '', expiry_days: '' });
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(null);
   const [copied, setCopied] = useState('');
 
   const usable = codes.filter((code) => code.can_be_used);
-  const typeId = form.subscription_type || defaultType;
   const set = (key) => (e) => setForm((prev) => ({ ...prev, [key]: e.target.value }));
 
   const issue = async (e) => {
@@ -61,14 +58,14 @@ export default function MainCodePanel({ partnerId, codes, types, onIssued }) {
       const days = form.expiry_days === '' ? null : Number(form.expiry_days);
       await activationCodesAPI.create({
         code: (form.code || '').trim().toUpperCase(),
-        subscription_type: typeId,
+        subscription_type: await resolveTypeId(form.subscription_type, types),
         partner: partnerId,
         max_uses: form.max_uses === '' ? null : Number(form.max_uses),
         expiry_date: days ? new Date(Date.now() + days * 86400000).toISOString() : null,
         description: 'Постоянный код партнёра',
         is_active: true,
       });
-      setForm({ code: '', subscription_type: '', max_uses: '', expiry_days: '' });
+      setForm({ code: '', subscription_type: ANY_CITY, max_uses: '', expiry_days: '' });
       setOpen(false);
       await onIssued();
     } catch (err) {
@@ -102,7 +99,7 @@ export default function MainCodePanel({ partnerId, codes, types, onIssued }) {
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="text-sm font-medium text-gray-800">Постоянный код партнёра</div>
         {!open ? (
-          <button type="button" className={PRIMARY} onClick={() => setOpen(true)} disabled={!types.length}>
+          <button type="button" className={PRIMARY} onClick={() => setOpen(true)}>
             Создать постоянный код
           </button>
         ) : null}
@@ -137,6 +134,9 @@ export default function MainCodePanel({ partnerId, codes, types, onIssued }) {
               {code.max_uses ?? '∞'} · {code.expiry_date ? `до ${formatDate(code.expiry_date)}` : 'бессрочно'}
             </div>
             <div className="flex flex-wrap gap-2">
+              {onEdit ? (
+                <button type="button" className={BUTTON} onClick={() => onEdit(code.code)}>Изменить</button>
+              ) : null}
               <button type="button" className={BUTTON} onClick={() => downloadQr(code.code, 'svg')}>QR для печати (SVG)</button>
               <button type="button" className={BUTTON} onClick={() => downloadQr(code.code, 'png')}>QR картинкой (PNG)</button>
             </div>
@@ -151,13 +151,13 @@ export default function MainCodePanel({ partnerId, codes, types, onIssued }) {
         <form onSubmit={issue} className="space-y-3 border-t border-gray-100 pt-3">
           <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
             <Field label="Что открывает" required>
-              <select className={SELECT_CLASS} value={typeId} onChange={set('subscription_type')} required>
-                {types.map((type) => (
-                  <option key={type.id} value={type.id}>
-                    {type.name}{type.access_mode === 'choose_city' && !/на выбор/i.test(type.name) ? ' (город на выбор)' : ''}
-                  </option>
-                ))}
-              </select>
+              <TypeSelect
+                className={SELECT_CLASS}
+                value={form.subscription_type}
+                onChange={set('subscription_type')}
+                types={types}
+                required
+              />
             </Field>
             <Field label="Текст кода" hint="Латиница и цифры, например VOLGA2026. Пусто — сгенерируем">
               <TextInput value={form.code} maxLength={40} onChange={set('code')} placeholder="VOLGA2026" />
@@ -170,7 +170,7 @@ export default function MainCodePanel({ partnerId, codes, types, onIssued }) {
             </Field>
           </div>
           <div className="flex gap-2">
-            <button type="submit" className={PRIMARY} disabled={busy || !typeId}>{busy ? 'Создаю…' : 'Создать код'}</button>
+            <button type="submit" className={PRIMARY} disabled={busy || !form.subscription_type}>{busy ? 'Создаю…' : 'Создать код'}</button>
             <button type="button" className={BUTTON} onClick={() => setOpen(false)} disabled={busy}>Отмена</button>
           </div>
         </form>
