@@ -49,6 +49,8 @@ export default function MainCodePanel({ partnerId, codes, types, onIssued, onEdi
 
   const usable = codes.filter((code) => code.can_be_used);
   const set = (key) => (e) => setForm((prev) => ({ ...prev, [key]: e.target.value }));
+  // Коды выдаются заглавными — и набираются сразу заглавными.
+  const setUpper = (key) => (e) => setForm((prev) => ({ ...prev, [key]: e.target.value.toUpperCase() }));
 
   const issue = async (e) => {
     e.preventDefault();
@@ -160,7 +162,7 @@ export default function MainCodePanel({ partnerId, codes, types, onIssued, onEdi
               />
             </Field>
             <Field label="Текст кода" hint="Латиница и цифры, например VOLGA2026. Пусто — сгенерируем">
-              <TextInput value={form.code} maxLength={40} onChange={set('code')} placeholder="VOLGA2026" />
+              <TextInput value={form.code} maxLength={40} onChange={setUpper('code')} placeholder="VOLGA2026" />
             </Field>
             <Field label="Активаций" hint="Пусто — без ограничения">
               <TextInput type="number" min={1} value={form.max_uses} onChange={set('max_uses')} />

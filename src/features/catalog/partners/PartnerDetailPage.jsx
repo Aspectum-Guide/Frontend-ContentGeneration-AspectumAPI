@@ -311,7 +311,11 @@ function CodesTab({ partnerId }) {
             <TextInput type="number" min={1} max={3650} value={form.expiry_days} onChange={set('expiry_days')} />
           </Field>
           <Field label="Префикс">
-            <TextInput value={form.prefix} maxLength={10} onChange={set('prefix')} />
+            <TextInput
+              value={form.prefix}
+              maxLength={10}
+              onChange={(e) => setForm((prev) => ({ ...prev, prefix: e.target.value.toUpperCase() }))}
+            />
           </Field>
         </div>
         <button type="submit" className={PRIMARY} disabled={issuing || !form.subscription_type}>

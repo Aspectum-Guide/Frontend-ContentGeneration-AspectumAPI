@@ -66,6 +66,8 @@ export default function CodeEditModal({ partnerId, codeText, types, onClose, onS
   }, [partnerId, codeText]);
 
   const set = (key) => (e) => setForm((prev) => ({ ...prev, [key]: e.target.value }));
+  // Коды выдаются заглавными — и набираются сразу заглавными.
+  const setUpper = (key) => (e) => setForm((prev) => ({ ...prev, [key]: e.target.value.toUpperCase() }));
 
   const save = async (e) => {
     e.preventDefault();
@@ -101,7 +103,7 @@ export default function CodeEditModal({ partnerId, codeText, types, onClose, onS
         <form onSubmit={save} className="space-y-3">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             <Field label="Текст кода" hint="Если код уже напечатан или разослан, старые ссылки и QR перестанут работать" required>
-              <TextInput value={form.code} maxLength={40} onChange={set('code')} required />
+              <TextInput value={form.code} maxLength={40} onChange={setUpper('code')} required />
             </Field>
             <Field label="Что открывает" required>
               <TypeSelect className={SELECT_CLASS} value={form.type} onChange={set('type')} types={types} required />
