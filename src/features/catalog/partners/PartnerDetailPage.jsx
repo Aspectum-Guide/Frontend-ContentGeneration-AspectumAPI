@@ -12,6 +12,7 @@ import CodeBatchResult from './CodeBatchResult';
 import CodeEditModal, { findCodeRecord } from './CodeEditModal';
 import { ANY_CITY, resolveTypeId } from './codeTypes';
 import MainCodePanel from './MainCodePanel';
+import { PARTNER_LANGS } from './partnerLangs';
 import TypeSelect from './TypeSelect';
 import PartnerFormModal from './PartnerFormModal';
 import {
@@ -379,6 +380,8 @@ function CodesTab({ partnerId }) {
 
 function MembersTab({ partner, onChanged }) {
   const [email, setEmail] = useState('');
+  // Язык готового текста приглашения — язык партнёра.
+  const [inviteLang, setInviteLang] = useState('ru');
   const [inviteText, setInviteText] = useState('');
   const [error, setError] = useState(null);
   const [busy, setBusy] = useState(false);
@@ -389,7 +392,7 @@ function MembersTab({ partner, onChanged }) {
     try {
       setBusy(true);
       setError(null);
-      const response = await partnersAdminAPI.invite(partner.id, email.trim());
+      const response = await partnersAdminAPI.invite(partner.id, email.trim(), inviteLang);
       setInviteText(response.data.invite_text);
       setEmail('');
       onChanged();
@@ -428,6 +431,16 @@ function MembersTab({ partner, onChanged }) {
             placeholder="manager@partner.ru"
             className="flex-1 min-w-[16rem] px-3 py-2 border border-gray-300 rounded-lg text-sm"
           />
+          <select
+            value={inviteLang}
+            onChange={(e) => setInviteLang(e.target.value)}
+            title="Язык текста приглашения"
+            className="px-3 py-2 border border-gray-300 rounded-lg text-sm"
+          >
+            {PARTNER_LANGS.map((lang) => (
+              <option key={lang.value} value={lang.value}>{lang.label}</option>
+            ))}
+          </select>
           <button type="submit" className={PRIMARY} disabled={busy}>Пригласить</button>
         </div>
         {inviteText && (

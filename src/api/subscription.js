@@ -24,7 +24,9 @@ export const codeBatchesAPI = {
   list: (params) => apiClient.get('/subscription/code-batches/', { params }),
   deactivate: (id) => apiClient.post(`/subscription/code-batches/${id}/deactivate/`),
   reactivate: (id) => apiClient.post(`/subscription/code-batches/${id}/reactivate/`),
-  exportXlsx: (id) => apiClient.get(`/subscription/code-batches/${id}/export/`, { responseType: 'blob' }),
+  // lang — язык таблицы для типографии: ru (по умолчанию), en, it, fr, de, es.
+  exportXlsx: (id, lang = 'ru') =>
+    apiClient.get(`/subscription/code-batches/${id}/export/`, { params: { lang }, responseType: 'blob' }),
 };
 
 export const citySubscriptionsAPI = {

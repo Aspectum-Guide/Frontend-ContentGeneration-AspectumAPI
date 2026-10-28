@@ -6,7 +6,8 @@ export const partnersAdminAPI = {
   get: (id) => apiClient.get(`/partners/admin/partners/${id}/`),
   create: (data) => apiClient.post('/partners/admin/partners/', data),
   update: (id, data) => apiClient.patch(`/partners/admin/partners/${id}/`, data),
-  invite: (id, email) => apiClient.post(`/partners/admin/partners/${id}/invite/`, { email }),
+  // lang — язык готового текста приглашения: ru, en, it, fr, de, es.
+  invite: (id, email, lang = 'ru') => apiClient.post(`/partners/admin/partners/${id}/invite/`, { email, lang }),
   revokeMember: (id, memberId) =>
     apiClient.post(`/partners/admin/partners/${id}/members/${memberId}/revoke/`),
   ledger: (id) => apiClient.get(`/partners/admin/partners/${id}/ledger/`),

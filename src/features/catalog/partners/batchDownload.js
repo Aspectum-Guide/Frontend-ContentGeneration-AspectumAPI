@@ -8,7 +8,7 @@ function filenameFromResponse(response, fallback) {
 }
 
 // Excel партии: коды, ссылки для QR и что они открывают — для типографии.
-export async function downloadBatchXlsx(batchId) {
-  const response = await codeBatchesAPI.exportXlsx(batchId);
+export async function downloadBatchXlsx(batchId, lang = 'ru') {
+  const response = await codeBatchesAPI.exportXlsx(batchId, lang);
   downloadBlob(filenameFromResponse(response, `aspectum-cards-${batchId}.xlsx`), response.data);
 }

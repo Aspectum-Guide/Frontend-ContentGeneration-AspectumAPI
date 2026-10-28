@@ -4,6 +4,7 @@ import { parseApiError } from '../../../utils/apiError';
 import FormErrorAlert from '../shared/components/FormErrorAlert';
 import { downloadBatchXlsx } from './batchDownload';
 import { formatDate } from './partnerFormat';
+import { PARTNER_LANGS } from './partnerLangs';
 
 const SMALL_BUTTON = 'px-2.5 py-1 text-xs font-medium rounded-md border border-gray-300 bg-white hover:bg-gray-50 disabled:opacity-50';
 
@@ -20,6 +21,8 @@ export default function CodeBatchesPanel({ partnerId, refreshKey, title = 'Па�
   const [loading, setLoading] = useState(true);
   const [busyId, setBusyId] = useState(null);
   const [error, setError] = useState(null);
+  // Язык Excel: для зарубежного партнёра и его типографии — не русский.
+  const [excelLang, setExcelLang] = useState('ru');
 
   const load = useCallback(async () => {
     try {
@@ -43,7 +46,7 @@ export default function CodeBatchesPanel({ partnerId, refreshKey, title = 'Па�
     try {
       setBusyId(batch.id);
       setError(null);
-      await downloadBatchXlsx(batch.id);
+      await downloadBatchXlsx(batch.id, excelLang);
     } catch (err) {
       setError(parseApiError(err, 'Не удалось выгрузить партию'));
     } finally {
@@ -78,8 +81,24 @@ export default function CodeBatchesPanel({ partnerId, refreshKey, title = 'Па�
 
   return (
     <div className="rounded-xl border border-gray-200 bg-white p-4 overflow-x-auto space-y-2">
-      <div className="text-sm font-medium text-gray-800">
-        {title} ({batches.length})
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div className="text-sm font-medium text-gray-800">
+          {title} ({batches.length})
+        </div>
+        {batches.length > 0 ? (
+          <label className="flex items-center gap-2 text-xs text-gray-600">
+            Язык Excel
+            <select
+              value={excelLang}
+              onChange={(e) => setExcelLang(e.target.value)}
+              className="px-2 py-1 border border-gray-300 rounded-md text-xs"
+            >
+              {PARTNER_LANGS.map((lang) => (
+                <option key={lang.value} value={lang.value}>{lang.label}</option>
+              ))}
+            </select>
+          </label>
+        ) : null}
       </div>
       <FormErrorAlert message={error} />
       {loading && batches.length === 0 ? <p className="text-sm text-gray-400">Загрузка…</p> : null}
