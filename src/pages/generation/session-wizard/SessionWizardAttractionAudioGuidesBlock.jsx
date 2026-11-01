@@ -385,6 +385,20 @@ function AudioGuideDraftsPanel({
   );
 }
 
+// Модели Fish Audio, если сервер не прислал список (старый бэкенд, ошибка
+// загрузки настроек). Сервер присылает тот же список с подсказками (note).
+const FISH_FALLBACK_MODELS = [
+  { model_id: 's2.1-pro-free', name: 'S2.1 Pro Free', recommended: true },
+  { model_id: 's2-pro', name: 'S2-Pro' },
+  { model_id: 's1', name: 'S1' },
+  {
+    model_id: 'drama-3',
+    name: 'Drama 3',
+    paid: true,
+    note: 'Самая выразительная модель Fish Audio, платная. Текст в [квадратных скобках] — пометка для голоса и вслух не читается.',
+  },
+];
+
 const resolveElevenLabsSettingsDisplayMessage = (settings, error = '') => {
   const voices = Array.isArray(settings?.voices) ? settings.voices : [];
   const hasVoices = voices.length > 0;
@@ -506,6 +520,8 @@ export function TTSProviderSettingsPanel({
   const models = provider === 'elevenlabs' && elevenLabsModels.length
     ? elevenLabsModels
     : providerModels;
+  const fishModels = models.length ? models : FISH_FALLBACK_MODELS;
+  const selectedFishModel = fishModels.find((model) => model.model_id === (modelId || 's2.1-pro-free'));
   const voices = Array.isArray(elevenLabsSettings?.voices)
     ? elevenLabsSettings.voices
     : [];
@@ -573,17 +589,17 @@ export function TTSProviderSettingsPanel({
           <div>
             <FormLabel  layout="block" size="sm" weight="medium" tone="emphasis" spacing="xs">Модель</FormLabel>
             <Select className="disabled:opacity-50" value={modelId || 's2.1-pro-free'} onChange={(event) => onModelChange?.(event.target.value)} disabled={disabled}>
-              {(models.length ? models : [
-                { model_id: 's2.1-pro-free', name: 'S2.1 Pro Free', recommended: true },
-                { model_id: 's2-pro', name: 'S2-Pro' },
-                { model_id: 's1', name: 'S1' },
-              ]).map((model) => (
+              {fishModels.map((model) => (
                 <option key={model.model_id} value={model.model_id}>
                   {model.name || model.model_id}
                   {model.recommended ? ' — рекомендуется' : ''}
+                  {model.paid ? ' — платная' : ''}
                 </option>
               ))}
             </Select>
+            {selectedFishModel?.note ? (
+              <p className="mt-1 text-xs text-aspectum-text-muted">{selectedFishModel.note}</p>
+            ) : null}
           </div>
           <div>
             <FormLabel  layout="block" size="sm" weight="medium" tone="emphasis" spacing="xs">Голос</FormLabel>
