@@ -12,10 +12,13 @@ import CodeBatchResult from './CodeBatchResult';
 import CodeEditModal, { findCodeRecord } from './CodeEditModal';
 import { ANY_CITY, resolveTypeId } from './codeTypes';
 import MainCodePanel from './MainCodePanel';
+import PartnerEventsTab from './PartnerEventsTab';
 import { PARTNER_LANGS } from './partnerLangs';
 import TypeSelect from './TypeSelect';
 import PartnerFormModal from './PartnerFormModal';
 import {
+  MEMBER_ROLE_LABELS,
+  MEMBER_ROLES,
   MEMBER_STATUS_LABELS,
   PARTNER_STATUSES,
   downloadBlob,
@@ -26,6 +29,7 @@ import {
 const TABS = [
   { key: 'report', label: 'Отчёт' },
   { key: 'codes', label: 'Коды' },
+  { key: 'events', label: 'Экскурсии' },
   { key: 'members', label: 'Доступ к кабинету' },
   { key: 'review', label: 'Проверка и сверка' },
 ];
@@ -382,6 +386,7 @@ function MembersTab({ partner, onChanged }) {
   const [email, setEmail] = useState('');
   // Язык готового текста приглашения — язык партнёра.
   const [inviteLang, setInviteLang] = useState('ru');
+  const [inviteRole, setInviteRole] = useState('manager');
   const [inviteText, setInviteText] = useState('');
   const [error, setError] = useState(null);
   const [busy, setBusy] = useState(false);
@@ -392,7 +397,7 @@ function MembersTab({ partner, onChanged }) {
     try {
       setBusy(true);
       setError(null);
-      const response = await partnersAdminAPI.invite(partner.id, email.trim(), inviteLang);
+      const response = await partnersAdminAPI.invite(partner.id, email.trim(), inviteLang, inviteRole);
       setInviteText(response.data.invite_text);
       setEmail('');
       onChanged();
@@ -417,10 +422,12 @@ function MembersTab({ partner, onChanged }) {
     <div className="space-y-4">
       <FormErrorAlert message={error} />
       <form onSubmit={invite} className="rounded-xl border border-gray-200 bg-white p-4 space-y-3">
-        <div className="text-sm font-medium text-gray-800">Пригласить сотрудника партнёра</div>
+        <div className="text-sm font-medium text-gray-800">Предоставить доступ к кабинету</div>
         <p className="text-xs text-gray-500">
-          Кабинет откроется тому, кто войдёт в Аспектум с этой почтой и подтвердит её. Если такой аккаунт уже есть,
-          доступ появится сразу. Письмо пока отправляете сами — ниже будет готовый текст.
+          Доступ получит пользователь, который войдёт в Аспектум с этим адресом электронной почты и подтвердит его.
+          Если учётная запись уже существует, доступ предоставляется сразу. Приглашение отправляется вручную: ниже
+          появится готовый текст. Вход выполняется в приложении «Аспектум Партнёр» или на сайте в разделе /partner.
+          Контролёров администратор партнёра может добавить самостоятельно (Профиль → Сотрудники).
         </p>
         <div className="flex flex-wrap gap-2">
           <input
@@ -431,6 +438,16 @@ function MembersTab({ partner, onChanged }) {
             placeholder="manager@partner.ru"
             className="flex-1 min-w-[16rem] px-3 py-2 border border-gray-300 rounded-lg text-sm"
           />
+          <select
+            value={inviteRole}
+            onChange={(e) => setInviteRole(e.target.value)}
+            title={MEMBER_ROLES.find((role) => role.value === inviteRole)?.hint}
+            className="px-3 py-2 border border-gray-300 rounded-lg text-sm"
+          >
+            {MEMBER_ROLES.map((role) => (
+              <option key={role.value} value={role.value}>{role.label}</option>
+            ))}
+          </select>
           <select
             value={inviteLang}
             onChange={(e) => setInviteLang(e.target.value)}
@@ -443,6 +460,9 @@ function MembersTab({ partner, onChanged }) {
           </select>
           <button type="submit" className={PRIMARY} disabled={busy}>Пригласить</button>
         </div>
+        <p className="text-xs text-gray-500">
+          {MEMBER_ROLES.find((role) => role.value === inviteRole)?.label}: {MEMBER_ROLES.find((role) => role.value === inviteRole)?.hint}.
+        </p>
         {inviteText && (
           <div className="rounded-lg bg-gray-50 border border-gray-200 p-3 text-sm space-y-2">
             <div className="whitespace-pre-wrap">{inviteText}</div>
@@ -458,6 +478,7 @@ function MembersTab({ partner, onChanged }) {
           <thead>
             <tr className="text-left text-gray-500">
               <th className="py-1 pr-3">Почта</th>
+              <th className="py-1 pr-3">Роль</th>
               <th className="py-1 pr-3">Статус</th>
               <th className="py-1 pr-3">Приглашён</th>
               <th className="py-1 pr-3">Вошёл</th>
@@ -468,6 +489,7 @@ function MembersTab({ partner, onChanged }) {
             {members.map((member) => (
               <tr key={member.id} className="border-t border-gray-100">
                 <td className="py-1 pr-3">{member.email}</td>
+                <td className="py-1 pr-3">{MEMBER_ROLE_LABELS[member.role] || MEMBER_ROLE_LABELS.manager}</td>
                 <td className="py-1 pr-3">{MEMBER_STATUS_LABELS[member.status] || member.status}</td>
                 <td className="py-1 pr-3">{formatDate(member.created_at)}</td>
                 <td className="py-1 pr-3">{member.accepted_at ? formatDate(member.accepted_at) : '—'}</td>
@@ -481,7 +503,7 @@ function MembersTab({ partner, onChanged }) {
               </tr>
             ))}
             {!members.length && (
-              <tr><td colSpan={5} className="py-2 text-gray-400">Пока никого не пригласили.</td></tr>
+              <tr><td colSpan={6} className="py-2 text-gray-400">Доступ к кабинету пока не предоставлен.</td></tr>
             )}
           </tbody>
         </table>
@@ -682,6 +704,7 @@ export default function PartnerDetailPage() {
                 {status} · комиссия {partner.commission_percent ? `${String(partner.commission_percent).replace('.', ',')} %` : 'не задана'}
                 {' '}· покупки в зачёт {partner.attribution_months} мес. после активации кода
                 {' '}· клиентов {partner.clients_count} · кодов {partner.codes_count}
+                {' '}· экскурсий {(partner.events || []).length}
               </p>
             </div>
             <button type="button" className={BUTTON} onClick={() => setEditing(true)}>Изменить</button>
@@ -702,6 +725,7 @@ export default function PartnerDetailPage() {
 
           {tab === 'report' && <ReportTab partnerId={partner.id} />}
           {tab === 'codes' && <CodesTab partnerId={partner.id} />}
+          {tab === 'events' && <PartnerEventsTab partner={partner} onChanged={load} />}
           {tab === 'members' && <MembersTab partner={partner} onChanged={load} />}
           {tab === 'review' && <ReviewTab partnerId={partner.id} />}
 

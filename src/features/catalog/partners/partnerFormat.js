@@ -46,3 +46,17 @@ export const MEMBER_STATUS_LABELS = {
   active: 'Есть доступ',
   revoked: 'Доступ отозван',
 };
+
+// Роль в кабинете партнёра: администратор — весь кабинет, контролёр — проверка билетов и отметка гостей.
+export const MEMBER_ROLES = [
+  { value: 'manager', label: 'Администратор', hint: 'полный доступ к кабинету: продажи, коды, бронирования и сотрудники' },
+  { value: 'staff', label: 'Контролёр', hint: 'проверка билетов и отметка прибытия гостей по экскурсиям партнёра' },
+];
+
+export const MEMBER_ROLE_LABELS = Object.fromEntries(MEMBER_ROLES.map((role) => [role.value, role.label]));
+
+// Название из мультиязычного словаря (как в каталоге: сначала русский).
+export function pickTitle(value) {
+  if (!value || typeof value !== 'object') return String(value || '');
+  return value.ru || value.en || Object.values(value).find(Boolean) || '';
+}

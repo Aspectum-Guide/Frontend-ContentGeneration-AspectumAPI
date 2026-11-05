@@ -6,10 +6,16 @@ export const partnersAdminAPI = {
   get: (id) => apiClient.get(`/partners/admin/partners/${id}/`),
   create: (data) => apiClient.post('/partners/admin/partners/', data),
   update: (id, data) => apiClient.patch(`/partners/admin/partners/${id}/`, data),
-  // lang — язык готового текста приглашения: ru, en, it, fr, de, es.
-  invite: (id, email, lang = 'ru') => apiClient.post(`/partners/admin/partners/${id}/invite/`, { email, lang }),
+  // lang — язык готового текста приглашения: ru, en, it, fr, de, es;
+  // role — manager (кабинет целиком) или staff (сотрудник на входе: только гости и сканер).
+  invite: (id, email, lang = 'ru', role = 'manager') =>
+    apiClient.post(`/partners/admin/partners/${id}/invite/`, { email, lang, role }),
   revokeMember: (id, memberId) =>
     apiClient.post(`/partners/admin/partners/${id}/members/${memberId}/revoke/`),
+  // Экскурсии партнёра: по ним его сотрудники видят брони и отмечают гостей в приложении «Аспектум Партнёр».
+  events: (id) => apiClient.get(`/partners/admin/partners/${id}/events/`),
+  addEvent: (id, eventId) => apiClient.post(`/partners/admin/partners/${id}/events/`, { event: eventId }),
+  removeEvent: (id, eventId) => apiClient.delete(`/partners/admin/partners/${id}/events/${eventId}/`),
   ledger: (id) => apiClient.get(`/partners/admin/partners/${id}/ledger/`),
   addAdjustment: (id, data) => apiClient.post(`/partners/admin/partners/${id}/adjustments/`, data),
   syncRuns: () => apiClient.get('/partners/admin/ledger/sync/'),
