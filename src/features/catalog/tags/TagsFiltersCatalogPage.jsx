@@ -5,7 +5,8 @@ import Modal from '../../../components/ui/Modal';
 import { ConfirmModal } from '../../../components/ui/Modal';
 import { Field, TextInput, FormActions, Select } from '../../../components/ui/FormField';
 import Toast, { useToast } from '../../../components/ui/Toast.jsx';
-import { appLanguagesAPI, citiesAPI, cityFiltersAPI, eventFiltersAPI, workspacesAPI } from './api';
+import { citiesAPI, cityFiltersAPI, eventFiltersAPI } from './api';
+import { staffCatalogAPI } from '../../../api/staffCatalog';
 import { workspaceTitle } from '../../../utils/workspace';
 import CityFilterEditorFields from './CityFilterEditorFields';
 import { isNotFoundError, parseApiError } from '../../../utils/apiError';
@@ -815,7 +816,7 @@ export default function TagsFilters() {
     let cancelled = false;
     (async () => {
       try {
-        const res = await appLanguagesAPI.list();
+        const res = await staffCatalogAPI.languages();
         if (!cancelled) {
           setAppLanguages(parseAppLanguagesResponse(res));
         }
@@ -828,7 +829,7 @@ export default function TagsFilters() {
 
   const [workspaces, setWorkspaces] = useState([]);
   useEffect(() => {
-    workspacesAPI.list()
+    staffCatalogAPI.workspaces()
       .then((r) => setWorkspaces(Array.isArray(r?.data?.results) ? r.data.results : []))
       .catch(() => setWorkspaces([]));
   }, []);

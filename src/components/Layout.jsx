@@ -3,6 +3,8 @@ import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { sessionsAPI, workspacesAPI } from '../api/generation';
 import { useLayoutActions } from '../context/useLayoutActions';
 import useTokenValidation from '../hooks/useTokenValidation';
+import { ADMIN, filterNavSections } from '../mode/appMode';
+import { useAppMode } from '../mode/AppModeContext';
 import TokenManager from '../utils/TokenManager';
 import { getWorkspace, setWorkspace, workspaceTitle } from '../utils/workspace';
 
@@ -67,6 +69,8 @@ function getActiveSessions(sessions) {
 }
 
 export default function Layout({ children, pageHeader = null, pageHeaderMode = 'desktop' }) {
+  const mode = useAppMode();
+  const isStudio = mode !== ADMIN;
   const { mobileActions } = useLayoutActions();
   const location = useLocation();
   const navigate = useNavigate();
@@ -96,13 +100,18 @@ export default function Layout({ children, pageHeader = null, pageHeaderMode = '
   }, []);
 
   useEffect(() => {
+    if (!isStudio) {
+      setActiveSessions([]);
+      return undefined;
+    }
     sessionsAPI.list().then((r) => {
       const data = r?.data;
       const list = Array.isArray(data?.results) ? data.results
         : Array.isArray(data) ? data : [];
       setActiveSessions(getActiveSessions(list));
     }).catch(() => { });
-  }, [location.pathname]);
+    return undefined;
+  }, [location.pathname, isStudio]);
 
   useEffect(() => {
     const updateMobile = () => {
@@ -208,6 +217,7 @@ export default function Layout({ children, pageHeader = null, pageHeaderMode = '
       ],
     },
   ];
+  const visibleSidebarSections = filterNavSections(sidebarSections, mode);
 
   const pageTitles = [
     { startsWith: '/generation/upload', title: 'Загрузка из файла' },
@@ -284,7 +294,7 @@ export default function Layout({ children, pageHeader = null, pageHeaderMode = '
 
   const SidebarContent = () => (
     <nav className="space-y-4">
-      {sidebarSections.map((section) => (
+      {visibleSidebarSections.map((section) => (
         <div key={section.title}>
           <p className={`pb-2 text-xs font-semibold uppercase tracking-wide text-gray-400 ${sidebarExpanded ? 'px-3' : 'px-1 text-center'
             }`}>
@@ -354,6 +364,9 @@ export default function Layout({ children, pageHeader = null, pageHeaderMode = '
               <div className="truncate">
                 <p className="text-sm font-bold text-gray-900 truncate">{user?.username || 'User'}</p>
                 <p className="text-xs text-gray-500 truncate">{user?.email || ''}</p>
+                <p className="text-[11px] font-medium uppercase tracking-wide text-gray-400">
+                  {isStudio ? 'Студия' : 'Админка'}
+                </p>
               </div>
             )}
             {isMobile ? (
@@ -378,7 +391,7 @@ export default function Layout({ children, pageHeader = null, pageHeaderMode = '
               </button>
             )}
           </div>
-          <WorkspaceSwitcher compact={!sidebarExpanded && !isMobile} />
+          {isStudio ? <WorkspaceSwitcher compact={!sidebarExpanded && !isMobile} /> : null}
         </div>
 
         {/* Navigation */}

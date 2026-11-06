@@ -3,8 +3,11 @@ import { useNavigate } from 'react-router-dom';
 import TokenManager from '../utils/TokenManager';
 import { authAPI } from '../api/auth.ts';
 import Button from '../components/ui/Button';
+import { landingPath } from '../mode/appMode';
+import { useAppMode } from '../mode/AppModeContext';
 
 export default function TokenAuth() {
+  const mode = useAppMode();
   const [login, setLogin] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
@@ -18,10 +21,10 @@ export default function TokenAuth() {
       const validation = TokenManager.validateToken(tokens.access);
       if (validation.isValid) {
         // Есть валидный токен, редирект на главную
-        navigate('/generation');
+        navigate(landingPath(mode));
       }
     }
-  }, [navigate]);
+  }, [navigate, mode]);
 
   const handleLogin = async (e) => {
     e.preventDefault();
@@ -63,7 +66,7 @@ export default function TokenAuth() {
       });
 
       console.log('✅ Токены сохранены успешно');
-      navigate('/generation');
+      navigate(landingPath(mode));
     } catch (err) {
       console.error('Ошибка при входе:', err);
       setError('Ошибка подключения к серверу. Проверьте данные и интернет');
@@ -121,7 +124,7 @@ export default function TokenAuth() {
       });
       const data = result.data;
       TokenManager.saveTokens({ access: data.access, refresh: data.refresh, expiresAt: Date.now() + 3600000 });
-      navigate('/generation');
+      navigate(landingPath(mode));
     } catch (err) {
       if (err?.name !== 'NotAllowedError') setError(err?.response?.data?.detail || 'Не удалось войти с passkey.');
     } finally {

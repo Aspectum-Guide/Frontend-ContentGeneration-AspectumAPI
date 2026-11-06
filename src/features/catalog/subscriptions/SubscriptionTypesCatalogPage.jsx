@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
-import { citiesAPI, eventsAPI } from '../../../api/generation';
+import { citiesAPI } from '../../../api/generation';
+import { listAllStaffEvents } from '../../../api/staffCatalog';
 import { subscriptionTypesAPI } from '../../../api/subscription';
 import Layout from '../../../components/Layout';
 import DataTable from '../../../components/ui/DataTable';
@@ -38,6 +39,22 @@ function normalizeIdList(value) {
   return value.map((item) => String(item));
 }
 
+function unwrapList(response) {
+  const data = response?.data;
+  if (Array.isArray(data?.results)) return data.results;
+  if (Array.isArray(data?.data)) return data.data;
+  if (Array.isArray(data)) return data;
+  return [];
+}
+
+async function loadEventChoices() {
+  try {
+    return await listAllStaffEvents();
+  } catch {
+    return [];
+  }
+}
+
 export default function SubscriptionTypesCatalogPage() {
   const { setMobileActions } = useLayoutActions();
   const [items, setItems] = useState([]);
@@ -61,22 +78,14 @@ export default function SubscriptionTypesCatalogPage() {
   const [refsLoading, setRefsLoading] = useState(true);
 
   const loadRefs = useCallback(async () => {
-    try {
-      setRefsLoading(true);
-      const [citiesResp, eventsResp] = await Promise.all([
-        citiesAPI.list({ page_size: 1000, limit: 1000 }),
-        eventsAPI.list({ page_size: 1000 }),
-      ]);
-      const citiesData = citiesResp?.data;
-      const eventsData = eventsResp?.data;
-      setCities(Array.isArray(citiesData?.results) ? citiesData.results : Array.isArray(citiesData) ? citiesData : []);
-      setEvents(Array.isArray(eventsData?.results) ? eventsData.results : Array.isArray(eventsData) ? eventsData : []);
-    } catch {
-      setCities([]);
-      setEvents([]);
-    } finally {
-      setRefsLoading(false);
-    }
+    setRefsLoading(true);
+    const [citiesResult, eventsResult] = await Promise.all([
+      citiesAPI.list({ page_size: 1000, limit: 1000 }).then(unwrapList).catch(() => []),
+      loadEventChoices(),
+    ]);
+    setCities(citiesResult);
+    setEvents(eventsResult);
+    setRefsLoading(false);
   }, []);
 
   useEffect(() => {

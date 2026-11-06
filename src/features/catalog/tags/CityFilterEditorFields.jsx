@@ -1,6 +1,6 @@
 import { useRef, useState } from 'react';
 import { Field, TextInput } from '../../../components/ui/FormField';
-import { imagesAPI } from '../../../api/generation';
+import { staffCatalogAPI } from '../../../api/staffCatalog';
 import { parseApiError } from '../../../utils/apiError';
 import { getMultiLangValue } from '../shared/i18n';
 
@@ -33,9 +33,7 @@ export default function CityFilterEditorFields({
     setUploading(true);
     setUploadError('');
     try {
-      const fd = new FormData();
-      fd.append('file', file);
-      const r = await imagesAPI.upload(fd);
+      const r = await staffCatalogAPI.uploadImage(file);
       const { id, url } = r?.data || {};
       if (id) {
         setFilter((prev) => ({

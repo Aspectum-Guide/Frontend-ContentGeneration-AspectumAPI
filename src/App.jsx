@@ -54,6 +54,8 @@ import AudioQueue from './pages/tasks/AudioQueue';
 import MediaRecovery from './pages/tasks/MediaRecovery';
 import TokenAuth from './pages/TokenAuth';
 import AccountSettings from './pages/AccountSettings';
+import { AppModeProvider } from './mode/AppModeContext';
+import RequireStudio from './mode/RequireStudio';
 import { registerAuthNavigate } from './utils/authRedirect';
 
 const routes = [
@@ -71,63 +73,63 @@ const routes = [
   },
   {
     path: '/generation',
-    element: <ProtectedRoute><ErrorBoundary><SessionsList /></ErrorBoundary></ProtectedRoute>,
+    element: <RequireStudio><ProtectedRoute><ErrorBoundary><SessionsList /></ErrorBoundary></ProtectedRoute></RequireStudio>,
   },
   {
     path: '/generation/list',
-    element: <ProtectedRoute><ErrorBoundary><GenerationList /></ErrorBoundary></ProtectedRoute>,
+    element: <RequireStudio><ProtectedRoute><ErrorBoundary><GenerationList /></ErrorBoundary></ProtectedRoute></RequireStudio>,
   },
   {
     path: '/generation/upload',
-    element: <ProtectedRoute><ErrorBoundary><UploadFile /></ErrorBoundary></ProtectedRoute>,
+    element: <RequireStudio><ProtectedRoute><ErrorBoundary><UploadFile /></ErrorBoundary></ProtectedRoute></RequireStudio>,
   },
   {
     path: '/generation/new',
-    element: <ProtectedRoute><ErrorBoundary><NewSession /></ErrorBoundary></ProtectedRoute>,
+    element: <RequireStudio><ProtectedRoute><ErrorBoundary><NewSession /></ErrorBoundary></ProtectedRoute></RequireStudio>,
   },
   {
     path: '/generation/:sessionId',
-    element: <ProtectedRoute><SessionWizardErrorBoundary><SessionWizard /></SessionWizardErrorBoundary></ProtectedRoute>,
+    element: <RequireStudio><ProtectedRoute><SessionWizardErrorBoundary><SessionWizard /></SessionWizardErrorBoundary></ProtectedRoute></RequireStudio>,
   },
   {
     path: '/ai/settings',
-    element: <ProtectedRoute><ErrorBoundary><AISettings /></ErrorBoundary></ProtectedRoute>,
+    element: <RequireStudio><ProtectedRoute><ErrorBoundary><AISettings /></ErrorBoundary></ProtectedRoute></RequireStudio>,
   },
   {
     path: '/ai/prompts',
-    element: <ProtectedRoute><ErrorBoundary><PromptSettings /></ErrorBoundary></ProtectedRoute>,
+    element: <RequireStudio><ProtectedRoute><ErrorBoundary><PromptSettings /></ErrorBoundary></ProtectedRoute></RequireStudio>,
   },
   {
     path: '/ai/tts',
-    element: <ProtectedRoute><ErrorBoundary><TTSSettings /></ErrorBoundary></ProtectedRoute>,
+    element: <RequireStudio><ProtectedRoute><ErrorBoundary><TTSSettings /></ErrorBoundary></ProtectedRoute></RequireStudio>,
   },
   {
     path: '/ai/playground',
-    element: <ProtectedRoute><ErrorBoundary><Playground /></ErrorBoundary></ProtectedRoute>,
+    element: <RequireStudio><ProtectedRoute><ErrorBoundary><Playground /></ErrorBoundary></ProtectedRoute></RequireStudio>,
   },
   {
     path: '/ai/images',
-    element: <ProtectedRoute><ErrorBoundary><ImageGeneration /></ErrorBoundary></ProtectedRoute>,
+    element: <RequireStudio><ProtectedRoute><ErrorBoundary><ImageGeneration /></ErrorBoundary></ProtectedRoute></RequireStudio>,
   },
   {
     path: '/ai/cities',
-    element: <ProtectedRoute><ErrorBoundary><CityGeneration /></ErrorBoundary></ProtectedRoute>,
+    element: <RequireStudio><ProtectedRoute><ErrorBoundary><CityGeneration /></ErrorBoundary></ProtectedRoute></RequireStudio>,
   },
   {
     path: '/ai/events',
-    element: <Navigate to="/generation" replace />,
+    element: <RequireStudio><Navigate to="/generation" replace /></RequireStudio>,
   },
   {
     path: '/tasks',
-    element: <ProtectedRoute><ErrorBoundary><MyTasks /></ErrorBoundary></ProtectedRoute>,
+    element: <RequireStudio><ProtectedRoute><ErrorBoundary><MyTasks /></ErrorBoundary></ProtectedRoute></RequireStudio>,
   },
   {
     path: '/tasks/audio-queue',
-    element: <ProtectedRoute><ErrorBoundary><AudioQueue /></ErrorBoundary></ProtectedRoute>,
+    element: <RequireStudio><ProtectedRoute><ErrorBoundary><AudioQueue /></ErrorBoundary></ProtectedRoute></RequireStudio>,
   },
   {
     path: '/tasks/media-recovery',
-    element: <ProtectedRoute><ErrorBoundary><MediaRecovery /></ErrorBoundary></ProtectedRoute>,
+    element: <RequireStudio><ProtectedRoute><ErrorBoundary><MediaRecovery /></ErrorBoundary></ProtectedRoute></RequireStudio>,
   },
   {
     path: '/catalog',
@@ -143,7 +145,7 @@ const routes = [
   },
   {
     path: '/catalog/external-products/linking',
-    element: <ProtectedRoute><ErrorBoundary><ExternalProductsLinking /></ErrorBoundary></ProtectedRoute>,
+    element: <RequireStudio><ProtectedRoute><ErrorBoundary><ExternalProductsLinking /></ErrorBoundary></ProtectedRoute></RequireStudio>,
   },
   {
     path: '/catalog/llm/keys',
@@ -155,15 +157,15 @@ const routes = [
   },
   {
     path: '/catalog/cities',
-    element: <ProtectedRoute><ErrorBoundary><CitiesCatalog /></ErrorBoundary></ProtectedRoute>,
+    element: <RequireStudio><ProtectedRoute><ErrorBoundary><CitiesCatalog /></ErrorBoundary></ProtectedRoute></RequireStudio>,
   },
   {
     path: '/catalog/events',
-    element: <ProtectedRoute><ErrorBoundary><EventsCatalog /></ErrorBoundary></ProtectedRoute>,
+    element: <RequireStudio><ProtectedRoute><ErrorBoundary><EventsCatalog /></ErrorBoundary></ProtectedRoute></RequireStudio>,
   },
   {
     path: '/catalog/events/orphans',
-    element: <ProtectedRoute><ErrorBoundary><OrphanEvents /></ErrorBoundary></ProtectedRoute>,
+    element: <RequireStudio><ProtectedRoute><ErrorBoundary><OrphanEvents /></ErrorBoundary></ProtectedRoute></RequireStudio>,
   },
   {
     path: '/catalog/authors',
@@ -211,11 +213,11 @@ const routes = [
   },
   {
     path: '/catalog/audio-guides',
-    element: <ProtectedRoute><ErrorBoundary><AudioGuidesCatalog /></ErrorBoundary></ProtectedRoute>,
+    element: <RequireStudio><ProtectedRoute><ErrorBoundary><AudioGuidesCatalog /></ErrorBoundary></ProtectedRoute></RequireStudio>,
   },
   {
     path: '/catalog/interactive-locations',
-    element: <ProtectedRoute><ErrorBoundary><InteractiveLocationsCatalog /></ErrorBoundary></ProtectedRoute>,
+    element: <RequireStudio><ProtectedRoute><ErrorBoundary><InteractiveLocationsCatalog /></ErrorBoundary></ProtectedRoute></RequireStudio>,
   },
   {
     path: '/catalog/subscription-types',
@@ -243,7 +245,7 @@ const routes = [
   },
   {
     path: '/catalog/photos',
-    element: <ProtectedRoute><ErrorBoundary><PhotosCatalog /></ErrorBoundary></ProtectedRoute>,
+    element: <RequireStudio><ProtectedRoute><ErrorBoundary><PhotosCatalog /></ErrorBoundary></ProtectedRoute></RequireStudio>,
   },
   {
     path: '/catalog/tags',
@@ -251,19 +253,19 @@ const routes = [
   },
   {
     path: '/export/zip',
-    element: <ProtectedRoute><ErrorBoundary><ExportZip /></ErrorBoundary></ProtectedRoute>,
+    element: <RequireStudio><ProtectedRoute><ErrorBoundary><ExportZip /></ErrorBoundary></ProtectedRoute></RequireStudio>,
   },
   {
     path: '/export/cities',
-    element: <ProtectedRoute><ErrorBoundary><ExportCities /></ErrorBoundary></ProtectedRoute>,
+    element: <RequireStudio><ProtectedRoute><ErrorBoundary><ExportCities /></ErrorBoundary></ProtectedRoute></RequireStudio>,
   },
   {
     path: '/export/events',
-    element: <ProtectedRoute><ErrorBoundary><ExportEvents /></ErrorBoundary></ProtectedRoute>,
+    element: <RequireStudio><ProtectedRoute><ErrorBoundary><ExportEvents /></ErrorBoundary></ProtectedRoute></RequireStudio>,
   },
   {
     path: '/import/google-sheet',
-    element: <ProtectedRoute><ErrorBoundary><ImportGoogleSheet /></ErrorBoundary></ProtectedRoute>,
+    element: <RequireStudio><ProtectedRoute><ErrorBoundary><ImportGoogleSheet /></ErrorBoundary></ProtectedRoute></RequireStudio>,
   },
   {
     path: '*',
@@ -285,9 +287,11 @@ registerAuthNavigate((path, opts) => router.navigate(path, opts));
 function App() {
   return (
     <ErrorBoundary>
-      <LayoutActionsProvider>
-        <RouterProvider router={router} />
-      </LayoutActionsProvider>
+      <AppModeProvider>
+        <LayoutActionsProvider>
+          <RouterProvider router={router} />
+        </LayoutActionsProvider>
+      </AppModeProvider>
     </ErrorBoundary>
   );
 }

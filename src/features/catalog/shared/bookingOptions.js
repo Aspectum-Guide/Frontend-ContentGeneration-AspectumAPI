@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { eventsAPI } from '../../../api/generation';
+import { listAllStaffEvents } from '../../../api/staffCatalog';
 import { bookingReferenceAPI, ticketTypesAPI } from '../../../api/booking';
 import { getTicketTypeLabel, filterTicketTypesForEvent } from './labels';
 import { normalizeListResponse } from './normalize';
@@ -7,42 +7,24 @@ import { normalizeListResponse } from './normalize';
 const REFERENCE_PAGE_SIZE = 100;
 
 async function loadAllReferenceEvents(pageSize = REFERENCE_PAGE_SIZE) {
-  const allEvents = [];
-  let cities = [];
-  let page = 1;
-  let totalPages = 1;
-
-  while (page <= totalPages) {
-    const response = await eventsAPI.list({ page, page_size: pageSize });
-    const data = response?.data;
-    const list = normalizeListResponse(data, ['events', 'results', 'data']);
-    allEvents.push(...list);
-    totalPages = Number(data?.total_pages) || 1;
-    if (Array.isArray(data?.reference?.cities) && data.reference.cities.length) {
-      cities = data.reference.cities;
-    }
-    page += 1;
+  const allEvents = await listAllStaffEvents({}, pageSize);
+  const cities = [];
+  const seen = new Set();
+  for (const event of allEvents) {
+    const id = String(event?.city_id || '');
+    if (!id || seen.has(id)) continue;
+    seen.add(id);
+    cities.push({
+      id,
+      name: event.city_display_name || id,
+    });
   }
-
   return { events: allEvents, cities };
 }
 
 /** Same pagination-loop shape as loadAllReferenceEvents, scoped to one city. */
 export async function loadReferenceEventsForCity(cityId, pageSize = REFERENCE_PAGE_SIZE) {
-  const allEvents = [];
-  let page = 1;
-  let totalPages = 1;
-
-  while (page <= totalPages) {
-    const response = await eventsAPI.list({ city_id: cityId, page, page_size: pageSize });
-    const data = response?.data;
-    const list = normalizeListResponse(data, ['events', 'results', 'data']);
-    allEvents.push(...list);
-    totalPages = Number(data?.total_pages) || 1;
-    page += 1;
-  }
-
-  return allEvents;
+  return listAllStaffEvents({ city_id: cityId }, pageSize);
 }
 
 export function useEventOptions(pageSize = REFERENCE_PAGE_SIZE) {

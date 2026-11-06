@@ -94,7 +94,9 @@ export default function UserSubscriptionsWorkbenchPage() {
         Array.isArray(typesData?.results) ? typesData.results : Array.isArray(typesData) ? typesData : [],
       );
       setCities(
-        Array.isArray(citiesData?.results) ? citiesData.results : Array.isArray(citiesData) ? citiesData : [],
+        Array.isArray(citiesData?.results) ? citiesData.results
+          : Array.isArray(citiesData?.data) ? citiesData.data
+            : Array.isArray(citiesData) ? citiesData : [],
       );
     } catch {
       setSubscriptionTypes([]);
@@ -642,7 +644,7 @@ export default function UserSubscriptionsWorkbenchPage() {
                     <tbody>
                       {selectedUser.ai_prompt_grants.map((grant) => (
                         <tr key={grant.id} className="border-b border-gray-100">
-                          <td className="py-2 whitespace-nowrap">{formatDate(grant.created_at)}</td>
+                          <td className="py-2 whitespace-nowrap">{formatDateTime(grant.created_at)}</td>
                           <td>+{grant.amount}</td>
                           <td className="max-w-sm break-words">{grant.reason || grant.source_key}</td>
                           <td>{grant.granted_by || '—'}</td>
