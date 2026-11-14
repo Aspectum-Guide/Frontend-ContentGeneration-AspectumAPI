@@ -1,1 +1,5 @@
-export { InlineProgressBanner as default } from '@aspectum/admin-ui-web';
+import { InlineProgressBanner as KitBanner } from '@aspectum/admin-ui-web';
+
+export default function InlineProgressBanner({ show = true, ...props }) {
+  return <KitBanner show={show} {...props} />;
+}
