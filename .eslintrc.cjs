@@ -31,6 +31,10 @@ module.exports = {
   },
   overrides: [
     {
+      files: ['scripts/**/*.js'],
+      env: { node: true },
+    },
+    {
       files: ['*.ts', '*.tsx'],
       parser: '@typescript-eslint/parser',
       plugins: ['@typescript-eslint'],
