@@ -72,6 +72,7 @@ export default defineConfig(({ mode, command }) => {
     test: {
       environment: 'jsdom',
       globals: true,
+      server: { deps: { inline: ['@aspectum/admin-ui-web'] } },
     },
   }
 })

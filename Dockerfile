@@ -2,6 +2,7 @@
 # Stage 1: build
 FROM node:18-alpine AS build
 WORKDIR /app
+RUN apk add --no-cache git
 COPY package.json package-lock.json* yarn.lock* ./
 RUN npm ci --silent || npm install
 COPY . .

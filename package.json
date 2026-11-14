@@ -16,11 +16,13 @@
     "codegen:verify": "node scripts/openapi-verify.js"
   },
   "dependencies": {
+    "@aspectum/admin-ui-web": "git+https://github.com/Aspectum-Guide/AspectumAdminUIWeb.git#v0.1.3",
     "@hookform/resolvers": "^3.3.0",
     "@sentry/react": "^10.67.0",
     "@tanstack/react-query": "^5.101.0",
     "axios": "^1.6.0",
     "leaflet": "^1.9.4",
+    "lucide-react": "^1.59.0",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
     "react-hook-form": "^7.48.0",

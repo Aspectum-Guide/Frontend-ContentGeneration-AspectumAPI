@@ -3,6 +3,7 @@ export default {
   content: [
     "./index.html",
     "./src/**/*.{js,jsx}",
+    "./node_modules/@aspectum/admin-ui-web/src/**/*.{js,jsx}",
   ],
   theme: {
     extend: {},

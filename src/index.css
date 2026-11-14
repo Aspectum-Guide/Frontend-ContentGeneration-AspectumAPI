@@ -1,3 +1,6 @@
+@import '@aspectum/admin-ui-web/theme.css';
+@import '@aspectum/admin-ui-web/theme-cs.css';
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
