@@ -4,7 +4,7 @@ FROM node:18-alpine AS build
 WORKDIR /app
 RUN apk add --no-cache git
 COPY package.json package-lock.json* yarn.lock* ./
-RUN npm ci --silent || npm install
+RUN npm ci --legacy-peer-deps --silent || npm install --legacy-peer-deps
 COPY . .
 RUN npm run build
 

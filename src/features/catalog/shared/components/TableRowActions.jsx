@@ -1,20 +1,24 @@
+import { Button } from '@aspectum/admin-ui-web';
+
 export default function TableRowActions({ onEdit, onDelete }) {
   return (
-    <>
-      <button
+    <div className="flex items-center gap-1.5">
+      <Button
         type="button"
+        size="xs"
+        variant="soft"
         onClick={onEdit}
-        className="px-3 py-1.5 text-xs font-medium text-blue-600 bg-blue-50 rounded-md hover:bg-blue-100 transition-colors"
       >
         Ред.
-      </button>
-      <button
+      </Button>
+      <Button
         type="button"
+        size="xs"
+        variant="softDanger"
         onClick={onDelete}
-        className="px-3 py-1.5 text-xs font-medium text-red-600 bg-red-50 rounded-md hover:bg-red-100 transition-colors"
       >
         Удалить
-      </button>
-    </>
+      </Button>
+    </div>
   );
 }

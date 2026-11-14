@@ -1,4 +1,8 @@
 import { describe, expect, it } from 'vitest';
+import { render, screen } from '@testing-library/react';
+import { MemoryRouter, Route, Routes } from 'react-router-dom';
+import RequireStudio from './RequireStudio';
+import { AppModeContext } from './AppModeContext';
 import {
   ADMIN,
   STUDIO,
@@ -108,5 +112,40 @@ describe('appMode', () => {
     });
     expect(mode).toBe(ADMIN);
     expect(explicitAppMode({})).toBeNull();
+  });
+
+  it('RequireStudio пропускает контент в режиме студии', () => {
+    render(
+      <AppModeContext.Provider value={STUDIO}>
+        <MemoryRouter initialEntries={['/generation']}>
+          <RequireStudio>
+            <div>Контент студии</div>
+          </RequireStudio>
+        </MemoryRouter>
+      </AppModeContext.Provider>
+    );
+    expect(screen.getByText('Контент студии')).toBeDefined();
+  });
+
+  it('RequireStudio перенаправляет в каталог в режиме админки', () => {
+    render(
+      <AppModeContext.Provider value={ADMIN}>
+        <MemoryRouter initialEntries={['/generation']}>
+          <Routes>
+            <Route
+              path="/generation"
+              element={
+                <RequireStudio>
+                  <div>Контент студии</div>
+                </RequireStudio>
+              }
+            />
+            <Route path="/catalog" element={<div>Экран каталога</div>} />
+          </Routes>
+        </MemoryRouter>
+      </AppModeContext.Provider>
+    );
+    expect(screen.queryByText('Контент студии')).toBeNull();
+    expect(screen.getByText('Экран каталога')).toBeDefined();
   });
 });

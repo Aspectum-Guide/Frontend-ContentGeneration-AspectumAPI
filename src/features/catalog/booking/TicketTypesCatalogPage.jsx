@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { ticketTypesAPI } from '../../../api/booking';
 import Layout from '../../../components/Layout';
+import Button from '../../../components/ui/Button';
 import DataTable from '../../../components/ui/DataTable';
 import AssignTicketTypeModal from './AssignTicketTypeModal';
 import { Field, FormActions, TextInput } from '../../../components/ui/FormField';
@@ -274,14 +275,15 @@ export default function TicketTypesCatalog() {
           </>
         )}
         actions={(row) => (
-          <div className="flex items-center gap-1">
-            <button
+          <div className="flex items-center gap-1.5">
+            <Button
+              size="xs"
+              variant="softPurple"
               onClick={() => setAssignTarget(row)}
               title="Назначить ивентам"
-              className="px-2 py-1.5 text-xs font-medium text-purple-600 bg-purple-50 rounded-md hover:bg-purple-100 transition-colors"
             >
               Ивенты
-            </button>
+            </Button>
             <TableRowActions
               onEdit={() => openEdit(row)}
               onDelete={() => crud.askDelete(row)}

@@ -2,7 +2,7 @@ import { createContext, useContext, useEffect, useState } from 'react';
 import { ADMIN, STUDIO, probeAppMode } from './appMode';
 import { setWorkspace } from '../utils/workspace';
 
-const AppModeContext = createContext(STUDIO);
+export const AppModeContext = createContext(STUDIO);
 
 export function AppModeProvider({ children }) {
   const [mode, setMode] = useState(null);

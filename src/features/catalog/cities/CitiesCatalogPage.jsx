@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import Layout from '../../../components/Layout';
+import Button from '../../../components/ui/Button';
 import DataTable from '../../../components/ui/DataTable';
 import { ConfirmModal } from '../../../components/ui/Modal';
 import Toast from '../../../components/ui/Toast';
@@ -195,22 +196,24 @@ export default function CitiesCatalogPage() {
   return (
     <Layout>
       <div className="mb-4 flex flex-wrap items-center gap-2">
-        <button
+        <Button
           type="button"
+          size="sm"
+          variant="soft"
           onClick={() => handleBulkSync(false)}
           disabled={bulkSyncing || selectedIds.size === 0}
-          className="px-3 py-2 text-sm font-medium text-blue-700 bg-blue-50 rounded-lg hover:bg-blue-100 disabled:opacity-50"
         >
           {bulkSyncing ? 'Синк...' : `Синк выбранных (${selectedIds.size})`}
-        </button>
-        <button
+        </Button>
+        <Button
           type="button"
+          size="sm"
+          variant="secondary"
           onClick={() => handleBulkSync(true)}
           disabled={bulkSyncing}
-          className="px-3 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 disabled:opacity-50"
         >
           Синк всех с SKU
-        </button>
+        </Button>
         {bulkSyncNote && (
           <span className={`text-sm ${bulkSyncNote.type === 'error' ? 'text-red-600' : 'text-green-700'}`}>
             {bulkSyncNote.text}
@@ -234,21 +237,23 @@ export default function CitiesCatalogPage() {
         pageSize={c.pageSize}
         onPage={c.setPage}
         actions={(row) => (
-          <>
-            <button
+          <div className="flex items-center gap-1.5">
+            <Button
+              size="xs"
+              variant="soft"
               onClick={() => c.openEdit(row)}
               disabled={c.preparingEdit}
-              className="px-3 py-1.5 text-xs font-medium text-blue-600 bg-blue-50 rounded-md hover:bg-blue-100 transition-colors disabled:opacity-60"
             >
               {c.preparingEdit ? 'Загрузка...' : 'Ред.'}
-            </button>
-            <button
+            </Button>
+            <Button
+              size="xs"
+              variant="softDanger"
               onClick={() => c.requestDelete(row)}
-              className="px-3 py-1.5 text-xs font-medium text-red-600 bg-red-50 rounded-md hover:bg-red-100 transition-colors"
             >
               Удалить
-            </button>
-          </>
+            </Button>
+          </div>
         )}
       />
 

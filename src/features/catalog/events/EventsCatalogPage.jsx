@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Layout from '../../../components/Layout';
+import Alert from '../../../components/ui/Alert';
+import Button from '../../../components/ui/Button';
 import DataTable from '../../../components/ui/DataTable';
 import { ConfirmModal } from '../../../components/ui/Modal';
 import Toast from '../../../components/ui/Toast';
@@ -193,38 +195,36 @@ export default function EventsCatalogPage() {
           <h1 className="text-2xl font-bold text-gray-900">Справочник событий</h1>
           <p className="mt-1 text-sm text-gray-500">Просмотр и редактирование событий</p>
         </div>
-        <button
+        <Button
           type="button"
+          size="sm"
+          variant="soft"
           onClick={handleCalculateNearest}
           disabled={nearestLoading}
-          className="px-3 py-2 text-sm font-medium text-blue-700 bg-blue-50 rounded-lg hover:bg-blue-100 disabled:opacity-50"
         >
           {nearestLoading ? 'Расчёт...' : 'Рассчитать ближайшие'}
-        </button>
+        </Button>
       </div>
 
       {nearestNote && (
-        <div className={`mb-4 text-sm rounded-lg px-3 py-2 border ${
-          nearestNote.type === 'error'
-            ? 'text-red-700 bg-red-50 border-red-200'
-            : 'text-green-700 bg-green-50 border-green-200'
-        }`}
-        >
-          {nearestNote.text}
+        <div className="mb-4">
+          <Alert tone={nearestNote.type === 'error' ? 'error' : 'success'}>
+            {nearestNote.text}
+          </Alert>
         </div>
       )}
 
       {(e.cityOptionsError || e.filtersError) && (
-        <div className="mb-4 flex flex-col gap-1">
+        <div className="mb-4 flex flex-col gap-2">
           {e.cityOptionsError && (
-            <div className="text-sm text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+            <Alert tone="warning">
               ⚠ {e.cityOptionsError} — фильтр по городу недоступен
-            </div>
+            </Alert>
           )}
           {e.filtersError && (
-            <div className="text-sm text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+            <Alert tone="warning">
               ⚠ {e.filtersError} — теги в форме недоступны
-            </div>
+            </Alert>
           )}
         </div>
       )}
@@ -259,20 +259,22 @@ export default function EventsCatalogPage() {
           )
         }
         actions={(row) => (
-          <>
-            <button
+          <div className="flex items-center gap-1.5">
+            <Button
+              size="xs"
+              variant="soft"
               onClick={() => e.openEdit(row)}
-              className="px-3 py-1.5 text-xs font-medium text-blue-600 bg-blue-50 rounded-md hover:bg-blue-100 transition-colors"
             >
               Ред.
-            </button>
-            <button
+            </Button>
+            <Button
+              size="xs"
+              variant="softDanger"
               onClick={() => e.requestDelete(row)}
-              className="px-3 py-1.5 text-xs font-medium text-red-600 bg-red-50 rounded-md hover:bg-red-100 transition-colors"
             >
               Удалить
-            </button>
-          </>
+            </Button>
+          </div>
         )}
       />
 
