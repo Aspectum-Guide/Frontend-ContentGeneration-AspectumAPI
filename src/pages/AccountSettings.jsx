@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { authAPI } from '../api/auth.ts';
 import Button from '../components/ui/Button';
+import { useConfirmModal } from '../components/ui/useConfirmModal.jsx';
 
 const fromBase64Url = (value) => {
   const padded = value.replace(/-/g, '+').replace(/_/g, '/') + '='.repeat((4 - value.length % 4) % 4);
@@ -15,6 +16,7 @@ const toBase64Url = (buffer) => {
 };
 
 export default function AccountSettings() {
+  const { confirm, confirmModal } = useConfirmModal();
   const [passkeys, setPasskeys] = useState([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -64,7 +66,13 @@ export default function AccountSettings() {
   };
 
   const removePasskey = async (id) => {
-    if (!window.confirm('Удалить этот passkey? Вход с этого устройства больше не будет доступен.')) return;
+    const ok = await confirm({
+      title: 'Удаление passkey',
+      message: 'Удалить этот passkey? Вход с этого устройства больше не будет доступен.',
+      danger: true,
+      confirmLabel: 'Удалить',
+    });
+    if (!ok) return;
     try { await authAPI.deletePasskey(id); setPasskeys((items) => items.filter((item) => item.id !== id)); }
     catch (err) { setError(err?.response?.data?.detail || 'Не удалось удалить passkey.'); }
   };
@@ -77,5 +85,6 @@ export default function AccountSettings() {
       {error && <p className="mt-4 text-sm text-red-700 bg-red-50 border border-red-200 rounded-lg p-3">{error}</p>}
       {loading ? <p className="mt-5 text-sm text-gray-500">Загрузка…</p> : passkeys.length === 0 ? <p className="mt-5 text-sm text-gray-500">Passkeys ещё не добавлены. Пароль остаётся способом восстановления доступа.</p> : <ul className="mt-5 divide-y divide-gray-100 border-t border-b border-gray-100">{passkeys.map((item) => <li className="py-3 flex justify-between items-center gap-4" key={item.id}><div><p className="text-sm font-medium text-gray-800">{item.name}</p><p className="text-xs text-gray-500">Добавлен {new Date(item.created_at).toLocaleDateString('ru-RU')}{item.last_used_at ? ` · использован ${new Date(item.last_used_at).toLocaleDateString('ru-RU')}` : ''}</p></div><button className="text-sm text-red-600 hover:text-red-800" onClick={() => removePasskey(item.id)}>Удалить</button></li>)}</ul>}
     </section>
+    {confirmModal}
   </div>;
 }

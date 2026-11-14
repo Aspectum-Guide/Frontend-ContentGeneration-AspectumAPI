@@ -2,6 +2,8 @@ import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import Layout from '../../components/Layout';
 import Button from '../../components/ui/Button';
+import Toast, { useToast } from '../../components/ui/Toast';
+import { useConfirmModal } from '../../components/ui/useConfirmModal';
 import { sessionsAPI } from '../../api/generation';
 import { parseApiError } from '../../utils/apiError';
 
@@ -9,6 +11,8 @@ export default function GenerationList() {
   const [sessions, setSessions] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const { confirm, confirmModal } = useConfirmModal();
+  const { note, showNote } = useToast();
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -51,15 +55,21 @@ export default function GenerationList() {
   };
 
   const handleDelete = async (sessionId) => {
-    if (!window.confirm('Вы уверены, что хотите удалить эту сессию?')) {
-      return;
-    }
+    const ok = await confirm({
+      title: 'Удаление сессии',
+      message: 'Вы уверены, что хотите удалить эту сессию?',
+      danger: true,
+      confirmLabel: 'Удалить',
+    });
+    if (!ok) return;
 
     try {
       await sessionsAPI.delete(sessionId);
+      showNote('Сессия удалена', 'success');
       loadSessions();
     } catch (err) {
-      alert('Ошибка при удалении сессии');
+      const errMsg = parseApiError(err, 'Ошибка при удалении сессии');
+      showNote(errMsg, 'error');
       console.error(err);
     }
   };
@@ -228,6 +238,8 @@ export default function GenerationList() {
           </div>
         )}
       </div>
+      {confirmModal}
+      <Toast note={note} />
     </Layout>
   );
 }

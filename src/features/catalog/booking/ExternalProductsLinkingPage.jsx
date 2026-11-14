@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { citiesAPI, eventsAPI } from '../../../api/generation';
 import Layout from '../../../components/Layout';
+import { useConfirmModal } from '../../../components/ui/useConfirmModal';
 import { parseApiError } from '../../../utils/apiError';
 import { useCatalogFilters } from '../core/useCatalogFilters';
 import CatalogPageHeader from '../shared/components/CatalogPageHeader';
@@ -34,6 +35,7 @@ function Badge({ tone, children }) {
 }
 
 function MergePanel({ product, onMerged, onError }) {
+  const { confirm, confirmModal } = useConfirmModal();
   const { search, setSearch, debouncedSearch } = useCatalogFilters({ debounceMs: 300 });
   const [events, setEvents] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -61,7 +63,12 @@ function MergePanel({ product, onMerged, onError }) {
     const text = moves
       ? `Слить с «${label(event.title)}»? Текущее событие продукта («${label(product.linked_event_title)}») будет скрыто.`
       : `Слить с «${label(event.title)}»? Текст события останется вашим, цены и билеты придут от поставщика.`;
-    if (!window.confirm(text)) return;
+    const ok = await confirm({
+      title: 'Слияние с событием',
+      message: text,
+      confirmLabel: 'Слить',
+    });
+    if (!ok) return;
     setBusyId(event.id);
     try {
       await eventsAPI.setExternalProduct(event.id, product.id);
@@ -112,6 +119,7 @@ function MergePanel({ product, onMerged, onError }) {
             </div>
           ))}
       </div>
+      {confirmModal}
     </div>
   );
 }

@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Field, TextInput } from '../../../components/ui/FormField';
+import { useConfirmModal } from '../../../components/ui/useConfirmModal';
 import { getMultiLangValue } from '../shared/i18n';
 import { useCatalogFilters } from '../core/useCatalogFilters';
 import { eventsCatalogAPI } from './api';
@@ -64,6 +65,7 @@ export default function ExternalProductField({
   saving,
   error,
 }) {
+  const { confirm, confirmModal } = useConfirmModal();
   const { search, setSearch, debouncedSearch } = useCatalogFilters({ debounceMs: 300 });
   const [results, setResults] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -161,13 +163,18 @@ export default function ExternalProductField({
           <button
             type="button"
             disabled={saving}
-            onClick={() => {
+            onClick={async () => {
               if (supplierText) {
                 onSetOwnership?.(externalProduct.id, false);
-              } else if (
-                window.confirm('Вернуть текст поставщику? Следующая синхронизация перезапишет название, описание и город этого события.')
-              ) {
-                onSetOwnership?.(externalProduct.id, true);
+              } else {
+                const ok = await confirm({
+                  title: 'Возврат текста поставщику',
+                  message: 'Вернуть текст поставщику? Следующая синхронизация перезапишет название, описание и город этого события.',
+                  confirmLabel: 'Вернуть текст',
+                });
+                if (ok) {
+                  onSetOwnership?.(externalProduct.id, true);
+                }
               }
             }}
             className="rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
@@ -207,6 +214,7 @@ export default function ExternalProductField({
           </div>
         </>
       )}
+      {confirmModal}
     </Field>
   );
 }

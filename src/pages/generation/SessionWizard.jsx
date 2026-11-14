@@ -881,9 +881,16 @@ export default function SessionWizard({ components = {} } = {}) {
         <div className="flex items-center gap-3 min-w-0">
           <button
             type="button"
-            onClick={() => {
+            onClick={async () => {
               if (hasUnsavedChangesRef.current) {
-                if (!window.confirm('Есть несохранённые изменения. Покинуть страницу?')) return;
+                const ok = await confirm({
+                  title: 'Несохранённые изменения',
+                  message: 'Есть несохранённые изменения. Покинуть страницу?',
+                  danger: true,
+                  confirmLabel: 'Покинуть',
+                  cancelLabel: 'Остаться',
+                });
+                if (!ok) return;
               }
               navigate('/generation');
             }}

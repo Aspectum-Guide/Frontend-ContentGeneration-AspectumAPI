@@ -4,6 +4,8 @@ import useCityForm from './Step1City/useCityForm';
 import useCityAI from './Step1City/useCityAI';
 import useCityImage from './Step1City/useCityImage';
 import useCityPublish from './Step1City/useCityPublish';
+import Toast, { useToast } from '../../../components/ui/Toast';
+import { useConfirmModal } from '../../../components/ui/useConfirmModal';
 import { citiesAPI } from '../../../api/generation';
 
 type Props = {
@@ -14,6 +16,8 @@ type Props = {
 };
 
 export default function Step1City({ session, cityData: initialCityData, onComplete, onSavedCity }: Props) {
+  const { confirm, confirmModal } = useConfirmModal();
+  const { note, showNote } = useToast();
   const {
     register,
     handleSubmit,
@@ -49,8 +53,7 @@ export default function Step1City({ session, cityData: initialCityData, onComple
     const country = countryValue || undefined;
 
     if (!cityName) {
-      // require at least a city name to generate
-      window.alert('Укажите название города для генерации');
+      showNote('Укажите название города для генерации', 'warning');
       return;
     }
 
@@ -71,11 +74,10 @@ export default function Step1City({ session, cityData: initialCityData, onComple
 
       // Если генерация завершена (не асинхронная или уже завершилась)
       if (!aiLoading) {
-        window.alert('Данные города сгенерированы! Проверьте и при необходимости отредактируйте.');
+        showNote('Данные города сгенерированы! Проверьте и при необходимости отредактируйте.', 'success');
       }
     } catch (err) {
-      // error state is handled inside the hook, but keep alert for parity
-      window.alert((aiError as string) || 'Ошибка при генерации через ИИ');
+      showNote((aiError as string) || 'Ошибка при генерации через ИИ', 'error');
     }
   };
 
@@ -89,67 +91,82 @@ export default function Step1City({ session, cityData: initialCityData, onComple
         onSavedCity(created);
       }
 
-      window.alert(initialCityData?.id ? 'Город обновлен!' : 'Город создан!');
+      showNote(initialCityData?.id ? 'Город обновлен!' : 'Город создан!', 'success');
       return created;
     } catch (err) {
-      window.alert((formError as string) || 'Ошибка при сохранении');
+      showNote((formError as string) || 'Ошибка при сохранении', 'error');
       throw err;
     }
   });
 
   const handlePublish = async () => {
-    if (!window.confirm('Вы уверены, что хотите опубликовать город? Это действие нельзя отменить.')) return;
+    const ok = await confirm({
+      title: 'Публикация города',
+      message: 'Вы уверены, что хотите опубликовать город? Это действие нельзя отменить.',
+      confirmLabel: 'Опубликовать',
+    });
+    if (!ok) return;
 
     const res = await publish();
     if (res?.success) {
-      window.alert(res.message || 'Город опубликован');
+      showNote(res.message || 'Город опубликован', 'success');
       if (onComplete) onComplete();
     } else {
-      window.alert(res?.error || 'Ошибка при публикации');
+      showNote(res?.error || 'Ошибка при публикации', 'error');
     }
   };
 
   const handleDelete = async () => {
     if (!initialCityData?.id) return;
-    const confirmed = window.confirm('Вы уверены, что хотите удалить город из сессии?');
+    const confirmed = await confirm({
+      title: 'Удаление города',
+      message: 'Вы уверены, что хотите удалить город из сессии?',
+      danger: true,
+      confirmLabel: 'Удалить',
+    });
     if (!confirmed) return;
     try {
       await citiesAPI.delete(initialCityData.id);
       // notify parent: remove from list
       if (onSavedCity) onSavedCity({ ...initialCityData, _deleted: true });
       if (onComplete) onComplete();
+      showNote('Город удален из сессии', 'success');
     } catch (err) {
       console.error('Ошибка удаления города:', err);
-      alert('Не удалось удалить город');
+      showNote('Не удалось удалить город', 'error');
     }
   };
 
   const isSingleStep = session?.content_type === 'city_only';
 
   return (
-    <CityForm
-      session={session}
-      register={register}
-      setValue={setValue}
-      nameValue={watch('name')}
-      descriptionValue={watch('description')}
-      countryValue={watch('country')}
-      copyrightValue={watch('image_copyright')}
-      onImageChange={handleFileChange}
-      imagePreview={imagePreview}
-      errors={errors}
-      onAiGenerate={handleAiGenerate}
-      aiLoading={aiLoading}
-      aiProgress={progress}
-      aiCurrentStep={currentStep}
-      saving={saving}
-      onSubmit={submit}
-      isSingleStep={isSingleStep}
-      publishLoading={publishLoading}
-      onPublish={handlePublish}
-      publishSuccess={publishSuccess}
-      isEditing={!!initialCityData?.id}
-      onDelete={handleDelete}
-    />
+    <>
+      <CityForm
+        session={session}
+        register={register}
+        setValue={setValue}
+        nameValue={watch('name')}
+        descriptionValue={watch('description')}
+        countryValue={watch('country')}
+        copyrightValue={watch('image_copyright')}
+        onImageChange={handleFileChange}
+        imagePreview={imagePreview}
+        errors={errors}
+        onAiGenerate={handleAiGenerate}
+        aiLoading={aiLoading}
+        aiProgress={progress}
+        aiCurrentStep={currentStep}
+        saving={saving}
+        onSubmit={submit}
+        isSingleStep={isSingleStep}
+        publishLoading={publishLoading}
+        onPublish={handlePublish}
+        publishSuccess={publishSuccess}
+        isEditing={!!initialCityData?.id}
+        onDelete={handleDelete}
+      />
+      {confirmModal}
+      <Toast note={note} />
+    </>
   );
 }

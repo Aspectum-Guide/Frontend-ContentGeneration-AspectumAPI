@@ -2,6 +2,7 @@ import React from 'react';
 import MultiLangInput from '../../../../components/forms/MultiLangInput';
 import Input from '../../../../components/ui/Input';
 import Button from '../../../../components/ui/Button';
+import { useConfirmModal } from '../../../../components/ui/useConfirmModal';
 
 // Simple country autocomplete used only in this form (no external deps)
 function CountryAutocomplete({ value, onChange }: { value: string; onChange: (v: string) => void }) {
@@ -102,6 +103,7 @@ export default function CityForm({
   isEditing = false,
   onDelete,
 }: Props) {
+  const { confirm, confirmModal } = useConfirmModal();
   const targetLanguages = session.target_languages?.map((code: string) => ({ code, name: code.toUpperCase() })) || [];
 
   return (
@@ -245,7 +247,13 @@ export default function CityForm({
               type="button"
               variant="outline"
               onClick={async () => {
-                if (!confirm('Удалить город из сессии? Это действие нельзя отменить.')) return;
+                const ok = await confirm({
+                  title: 'Удаление города',
+                  message: 'Удалить город из сессии? Это действие нельзя отменить.',
+                  danger: true,
+                  confirmLabel: 'Удалить',
+                });
+                if (!ok) return;
                 if (onDelete) await onDelete();
               }}
               className="w-full sm:w-auto text-red-600 border-red-200 hover:border-red-300"
@@ -267,6 +275,7 @@ export default function CityForm({
           )}
         </div>
       </form>
+      {confirmModal}
     </div>
   );
 }

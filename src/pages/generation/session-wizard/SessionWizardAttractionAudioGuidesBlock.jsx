@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from 'react';
 import { audioAPI } from '../../../api/generation';
 import AiGenerationModal, { WizardGenerationActionFooter } from '../../../components/generation/AiGenerationModal.jsx';
 import AiGenerationQualitySettings from '../../../components/generation/AiGenerationQualitySettings.jsx';
+import { useConfirmModal } from '../../../components/ui/useConfirmModal.jsx';
 
 import { getAttrName, getFlag, normalizeId } from './sessionWizardShared.jsx';
 
@@ -803,6 +804,7 @@ export default function SessionWizardAttractionAudioGuidesBlock({
   onSetAudioGuideTtsModelId,
   onGoToStep,
 }) {
+  const { confirm, confirmModal } = useConfirmModal();
   const audioFileRef = useRef(null);
   const [planImportText, setPlanImportText] = useState('');
   // Провайдер для расстановки ударений: '' = по настройке AI_PROVIDER
@@ -977,15 +979,19 @@ export default function SessionWizardAttractionAudioGuidesBlock({
     !attractionAudioGuideSaving &&
     !attractionAudioUploading;
 
-  const handleImportPlanFromText = () => {
+  const handleImportPlanFromText = async () => {
     const raw = planImportText.trim();
     if (!raw) return;
 
     if (planPoints.length > 0) {
-      const confirmed = window.confirm(
-        `Текущий план (${planPoints.length} пункт(ов)) и тексты пунктов для этого языка ` +
+      const confirmed = await confirm({
+        title: 'Замена плана аудиогида',
+        message:
+          `Текущий план (${planPoints.length} пункт(ов)) и тексты пунктов для этого языка ` +
           'будут заменены содержимым из вставленного текста. Продолжить?',
-      );
+        danger: true,
+        confirmLabel: 'Заменить план',
+      });
       if (!confirmed) return;
     }
 
@@ -1980,6 +1986,7 @@ export default function SessionWizardAttractionAudioGuidesBlock({
           </button>
         </div>
       </main>
+      {confirmModal}
     </section>
   );
 }

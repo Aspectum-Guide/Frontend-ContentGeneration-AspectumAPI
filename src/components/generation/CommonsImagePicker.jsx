@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { imagesAPI } from '../../api/generation';
+import Alert from '../ui/Alert';
 
 /**
  * CommonsImagePicker - компонент для поиска и выбора изображений из Wikimedia Commons
@@ -31,6 +32,7 @@ export default function CommonsImagePicker({
   const [page, setPage] = useState(1);
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [importError, setImportError] = useState(null);
   const [hasMore, setHasMore] = useState(true);
   const [tab, setTab] = useState('best');
   const [library, setLibrary] = useState(null);   // ответ photo-library
@@ -290,7 +292,7 @@ export default function CommonsImagePicker({
       onClose?.();
     } catch (err) {
       console.error('Image import error:', err);
-      alert(`Ошибка: ${err.message || 'Не удалось загрузить изображение'}`);
+      setImportError(err.message || 'Не удалось загрузить изображение');
     } finally {
       setLoading(false);
     }
@@ -374,6 +376,14 @@ export default function CommonsImagePicker({
             ×
           </button>
         </div>
+
+        {importError && (
+          <div className="px-4 pt-3">
+            <Alert tone="error">
+              {importError}
+            </Alert>
+          </div>
+        )}
 
         <form
           onSubmit={handleSearchSubmit}

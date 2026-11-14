@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import Layout from '../../components/Layout';
+import { useConfirmModal } from '../../components/ui/useConfirmModal';
 import { mediaRecoveryAPI } from '../../api/mediaRecovery';
 import { parseApiError } from '../../utils/apiError';
 
@@ -174,12 +175,19 @@ function RecoverableGroup({ group, onChanged }) {
 }
 
 function CleanupGroup({ group, onDeleted }) {
+  const { confirm, confirmModal } = useConfirmModal();
   const [deleting, setDeleting] = useState(null);
   const [error, setError] = useState(null);
   const [files, setFiles] = useState(group.files);
 
   const handleDelete = async (fileId) => {
-    if (!window.confirm('Удалить этот файл насовсем? Отменить нельзя.')) return;
+    const ok = await confirm({
+      title: 'Удаление аудиофайла',
+      message: 'Удалить этот файл насовсем? Отменить нельзя.',
+      danger: true,
+      confirmLabel: 'Удалить',
+    });
+    if (!ok) return;
     setDeleting(fileId);
     setError(null);
     try {
@@ -221,6 +229,7 @@ function CleanupGroup({ group, onDeleted }) {
           </div>
         ))}
       </div>
+      {confirmModal}
     </div>
   );
 }

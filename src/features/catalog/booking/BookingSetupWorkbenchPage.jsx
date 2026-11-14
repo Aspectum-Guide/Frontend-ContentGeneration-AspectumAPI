@@ -10,6 +10,7 @@ import {
 } from '../../../api/booking';
 import Layout from '../../../components/Layout';
 import Modal, { ConfirmModal } from '../../../components/ui/Modal';
+import { useConfirmModal } from '../../../components/ui/useConfirmModal';
 import { Field, TextInput } from '../../../components/ui/FormField';
 import { parseApiError } from '../../../utils/apiError';
 import { useEventOptions } from '../shared/bookingOptions';
@@ -435,6 +436,7 @@ function SlotsManagerModal({ open, eventId, onClose, onChanged }) {
 // ─── main ────────────────────────────────────────────────────────────────────
 
 export default function BookingSetupWorkbenchPage() {
+  const { confirm, confirmModal } = useConfirmModal();
   const { eventOptions, cityOptions: refCityOptions, eventsLoading, eventsError, reloadEvents } = useEventOptions();
   const [cityFilter, setCityFilter] = useState('');
   const [eventId, setEventId] = useState('');
@@ -1067,7 +1069,13 @@ export default function BookingSetupWorkbenchPage() {
   };
 
   const handleDeleteTt = async (tt) => {
-    if (!confirm(`Удалить тип «${getTicketTypeLabel(tt)}»?`)) return;
+    const ok = await confirm({
+      title: 'Удаление типа билета',
+      message: `Удалить тип «${getTicketTypeLabel(tt)}»?`,
+      danger: true,
+      confirmLabel: 'Удалить',
+    });
+    if (!ok) return;
     try {
       await ticketTypesAPI.delete(tt.id);
       await loadTicketTypes(eventId);
@@ -1818,6 +1826,7 @@ export default function BookingSetupWorkbenchPage() {
           : ''}
         confirmLabel="Сохранить"
       />
+      {confirmModal}
     </Layout>
   );
 }

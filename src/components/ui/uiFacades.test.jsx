@@ -8,6 +8,7 @@ import StatusBadge, { SessionStatusBadge } from './StatusBadge';
 import { Field, FormActions, Select, Textarea, TextInput, MultiLangField } from './FormField';
 import Input from './Input';
 import InlineProgressBanner from './InlineProgressBanner';
+import Alert from './Alert';
 
 describe('UI facades over @aspectum/admin-ui-web', () => {
   it('renders Button correctly and handles click', () => {
@@ -119,5 +120,10 @@ describe('UI facades over @aspectum/admin-ui-web', () => {
     );
     expect(screen.getByText('Идёт загрузка...')).toBeDefined();
     expect(screen.getByText('Данные сохранены')).toBeDefined();
+  });
+
+  it('renders Alert component', () => {
+    render(<Alert tone="error">Произошла ошибка сервера</Alert>);
+    expect(screen.getByText('Произошла ошибка сервера')).toBeDefined();
   });
 });

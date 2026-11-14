@@ -1,7 +1,11 @@
 import { useState, useEffect } from 'react';
 import { citiesAPI, attractionsAPI } from '../../api/generation';
+import Toast, { useToast } from '../ui/Toast';
+import { useConfirmModal } from '../ui/useConfirmModal';
 
 export default function SessionSidebar({ session, onCitySelect, selectedCityId, onCitiesChange, initialCities }) {
+  const { confirm, confirmModal } = useConfirmModal();
+  const { note, showNote } = useToast();
   const [cities, setCities] = useState([]);
   const [attractions, setAttractions] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -133,11 +137,11 @@ export default function SessionSidebar({ session, onCitySelect, selectedCityId, 
                   const status = err?.response?.status;
                   console.error('Ошибка создания города:', err);
                   if (status === 400) {
-                    alert('Сервер отверг создание города: проверьте обязательные поля (400).');
+                    showNote('Сервер отверг создание города: проверьте обязательные поля (400).', 'error');
                   } else if (status === 429) {
-                    alert('Сервер перегружен (429). Попробуйте ещё раз через несколько секунд.');
+                    showNote('Сервер перегружен (429). Попробуйте ещё раз через несколько секунд.', 'warning');
                   } else {
-                    alert('Не удалось создать город');
+                    showNote('Не удалось создать город', 'error');
                   }
                 } finally {
                   setCreating(false);
@@ -176,14 +180,21 @@ export default function SessionSidebar({ session, onCitySelect, selectedCityId, 
                 <button
                   onClick={async (e) => {
                     e.stopPropagation();
-                    if (!confirm('Удалить город из сессии?')) return;
+                    const ok = await confirm({
+                      title: 'Удаление города',
+                      message: 'Удалить город из сессии?',
+                      danger: true,
+                      confirmLabel: 'Удалить',
+                    });
+                    if (!ok) return;
                     try {
                       await citiesAPI.delete(city.id);
                       await loadData();
                       if (onCitySelect) onCitySelect(undefined);
+                      showNote('Город удален из сессии', 'success');
                     } catch (err) {
                       console.error('Ошибка удаления города:', err);
-                      alert('Не удалось удалить город');
+                      showNote('Не удалось удалить город', 'error');
                     }
                   }}
                   className="ml-2 text-red-500 hover:text-red-700"
@@ -234,6 +245,8 @@ export default function SessionSidebar({ session, onCitySelect, selectedCityId, 
           🔄 Обновить список
         </button>
       </div>
+      {confirmModal}
+      <Toast note={note} />
     </div>
   );
 }

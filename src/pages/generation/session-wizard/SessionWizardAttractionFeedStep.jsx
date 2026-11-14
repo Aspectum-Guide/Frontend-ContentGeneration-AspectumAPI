@@ -2,6 +2,7 @@ import { useMemo, useRef, useState } from 'react';
 
 import { getFlag, normalizeId } from './sessionWizardShared.jsx';
 import { usePasteImageOnHover } from '../../../hooks/usePasteImageOnHover';
+import { useConfirmModal } from '../../../components/ui/useConfirmModal.jsx';
 
 const getMultilangDisplay = (value, fallback = '') => {
   if (!value) return fallback;
@@ -600,6 +601,7 @@ export default function SessionWizardAttractionFeedStep({
   onOpenAttractionFeedCommonsModal,
   onGoToStep,
 }) {
+  const { confirm, confirmModal } = useConfirmModal();
   const currentLocale =
     attractionFeedLocaleData[attractionFeedActiveLocale] || {};
 
@@ -837,7 +839,7 @@ export default function SessionWizardAttractionFeedStep({
 
             <select
               value={itemType}
-              onChange={(event) => {
+              onChange={async (event) => {
                 const nextType = event.target.value;
                 if (nextType === itemType) return;
 
@@ -847,13 +849,20 @@ export default function SessionWizardAttractionFeedStep({
                 ).some(Boolean);
                 const hasImage = itemType === 'image' && getFeedImagePreview(currentAttractionFeedItem);
 
-                if ((hasText || hasImage) && !window.confirm(
-                  nextType === 'text'
+                if (hasText || hasImage) {
+                  const message = nextType === 'text'
                     ? 'Смена типа на «Текст» сотрёт прикреплённое изображение. Продолжить?'
-                    : 'Смена типа на «Изображение» сотрёт текстовое содержимое. Продолжить?'
-                )) {
-                  event.target.value = itemType;
-                  return;
+                    : 'Смена типа на «Изображение» сотрёт текстовое содержимое. Продолжить?';
+                  const confirmed = await confirm({
+                    title: 'Смена типа элемента ленты',
+                    message,
+                    danger: true,
+                    confirmLabel: 'Сменить тип',
+                  });
+                  if (!confirmed) {
+                    event.target.value = itemType;
+                    return;
+                  }
                 }
 
                 if (nextType === 'text') {
@@ -1108,6 +1117,7 @@ export default function SessionWizardAttractionFeedStep({
           </button>
         </div>
       </main>
+      {confirmModal}
     </section>
   );
 }
