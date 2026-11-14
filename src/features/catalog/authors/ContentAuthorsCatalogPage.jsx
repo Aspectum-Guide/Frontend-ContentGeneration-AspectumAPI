@@ -1,6 +1,9 @@
 import { useCallback, useEffect, useState } from 'react';
 import Layout from '../../../components/Layout';
 import Modal, { ConfirmModal } from '../../../components/ui/Modal';
+import Button from '../../../components/ui/Button';
+import Alert from '../../../components/ui/Alert';
+import { Card, EmptyState } from '@aspectum/admin-ui-web';
 import { Field, MultiLangField, TextInput } from '../../../components/ui/FormField';
 import { contentAuthorsAPI } from '../../../api/generation';
 import { getMultiLangValue } from '../shared/i18n';
@@ -85,18 +88,31 @@ export default function ContentAuthorsCatalogPage() {
           <h1 className="text-2xl font-bold text-gray-900">Авторы</h1>
           <p className="mt-1 text-sm text-gray-500">Самостоятельный справочник авторов контента. Связи с гидами пока нет.</p>
         </div>
-        <button onClick={() => setEditor(emptyAuthor())} className="shrink-0 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700">
+        <Button onClick={() => setEditor(emptyAuthor())} variant="primary">
           + Добавить автора
-        </button>
+        </Button>
       </div>
 
-      {error && <div className="mb-4 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{error}</div>}
-      {loading ? <div className="py-16 text-center text-gray-500">Загрузка...</div> : authors.length === 0 ? (
-        <div className="rounded-xl border border-dashed border-gray-300 bg-white p-12 text-center text-gray-500">Авторов пока нет</div>
+      {error && <Alert variant="error" className="mb-4">{error}</Alert>}
+      {loading ? (
+        <div className="py-16 text-center text-gray-500">Загрузка...</div>
+      ) : authors.length === 0 ? (
+        <Card className="py-8">
+          <EmptyState
+            icon="✍️"
+            title="Авторов пока нет"
+            description="Добавьте первого автора контента"
+            actions={
+              <Button variant="primary" onClick={() => setEditor(emptyAuthor())}>
+                + Добавить автора
+              </Button>
+            }
+          />
+        </Card>
       ) : (
         <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
           {authors.map((author) => (
-            <article key={author.id} className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
+            <Card key={author.id} className="p-4">
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
                   <h2 className="truncate font-semibold text-gray-900">{author.name}</h2>
@@ -107,23 +123,44 @@ export default function ContentAuthorsCatalogPage() {
                 </span>
               </div>
               <div className="mt-4 flex gap-2 border-t border-gray-100 pt-3">
-                <button onClick={() => setEditor({ ...author, biography: author.biography || {}, links: author.links || {} })} className="text-sm font-medium text-blue-600 hover:text-blue-800">Редактировать</button>
-                <button onClick={() => setDeleteTarget(author)} className="text-sm font-medium text-red-600 hover:text-red-800">Удалить</button>
+                <Button
+                  size="sm"
+                  variant="soft"
+                  onClick={() => setEditor({ ...author, biography: author.biography || {}, links: author.links || {} })}
+                >
+                  Редактировать
+                </Button>
+                <Button
+                  size="sm"
+                  variant="softDanger"
+                  onClick={() => setDeleteTarget(author)}
+                >
+                  Удалить
+                </Button>
               </div>
-            </article>
+            </Card>
           ))}
         </div>
       )}
 
       <Modal open={!!editor} onClose={() => !saving && setEditor(null)} title={editor?.id ? 'Редактировать автора' : 'Новый автор'} size="ml">
-        {editor && <form className="space-y-4" onSubmit={save}>
-          <Field label="Имя" required><TextInput value={editor.name} onChange={(e) => setEditor({ ...editor, name: e.target.value })} autoFocus /></Field>
-          <MultiLangField label="Биография" value={editor.biography} onChange={(biography) => setEditor({ ...editor, biography })} langs={['ru', 'en', 'it']} multiline />
-          <Field label="Сайт"><TextInput value={editor.links?.website || ''} onChange={(e) => setEditor({ ...editor, links: { ...editor.links, website: e.target.value } })} placeholder="https://..." /></Field>
-          <Field label="Telegram"><TextInput value={editor.links?.telegram || ''} onChange={(e) => setEditor({ ...editor, links: { ...editor.links, telegram: e.target.value } })} placeholder="https://t.me/..." /></Field>
-          <Field label="Видимость"><label className="flex items-center gap-2 text-sm text-gray-700"><input type="checkbox" checked={editor.is_show !== false} onChange={(e) => setEditor({ ...editor, is_show: e.target.checked })} /> Показывать автора</label></Field>
-          <div className="flex justify-end gap-3 pt-2"><button type="button" onClick={() => setEditor(null)} disabled={saving} className="rounded-lg bg-gray-100 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-200">Отмена</button><button disabled={saving} className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50">{saving ? 'Сохранение...' : 'Сохранить'}</button></div>
-        </form>}
+        {editor && (
+          <form className="space-y-4" onSubmit={save}>
+            <Field label="Имя" required><TextInput value={editor.name} onChange={(e) => setEditor({ ...editor, name: e.target.value })} autoFocus /></Field>
+            <MultiLangField label="Биография" value={editor.biography} onChange={(biography) => setEditor({ ...editor, biography })} langs={['ru', 'en', 'it']} multiline />
+            <Field label="Сайт"><TextInput value={editor.links?.website || ''} onChange={(e) => setEditor({ ...editor, links: { ...editor.links, website: e.target.value } })} placeholder="https://..." /></Field>
+            <Field label="Telegram"><TextInput value={editor.links?.telegram || ''} onChange={(e) => setEditor({ ...editor, links: { ...editor.links, telegram: e.target.value } })} placeholder="https://t.me/..." /></Field>
+            <Field label="Видимость"><label className="flex items-center gap-2 text-sm text-gray-700"><input type="checkbox" checked={editor.is_show !== false} onChange={(e) => setEditor({ ...editor, is_show: e.target.checked })} /> Показывать автора</label></Field>
+            <div className="flex justify-end gap-3 pt-2">
+              <Button type="button" onClick={() => setEditor(null)} disabled={saving} variant="secondary">
+                Отмена
+              </Button>
+              <Button type="submit" disabled={saving} loading={saving} variant="primary">
+                Сохранить
+              </Button>
+            </div>
+          </form>
+        )}
       </Modal>
       <ConfirmModal open={!!deleteTarget} onClose={() => !deleting && setDeleteTarget(null)} onConfirm={remove} title="Удалить автора?" message="Связей с контентом пока нет, поэтому будет удалён только профиль автора." confirmLabel="Удалить" danger loading={deleting} />
     </Layout>

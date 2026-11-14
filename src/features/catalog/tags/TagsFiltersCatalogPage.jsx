@@ -1,8 +1,9 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import Layout from '../../../components/Layout';
 import DataTable from '../../../components/ui/DataTable';
-import Modal from '../../../components/ui/Modal';
-import { ConfirmModal } from '../../../components/ui/Modal';
+import Modal, { ConfirmModal } from '../../../components/ui/Modal';
+import Button from '../../../components/ui/Button';
+import Alert from '../../../components/ui/Alert';
 import { Field, TextInput, FormActions, Select } from '../../../components/ui/FormField';
 import Toast, { useToast } from '../../../components/ui/Toast.jsx';
 import { citiesAPI, cityFiltersAPI, eventFiltersAPI } from './api';
@@ -482,7 +483,7 @@ function FilterTab({
   return (
     <>
       <div className="flex justify-end mb-3">
-        <button
+        <Button
           type="button"
           onClick={() => {
             setCreateError(null);
@@ -491,11 +492,12 @@ function FilterTab({
             setNewFilter(initialNewFilter(mode));
             setCreateModalOpen(true);
           }}
-          className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50"
           disabled={creating}
+          loading={creating}
+          variant="primary"
         >
-          {creating ? 'Создание…' : (createLabel || 'Создать тег')}
-        </button>
+          {createLabel || 'Создать тег'}
+        </Button>
       </div>
 
       {canMoveTags && selectedTagIds.size > 0 && (
@@ -515,22 +517,25 @@ function FilterTab({
               </option>
             ))}
           </select>
-          <button
+          <Button
             type="button"
             onClick={moveSelectedTags}
             disabled={moving || !moveTargetId}
-            className="px-3 py-1 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-50"
+            loading={moving}
+            variant="primary"
+            size="sm"
           >
-            {moving ? 'Переносим…' : 'Перенести'}
-          </button>
-          <button
+            Перенести
+          </Button>
+          <Button
             type="button"
             onClick={() => { setSelectedTagIds(new Set()); setMoveError(null); }}
             disabled={moving}
-            className="px-3 py-1 text-sm text-gray-700 border border-gray-300 rounded-lg bg-white hover:bg-gray-50"
+            variant="secondary"
+            size="sm"
           >
             Снять выбор
-          </button>
+          </Button>
           <span className="w-full text-xs text-blue-800">
             Теги остаются теми же — привязки к достопримечательностям и ИЛ сохранятся.
           </span>
@@ -549,9 +554,12 @@ function FilterTab({
         onSearch={setSearch}
         searchPlaceholder="Поиск..."
         actions={(row) => (
-          <>
-            <button
+          <div className="flex items-center gap-1.5">
+            <Button
               type="button"
+              size="xs"
+              variant="soft"
+              loading={loadingEditId === row.id}
               onClick={async () => {
                 setSaveError(null);
                 setEditEmoji(row.emoji || '');
@@ -585,22 +593,22 @@ function FilterTab({
                   });
                 }
               }}
-              className="px-3 py-1.5 text-xs font-medium text-blue-600 bg-blue-50 rounded-md hover:bg-blue-100 transition-colors"
             >
-              {loadingEditId === row.id ? '…' : 'Ред.'}
-            </button>
-            <button
+              Ред.
+            </Button>
+            <Button
               type="button"
+              size="xs"
+              variant="softDanger"
               disabled={deletingFilterIds.has(String(row.id))}
               onClick={(event) => {
                 event.stopPropagation();
                 setDeleteTarget(row);
               }}
-              className="px-3 py-1.5 text-xs font-medium text-red-600 bg-red-50 rounded-md hover:bg-red-100 transition-colors disabled:opacity-50"
             >
               Удалить
-            </button>
-          </>
+            </Button>
+          </div>
         )}
       />
 
@@ -612,9 +620,7 @@ function FilterTab({
       >
         <form onSubmit={handleCreate} className="space-y-4">
           {createError && (
-            <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">
-              {createError}
-            </div>
+            <Alert variant="error">{createError}</Alert>
           )}
 
           {mode === 'event' && (
@@ -703,9 +709,7 @@ function FilterTab({
         {editingFilter && (
           <form onSubmit={handleSave} className="space-y-4">
             {saveError && (
-              <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">
-                {saveError}
-              </div>
+              <Alert variant="error">{saveError}</Alert>
             )}
             {editLoading && (
               <p className="text-sm text-gray-400">Загрузка данных фильтра...</p>

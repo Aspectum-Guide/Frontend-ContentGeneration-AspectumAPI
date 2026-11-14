@@ -3,7 +3,10 @@ import { Link } from 'react-router-dom';
 import Layout from '../../../components/Layout';
 import apiClient from '../../../api/client';
 import { imagesAPI } from './api';
-import { ConfirmModal } from '../../../components/ui/Modal';
+import Modal, { ConfirmModal } from '../../../components/ui/Modal';
+import Button from '../../../components/ui/Button';
+import Alert from '../../../components/ui/Alert';
+import { Card, EmptyState } from '@aspectum/admin-ui-web';
 
 const USAGE_KIND_LABELS = {
   city: 'Город',
@@ -185,27 +188,27 @@ export default function PhotosCatalog() {
       </div>
 
       {error && (
-        <div className="mb-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg text-sm text-yellow-700">
-          {error}
+        <div className="mb-4">
+          <Alert tone="warning">{error}</Alert>
         </div>
       )}
       {actionError && (
-        <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700 flex items-center justify-between">
-          {actionError}
+        <div className="mb-4 flex items-center justify-between">
+          <Alert tone="error" className="flex-1">{actionError}</Alert>
           <button onClick={() => setActionError(null)} className="text-red-400 hover:text-red-600 ml-3 shrink-0">✕</button>
         </div>
       )}
 
       {loading ? (
-        <div className="flex justify-center py-16 text-gray-500">Загрузка...</div>
+        <div className="flex justify-center py-16 text-aspectum-text-subtle">Загрузка...</div>
       ) : images.length === 0 ? (
-        <div className="bg-white rounded-xl border border-gray-200 p-12 text-center">
-          <div className="text-5xl mb-4">🖼️</div>
-          <p className="text-gray-500">Изображений не найдено</p>
-          <p className="text-xs text-gray-400 mt-2">
-            Изображения добавляются автоматически при создании контента городов и событий
-          </p>
-        </div>
+        <Card className="p-8">
+          <EmptyState
+            icon="🖼️"
+            title="Изображений не найдено"
+            description="Изображения добавляются автоматически при создании контента городов и событий"
+          />
+        </Card>
       ) : (
         <>
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3 mb-4">
@@ -252,179 +255,188 @@ export default function PhotosCatalog() {
 
           {totalPages > 1 && (
             <div className="flex items-center justify-center gap-2 py-4">
-              <button disabled={page <= 1} onClick={() => setPage(page - 1)}
-                className="px-3 py-1.5 text-sm rounded border border-gray-300 disabled:opacity-40 hover:bg-gray-100">
+              <Button size="sm" variant="secondary" disabled={page <= 1} onClick={() => setPage(page - 1)}>
                 ← Предыдущая
-              </button>
-              <span className="text-sm text-gray-600">{page} / {totalPages}</span>
-              <button disabled={page >= totalPages} onClick={() => setPage(page + 1)}
-                className="px-3 py-1.5 text-sm rounded border border-gray-300 disabled:opacity-40 hover:bg-gray-100">
+              </Button>
+              <span className="text-sm text-aspectum-text-subtle">{page} / {totalPages}</span>
+              <Button size="sm" variant="secondary" disabled={page >= totalPages} onClick={() => setPage(page + 1)}>
                 Следующая →
-              </button>
+              </Button>
             </div>
           )}
         </>
       )}
 
-      {editingImage && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-          <div className="bg-white rounded-xl shadow-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
-            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 sticky top-0 bg-white z-10">
-              <h2 className="text-lg font-semibold text-gray-900">Редактировать изображение</h2>
-              <button onClick={() => setEditingImage(null)} className="text-gray-400 hover:text-gray-600 text-xl font-light">✕</button>
+      <Modal
+        open={!!editingImage}
+        onClose={() => setEditingImage(null)}
+        title="Редактировать изображение"
+        size="lg"
+      >
+        {editingImage && (
+          <form onSubmit={handleSave} className="space-y-4">
+            {editingImage.image_url && (
+              <img
+                src={editingImage.image_url}
+                alt="preview"
+                className="w-full max-h-56 object-contain rounded-lg border border-gray-200 bg-gray-50"
+              />
+            )}
+
+            {detailLoading && (
+              <p className="text-sm text-gray-500">Загрузка деталей...</p>
+            )}
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">ID</label>
+              <CopyableMono value={editingImage.id} />
             </div>
-            <form onSubmit={handleSave} className="px-6 py-4 space-y-4">
-              {editingImage.image_url && (
-                <img src={editingImage.image_url} alt="preview"
-                  className="w-full max-h-56 object-contain rounded-lg border border-gray-200 bg-gray-50" />
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Имя файла</label>
+                <CopyableMono value={editingImage.filename} />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Путь на сервере</label>
+                <CopyableMono value={editingImage.path} />
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">URL файла</label>
+              {editingImage.image_url || editingImage.url ? (
+                <a
+                  href={editingImage.image_url || editingImage.url}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="block font-mono text-xs text-blue-700 bg-blue-50 border border-blue-100 rounded-lg px-3 py-2 break-all hover:underline"
+                >
+                  {editingImage.image_url || editingImage.url}
+                </a>
+              ) : (
+                <CopyableMono value={null} />
               )}
+            </div>
 
-              {detailLoading && (
-                <p className="text-sm text-gray-500">Загрузка деталей...</p>
-              )}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Авторское право</label>
+              <input
+                type="text"
+                value={editingImage.copyright || ''}
+                onChange={(e) => setEditingImage((p) => ({ ...p, copyright: e.target.value }))}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+                placeholder="© Author Name"
+              />
+            </div>
 
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">ID</label>
-                <CopyableMono value={editingImage.id} />
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Source URL</label>
+              <input
+                type="url"
+                value={editingImage.source_url || ''}
+                onChange={(e) => setEditingImage((p) => ({ ...p, source_url: e.target.value }))}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+                placeholder="https://..."
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Страница источника (file page)</label>
+              <input
+                type="url"
+                value={editingImage.file_page_url || ''}
+                onChange={(e) => setEditingImage((p) => ({ ...p, file_page_url: e.target.value }))}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+                placeholder="https://commons.wikimedia.org/..."
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Original image URL</label>
+              <input
+                type="url"
+                value={editingImage.original_image_url || ''}
+                onChange={(e) => setEditingImage((p) => ({ ...p, original_image_url: e.target.value }))}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+                placeholder="https://..."
+              />
+            </div>
+
+            <div>
+              <div className="flex items-center justify-between mb-2">
+                <label className="block text-sm font-medium text-gray-700">Где используется</label>
+                <span className="text-xs text-gray-400">
+                  {(editingImage.usages || []).length} связей
+                </span>
               </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Имя файла</label>
-                  <CopyableMono value={editingImage.filename} />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Путь на сервере</label>
-                  <CopyableMono value={editingImage.path} />
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">URL файла</label>
-                {editingImage.image_url || editingImage.url ? (
-                  <a
-                    href={editingImage.image_url || editingImage.url}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="block font-mono text-xs text-blue-700 bg-blue-50 border border-blue-100 rounded-lg px-3 py-2 break-all hover:underline"
-                  >
-                    {editingImage.image_url || editingImage.url}
-                  </a>
-                ) : (
-                  <CopyableMono value={null} />
-                )}
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Авторское право</label>
-                <input
-                  type="text"
-                  value={editingImage.copyright || ''}
-                  onChange={(e) => setEditingImage((p) => ({ ...p, copyright: e.target.value }))}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none"
-                  placeholder="© Author Name"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Source URL</label>
-                <input
-                  type="url"
-                  value={editingImage.source_url || ''}
-                  onChange={(e) => setEditingImage((p) => ({ ...p, source_url: e.target.value }))}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none"
-                  placeholder="https://..."
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Страница источника (file page)</label>
-                <input
-                  type="url"
-                  value={editingImage.file_page_url || ''}
-                  onChange={(e) => setEditingImage((p) => ({ ...p, file_page_url: e.target.value }))}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none"
-                  placeholder="https://commons.wikimedia.org/..."
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Original image URL</label>
-                <input
-                  type="url"
-                  value={editingImage.original_image_url || ''}
-                  onChange={(e) => setEditingImage((p) => ({ ...p, original_image_url: e.target.value }))}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none"
-                  placeholder="https://..."
-                />
-              </div>
-
-              <div>
-                <div className="flex items-center justify-between mb-2">
-                  <label className="block text-sm font-medium text-gray-700">Где используется</label>
-                  <span className="text-xs text-gray-400">
-                    {(editingImage.usages || []).length} связей
-                  </span>
-                </div>
-                {(editingImage.usages || []).length === 0 ? (
-                  <p className="text-sm text-gray-400 bg-gray-50 border border-dashed border-gray-200 rounded-lg px-3 py-4 text-center">
-                    {detailLoading ? 'Ищем связи…' : 'Нигде не используется (или только в черновиках без привязки)'}
-                  </p>
-                ) : (
-                  <ul className="divide-y divide-gray-100 border border-gray-200 rounded-lg overflow-hidden">
-                    {editingImage.usages.map((u, idx) => {
-                      const title = `${usageKindLabel(u.kind)}: ${u.label || '—'}`;
-                      const role = usageRoleLabel(u.role);
-                      const inner = (
-                        <>
-                          <div className="min-w-0">
-                            <p className="text-sm text-gray-900 truncate">{title}</p>
-                            <p className="text-xs text-gray-500 truncate">
-                              {role}
-                              {u.id ? ` · #${u.id}` : ''}
-                            </p>
+              {(editingImage.usages || []).length === 0 ? (
+                <p className="text-sm text-gray-400 bg-gray-50 border border-dashed border-gray-200 rounded-lg px-3 py-4 text-center">
+                  {detailLoading ? 'Ищем связи…' : 'Нигде не используется (или только в черновиках без привязки)'}
+                </p>
+              ) : (
+                <ul className="divide-y divide-gray-100 border border-gray-200 rounded-lg overflow-hidden">
+                  {editingImage.usages.map((u, idx) => {
+                    const title = `${usageKindLabel(u.kind)}: ${u.label || '—'}`;
+                    const role = usageRoleLabel(u.role);
+                    const inner = (
+                      <>
+                        <div className="min-w-0">
+                          <p className="text-sm text-gray-900 truncate">{title}</p>
+                          <p className="text-xs text-gray-500 truncate">
+                            {role}
+                            {u.id ? ` · #${u.id}` : ''}
+                          </p>
+                        </div>
+                        {u.href ? (
+                          <span className="text-xs text-blue-600 shrink-0">открыть →</span>
+                        ) : null}
+                      </>
+                    );
+                    return (
+                      <li key={`${u.kind}-${u.id}-${u.role}-${idx}`}>
+                        {u.href ? (
+                          <Link
+                            to={u.href}
+                            className="flex items-center justify-between gap-3 px-3 py-2.5 hover:bg-blue-50"
+                            onClick={() => setEditingImage(null)}
+                          >
+                            {inner}
+                          </Link>
+                        ) : (
+                          <div className="flex items-center justify-between gap-3 px-3 py-2.5">
+                            {inner}
                           </div>
-                          {u.href ? (
-                            <span className="text-xs text-blue-600 shrink-0">открыть →</span>
-                          ) : null}
-                        </>
-                      );
-                      return (
-                        <li key={`${u.kind}-${u.id}-${u.role}-${idx}`}>
-                          {u.href ? (
-                            <Link
-                              to={u.href}
-                              className="flex items-center justify-between gap-3 px-3 py-2.5 hover:bg-blue-50"
-                              onClick={() => setEditingImage(null)}
-                            >
-                              {inner}
-                            </Link>
-                          ) : (
-                            <div className="flex items-center justify-between gap-3 px-3 py-2.5">
-                              {inner}
-                            </div>
-                          )}
-                        </li>
-                      );
-                    })}
-                  </ul>
-                )}
-              </div>
+                        )}
+                      </li>
+                    );
+                  })}
+                </ul>
+              )}
+            </div>
 
-              <div className="flex gap-3 pt-2 sticky bottom-0 bg-white pb-1">
-                <button type="submit" disabled={saving || detailLoading}
-                  className="flex-1 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-50">
-                  {saving ? 'Сохранение...' : 'Сохранить'}
-                </button>
-                <button type="button" onClick={() => setEditingImage(null)}
-                  className="flex-1 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200">
-                  Отмена
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
+            <div className="flex gap-3 pt-2">
+              <Button
+                type="submit"
+                disabled={saving || detailLoading}
+                loading={saving}
+                variant="primary"
+                className="flex-1"
+              >
+                Сохранить
+              </Button>
+              <Button
+                type="button"
+                onClick={() => setEditingImage(null)}
+                variant="secondary"
+                className="flex-1"
+              >
+                Отмена
+              </Button>
+            </div>
+          </form>
+        )}
+      </Modal>
 
       <ConfirmModal
         open={!!deleteTarget}

@@ -3,6 +3,9 @@ import { useSearchParams } from 'react-router-dom';
 import { eventAudioGuidesAPI, audioAPI, eventsAPI } from './api';
 import Layout from '../../../components/Layout';
 import Modal, { ConfirmModal } from '../../../components/ui/Modal';
+import Button from '../../../components/ui/Button';
+import Alert from '../../../components/ui/Alert';
+import { Card, EmptyState } from '@aspectum/admin-ui-web';
 import { Field, TextInput } from '../../../components/ui/FormField';
 import { parseApiError } from '../../../utils/apiError';
 import AudioPlayer from '../shared/components/AudioPlayer';
@@ -82,13 +85,15 @@ function TrackRow({ track, guideId, onUploaded, onDeleted }) {
               {uploading ? '…' : linked ? 'Заменить' : '+ MP3'}
               <input ref={inputRef} type="file" accept="audio/*,.mp3" className="hidden" onChange={handleUpload} disabled={uploading} />
             </label>
-            <button
+            <Button
+              size="xs"
+              variant="softDanger"
               onClick={() => setConfirmDelete(true)}
               disabled={deleting}
-              className="px-2.5 py-1.5 text-xs font-medium text-red-500 bg-white border border-red-200 rounded-lg hover:bg-red-50 disabled:opacity-50 transition-colors"
+              title="Удалить"
             >
               ✕
-            </button>
+            </Button>
           </div>
         </div>
         {uploadError && <p className="text-xs text-red-500 mt-1">{uploadError}</p>}
@@ -141,13 +146,15 @@ function AddLanguageRow({ guideId, existingLangs, onAdded }) {
           <option key={l} value={l}>{langLabel(l)} — {l}</option>
         ))}
       </select>
-      <button
+      <Button
+        size="sm"
+        variant="primary"
         onClick={handleAdd}
         disabled={!selected || adding}
-        className="px-3 py-1.5 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors"
+        loading={adding}
       >
-        {adding ? '…' : 'Добавить'}
-      </button>
+        Добавить
+      </Button>
     </div>
   );
 }
@@ -226,7 +233,7 @@ function GuideDetailModal({
       is_show: guide.is_show !== false,
     });
     setMetaError('');
-  }, [guide?.id, open]);
+  }, [guide, open]);
 
   if (!guide) return null;
   const title = getMultiLangValue(guide.title) || `Гид #${guide.index + 1}`;
@@ -299,22 +306,23 @@ function GuideDetailModal({
           </div>
           {metaError && <p className="text-xs text-red-600">{metaError}</p>}
           <div className="flex flex-wrap gap-2">
-            <button
+            <Button
               type="button"
               onClick={handleSaveMeta}
               disabled={savingMeta}
-              className="px-3 py-1.5 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-50"
+              loading={savingMeta}
+              variant="primary"
             >
-              {savingMeta ? 'Сохранение...' : 'Сохранить метаданные'}
-            </button>
-            <button
+              Сохранить метаданные
+            </Button>
+            <Button
               type="button"
               onClick={() => setConfirmDelete(true)}
               disabled={savingMeta || deleting}
-              className="px-3 py-1.5 text-sm font-medium text-red-600 bg-red-50 rounded-lg hover:bg-red-100 disabled:opacity-50"
+              variant="softDanger"
             >
               Удалить гид
-            </button>
+            </Button>
           </div>
         </div>
 
@@ -521,14 +529,14 @@ export default function AudioGuidesCatalogPage() {
             <span className="text-gray-400">○</span> нет файла · клик → управление треками
           </p>
         </div>
-        <button
+        <Button
           type="button"
           onClick={() => { setCreateError(''); setCreateTitle(''); setCreateOpen(true); }}
           disabled={!eventId || creating}
-          className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors"
+          variant="primary"
         >
           + Создать аудиогид
-        </button>
+        </Button>
       </div>
 
       <div className="mb-4 flex flex-wrap gap-3">
@@ -556,7 +564,7 @@ export default function AudioGuidesCatalogPage() {
         </select>
       </div>
 
-      {error && <div className="mb-4 text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">{error}</div>}
+      {error && <Alert variant="error" className="mb-4">{error}</Alert>}
 
       {!loading && visibleGuides.length > 0 && <CoverageSummary guides={visibleGuides} />}
 
@@ -566,12 +574,13 @@ export default function AudioGuidesCatalogPage() {
           Загрузка...
         </div>
       ) : visibleGuides.length === 0 ? (
-        <div className="text-center py-12 bg-white rounded-xl border border-gray-200">
-          <div className="text-4xl mb-3">🎧</div>
-          <p className="text-gray-500 text-sm">
-            {eventId ? 'У этого события нет аудиогидов' : cityId ? 'У этого города нет аудиогидов' : 'Нет аудиогидов'}
-          </p>
-        </div>
+        <Card className="py-8">
+          <EmptyState
+            icon="🎧"
+            title={eventId ? 'У этого события нет аудиогидов' : cityId ? 'У этого города нет аудиогидов' : 'Нет аудиогидов'}
+            description={eventId ? undefined : 'Выберите событие или создайте новый аудиогид'}
+          />
+        </Card>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
           {visibleGuides.map((guide) => (
@@ -602,12 +611,12 @@ export default function AudioGuidesCatalogPage() {
       >
         <form onSubmit={handleCreate} className="space-y-4">
           {createError && (
-            <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">{createError}</div>
+            <Alert variant="error">{createError}</Alert>
           )}
           {!eventId && (
-            <p className="text-sm text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+            <Alert variant="warning">
               Сначала выберите событие в фильтре выше.
-            </p>
+            </Alert>
           )}
           <Field label="Название (RU)" required>
             <TextInput
@@ -619,20 +628,21 @@ export default function AudioGuidesCatalogPage() {
             />
           </Field>
           <div className="flex gap-2 justify-end">
-            <button
+            <Button
               type="button"
+              variant="secondary"
               onClick={() => setCreateOpen(false)}
-              className="px-4 py-2 text-sm text-gray-600 bg-gray-100 rounded-lg hover:bg-gray-200"
             >
               Отмена
-            </button>
-            <button
+            </Button>
+            <Button
               type="submit"
+              variant="primary"
               disabled={creating || !eventId}
-              className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-50"
+              loading={creating}
             >
-              {creating ? 'Создание...' : 'Создать'}
-            </button>
+              Создать
+            </Button>
           </div>
         </form>
       </Modal>

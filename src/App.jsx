@@ -1,62 +1,94 @@
+import { lazy, Suspense } from 'react';
 import { createBrowserRouter, Navigate, RouterProvider } from 'react-router-dom';
 import ErrorBoundary, { SessionWizardErrorBoundary } from './components/ErrorBoundary';
 import ProtectedRoute from './components/ProtectedRoute';
 import { LayoutActionsProvider } from './context/LayoutActionsContext';
-import NotFound from './pages/NotFound';
-import AISettings from './pages/ai/AISettings';
-import PromptSettings from './pages/ai/PromptSettings';
-import TTSSettings from './pages/ai/TTSSettings';
-import CityGeneration from './pages/ai/CityGeneration';
-import ImageGeneration from './pages/ai/ImageGeneration';
-import Playground from './pages/ai/Playground';
-import CatalogHome from './pages/catalog/CatalogHome';
-import BookingCatalogHome from './pages/catalog/BookingCatalogHome';
-import CitiesCatalog from './pages/catalog/CitiesCatalog';
-import EventsCatalog from './pages/catalog/EventsCatalog';
-import OrphanEvents from './pages/catalog/OrphanEvents';
-import PhotosCatalog from './pages/catalog/PhotosCatalog';
-import TagsFilters from './pages/catalog/TagsFilters';
-import TicketTypesCatalog from './pages/catalog/TicketTypesCatalog';
-import SlotAvailabilitiesCatalog from './pages/catalog/SlotAvailabilitiesCatalog';
-import TicketPricesCatalog from './pages/catalog/TicketPricesCatalog';
-import BookingSetupWorkbench from './pages/catalog/BookingSetupWorkbench';
-import CityPricingWorkbench from './pages/catalog/CityPricingWorkbench';
-import SubscriptionTypesCatalog from './pages/catalog/SubscriptionTypesCatalog';
-import ActivationCodesCatalog from './pages/catalog/ActivationCodesCatalog';
-import UserSubscriptionsWorkbench from './pages/catalog/UserSubscriptionsWorkbench';
-import CodeUsageLogsCatalog from './pages/catalog/CodeUsageLogsCatalog';
-import CitySubscriptionsCatalog from './pages/catalog/CitySubscriptionsCatalog';
-import IAPPurchasesCatalog from './pages/catalog/IAPPurchasesCatalog';
-import BookingReservationsCatalog from './pages/catalog/BookingReservationsCatalog';
-import BasePricesCatalog from './pages/catalog/BasePricesCatalog';
-import PricingRulesCatalog from './pages/catalog/PricingRulesCatalog';
-import BookingAnalytics from './pages/catalog/BookingAnalytics';
-import ExternalProductsCatalog from './pages/catalog/ExternalProductsCatalog';
-import ExternalProductsLinking from './pages/catalog/ExternalProductsLinking';
-import ProductAnalytics from './pages/catalog/ProductAnalytics';
-import AudioGuidesCatalog from './pages/catalog/AudioGuidesCatalog';
-import InteractiveLocationsCatalog from './pages/catalog/InteractiveLocationsCatalog';
-import LLMKeysCatalog from './pages/catalog/LLMKeysCatalog';
-import LLMUsageCatalog from './pages/catalog/LLMUsageCatalog';
-import ContentAuthorsCatalog from './pages/catalog/ContentAuthorsCatalog';
-import ExportCities from './pages/export/ExportCities';
-import ExportEvents from './pages/export/ExportEvents';
-import ExportZip from './pages/export/ExportZip';
-import GenerationList from './pages/generation/GenerationList';
-import NewSession from './pages/generation/NewSession';
-import SessionsList from './pages/generation/SessionsList';
-import SessionWizard from './pages/generation/SessionWizard';
-import UploadFile from './pages/generation/UploadFile';
-import Home from './pages/Home';
-import ImportGoogleSheet from './pages/import/ImportGoogleSheet';
-import MyTasks from './pages/tasks/MyTasks';
-import AudioQueue from './pages/tasks/AudioQueue';
-import MediaRecovery from './pages/tasks/MediaRecovery';
-import TokenAuth from './pages/TokenAuth';
-import AccountSettings from './pages/AccountSettings';
 import { AppModeProvider } from './mode/AppModeContext';
 import RequireStudio from './mode/RequireStudio';
 import { registerAuthNavigate } from './utils/authRedirect';
+
+function PageLoadingFallback() {
+  return (
+    <div className="min-h-[50vh] flex items-center justify-center p-8 text-sm text-aspectum-text-subtle">
+      <div className="flex items-center gap-3 px-4 py-3 rounded-aspectum-card border border-aspectum-border bg-aspectum-surface shadow-sm">
+        <div className="w-4 h-4 border-2 border-aspectum-primary border-t-transparent rounded-full animate-spin" />
+        <span>Загрузка страницы…</span>
+      </div>
+    </div>
+  );
+}
+
+function lazyPage(importFn) {
+  const LazyComponent = lazy(importFn);
+  return function SuspenseWrappedPage(props) {
+    return (
+      <Suspense fallback={<PageLoadingFallback />}>
+        <LazyComponent {...props} />
+      </Suspense>
+    );
+  };
+}
+
+const TokenAuth = lazyPage(() => import('./pages/TokenAuth'));
+const Home = lazyPage(() => import('./pages/Home'));
+const AccountSettings = lazyPage(() => import('./pages/AccountSettings'));
+const NotFound = lazyPage(() => import('./pages/NotFound'));
+
+// Generation & Studio
+const SessionsList = lazyPage(() => import('./pages/generation/SessionsList'));
+const GenerationList = lazyPage(() => import('./pages/generation/GenerationList'));
+const UploadFile = lazyPage(() => import('./pages/generation/UploadFile'));
+const NewSession = lazyPage(() => import('./pages/generation/NewSession'));
+const SessionWizard = lazyPage(() => import('./pages/generation/SessionWizard'));
+
+// AI
+const AISettings = lazyPage(() => import('./pages/ai/AISettings'));
+const PromptSettings = lazyPage(() => import('./pages/ai/PromptSettings'));
+const TTSSettings = lazyPage(() => import('./pages/ai/TTSSettings'));
+const Playground = lazyPage(() => import('./pages/ai/Playground'));
+const ImageGeneration = lazyPage(() => import('./pages/ai/ImageGeneration'));
+const CityGeneration = lazyPage(() => import('./pages/ai/CityGeneration'));
+
+// Catalog
+const CatalogHome = lazyPage(() => import('./pages/catalog/CatalogHome'));
+const BookingCatalogHome = lazyPage(() => import('./pages/catalog/BookingCatalogHome'));
+const CitiesCatalog = lazyPage(() => import('./pages/catalog/CitiesCatalog'));
+const EventsCatalog = lazyPage(() => import('./pages/catalog/EventsCatalog'));
+const OrphanEvents = lazyPage(() => import('./pages/catalog/OrphanEvents'));
+const PhotosCatalog = lazyPage(() => import('./pages/catalog/PhotosCatalog'));
+const TagsFilters = lazyPage(() => import('./pages/catalog/TagsFilters'));
+const TicketTypesCatalog = lazyPage(() => import('./pages/catalog/TicketTypesCatalog'));
+const SlotAvailabilitiesCatalog = lazyPage(() => import('./pages/catalog/SlotAvailabilitiesCatalog'));
+const TicketPricesCatalog = lazyPage(() => import('./pages/catalog/TicketPricesCatalog'));
+const BookingSetupWorkbench = lazyPage(() => import('./pages/catalog/BookingSetupWorkbench'));
+const CityPricingWorkbench = lazyPage(() => import('./pages/catalog/CityPricingWorkbench'));
+const SubscriptionTypesCatalog = lazyPage(() => import('./pages/catalog/SubscriptionTypesCatalog'));
+const ActivationCodesCatalog = lazyPage(() => import('./pages/catalog/ActivationCodesCatalog'));
+const UserSubscriptionsWorkbench = lazyPage(() => import('./pages/catalog/UserSubscriptionsWorkbench'));
+const CodeUsageLogsCatalog = lazyPage(() => import('./pages/catalog/CodeUsageLogsCatalog'));
+const CitySubscriptionsCatalog = lazyPage(() => import('./pages/catalog/CitySubscriptionsCatalog'));
+const IAPPurchasesCatalog = lazyPage(() => import('./pages/catalog/IAPPurchasesCatalog'));
+const BookingReservationsCatalog = lazyPage(() => import('./pages/catalog/BookingReservationsCatalog'));
+const BasePricesCatalog = lazyPage(() => import('./pages/catalog/BasePricesCatalog'));
+const PricingRulesCatalog = lazyPage(() => import('./pages/catalog/PricingRulesCatalog'));
+const BookingAnalytics = lazyPage(() => import('./pages/catalog/BookingAnalytics'));
+const ExternalProductsCatalog = lazyPage(() => import('./pages/catalog/ExternalProductsCatalog'));
+const ExternalProductsLinking = lazyPage(() => import('./pages/catalog/ExternalProductsLinking'));
+const ProductAnalytics = lazyPage(() => import('./pages/catalog/ProductAnalytics'));
+const AudioGuidesCatalog = lazyPage(() => import('./pages/catalog/AudioGuidesCatalog'));
+const InteractiveLocationsCatalog = lazyPage(() => import('./pages/catalog/InteractiveLocationsCatalog'));
+const LLMKeysCatalog = lazyPage(() => import('./pages/catalog/LLMKeysCatalog'));
+const LLMUsageCatalog = lazyPage(() => import('./pages/catalog/LLMUsageCatalog'));
+const ContentAuthorsCatalog = lazyPage(() => import('./pages/catalog/ContentAuthorsCatalog'));
+
+// Export & Import & Tasks
+const ExportCities = lazyPage(() => import('./pages/export/ExportCities'));
+const ExportEvents = lazyPage(() => import('./pages/export/ExportEvents'));
+const ExportZip = lazyPage(() => import('./pages/export/ExportZip'));
+const ImportGoogleSheet = lazyPage(() => import('./pages/import/ImportGoogleSheet'));
+const MyTasks = lazyPage(() => import('./pages/tasks/MyTasks'));
+const AudioQueue = lazyPage(() => import('./pages/tasks/AudioQueue'));
+const MediaRecovery = lazyPage(() => import('./pages/tasks/MediaRecovery'));
 
 const routes = [
   {

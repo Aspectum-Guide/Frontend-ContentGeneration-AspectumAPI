@@ -7,6 +7,9 @@ import Layout from '../../../components/Layout';
 import DataTable from '../../../components/ui/DataTable';
 import { Field, TextInput } from '../../../components/ui/FormField';
 import Modal, { ConfirmModal } from '../../../components/ui/Modal';
+import Button from '../../../components/ui/Button';
+import Alert from '../../../components/ui/Alert';
+import TableRowActions from '../shared/components/TableRowActions';
 import { useLayoutActions } from '../../../context/useLayoutActions';
 import { parseApiError } from '../../../utils/apiError';
 import { createCoordinatePasteHandler, parseCoord } from '../../../utils/coordinates';
@@ -360,15 +363,25 @@ function ILEditorModal({ open, onClose, location, onSaved, cityOptions, tagOptio
                 </div>
                 <div className="flex flex-col gap-2">
                   <input ref={iconInputRef} type="file" accept="image/*,.svg" className="hidden" onChange={(e) => handleImageUpload(e, 'icon')} />
-                  <button type="button" onClick={() => iconInputRef.current?.click()} disabled={iconUploading}
-                    className="px-3 py-1.5 text-sm text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 disabled:opacity-50 transition-colors">
-                    {iconUploading ? 'Загрузка…' : 'Загрузить иконку'}
-                  </button>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="secondary"
+                    onClick={() => iconInputRef.current?.click()}
+                    disabled={iconUploading}
+                    loading={iconUploading}
+                  >
+                    Загрузить иконку
+                  </Button>
                   {form.icon_id && (
-                    <button type="button" onClick={() => setForm((p) => ({ ...p, icon_id: null, icon_url: null }))}
-                      className="px-3 py-1.5 text-sm text-red-600 bg-red-50 rounded-lg hover:bg-red-100 transition-colors">
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="softDanger"
+                      onClick={() => setForm((p) => ({ ...p, icon_id: null, icon_url: null }))}
+                    >
                       Удалить иконку
-                    </button>
+                    </Button>
                   )}
                 </div>
               </div>
@@ -393,10 +406,16 @@ function ILEditorModal({ open, onClose, location, onSaved, cityOptions, tagOptio
                   )
                 }
                 <input ref={imageInputRef} type="file" accept="image/*" className="hidden" onChange={(e) => handleImageUpload(e, 'image')} />
-                <button type="button" onClick={() => imageInputRef.current?.click()} disabled={imageUploading}
-                  className="px-3 py-1.5 text-sm text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 disabled:opacity-50 transition-colors">
-                  {imageUploading ? 'Загрузка…' : 'Загрузить изображение'}
-                </button>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="secondary"
+                  onClick={() => imageInputRef.current?.click()}
+                  disabled={imageUploading}
+                  loading={imageUploading}
+                >
+                  Загрузить изображение
+                </Button>
               </div>
             </div>
           </div>
@@ -406,22 +425,24 @@ function ILEditorModal({ open, onClose, location, onSaved, cityOptions, tagOptio
           <ILCityPhotosEditor cityId={form.city_id || null} disabled={isNew && !form.city_id} />
         )}
 
+        {error && <Alert variant="error" className="mt-4">{error}</Alert>}
+
         <div className="flex items-center gap-3 mt-5 pt-4 border-t border-gray-100">
-          <button
+          <Button
             type="submit"
             disabled={saving}
-            className="px-5 py-2 text-sm text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors"
+            loading={saving}
+            variant="primary"
           >
-            {saving ? 'Сохранение…' : isNew ? 'Создать' : 'Сохранить'}
-          </button>
-          <button
+            {isNew ? 'Создать' : 'Сохранить'}
+          </Button>
+          <Button
             type="button"
+            variant="secondary"
             onClick={onClose}
-            className="px-4 py-2 text-sm text-gray-600 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
           >
             Отмена
-          </button>
-          {error && <p className="text-xs text-red-600 bg-red-50 rounded px-2 py-1">{error}</p>}
+          </Button>
         </div>
       </form>
     </Modal>
@@ -578,20 +599,10 @@ export default function InteractiveLocationsCatalogPage() {
       key: 'actions',
       label: '',
       render: (_, row) => (
-        <div className="flex items-center gap-2 justify-end" onClick={(e) => e.stopPropagation()}>
-          <button
-            onClick={() => { setEditingRow(row); setEditorOpen(true); }}
-            className="px-2 py-1 text-xs text-blue-600 bg-blue-50 rounded-md hover:bg-blue-100 transition-colors"
-          >
-            Ред.
-          </button>
-          <button
-            onClick={() => setDeleteTarget(row)}
-            className="px-2 py-1 text-xs text-red-500 bg-red-50 rounded-md hover:bg-red-100 transition-colors"
-          >
-            Удалить
-          </button>
-        </div>
+        <TableRowActions
+          onEdit={() => { setEditingRow(row); setEditorOpen(true); }}
+          onDelete={() => setDeleteTarget(row)}
+        />
       ),
     },
   ];
@@ -603,12 +614,12 @@ export default function InteractiveLocationsCatalogPage() {
           <h1 className="text-2xl font-bold text-gray-900">Интерактивные локации</h1>
           <p className="mt-1 text-sm text-gray-500">Управление локациями для приложения</p>
         </div>
-        <button
+        <Button
           onClick={() => { setEditingRow(null); setEditorOpen(true); }}
-          className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors"
+          variant="primary"
         >
           + Новая локация
-        </button>
+        </Button>
       </div>
 
       <DataTable
@@ -667,7 +678,9 @@ export default function InteractiveLocationsCatalogPage() {
         onConfirm={handleDelete}
         title="Удалить локацию?"
         message={`«${getMultiLangValue(deleteTarget?.title) || 'Локация'}» будет удалена безвозвратно.`}
-        confirmLabel={deleting ? 'Удаление…' : 'Удалить'}
+        confirmLabel="Удалить"
+        danger
+        loading={deleting}
       />
     </Layout>
   );
