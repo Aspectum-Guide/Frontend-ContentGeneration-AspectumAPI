@@ -27,8 +27,11 @@ describe('appMode', () => {
   it('отличает студийные адреса от каталога продаж', () => {
     expect(isStudioPath('/generation')).toBe(true);
     expect(isStudioPath('/generation/12')).toBe(true);
-    expect(isStudioPath('/catalog/events/orphans')).toBe(true);
-    expect(isStudioPath('/catalog/external-products/linking')).toBe(true);
+    expect(isStudioPath('/catalog/events/orphans')).toBe(false);
+    expect(isStudioPath('/catalog/external-products/linking')).toBe(false);
+    expect(isStudioPath('/catalog/cities')).toBe(false);
+    expect(isStudioPath('/export/zip')).toBe(false);
+    expect(isStudioPath('/import/google-sheet')).toBe(false);
     expect(isStudioPath('/ai/settings')).toBe(true);
     expect(isStudioPath('/catalog/external-products')).toBe(false);
     expect(isStudioPath('/catalog/booking-setup')).toBe(false);
@@ -59,6 +62,7 @@ describe('appMode', () => {
 
     expect(sections.map((section) => section.title)).toEqual(['Контент', 'Букинг']);
     expect(sections[0].items.map((item) => item.to)).toEqual([
+      '/catalog/cities',
       '/catalog/authors',
       '/catalog/tags',
     ]);

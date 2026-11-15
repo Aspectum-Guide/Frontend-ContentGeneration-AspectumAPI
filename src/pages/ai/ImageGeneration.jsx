@@ -1,6 +1,8 @@
 import { useState } from 'react';
 import Layout from '../../components/Layout';
 import { aiAPI } from '../../api/generation';
+import Button from '../../components/ui/Button';
+import { TextInput } from '../../components/ui/FormField';
 
 export default function ImageGeneration() {
   const [query, setQuery] = useState('');
@@ -54,24 +56,24 @@ export default function ImageGeneration() {
               <label className="block text-sm font-medium text-gray-700 mb-1">
                 Поисковый запрос
               </label>
-              <input
+              <TextInput
                 type="text"
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
                 placeholder="напр. «Colosseum Rome architecture»"
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+                className="text-sm"
               />
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
                 Город / контекст
               </label>
-              <input
+              <TextInput
                 type="text"
                 value={cityName}
                 onChange={(e) => setCityName(e.target.value)}
                 placeholder="напр. «Rome»"
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+                className="text-sm"
               />
             </div>
           </div>
@@ -80,13 +82,13 @@ export default function ImageGeneration() {
             <label className="block text-sm font-medium text-gray-700 mb-1">
               Количество результатов
             </label>
-            <input
+            <TextInput
               type="number"
               value={count}
               onChange={(e) => setCount(Math.max(1, Math.min(20, Number(e.target.value))))}
               min={1}
               max={20}
-              className="w-24 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+              className="w-24 text-sm"
             />
           </div>
 
@@ -96,10 +98,10 @@ export default function ImageGeneration() {
             </div>
           )}
 
-          <button
+          <Button
             type="submit"
             disabled={loading || (!query.trim() && !cityName.trim())}
-            className="px-6 py-2.5 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors"
+            className="px-6 py-2.5 text-sm font-medium"
           >
             {loading ? (
               <span className="flex items-center gap-2">
@@ -109,7 +111,7 @@ export default function ImageGeneration() {
             ) : (
               '🔍 Найти изображения'
             )}
-          </button>
+          </Button>
         </form>
       </div>
 

@@ -5,12 +5,9 @@ import Layout from '../../components/Layout';
 import CommonsImagePicker from '../../components/generation/CommonsImagePicker';
 import SessionWizardAttractionsStep from './session-wizard/SessionWizardAttractionsStep';
 import SessionWizardInteractiveLocationsStep from './session-wizard/SessionWizardInteractiveLocationsStep';
-import SessionWizardCityStep from './session-wizard/SessionWizardCityStep';
-import SessionWizardGenerateCityFull from './session-wizard/SessionWizardGenerateCityFull';
+import SessionWizardCityStepSection from './session-wizard/SessionWizardCityStepSection.jsx';
 import SessionWizardPublishStep from './session-wizard/SessionWizardPublishStep';
 import SessionWizardTagsCatalogStep from './session-wizard/SessionWizardTagsCatalogStep';
-import SessionWizardCityTagsPicker from './session-wizard/SessionWizardCityTagsPicker';
-import SessionWizardCityInfoStep from './session-wizard/SessionWizardCityInfoStep';
 import SessionWizardAttractionInfoStep from './session-wizard/SessionWizardAttractionInfoStep';
 import SessionWizardAttractionFeedStep from './session-wizard/SessionWizardAttractionFeedStep.jsx';
 import SessionWizardAttractionAudioGuidesBlock from './session-wizard/SessionWizardAttractionAudioGuidesBlock.jsx';
@@ -30,14 +27,7 @@ import DefaultInlineProgressBanner from '../../components/ui/InlineProgressBanne
 import { ConfirmModal as DefaultConfirmModal } from '../../components/ui/Modal.jsx';
 import { useConfirmModal } from '../../components/ui/useConfirmModal.jsx';
 import DefaultSessionCloseDialog from '../../components/generation/SessionCloseDialog.jsx';
-
-const STEP_LABELS = [
-  'Город',
-  'Теги',
-  'Достопримечательности',
-  'Интерактивные локации',
-  'Публикация',
-];
+import SessionWizardStepNavigation from './session-wizard/SessionWizardStepNavigation.jsx';
 
 function normalizeCommonsQuery(value) {
   if (value == null) return '';
@@ -96,8 +86,6 @@ export default function SessionWizard({ components = {} } = {}) {
 
     localeData,
     activeLocale,
-    defaultLocale,
-    setDefaultLocale,
 
     addLocaleOpen,
     setAddLocaleOpen,
@@ -108,29 +96,12 @@ export default function SessionWizard({ components = {} } = {}) {
 
     lat,
     lon,
-    savedLat,
-    savedLon,
-
-    imagePreview,
-    imageOriginalUrl,
-    parentCityId,
-    setParentCityId,
-    authorIds,
-    setAuthorIds,
-    imageCopyright,
-    setImageOriginalUrl,
-    setImageCopyright,
     photoUploading,
-    photoFileRef,
 
     commonsModalOpen,
     setCommonsModalOpen,
 
     cityTags,
-    cityFilterTree,
-    cityFilterTreeLoading,
-    cityFilterTreeError,
-    loadCityFilterTree,
     eventFilterTree,
     eventFilterTreeLoading,
     eventFilterTreeError,
@@ -143,20 +114,7 @@ export default function SessionWizard({ components = {} } = {}) {
     deletingEventFilterIds,
     cityInfos,
     currentCityInfo,
-    cityInfoLocaleData,
-    cityInfoActiveLocale,
     cityInfoSaving,
-    cityInfoAutoSaving,
-    cityInfoAutoSaved,
-    cityInfoGenerateModalOpen,
-    cityInfoGeneratePrompt,
-    cityInfoGenerateCount,
-    cityInfoDedupeExistingItems,
-    setCityInfoDedupeExistingItems,
-    cityInfoGenerating,
-    cityInfoGenerationError,
-    cityInfoGenerationTaskId,
-    cityInfoGenerationLang,
     aiGenerationMode,
     aiUseWebSearch,
     aiAdvancedGenerationAvailable,
@@ -238,7 +196,6 @@ export default function SessionWizard({ components = {} } = {}) {
     saving,
     autoSaving,
     autoSaved,
-    onCityFormBlur,
     hasUnsavedChangesRef,
     preparingPublishStep,
     closeOpen,
@@ -252,23 +209,11 @@ export default function SessionWizard({ components = {} } = {}) {
     setAttrActiveLocale,
     setCloseOpen,
     setCloseMode,
-    setMapContainerRef,
 
-    switchLocale,
     addLocale,
-    removeLocale,
-    updateLocaleField,
-
-    handleSelectDraft,
-    handleCreateDraft,
-    handleDeleteDraft,
-
-    handlePhotoFile,
-    handlePhotoDelete,
     handleCommonsImageSelect,
     getSessionUuid,
 
-    toggleCityTag,
     uploadCityFilterImage,
     createCityTag,
     updateCityFilter,
@@ -283,20 +228,7 @@ export default function SessionWizard({ components = {} } = {}) {
     deleteEventFilter,
 
     setCurrentCityInfo,
-    setCityInfoActiveLocale,
-    openCityInfoDetail,
-    addCityInfo,
-    updateCurrentCityInfoPatch,
-    updateCityInfoLocaleField,
     saveCurrentCityInfo,
-    deleteCurrentCityInfo,
-    importCityInfoFromText,
-    openCityInfoGenerateModal,
-    closeCityInfoGenerateModal,
-    setCityInfoGeneratePrompt,
-    setCityInfoGenerateCount,
-    setCityInfoGenerationLang,
-    generateCityInfoFromPrompt,
 
     openAttrDetail,
     addAttraction,
@@ -1044,158 +976,18 @@ export default function SessionWizard({ components = {} } = {}) {
       </div>
 
       <main className="min-w-0 w-full">
-        <div className="mb-5">
-          <div className="relative h-1.5 bg-gray-200 rounded-full mb-3">
-            <div
-              className="absolute inset-y-0 left-0 bg-blue-600 rounded-full transition-all duration-300"
-              style={{ width: `${((currentStep - 1) / (STEP_LABELS.length - 1)) * 100}%` }}
-            />
-          </div>
-
-          <div className="flex">
-            {STEP_LABELS.map((label, index) => {
-              const step = index + 1;
-              const isCompleted = step < currentStep;
-              const isActive = step === currentStep;
-
-              return (
-                <button
-                  key={step}
-                  type="button"
-                  onClick={() => goToStep(step)}
-                  className={`flex-1 text-xs py-1 px-1 text-center transition-colors border-b-2 ${
-                    isActive
-                      ? 'border-blue-600 text-blue-700 font-semibold'
-                      : isCompleted
-                        ? 'border-blue-300 text-blue-500 hover:text-blue-700 cursor-pointer'
-                        : 'border-transparent text-gray-400 hover:text-gray-600 cursor-pointer'
-                  }`}
-                >
-                  {step}. {label}
-                </button>
-              );
-            })}
-          </div>
-        </div>
+        <SessionWizardStepNavigation currentStep={currentStep} onGoToStep={goToStep} />
 
         {currentStep === 1 && (
-          /* onBlur: сейв города при уходе фокуса из формы — вместо таймера
-             2.5с, который дёргал сервер и сбрасывал курсор при наборе */
-          <div className="space-y-6" onBlur={onCityFormBlur}>
-            <SessionWizardGenerateCityFull
-              sessionId={sessionId}
-              defaultLang={defaultLocale || 'ru'}
-              onDone={() => controller.loadSession(activeCityDraftId)}
-            />
-
-            <SessionWizardCityStep
-              cityDrafts={cityDrafts}
-              referenceCities={referenceCities || []}
-              parentCityId={parentCityId}
-              setParentCityId={setParentCityId}
-              authorIds={authorIds}
-              setAuthorIds={setAuthorIds}
-              activeCityDraftId={activeCityDraftId}
-              localeData={localeData}
-              activeLocale={activeLocale}
-              defaultLocale={defaultLocale}
-              currentLocale={currentLocale}
-              lat={lat}
-              lon={lon}
-              savedLat={savedLat}
-              savedLon={savedLon}
-              imagePreview={imagePreview}
-              photoUploading={photoUploading}
-              imageOriginalUrl={imageOriginalUrl}
-              imageCopyright={imageCopyright}
-              setMapContainerRef={setMapContainerRef}
-              photoFileRef={photoFileRef}
-              onOpenCommonsModal={openCityCommonsModal}
-              onPhotoFileChange={handlePhotoFile}
-              onPhotoDelete={handlePhotoDelete}
-              onImageOriginalUrlChange={setImageOriginalUrl}
-              onImageCopyrightChange={setImageCopyright}
-              onCreateDraft={handleCreateDraft}
-              onSelectDraft={handleSelectDraft}
-              onDeleteDraft={handleDeleteDraft}
-              onSwitchLocale={switchLocale}
-              onSetDefaultLocale={setDefaultLocale}
-              onAddLocale={() => setAddLocaleOpen(true)}
-              onRemoveLocale={removeLocale}
-              onUpdateLocaleField={updateLocaleField}
-              onLatChange={controller.setLat}
-              onLonChange={controller.setLon}
-              onRestoreSavedCoords={() => {
-                if (savedLat != null && savedLon != null) {
-                  controller.setLat(String(savedLat));
-                  controller.setLon(String(savedLon));
-                }
-              }}
-              onGoToStep={goToStep}
-              saving={saving}
-            />
-
-            <div className="pt-5 border-t border-gray-200">
-              <SessionWizardCityTagsPicker
-                cityTags={cityTags}
-                cityTagCatalog={cityTagCatalog}
-                cityTagCatalogLoading={cityTagCatalogLoading}
-                cityTagCatalogError={cityTagCatalogError}
-                onReloadCityTagCatalog={loadCityTagCatalog}
-                cityFilterTree={cityFilterTree}
-                cityFilterTreeLoading={cityFilterTreeLoading}
-                cityFilterTreeError={cityFilterTreeError}
-                onReloadCityFilters={loadCityFilterTree}
-                onToggleCityTag={toggleCityTag}
-              />
-            </div>
-
-            <div className="pt-5 border-t border-gray-200">
-              <SessionWizardCityInfoStep
-                embedded
-                scopedToCityDraftId={scopedCityDraftId || scopedDatabaseCityId || ''}
-                cityInfos={visibleCityInfos}
-                currentCityInfo={currentCityInfo}
-                cityInfoLocaleData={cityInfoLocaleData}
-                cityInfoActiveLocale={cityInfoActiveLocale}
-                cityInfoSaving={cityInfoSaving}
-                cityInfoAutoSaving={cityInfoAutoSaving}
-                cityInfoAutoSaved={cityInfoAutoSaved}
-                referenceCities={referenceCities || []}
-                cityDrafts={cityDrafts || []}
-                onOpenCityInfoDetail={openCityInfoDetail}
-                onAddCityInfo={addCityInfo}
-                onSetCurrentCityInfo={setCurrentCityInfo}
-                onSetCityInfoActiveLocale={setCityInfoActiveLocale}
-                onUpdateCityInfoLocaleField={updateCityInfoLocaleField}
-                onUpdateCurrentCityInfoPatch={updateCurrentCityInfoPatch}
-                onSaveCurrentCityInfo={saveCurrentCityInfo}
-                onDeleteCurrentCityInfo={deleteCurrentCityInfo}
-                onImportCityInfoFromText={importCityInfoFromText}
-                onGoToStep={goToStep}
-                cityInfoGenerateModalOpen={cityInfoGenerateModalOpen}
-                cityInfoGeneratePrompt={cityInfoGeneratePrompt}
-                cityInfoGenerateCount={cityInfoGenerateCount}
-                cityInfoDedupeExistingItems={cityInfoDedupeExistingItems}
-                onCityInfoDedupeExistingItemsChange={setCityInfoDedupeExistingItems}
-                cityInfoGenerating={cityInfoGenerating}
-                cityInfoGenerationError={cityInfoGenerationError}
-                cityInfoGenerationTaskId={cityInfoGenerationTaskId}
-                cityInfoGenerationLang={cityInfoGenerationLang}
-                onOpenCityInfoGenerateModal={openCityInfoGenerateModal}
-                onCloseCityInfoGenerateModal={closeCityInfoGenerateModal}
-                onCityInfoGeneratePromptChange={setCityInfoGeneratePrompt}
-                onCityInfoGenerateCountChange={setCityInfoGenerateCount}
-                onCityInfoGenerationLangChange={setCityInfoGenerationLang}
-                onGenerateCityInfoFromPrompt={generateCityInfoFromPrompt}
-                aiGenerationMode={aiGenerationMode}
-                aiUseWebSearch={aiUseWebSearch}
-                aiAdvancedGenerationAvailable={aiAdvancedGenerationAvailable}
-                onAiGenerationModeChange={setAiGenerationMode}
-                onAiUseWebSearchChange={setAiUseWebSearch}
-              />
-            </div>
-          </div>
+          <SessionWizardCityStepSection
+            controller={controller}
+            sessionId={sessionId}
+            currentLocale={currentLocale}
+            scopedCityDraftId={scopedCityDraftId}
+            scopedDatabaseCityId={scopedDatabaseCityId}
+            visibleCityInfos={visibleCityInfos}
+            openCityCommonsModal={openCityCommonsModal}
+          />
         )}
 
         {currentStep === 2 && (

@@ -2,6 +2,7 @@ import { useState } from 'react';
 import Layout from '../../components/Layout';
 import apiClient from '../../api/client';
 import Button from '../../components/ui/Button';
+import { TextInput } from '../../components/ui/FormField';
 
 export default function Playground() {
   const [message, setMessage] = useState('Привет');
@@ -120,13 +121,13 @@ export default function Playground() {
         {/* Input Form */}
         <div className="border-t p-6 bg-gray-50">
           <form onSubmit={handleSendMessage} className="flex gap-2">
-            <input
+            <TextInput
               type="text"
               value={message}
               onChange={(e) => setMessage(e.target.value)}
               placeholder="Введите вопрос..."
               disabled={loading}
-              className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none disabled:bg-gray-100"
+              className="flex-1"
             />
             <Button
               type="submit"

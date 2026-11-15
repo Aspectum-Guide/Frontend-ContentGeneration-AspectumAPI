@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import TokenManager from '../utils/TokenManager';
 import { authAPI } from '../api/auth.ts';
 import Button from '../components/ui/Button';
+import { TextInput } from '../components/ui/FormField';
 import { landingPath } from '../mode/appMode';
 import { useAppMode } from '../mode/AppModeContext';
 
@@ -145,12 +146,11 @@ export default function TokenAuth() {
             <label className="block text-sm font-medium text-gray-700 mb-2">
               Email или логин
             </label>
-            <input
+            <TextInput
               type="text"
               value={login}
               onChange={(e) => setLogin(e.target.value)}
               placeholder="your@example.com или username"
-              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition"
               disabled={loading}
               autoFocus
             />
@@ -160,12 +160,11 @@ export default function TokenAuth() {
             <label className="block text-sm font-medium text-gray-700 mb-2">
               Пароль
             </label>
-            <input
+            <TextInput
               type="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               placeholder="••••••••"
-              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition"
               disabled={loading}
             />
           </div>

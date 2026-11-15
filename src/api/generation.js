@@ -239,11 +239,11 @@ export const ttsAPI = {
 
 // ─── Audio uploads / streaming ───────────────────────────────────────────────
 const generationAudioFilePath = (audioId) =>
-  `${BASE}/audio/${encodeURIComponent(String(audioId ?? '').trim())}/file/`;
+  `/media/staff/audio/${encodeURIComponent(String(audioId ?? '').trim())}/file/`;
 
 export const audioAPI = {
   upload: (formData) =>
-    apiClient.post(`${BASE}/audio/upload/`, formData, {
+    apiClient.post('/media/staff/audio/upload/', formData, {
       headers: { 'Content-Type': 'multipart/form-data' },
     }),
 
@@ -264,7 +264,7 @@ export const audioAPI = {
     if (!raw) {
       return Promise.reject(new Error('Empty audio reference'));
     }
-    const fromPath = raw.match(/\/generation\/audio\/([0-9a-f-]{36})\/file\/?/i);
+    const fromPath = raw.match(/\/(?:generation|media\/staff)\/audio\/([0-9a-f-]{36})\/file\/?/i);
     if (fromPath) {
       return apiClient.get(generationAudioFilePath(fromPath[1]), {
         responseType: 'blob',
@@ -303,20 +303,20 @@ export const cityInfosAPI = {
 
 // ─── Cities (reference) ───────────────────────────────────────────────────────
 export const citiesAPI = {
-  create: (data) => apiClient.post(`${BASE}/cities/create/`, data),
-  get: (cityId) => apiClient.get(`${BASE}/cities/${cityId}/`),
-  update: (cityId, data) => apiClient.patch(`${BASE}/cities/${cityId}/update/`, data),
-  delete: (cityId) => apiClient.delete(`${BASE}/cities/${cityId}/delete/`),
+  create: (data) => apiClient.post('/city/staff/create/', data),
+  get: (cityId) => apiClient.get(`/city/staff/${cityId}/`),
+  update: (cityId, data) => apiClient.patch(`/city/staff/${cityId}/update/`, data),
+  delete: (cityId) => apiClient.delete(`/city/staff/${cityId}/delete/`),
   exportJson: () =>
-    apiClient.get(`${BASE}/cities/export/`, { responseType: 'blob' }),
+    apiClient.get('/export/staff/cities/', { responseType: 'blob' }),
   listUsefulInformation: (cityId) =>
-    apiClient.get(`${BASE}/cities/${cityId}/useful-information/`),
+    apiClient.get(`/city/staff/${cityId}/useful-information/`),
   createUsefulInformation: (cityId, data) =>
-    apiClient.post(`${BASE}/cities/${cityId}/useful-information/`, data),
+    apiClient.post(`/city/staff/${cityId}/useful-information/`, data),
   updateUsefulInformation: (cityId, infoId, data) =>
-    apiClient.patch(`${BASE}/cities/${cityId}/useful-information/${infoId}/`, data),
+    apiClient.patch(`/city/staff/${cityId}/useful-information/${infoId}/`, data),
   deleteUsefulInformation: (cityId, infoId) =>
-    apiClient.delete(`${BASE}/cities/${cityId}/useful-information/${infoId}/`),
+    apiClient.delete(`/city/staff/${cityId}/useful-information/${infoId}/`),
   // CityAPI list (used in CitiesCatalog)
   list: (params) => apiClient.get('/city/list', { params }),
 };
@@ -343,13 +343,13 @@ export const iapAdminAPI = {
 // ─── Images ──────────────────────────────────────────────────────────────────
 export const imagesAPI = {
   upload: (formData) =>
-    apiClient.post(`${BASE}/image/upload/`, formData, {
+    apiClient.post('/media/staff/upload/', formData, {
       headers: { 'Content-Type': 'multipart/form-data' },
     }),
-  get: (imageId) => apiClient.get(`${BASE}/images/${imageId}/`),
+  get: (imageId) => apiClient.get(`/media/staff/images/${imageId}/`),
   update: (imageId, data) =>
-    apiClient.patch(`${BASE}/images/${imageId}/update/`, data),
-  delete: (imageId) => apiClient.delete(`${BASE}/images/${imageId}/delete/`),
+    apiClient.patch(`/media/staff/images/${imageId}/update/`, data),
+  delete: (imageId) => apiClient.delete(`/media/staff/images/${imageId}/delete/`),
   // Wikimedia Commons integration
   searchCommons: (query, limit = 10, page = 1) =>
     apiClient.get('media/commons/search/', {
@@ -481,66 +481,67 @@ export const aiAPI = {
 };
 
 // ─── Events (reference) ───────────────────────────────────────────────────────
+const EVENT_STAFF = '/events/staff';
+
 export const eventsAPI = {
   list: (params) =>
-    apiClient.get(`${BASE}/events/reference/`, { params }),
-  create: (data) => apiClient.post(`${BASE}/events/create/`, data),
-  get: (eventId) => apiClient.get(`${BASE}/events/${eventId}/`),
+    apiClient.get(`${EVENT_STAFF}/reference/`, { params }),
+  create: (data) => apiClient.post(`${EVENT_STAFF}/create/`, data),
+  get: (eventId) => apiClient.get(`${EVENT_STAFF}/${eventId}/`),
   update: (eventId, data) =>
-    apiClient.patch(`${BASE}/events/${eventId}/update/`, data),
+    apiClient.patch(`${EVENT_STAFF}/${eventId}/update/`, data),
   delete: (eventId) =>
-    apiClient.delete(`${BASE}/events/${eventId}/delete/`),
+    apiClient.delete(`${EVENT_STAFF}/${eventId}/delete/`),
   setMedia: (eventId, data) =>
-    apiClient.post(`${BASE}/events/${eventId}/media/`, data),
+    apiClient.post(`${EVENT_STAFF}/${eventId}/media/`, data),
   listExternalProducts: (params) =>
-    apiClient.get(`${BASE}/events/external-products/reference/`, { params }),
+    apiClient.get(`${EVENT_STAFF}/external-products/reference/`, { params }),
   setExternalProduct: (eventId, externalProductId, options = {}) =>
-    apiClient.post(`${BASE}/events/${eventId}/external-product/`, {
+    apiClient.post(`${EVENT_STAFF}/${eventId}/external-product/`, {
       external_product_id: externalProductId,
       ...(typeof options.syncEventContent === 'boolean' ? { sync_event_content: options.syncEventContent } : {}),
     }),
   createEventFromExternalProduct: (productId, options = {}) =>
-    apiClient.post(`${BASE}/events/external-products/${productId}/create-event/`, {
+    apiClient.post(`${EVENT_STAFF}/external-products/${productId}/create-event/`, {
       ...(options.cityId ? { city_id: options.cityId } : {}),
     }),
   listEventCandidatesForExternalProduct: (productId, params) =>
-    apiClient.get(`${BASE}/events/external-products/${productId}/event-candidates/`, { params }),
+    apiClient.get(`${EVENT_STAFF}/external-products/${productId}/event-candidates/`, { params }),
   listInformation: (eventId) =>
-    apiClient.get(`${BASE}/events/${eventId}/information/`),
+    apiClient.get(`${EVENT_STAFF}/${eventId}/information/`),
   createInformation: (eventId, data) =>
-    apiClient.post(`${BASE}/events/${eventId}/information/`, data),
+    apiClient.post(`${EVENT_STAFF}/${eventId}/information/`, data),
   updateInformation: (eventId, infoId, data) =>
-    apiClient.patch(`${BASE}/events/${eventId}/information/${infoId}/`, data),
+    apiClient.patch(`${EVENT_STAFF}/${eventId}/information/${infoId}/`, data),
   deleteInformation: (eventId, infoId) =>
-    apiClient.delete(`${BASE}/events/${eventId}/information/${infoId}/`),
+    apiClient.delete(`${EVENT_STAFF}/${eventId}/information/${infoId}/`),
   listFeed: (eventId) =>
-    apiClient.get(`${BASE}/events/${eventId}/feed/`),
+    apiClient.get(`${EVENT_STAFF}/${eventId}/feed/`),
   createFeedItem: (eventId, data) =>
-    apiClient.post(`${BASE}/events/${eventId}/feed/`, data),
+    apiClient.post(`${EVENT_STAFF}/${eventId}/feed/`, data),
   updateFeedItem: (eventId, feedId, data) =>
-    apiClient.patch(`${BASE}/events/${eventId}/feed/${feedId}/`, data),
+    apiClient.patch(`${EVENT_STAFF}/${eventId}/feed/${feedId}/`, data),
   deleteFeedItem: (eventId, feedId) =>
-    apiClient.delete(`${BASE}/events/${eventId}/feed/${feedId}/`),
-  // Shop-only content (BookingAPI.EventItineraryStep/EventInclusion) — see ARCHITECTURE.md.
+    apiClient.delete(`${EVENT_STAFF}/${eventId}/feed/${feedId}/`),
   listItinerary: (eventId) =>
-    apiClient.get(`${BASE}/events/${eventId}/itinerary/`),
+    apiClient.get(`${EVENT_STAFF}/${eventId}/itinerary/`),
   createItineraryStep: (eventId, data) =>
-    apiClient.post(`${BASE}/events/${eventId}/itinerary/`, data),
+    apiClient.post(`${EVENT_STAFF}/${eventId}/itinerary/`, data),
   updateItineraryStep: (eventId, stepId, data) =>
-    apiClient.patch(`${BASE}/events/${eventId}/itinerary/${stepId}/`, data),
+    apiClient.patch(`${EVENT_STAFF}/${eventId}/itinerary/${stepId}/`, data),
   deleteItineraryStep: (eventId, stepId) =>
-    apiClient.delete(`${BASE}/events/${eventId}/itinerary/${stepId}/`),
+    apiClient.delete(`${EVENT_STAFF}/${eventId}/itinerary/${stepId}/`),
   listInclusions: (eventId) =>
-    apiClient.get(`${BASE}/events/${eventId}/inclusions/`),
+    apiClient.get(`${EVENT_STAFF}/${eventId}/inclusions/`),
   createInclusion: (eventId, data) =>
-    apiClient.post(`${BASE}/events/${eventId}/inclusions/`, data),
+    apiClient.post(`${EVENT_STAFF}/${eventId}/inclusions/`, data),
   updateInclusion: (eventId, itemId, data) =>
-    apiClient.patch(`${BASE}/events/${eventId}/inclusions/${itemId}/`, data),
+    apiClient.patch(`${EVENT_STAFF}/${eventId}/inclusions/${itemId}/`, data),
   deleteInclusion: (eventId, itemId) =>
-    apiClient.delete(`${BASE}/events/${eventId}/inclusions/${itemId}/`),
+    apiClient.delete(`${EVENT_STAFF}/${eventId}/inclusions/${itemId}/`),
   filtersReference: () =>
     apiClient.get(`${BASE}/events/filters-reference/`, { params: withWorkspaceParams() }),
-  cities: () => apiClient.get(`${BASE}/events/cities/`),
+  cities: () => apiClient.get(`${EVENT_STAFF}/cities/`),
   generate: (data) => apiClient.post(`${BASE}/events/generate/`, data),
   generateTasks: () => apiClient.get(`${BASE}/events/generate/tasks/`),
   generateStatus: (taskId) =>
@@ -550,20 +551,20 @@ export const eventsAPI = {
 // ─── Export ───────────────────────────────────────────────────────────────────
 export const exportAPI = {
   zip: () =>
-    apiClient.get(`${BASE}/export/zip/`, { responseType: 'blob' }),
+    apiClient.get('/export/staff/zip/', { responseType: 'blob' }),
   cities: () =>
-    apiClient.get(`${BASE}/cities/export/`, { responseType: 'blob' }),
+    apiClient.get('/export/staff/cities/', { responseType: 'blob' }),
 };
 
 // ─── Import ───────────────────────────────────────────────────────────────────
 export const importAPI = {
   fromZip: (formData) =>
-    apiClient.post(`${BASE}/import/zip/`, formData, {
+    apiClient.post('/admin/import/zip/', formData, {
       headers: { 'Content-Type': 'multipart/form-data' },
     }),
-  fromSheets: (data) => apiClient.post(`${BASE}/import/sheets/`, data),
+  fromSheets: (data) => apiClient.post('/admin/import/sheets/', data),
   fromSheetsStatus: (params) =>
-    apiClient.get(`${BASE}/import/sheets/status/`, { params }),
+    apiClient.get('/admin/import/sheets/status/', { params }),
   events: (formData) =>
     apiClient.post(`${BASE}/events/import/`, formData, {
       headers: { 'Content-Type': 'multipart/form-data' },
@@ -578,27 +579,27 @@ export { citiesAPI as citiesAPI_legacy };
 
 export const eventAudioGuidesAPI = {
   list: (eventId) =>
-    apiClient.get(`${BASE}/event-audio-guides/`, { params: eventId ? { event_id: eventId } : {} }),
-  create: (data) => apiClient.post(`${BASE}/event-audio-guides/`, data),
+    apiClient.get(`${EVENT_STAFF}/audio-guides/`, { params: eventId ? { event_id: eventId } : {} }),
+  create: (data) => apiClient.post(`${EVENT_STAFF}/audio-guides/`, data),
   update: (guideId, data) =>
-    apiClient.patch(`${BASE}/event-audio-guides/${guideId}/`, data),
-  delete: (guideId) => apiClient.delete(`${BASE}/event-audio-guides/${guideId}/`),
+    apiClient.patch(`${EVENT_STAFF}/audio-guides/${guideId}/`, data),
+  delete: (guideId) => apiClient.delete(`${EVENT_STAFF}/audio-guides/${guideId}/`),
   upsertTrack: (guideId, data) =>
-    apiClient.post(`${BASE}/event-audio-guides/${guideId}/tracks/`, data),
+    apiClient.post(`${EVENT_STAFF}/audio-guides/${guideId}/tracks/`, data),
   deleteTrack: (guideId, trackId) =>
-    apiClient.delete(`${BASE}/event-audio-guides/${guideId}/tracks/${trackId}/delete/`),
+    apiClient.delete(`${EVENT_STAFF}/audio-guides/${guideId}/tracks/${trackId}/delete/`),
 };
 
 export const ilCatalogAPI = {
-  list: (params) => apiClient.get(`${BASE}/interactive-locations/`, { params }),
-  create: (data) => apiClient.post(`${BASE}/interactive-locations/`, data),
-  update: (id, data) => apiClient.patch(`${BASE}/interactive-locations/${id}/`, data),
-  delete: (id) => apiClient.delete(`${BASE}/interactive-locations/${id}/`),
+  list: (params) => apiClient.get(`${EVENT_STAFF}/interactive-locations/`, { params }),
+  create: (data) => apiClient.post(`${EVENT_STAFF}/interactive-locations/`, data),
+  update: (id, data) => apiClient.patch(`${EVENT_STAFF}/interactive-locations/${id}/`, data),
+  delete: (id) => apiClient.delete(`${EVENT_STAFF}/interactive-locations/${id}/`),
 };
 
 export const ilPhotosAPI = {
-  list: (cityId) => apiClient.get(`${BASE}/cities/${cityId}/il-photos/`),
-  create: (cityId, data) => apiClient.post(`${BASE}/cities/${cityId}/il-photos/`, data),
-  update: (cityId, photoId, data) => apiClient.patch(`${BASE}/cities/${cityId}/il-photos/${photoId}/`, data),
-  remove: (cityId, photoId) => apiClient.delete(`${BASE}/cities/${cityId}/il-photos/${photoId}/`),
+  list: (cityId) => apiClient.get(`/city/staff/${cityId}/il-photos/`),
+  create: (cityId, data) => apiClient.post(`/city/staff/${cityId}/il-photos/`, data),
+  update: (cityId, photoId, data) => apiClient.patch(`/city/staff/${cityId}/il-photos/${photoId}/`, data),
+  remove: (cityId, photoId) => apiClient.delete(`/city/staff/${cityId}/il-photos/${photoId}/`),
 };

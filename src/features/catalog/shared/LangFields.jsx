@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
-import { TextInput, Textarea } from '../../../components/ui/FormField';
+import { Select, TextInput, Textarea } from '../../../components/ui/FormField';
+import Button from '../../../components/ui/Button';
 import { getFilledLangCodes } from './i18n';
 
 const DEFAULT_AVAILABLE_LANGS = ['ru', 'en', 'it', 'fr', 'de', 'es'];
@@ -78,11 +79,12 @@ export function LangTabs({
   return (
     <div className="flex flex-wrap gap-1 mb-3 items-center">
       {langOptions.map(({ code, label, flag }) => (
-        <button
+        <Button
           key={code}
           type="button"
           onClick={() => onSwitch(code)}
-          className={`relative flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium border transition-all ${
+          variant={active === code ? 'primary' : 'outline'}
+          className={`min-h-0 relative flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium transition-all ${
             active === code
               ? 'bg-blue-600 text-white border-blue-600'
               : filled.has(code)
@@ -110,26 +112,27 @@ export function LangTabs({
               ×
             </span>
           )}
-        </button>
+        </Button>
       ))}
 
       {canManage && (
         <>
           {!adding ? (
-            <button
+            <Button
               type="button"
               onClick={() => { setAdding(true); setNewLang(candidates[0] || ''); }}
-              className="px-2.5 py-1 rounded-full text-xs font-medium border border-gray-300 text-gray-600 hover:bg-gray-100 transition-colors"
+              variant="outline"
+              className="min-h-0 rounded-full px-2.5 py-1 text-xs font-medium"
               title="Добавить перевод"
             >
               + Язык
-            </button>
+            </Button>
           ) : (
             <div className="flex items-center gap-1">
-              <select
+              <Select
                 value={newLang}
                 onChange={(e) => setNewLang(e.target.value)}
-                className="px-2 py-1 text-xs border border-gray-300 rounded-lg bg-white"
+                className="min-h-0 w-auto px-2 py-1 text-xs"
               >
                 {candidates.length === 0 ? (
                   <option value="">— нет —</option>
@@ -137,7 +140,7 @@ export function LangTabs({
                   candidates.map((c) => <option key={c} value={c}>{c.toUpperCase()}</option>)
                 )}
                 <option value="custom">Другое…</option>
-              </select>
+              </Select>
               {newLang === 'custom' && (
                 <input
                   value=""
@@ -152,21 +155,22 @@ export function LangTabs({
                 placeholder="ru"
                 className={`px-2 py-1 text-xs border border-gray-300 rounded-lg ${newLang === 'custom' ? '' : 'hidden'}`}
               />
-              <button
+              <Button
                 type="button"
                 onClick={addLang}
                 disabled={!newLang || candidates.length === 0 && newLang !== 'custom'}
-                className="px-2 py-1 text-xs rounded-lg bg-blue-600 text-white disabled:opacity-50"
+                className="min-h-0 rounded-lg px-2 py-1 text-xs"
               >
                 Добавить
-              </button>
-              <button
+              </Button>
+              <Button
                 type="button"
                 onClick={() => { setAdding(false); setNewLang(''); }}
-                className="px-2 py-1 text-xs rounded-lg bg-gray-100 text-gray-700"
+                variant="secondary"
+                className="min-h-0 rounded-lg px-2 py-1 text-xs"
               >
                 Отмена
-              </button>
+              </Button>
             </div>
           )}
         </>

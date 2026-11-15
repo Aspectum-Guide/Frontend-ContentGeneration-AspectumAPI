@@ -1,4 +1,5 @@
 import { StatusBadge as DefaultStatusBadge } from './sessionWizardShared.jsx';
+import Button from '../../../components/ui/Button.jsx';
 
 const getCountLabel = (count, emptyLabel = '—') => {
   return count > 0 ? count : emptyLabel;
@@ -176,32 +177,35 @@ export default function SessionWizardPublishStep({
       )}
 
       <div className="flex justify-between pt-2">
-        <button
+        <Button
           type="button"
+          variant="outline"
           onClick={() => onGoToStep(4)}
-          className="px-4 py-2 text-sm text-gray-600 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+          className="!min-h-0 !rounded-lg !px-4 !py-2 !text-sm !font-normal !text-gray-600 hover:!bg-gray-50 transition-colors"
         >
           ← Назад
-        </button>
+        </Button>
 
         <div className="flex items-center gap-2">
-          <button
+          <Button
             type="button"
+            variant="secondary"
             onClick={onTranslateSession}
             disabled={translating || !hasAnythingToPublish}
-            className="px-4 py-2 text-sm font-medium text-indigo-700 bg-indigo-50 border border-indigo-200 rounded-lg hover:bg-indigo-100 disabled:opacity-50 transition-colors"
+            className="!min-h-0 !rounded-lg !border !border-indigo-200 !bg-indigo-50 !px-4 !py-2 !text-sm !font-medium !text-indigo-700 hover:!bg-indigo-100 disabled:!opacity-50 transition-colors"
           >
             {translating ? 'Перевод...' : 'Перевести сессию'}
-          </button>
+          </Button>
 
-          <button
+          <Button
             type="button"
+            variant="primary"
             onClick={onPublish}
             disabled={publishing || !hasAnythingToPublish}
-            className="px-6 py-2 text-sm font-medium text-white bg-green-600 rounded-lg hover:bg-green-700 disabled:opacity-50 transition-colors"
+            className="!min-h-0 !rounded-lg !bg-green-600 !px-6 !py-2 !text-sm !font-medium !text-white hover:!bg-green-700 disabled:!opacity-50 transition-colors"
           >
             {publishing ? 'Публикация...' : '✓ Опубликовать сессию'}
-          </button>
+          </Button>
         </div>
       </div>
     </div>

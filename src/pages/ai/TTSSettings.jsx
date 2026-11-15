@@ -2,6 +2,8 @@ import { useState, useEffect, useRef } from 'react';
 import Layout from '../../components/Layout';
 import { ttsAPI } from '../../api/generation';
 import AudioProcessingMixer from '../../components/tts/AudioProcessingMixer';
+import Button from '../../components/ui/Button';
+import { TextInput } from '../../components/ui/FormField';
 
 const CATEGORY_MESSAGES = {
   elevenlabs_access_restricted:
@@ -57,13 +59,14 @@ function VoiceCard({ voice, isDefault, onPreview }) {
           <p className="text-xs text-gray-400 font-mono mt-0.5">{voice.voice_id}</p>
         </div>
         {voice.preview_url && (
-          <button
+          <Button
             type="button"
             onClick={() => onPreview(voice)}
-            className="shrink-0 text-xs px-2.5 py-1 rounded-md border border-gray-200 hover:bg-gray-50 text-gray-600"
+            variant="outline"
+            className="shrink-0 text-xs px-2.5 py-1 min-h-0"
           >
             ▶ Слушать
-          </button>
+          </Button>
         )}
       </div>
     </div>
@@ -164,17 +167,18 @@ export default function TTSSettings() {
               Общий профиль обработки хранится в базе.
             </p>
           </div>
-          <button
+          <Button
             type="button"
             onClick={() => load({ refresh: true })}
             disabled={refreshing}
-            className="shrink-0 flex items-center gap-1.5 px-3 py-2 text-sm font-medium border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 transition-colors"
+            variant="outline"
+            className="shrink-0 flex items-center gap-1.5 px-3 py-2 text-sm"
           >
             {refreshing ? (
               <span className="animate-spin w-3.5 h-3.5 border border-gray-400 border-t-transparent rounded-full" />
             ) : '↻'}
             Обновить кеш
-          </button>
+          </Button>
         </div>
 
         {error && (
@@ -372,12 +376,12 @@ export default function TTSSettings() {
               <h2 className="font-semibold text-gray-900">
                 Голоса <span className="text-gray-400 font-normal text-sm">({voices.length})</span>
               </h2>
-              <input
+              <TextInput
                 type="search"
                 value={voiceSearch}
                 onChange={(e) => setVoiceSearch(e.target.value)}
                 placeholder="Поиск по имени, категории..."
-                className="w-56 px-3 py-1.5 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-56 min-h-0 py-1.5 text-sm"
               />
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-[480px] overflow-y-auto pr-1">

@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { productAnalyticsAPI } from '../../../api/analytics';
 import Layout from '../../../components/Layout';
+import { Select, TextInput } from '../../../components/ui/FormField';
 import { parseApiError } from '../../../utils/apiError';
 import MetricCard from '../shared/components/MetricCard';
 
@@ -55,36 +56,36 @@ export default function ProductAnalyticsPage() {
           </p>
         </div>
         <div className="flex flex-wrap gap-2 items-center">
-          <input
+          <TextInput
             type="date"
             value={from}
             onChange={(e) => setFrom(e.target.value)}
-            className="px-3 py-2 border border-gray-300 rounded-lg text-sm"
+            className="w-auto text-sm"
           />
-          <input
+          <TextInput
             type="date"
             value={to}
             onChange={(e) => setTo(e.target.value)}
-            className="px-3 py-2 border border-gray-300 rounded-lg text-sm"
+            className="w-auto text-sm"
           />
-          <select
+          <Select
             value={brand}
             onChange={(e) => setBrand(e.target.value)}
-            className="px-3 py-2 border border-gray-300 rounded-lg text-sm"
+            className="w-auto text-sm"
           >
             <option value="">Все бренды</option>
             <option value="aspectum">aspectum</option>
             <option value="aspectum-rus">aspectum-rus</option>
-          </select>
-          <select
+          </Select>
+          <Select
             value={platform}
             onChange={(e) => setPlatform(e.target.value)}
-            className="px-3 py-2 border border-gray-300 rounded-lg text-sm"
+            className="w-auto text-sm"
           >
             <option value="">Все платформы</option>
             <option value="ios">ios</option>
             <option value="android">android</option>
-          </select>
+          </Select>
         </div>
       </div>
 

@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Field, TextInput } from '../../../components/ui/FormField';
+import Button from '../../../components/ui/Button';
 import { ConfirmModal } from '../../../components/ui/Modal';
 import { parseApiError } from '../../../utils/apiError';
 import { imagesAPI } from '../../../api/generation';
@@ -153,14 +154,15 @@ export default function PublishedFeedEditor({ parentId, api, disabled = false })
                 <span className="text-xs font-medium uppercase tracking-wide text-gray-500">
                   {isImage ? 'Изображение' : 'Текст'}
                 </span>
-                <button
+                <Button
                   type="button"
                   disabled={disabled || busy}
                   onClick={() => setDeleteTarget(item)}
-                  className="ml-auto text-sm text-red-600 hover:text-red-700 disabled:opacity-50"
+                  variant="danger"
+                  className="ml-auto min-h-0 px-3 py-1.5 text-sm"
                 >
                   Удалить
-                </button>
+                </Button>
               </div>
 
               {isImage ? (
@@ -170,14 +172,15 @@ export default function PublishedFeedEditor({ parentId, api, disabled = false })
                   ) : (
                     <p className="text-sm text-gray-400">Изображение не выбрано</p>
                   )}
-                  <button
+                  <Button
                     type="button"
                     disabled={disabled || busy}
                     onClick={() => handleImagePick(item.id)}
-                    className="px-3 py-2 text-sm font-medium text-blue-700 bg-blue-50 rounded-lg hover:bg-blue-100 disabled:opacity-50"
+                    variant="outline"
+                    className="min-h-0 bg-blue-50 px-3 py-2 text-sm font-medium text-blue-700"
                   >
                     {busy ? 'Загрузка...' : 'Загрузить изображение'}
-                  </button>
+                  </Button>
                 </div>
               ) : (
                 <>
@@ -199,14 +202,15 @@ export default function PublishedFeedEditor({ parentId, api, disabled = false })
                       setItems((prev) => prev.map((x) => (x.id === item.id ? { ...x, text } : x)));
                     }}
                   />
-                  <button
+                  <Button
                     type="button"
                     disabled={disabled || busy}
                     onClick={() => patchItem(item.id, { item_type: 'text', text: item.text || {} })}
-                    className="text-sm text-blue-700 hover:text-blue-800 disabled:opacity-50"
+                    variant="outline"
+                    className="min-h-0 px-3 py-1.5 text-sm text-blue-700"
                   >
                     {busy ? 'Сохранение...' : 'Сохранить текст'}
-                  </button>
+                  </Button>
                 </>
               )}
             </div>
@@ -215,15 +219,16 @@ export default function PublishedFeedEditor({ parentId, api, disabled = false })
       )}
 
       <div className="flex flex-wrap gap-2">
-        <button
+        <Button
           type="button"
           disabled={disabled || savingId === 'new'}
           onClick={handleAddText}
-          className="px-3 py-2 text-sm font-medium text-blue-700 bg-blue-50 rounded-lg hover:bg-blue-100 disabled:opacity-50"
+          variant="outline"
+          className="min-h-0 bg-blue-50 px-3 py-2 text-sm font-medium text-blue-700"
         >
           {savingId === 'new' ? 'Добавление...' : '+ Текстовый блок'}
-        </button>
-        <button
+        </Button>
+        <Button
           type="button"
           disabled={disabled || savingId === 'new'}
           onClick={async () => {
@@ -239,10 +244,11 @@ export default function PublishedFeedEditor({ parentId, api, disabled = false })
               setSavingId(null);
             }
           }}
-          className="px-3 py-2 text-sm font-medium text-blue-700 bg-blue-50 rounded-lg hover:bg-blue-100 disabled:opacity-50"
+          variant="outline"
+          className="min-h-0 bg-blue-50 px-3 py-2 text-sm font-medium text-blue-700"
         >
           + Блок с изображением
-        </button>
+        </Button>
       </div>
 
       <ConfirmModal

@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import Layout from '../../components/Layout';
 import apiClient from '../../api/client';
 import Button from '../../components/ui/Button';
+import { Select, TextInput } from '../../components/ui/FormField';
 
 export default function AISettings() {
   const [settings, setSettings] = useState(null);
@@ -111,7 +112,7 @@ export default function AISettings() {
           <label className="block text-sm font-medium text-gray-700 mb-2">
             Поставщик ИИ
           </label>
-          <select
+          <Select
             value={settings.provider}
             onChange={(e) =>
               setSettings({ ...settings, provider: e.target.value })
@@ -120,7 +121,7 @@ export default function AISettings() {
           >
             <option value="openai">OpenAI (GPT-4)</option>
             <option value="ollama">Ollama (локально)</option>
-          </select>
+          </Select>
         </div>
 
         {/* OpenAI Settings */}
@@ -132,7 +133,7 @@ export default function AISettings() {
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 Модель
               </label>
-              <input
+              <TextInput
                 type="text"
                 value={settings.openai?.model || ''}
                 onChange={(e) =>
@@ -153,7 +154,7 @@ export default function AISettings() {
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 API Ключ
               </label>
-              <input
+              <TextInput
                 type="password"
                 placeholder="sk-..."
                 onChange={(e) =>
@@ -182,7 +183,7 @@ export default function AISettings() {
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 Base URL
               </label>
-              <input
+              <TextInput
                 type="text"
                 value={settings.ollama?.base_url || ''}
                 onChange={(e) =>
@@ -200,7 +201,7 @@ export default function AISettings() {
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 Модель
               </label>
-              <select
+              <Select
                 value={settings.ollama?.model || ''}
                 onChange={(e) =>
                   setSettings({
@@ -216,7 +217,7 @@ export default function AISettings() {
                     {model}
                   </option>
                 ))}
-              </select>
+              </Select>
               <p className="text-xs text-gray-500 mt-1">
                 {settings.ollama?.available
                   ? '✅ Ollama доступна'
@@ -229,7 +230,7 @@ export default function AISettings() {
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   Timeout (сек)
                 </label>
-                <input
+                <TextInput
                   type="number"
                   min="1"
                   value={settings.ollama?.timeout || 300}
@@ -250,7 +251,7 @@ export default function AISettings() {
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   Temperature (0-1)
                 </label>
-                <input
+                <TextInput
                   type="number"
                   min="0"
                   max="1"
@@ -374,7 +375,7 @@ function SourceToggles() {
                         : 'border-gray-200 hover:border-blue-300'
                     }`}
                   >
-                    <input
+                    <TextInput
                       type="checkbox"
                       className="mt-1"
                       checked={checked}

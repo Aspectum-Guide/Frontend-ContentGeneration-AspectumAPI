@@ -6,6 +6,8 @@ import { ConfirmModal } from '../../../components/ui/Modal';
 import Toast from '../../../components/ui/Toast';
 import { useLayoutActions } from '../../../context/useLayoutActions';
 import { iapAdminAPI } from '../../../api/generation';
+import { ADMIN } from '../../../mode/appMode';
+import { useAppMode } from '../../../mode/AppModeContext';
 import { parseApiError } from '../../../utils/apiError';
 import { getMultiLangValue } from '../shared/i18n';
 import CityEditorModal from './CityEditorModal';
@@ -13,6 +15,7 @@ import { useCitiesCatalog } from './useCitiesCatalog';
 
 export default function CitiesCatalogPage() {
   const { setMobileActions } = useLayoutActions();
+  const isStudio = useAppMode() !== ADMIN;
   const c = useCitiesCatalog();
   const [toggleConfirm, setToggleConfirm] = useState(null); // { id, field, value, label }
   const [selectedIds, setSelectedIds] = useState(() => new Set());
@@ -149,15 +152,18 @@ export default function CitiesCatalogPage() {
 
   useEffect(() => {
     if (c.editingCity) return;
-    setMobileActions([
+    const actions = [
       { id: 'create-city', label: 'Создать город', onClick: c.openCreate, variant: 'primary' },
-      { id: 'create-city-session', label: 'Через сессию', onClick: c.openNewSession, variant: 'secondary' },
       { id: 'create-city-tag', label: 'Создать тег города', onClick: c.openTags, variant: 'secondary' },
-      { id: 'open-sessions', label: 'Открыть сессии', onClick: c.openSessions },
       { id: 'refresh-cities', label: 'Обновить справочник', onClick: c.reload },
-    ]);
+    ];
+    if (isStudio) {
+      actions.splice(1, 0, { id: 'create-city-session', label: 'Через сессию', onClick: c.openNewSession, variant: 'secondary' });
+      actions.splice(3, 0, { id: 'open-sessions', label: 'Открыть сессии', onClick: c.openSessions });
+    }
+    setMobileActions(actions);
     return () => setMobileActions([]);
-  }, [c.editingCity, c.openCreate, c.openNewSession, c.openTags, c.openSessions, c.reload, setMobileActions]);
+  }, [c.editingCity, c.openCreate, c.openNewSession, c.openTags, c.openSessions, c.reload, isStudio, setMobileActions]);
 
   useEffect(() => {
     if (!c.editingCity) return;

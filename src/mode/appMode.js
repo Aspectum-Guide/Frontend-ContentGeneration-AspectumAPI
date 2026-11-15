@@ -11,19 +11,11 @@ export const STUDIO = 'studio';
 export const ADMIN = 'admin';
 export const APP_MODE_STORAGE_KEY = 'cg.appMode';
 
-/** Экраны, которые ходят в ContentGeneration и на serve не живут. */
+/** Экраны генерации. На serve их нет: контент-справочники ходят мимо /generation/. */
 const STUDIO_PREFIXES = [
   '/generation',
   '/ai',
   '/tasks',
-  '/export',
-  '/import',
-  '/catalog/cities',
-  '/catalog/events',
-  '/catalog/photos',
-  '/catalog/audio-guides',
-  '/catalog/interactive-locations',
-  '/catalog/external-products/linking',
 ];
 
 export function isStudioPath(pathname) {

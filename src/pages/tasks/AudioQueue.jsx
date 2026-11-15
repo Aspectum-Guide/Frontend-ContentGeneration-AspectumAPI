@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { audioQueueAPI } from '../../api/generation';
 import Layout from '../../components/Layout';
+import Button from '../../components/ui/Button';
 import { parseApiError } from '../../utils/apiError';
 
 // Очередь пакетной озвучки по всем сессиям: что идёт, что ждёт и почему.
@@ -164,22 +165,24 @@ export default function AudioQueue() {
         </div>
         <div className="flex items-center gap-2">
           {PERIODS.map((period) => (
-            <button
+            <Button
               key={period.hours}
               type="button"
               onClick={() => setHours(period.hours)}
-              className={`px-3 py-1.5 rounded-md text-sm font-medium ${hours === period.hours ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}
+              variant={hours === period.hours ? 'primary' : 'secondary'}
+              className="min-h-0 rounded-md px-3 py-1.5 text-sm"
             >
               {period.label}
-            </button>
+            </Button>
           ))}
-          <button
+          <Button
             type="button"
             onClick={() => load()}
-            className="px-3 py-1.5 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50"
+            variant="outline"
+            className="min-h-0 rounded-md px-3 py-1.5 text-sm"
           >
             ↻ Обновить
-          </button>
+          </Button>
         </div>
       </div>
 

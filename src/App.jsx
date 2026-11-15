@@ -177,7 +177,7 @@ const routes = [
   },
   {
     path: '/catalog/external-products/linking',
-    element: <RequireStudio><ProtectedRoute><ErrorBoundary><ExternalProductsLinking /></ErrorBoundary></ProtectedRoute></RequireStudio>,
+    element: <ProtectedRoute><ErrorBoundary><ExternalProductsLinking /></ErrorBoundary></ProtectedRoute>,
   },
   {
     path: '/catalog/llm/keys',
@@ -189,15 +189,15 @@ const routes = [
   },
   {
     path: '/catalog/cities',
-    element: <RequireStudio><ProtectedRoute><ErrorBoundary><CitiesCatalog /></ErrorBoundary></ProtectedRoute></RequireStudio>,
+    element: <ProtectedRoute><ErrorBoundary><CitiesCatalog /></ErrorBoundary></ProtectedRoute>,
   },
   {
     path: '/catalog/events',
-    element: <RequireStudio><ProtectedRoute><ErrorBoundary><EventsCatalog /></ErrorBoundary></ProtectedRoute></RequireStudio>,
+    element: <ProtectedRoute><ErrorBoundary><EventsCatalog /></ErrorBoundary></ProtectedRoute>,
   },
   {
     path: '/catalog/events/orphans',
-    element: <RequireStudio><ProtectedRoute><ErrorBoundary><OrphanEvents /></ErrorBoundary></ProtectedRoute></RequireStudio>,
+    element: <ProtectedRoute><ErrorBoundary><OrphanEvents /></ErrorBoundary></ProtectedRoute>,
   },
   {
     path: '/catalog/authors',
@@ -245,11 +245,11 @@ const routes = [
   },
   {
     path: '/catalog/audio-guides',
-    element: <RequireStudio><ProtectedRoute><ErrorBoundary><AudioGuidesCatalog /></ErrorBoundary></ProtectedRoute></RequireStudio>,
+    element: <ProtectedRoute><ErrorBoundary><AudioGuidesCatalog /></ErrorBoundary></ProtectedRoute>,
   },
   {
     path: '/catalog/interactive-locations',
-    element: <RequireStudio><ProtectedRoute><ErrorBoundary><InteractiveLocationsCatalog /></ErrorBoundary></ProtectedRoute></RequireStudio>,
+    element: <ProtectedRoute><ErrorBoundary><InteractiveLocationsCatalog /></ErrorBoundary></ProtectedRoute>,
   },
   {
     path: '/catalog/subscription-types',
@@ -277,7 +277,7 @@ const routes = [
   },
   {
     path: '/catalog/photos',
-    element: <RequireStudio><ProtectedRoute><ErrorBoundary><PhotosCatalog /></ErrorBoundary></ProtectedRoute></RequireStudio>,
+    element: <ProtectedRoute><ErrorBoundary><PhotosCatalog /></ErrorBoundary></ProtectedRoute>,
   },
   {
     path: '/catalog/tags',
@@ -285,19 +285,19 @@ const routes = [
   },
   {
     path: '/export/zip',
-    element: <RequireStudio><ProtectedRoute><ErrorBoundary><ExportZip /></ErrorBoundary></ProtectedRoute></RequireStudio>,
+    element: <ProtectedRoute><ErrorBoundary><ExportZip /></ErrorBoundary></ProtectedRoute>,
   },
   {
     path: '/export/cities',
-    element: <RequireStudio><ProtectedRoute><ErrorBoundary><ExportCities /></ErrorBoundary></ProtectedRoute></RequireStudio>,
+    element: <ProtectedRoute><ErrorBoundary><ExportCities /></ErrorBoundary></ProtectedRoute>,
   },
   {
     path: '/export/events',
-    element: <RequireStudio><ProtectedRoute><ErrorBoundary><ExportEvents /></ErrorBoundary></ProtectedRoute></RequireStudio>,
+    element: <ProtectedRoute><ErrorBoundary><ExportEvents /></ErrorBoundary></ProtectedRoute>,
   },
   {
     path: '/import/google-sheet',
-    element: <RequireStudio><ProtectedRoute><ErrorBoundary><ImportGoogleSheet /></ErrorBoundary></ProtectedRoute></RequireStudio>,
+    element: <ProtectedRoute><ErrorBoundary><ImportGoogleSheet /></ErrorBoundary></ProtectedRoute>,
   },
   {
     path: '*',

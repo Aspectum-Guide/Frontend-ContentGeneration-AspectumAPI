@@ -7,6 +7,7 @@ import { ADMIN, filterNavSections } from '../mode/appMode';
 import { useAppMode } from '../mode/AppModeContext';
 import TokenManager from '../utils/TokenManager';
 import { getWorkspace, setWorkspace, workspaceTitle } from '../utils/workspace';
+import { Select } from './ui/FormField';
 
 /**
  * Переключатель рабочего пространства (Россия / Европа / …). Сужает списки
@@ -48,16 +49,16 @@ function WorkspaceSwitcher({ compact }) {
   return (
     <label className="flex flex-col gap-1">
       <span className="text-[11px] font-medium uppercase tracking-wide text-gray-500">Пространство</span>
-      <select
+      <Select
         value={current}
         onChange={onChange}
-        className="w-full rounded-lg border border-gray-300 bg-white px-2 py-1.5 text-sm text-gray-900 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+        className="px-2 py-1.5 text-sm"
       >
         <option value="">Все пространства</option>
         {items.map((w) => (
           <option key={w.code} value={w.code}>{workspaceTitle(w)}</option>
         ))}
-      </select>
+      </Select>
     </label>
   );
 }

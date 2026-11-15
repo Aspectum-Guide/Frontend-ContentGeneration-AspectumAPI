@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Field, TextInput } from '../../../components/ui/FormField';
+import Button from '../../../components/ui/Button';
 import { ConfirmModal } from '../../../components/ui/Modal';
 import { parseApiError } from '../../../utils/apiError';
 import { buildLangOptions } from './i18n';
@@ -138,7 +139,7 @@ export default function InformationBlocksEditor({
                     Показывать
                   </label>
                 )}
-                <button
+                <Button
                   type="button"
                   disabled={disabled || busy}
                   onClick={() => patchItem(item.id, {
@@ -147,18 +148,20 @@ export default function InformationBlocksEditor({
                     description: item.description || {},
                     ...(showVisibility ? { is_show: !!item.is_show } : {}),
                   })}
-                  className="text-sm text-blue-700 hover:text-blue-800 disabled:opacity-50"
+                  variant="outline"
+                  className="min-h-0 px-3 py-1.5 text-sm text-blue-700"
                 >
                   {busy ? 'Сохранение...' : 'Сохранить блок'}
-                </button>
-                <button
+                </Button>
+                <Button
                   type="button"
                   disabled={disabled || busy}
                   onClick={() => setDeleteTarget(item)}
-                  className="ml-auto text-sm text-red-600 hover:text-red-700 disabled:opacity-50"
+                  variant="danger"
+                  className="ml-auto min-h-0 px-3 py-1.5 text-sm"
                 >
                   Удалить
-                </button>
+                </Button>
               </div>
 
               {langOptions.length > 0 && (
@@ -193,14 +196,15 @@ export default function InformationBlocksEditor({
         })
       )}
 
-      <button
+      <Button
         type="button"
         disabled={disabled || savingId === 'new'}
         onClick={handleAdd}
-        className="px-3 py-2 text-sm font-medium text-blue-700 bg-blue-50 rounded-lg hover:bg-blue-100 disabled:opacity-50"
+        variant="outline"
+        className="min-h-0 bg-blue-50 px-3 py-2 text-sm font-medium text-blue-700"
       >
         {savingId === 'new' ? 'Добавление...' : '+ Добавить блок'}
-      </button>
+      </Button>
 
       <ConfirmModal
         open={!!deleteTarget}

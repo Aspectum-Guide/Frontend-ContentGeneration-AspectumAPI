@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { audioAPI } from '../../../../api/generation';
+import Button from '../../../../components/ui/Button';
 
 export default function AudioPlayer({ audioId }) {
   const [blobUrl, setBlobUrl] = useState(null);
@@ -31,14 +32,15 @@ export default function AudioPlayer({ audioId }) {
   if (error) return <span className="text-xs text-red-500">{error}</span>;
   if (!blobUrl) {
     return (
-      <button
+      <Button
         type="button"
         onClick={load}
         disabled={loading}
-        className="px-3 py-1.5 text-xs font-medium text-blue-600 bg-blue-50 rounded-lg hover:bg-blue-100 disabled:opacity-50 transition-colors"
+        variant="outline"
+        className="min-h-0 rounded-lg bg-blue-50 px-3 py-1.5 text-xs font-medium text-blue-600"
       >
         {loading ? '⏳' : '▶ Слушать'}
-      </button>
+      </Button>
     );
   }
   return <audio controls src={blobUrl} className="h-8 flex-1 min-w-0" />;

@@ -32,7 +32,7 @@ module.exports = {
   overrides: [
     {
       files: ['scripts/**/*.js'],
-      env: { node: true },
+      env: { node: true, browser: false },
     },
     {
       files: ['*.ts', '*.tsx'],

@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useState } from 'react';
 import Layout from '../../components/Layout';
 import { aiAPI } from '../../api/generation';
+import Button from '../../components/ui/Button';
+import { Textarea } from '../../components/ui/FormField';
 
 /**
  * Вкладка «Промпты» — базовые промпты/правила генерации (аудиогиды, стиль-гайд),
@@ -67,7 +69,7 @@ export default function PromptSettings() {
 
         {error && (
           <div className="mb-4 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
-            {error} <button className="underline" onClick={load}>Повторить</button>
+            {error} <Button variant="outline" className="ml-2 min-h-0 px-2 py-0 text-xs underline" onClick={load}>Повторить</Button>
           </div>
         )}
         {loading && <div className="text-sm text-gray-400">Загрузка…</div>}
@@ -99,38 +101,40 @@ export default function PromptSettings() {
                   </span>
                 </div>
 
-                <textarea
+                <Textarea
                   value={draft}
                   onChange={(e) => setDrafts((d) => ({ ...d, [p.key]: e.target.value }))}
                   rows={draft ? Math.min(16, Math.max(6, draft.split('\n').length + 2)) : 4}
                   placeholder="Пусто — используется дефолт (ниже). Вставьте сюда свой вариант для правки."
-                  className="mt-3 w-full rounded-md border border-gray-300 px-3 py-2 font-mono text-xs focus:border-indigo-400 focus:outline-none focus:ring-1 focus:ring-indigo-400"
+                  className="mt-3 font-mono text-xs focus:border-indigo-400 focus:ring-indigo-400"
                 />
 
                 <div className="mt-2 flex flex-wrap items-center gap-2">
-                  <button
+                  <Button
                     type="button"
                     disabled={saving[p.key] || !dirty}
                     onClick={() => save(p.key, draft)}
-                    className="rounded-md bg-indigo-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-indigo-700 disabled:opacity-50"
+                    className="min-h-0 rounded-md px-3 py-1.5 text-xs font-medium"
                   >
                     {saving[p.key] ? 'Сохраняем…' : 'Сохранить'}
-                  </button>
-                  <button
+                  </Button>
+                  <Button
                     type="button"
                     disabled={saving[p.key] || (!p.override && !draft)}
                     onClick={() => { setDrafts((d) => ({ ...d, [p.key]: '' })); save(p.key, ''); }}
-                    className="rounded-md border border-gray-300 px-3 py-1.5 text-xs text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+                    variant="outline"
+                    className="min-h-0 rounded-md px-3 py-1.5 text-xs"
                   >
                     Сбросить к дефолту
-                  </button>
-                  <button
+                  </Button>
+                  <Button
                     type="button"
                     onClick={() => setDrafts((d) => ({ ...d, [p.key]: p.default || '' }))}
-                    className="rounded-md border border-gray-300 px-3 py-1.5 text-xs text-gray-700 hover:bg-gray-50"
+                    variant="outline"
+                    className="min-h-0 rounded-md px-3 py-1.5 text-xs"
                   >
                     Вставить дефолт для правки
-                  </button>
+                  </Button>
                   {notice[p.key] && (
                     <span className={`text-xs ${notice[p.key].startsWith('Ошибка') ? 'text-red-600' : 'text-green-700'}`}>
                       {notice[p.key]}

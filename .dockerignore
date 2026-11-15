@@ -1,0 +1,11 @@
+# Keep machine-specific configuration and generated files out of Docker builds.
+.env
+.env.*
+!.env.example
+node_modules
+npm-debug.log*
+dist
+dist-ssr
+.git
+.gitignore
+.DS_Store

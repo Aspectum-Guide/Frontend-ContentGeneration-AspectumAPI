@@ -17,7 +17,8 @@
 
 ```bash
 npm install
-cp .env.example .env   # заполнить VITE_API_URL под свой backend
+# Для локальной разработки можно задать VITE_API_URL в .env.local.
+# Production-сборка использует same-origin /api/v1 и не должна получать VITE_API_URL.
 npm run dev             # http://localhost:17000, проксирует /api на бэкенд из VITE_API_PROXY_TARGET
 ```
 
@@ -35,7 +36,7 @@ npm run test:watch
 
 | Переменная | Обязательна | Назначение |
 |---|---|---|
-| `VITE_API_URL` | да | Базовый URL backend API (используется в собранном билде) |
+| `VITE_API_URL` | нет | Адрес backend API для локальной разработки. В production оставлять пустым: запросы идут на same-origin `/api/v1`. |
 | `VITE_API_PROXY_TARGET` | нет (только dev) | Куда проксирует Vite dev-сервер `/api/*`; по умолчанию `http://localhost:8443` |
 | `VITE_SENTRY_DSN` | нет | DSN проекта Sentry; если не задан — crash reporting не инициализируется |
 
@@ -105,7 +106,7 @@ src/
 docker build -t aspectum-admin .
 ```
 
-Собирает статику и раздаёт её через nginx (`nginx.conf` в корне репозитория): security-заголовки (CSP, X-Frame-Options и т.д.), SPA `try_files`-фоллбэк, запрет прямого доступа к `*.map`. Для локальной разработки в контейнере — `Dockerfile.dev` + `docker-compose.dev.yml`.
+Собирает статику и раздаёт её через nginx (`nginx.conf` в корне репозитория). `.dockerignore` исключает локальные env-файлы и `node_modules`, поэтому machine-specific `VITE_API_URL` не попадает в production Docker build: security-заголовки (CSP, X-Frame-Options и т.д.), SPA `try_files`-фоллбэк, запрет прямого доступа к `*.map`. Для локальной разработки в контейнере — `Dockerfile.dev` + `docker-compose.dev.yml`.
 
 ## Тесты
 

@@ -13,7 +13,7 @@ export default function ExportEvents() {
       setError(null);
       setSuccess(false);
 
-      const response = await apiClient.get('/generation/events/export/', {
+      const response = await apiClient.get('/export/staff/events/', {
         responseType: 'blob',
       });
 

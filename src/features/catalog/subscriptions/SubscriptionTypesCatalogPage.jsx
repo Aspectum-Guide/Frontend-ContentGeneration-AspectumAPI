@@ -4,7 +4,7 @@ import { listAllStaffEvents } from '../../../api/staffCatalog';
 import { subscriptionTypesAPI } from '../../../api/subscription';
 import Layout from '../../../components/Layout';
 import DataTable from '../../../components/ui/DataTable';
-import { Field, FormActions, TextInput, Textarea } from '../../../components/ui/FormField';
+import { Field, FormActions, Select, TextInput, Textarea } from '../../../components/ui/FormField';
 import Modal, { ConfirmModal } from '../../../components/ui/Modal';
 import { useLayoutActions } from '../../../context/useLayoutActions';
 import { parseApiError } from '../../../utils/apiError';
@@ -265,15 +265,15 @@ export default function SubscriptionTypesCatalogPage() {
         pageSize={PAGE_SIZE}
         onPage={setPage}
         filters={(
-          <select
+          <Select
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value)}
-            className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+            className="w-auto text-sm"
           >
             <option value="">Любой статус</option>
             <option value="active">Активные</option>
             <option value="inactive">Отключенные</option>
-          </select>
+          </Select>
         )}
         actions={(row) => (
           <TableRowActions
@@ -338,7 +338,7 @@ export default function SubscriptionTypesCatalogPage() {
             />
 
             <Field label="Города" hint="Ctrl/Cmd + click для множественного выбора">
-              <select
+              <Select
                 multiple
                 size={8}
                 disabled={refsLoading}
@@ -347,16 +347,16 @@ export default function SubscriptionTypesCatalogPage() {
                   const selected = Array.from(e.target.selectedOptions).map((o) => o.value);
                   setEditingItem((prev) => ({ ...prev, cities: selected }));
                 }}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+                className="min-h-0 text-sm"
               >
                 {cities.map((city) => (
                   <option key={city.id} value={city.id}>{getCityLabel(city)}</option>
                 ))}
-              </select>
+              </Select>
             </Field>
 
             <Field label="События" hint="Ctrl/Cmd + click для множественного выбора">
-              <select
+              <Select
                 multiple
                 size={8}
                 disabled={refsLoading}
@@ -365,12 +365,12 @@ export default function SubscriptionTypesCatalogPage() {
                   const selected = Array.from(e.target.selectedOptions).map((o) => o.value);
                   setEditingItem((prev) => ({ ...prev, events: selected }));
                 }}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+                className="min-h-0 text-sm"
               >
                 {events.map((event) => (
                   <option key={event.id} value={event.id}>{getEventLabel(event)}</option>
                 ))}
-              </select>
+              </Select>
             </Field>
 
             <FormActions

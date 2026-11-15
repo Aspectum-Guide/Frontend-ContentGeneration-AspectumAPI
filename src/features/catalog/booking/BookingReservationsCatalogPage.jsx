@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { bookingReservationsAPI, eventSlotAvailabilitiesAPI } from '../../../api/booking';
 import Layout from '../../../components/Layout';
 import DataTable from '../../../components/ui/DataTable';
-import { Field } from '../../../components/ui/FormField';
+import { Field, Select } from '../../../components/ui/FormField';
 import Modal from '../../../components/ui/Modal';
 import { useLayoutActions } from '../../../context/useLayoutActions';
 import { parseApiError } from '../../../utils/apiError';
@@ -207,16 +207,16 @@ export default function BookingReservationsCatalogPage() {
               className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none"
             />
 
-            <select
+            <Select
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value)}
-              className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+              className="w-auto text-sm"
             >
               <option value="">Любой статус</option>
               <option value="reserved">reserved</option>
               <option value="cancelled">cancelled</option>
               <option value="expired">expired</option>
-            </select>
+            </Select>
 
             <TicketTypeSelect
               value={ticketTypeFilter}
@@ -227,10 +227,10 @@ export default function BookingReservationsCatalogPage() {
               className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none"
             />
 
-            <select
+            <Select
               value={slotFilter}
               onChange={(e) => setSlotFilter(e.target.value)}
-              className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+              className="w-auto text-sm"
               disabled={!eventFilter || slotsLoading || !slotOptions.length}
             >
               <option value="">{eventFilter ? 'Все слоты' : 'Сначала выберите событие'}</option>
@@ -239,7 +239,7 @@ export default function BookingReservationsCatalogPage() {
                   {s.label || s.id}
                 </option>
               ))}
-            </select>
+            </Select>
           </>
         )}
       />

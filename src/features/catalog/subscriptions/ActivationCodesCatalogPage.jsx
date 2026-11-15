@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { activationCodesAPI, subscriptionTypesAPI } from '../../../api/subscription';
 import Layout from '../../../components/Layout';
 import DataTable from '../../../components/ui/DataTable';
-import { Field, FormActions, TextInput, Textarea } from '../../../components/ui/FormField';
+import { Field, FormActions, Select, TextInput, Textarea } from '../../../components/ui/FormField';
 import Modal, { ConfirmModal } from '../../../components/ui/Modal';
 import { useLayoutActions } from '../../../context/useLayoutActions';
 import { parseApiError } from '../../../utils/apiError';
@@ -269,7 +269,7 @@ export default function ActivationCodesCatalogPage() {
         onPage={setPage}
         filters={(
           <>
-            <select
+            <Select
               value={subscriptionTypeFilter}
               onChange={(e) => setSubscriptionTypeFilter(e.target.value)}
               className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none"
@@ -279,9 +279,9 @@ export default function ActivationCodesCatalogPage() {
               {subscriptionTypes.map((st) => (
                 <option key={st.id} value={st.id}>{st.name}</option>
               ))}
-            </select>
+            </Select>
 
-            <select
+            <Select
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value)}
               className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none"
@@ -289,7 +289,7 @@ export default function ActivationCodesCatalogPage() {
               <option value="">Любой статус</option>
               <option value="active">Активные</option>
               <option value="inactive">Отключенные</option>
-            </select>
+            </Select>
           </>
         )}
         actions={(row) => (
@@ -321,7 +321,7 @@ export default function ActivationCodesCatalogPage() {
               </Field>
 
               <Field label="Тип подписки">
-                <select
+                <Select
                   value={crud.editingItem.subscription_type}
                   onChange={(e) => crud.setEditingItem((prev) => ({ ...prev, subscription_type: e.target.value }))}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none"
@@ -330,7 +330,7 @@ export default function ActivationCodesCatalogPage() {
                   {subscriptionTypes.map((st) => (
                     <option key={st.id} value={st.id}>{st.name}</option>
                   ))}
-                </select>
+                </Select>
               </Field>
             </div>
 
@@ -447,7 +447,7 @@ export default function ActivationCodesCatalogPage() {
             </div>
 
             <Field label="Тип подписки">
-              <select
+              <Select
                 value={values.subscription_type}
                 onChange={(e) => setValues((prev) => ({ ...prev, subscription_type: e.target.value }))}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none"
@@ -458,7 +458,7 @@ export default function ActivationCodesCatalogPage() {
                 {subscriptionTypes.map((st) => (
                   <option key={st.id} value={st.id}>{st.name}</option>
                 ))}
-              </select>
+              </Select>
             </Field>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">

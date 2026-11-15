@@ -1,6 +1,6 @@
 import apiClient from '../../../api/client';
 
-const BASE = '/generation/events';
+const BASE = '/events/staff';
 
 export const orphanEventsAPI = {
   listOrphans: (params) => apiClient.get(`${BASE}/orphans/`, { params }),
