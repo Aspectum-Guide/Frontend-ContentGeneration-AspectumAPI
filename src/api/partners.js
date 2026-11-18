@@ -1,0 +1,38 @@
+import apiClient from './client';
+
+// Партнёры: управление (только сотрудники) и отчёты, которые видит и сам партнёр.
+export const partnersAdminAPI = {
+  list: (params) => apiClient.get('/partners/admin/partners/', { params }),
+  get: (id) => apiClient.get(`/partners/admin/partners/${id}/`),
+  create: (data) => apiClient.post('/partners/admin/partners/', data),
+  update: (id, data) => apiClient.patch(`/partners/admin/partners/${id}/`, data),
+  // lang — язык готового текста приглашения: ru, en, it, fr, de, es;
+  // role — manager (кабинет целиком) или staff (сотрудник на входе: только гости и сканер).
+  invite: (id, email, lang = 'ru', role = 'manager') =>
+    apiClient.post(`/partners/admin/partners/${id}/invite/`, { email, lang, role }),
+  revokeMember: (id, memberId) =>
+    apiClient.post(`/partners/admin/partners/${id}/members/${memberId}/revoke/`),
+  // Экскурсии партнёра: по ним его сотрудники видят брони и отмечают гостей в приложении «Аспектум Партнёр».
+  events: (id) => apiClient.get(`/partners/admin/partners/${id}/events/`),
+  addEvent: (id, eventId) => apiClient.post(`/partners/admin/partners/${id}/events/`, { event: eventId }),
+  removeEvent: (id, eventId) => apiClient.delete(`/partners/admin/partners/${id}/events/${eventId}/`),
+  ledger: (id) => apiClient.get(`/partners/admin/partners/${id}/ledger/`),
+  addAdjustment: (id, data) => apiClient.post(`/partners/admin/partners/${id}/adjustments/`, data),
+  syncRuns: () => apiClient.get('/partners/admin/ledger/sync/'),
+  syncNow: () => apiClient.post('/partners/admin/ledger/sync/'),
+};
+
+export const partnerReportsAPI = {
+  summary: (id, params) => apiClient.get(`/partners/${id}/summary/`, { params }),
+  entries: (id, params) => apiClient.get(`/partners/${id}/entries/`, { params }),
+  clients: (id) => apiClient.get(`/partners/${id}/clients/`),
+  codes: (id) => apiClient.get(`/partners/${id}/codes/`),
+  // QR ссылки активации кода партнёра: type 'svg' (печать) или 'png'.
+  codeQr: (id, code, type = 'png', download = false) =>
+    apiClient.get(`/partners/${id}/codes/${encodeURIComponent(code)}/qr/`, {
+      params: { type, ...(download ? { download: 1 } : {}) },
+      responseType: 'blob',
+    }),
+  entriesCsv: (id, params) =>
+    apiClient.get(`/partners/${id}/entries.csv`, { params, responseType: 'blob' }),
+};

@@ -64,6 +64,8 @@ const BookingSetupWorkbench = lazyPage(() => import('./pages/catalog/BookingSetu
 const CityPricingWorkbench = lazyPage(() => import('./pages/catalog/CityPricingWorkbench'));
 const SubscriptionTypesCatalog = lazyPage(() => import('./pages/catalog/SubscriptionTypesCatalog'));
 const ActivationCodesCatalog = lazyPage(() => import('./pages/catalog/ActivationCodesCatalog'));
+const PartnersCatalog = lazyPage(() => import('./pages/catalog/PartnersCatalog'));
+const PartnerDetail = lazyPage(() => import('./pages/catalog/PartnerDetail'));
 const UserSubscriptionsWorkbench = lazyPage(() => import('./pages/catalog/UserSubscriptionsWorkbench'));
 const CodeUsageLogsCatalog = lazyPage(() => import('./pages/catalog/CodeUsageLogsCatalog'));
 const CitySubscriptionsCatalog = lazyPage(() => import('./pages/catalog/CitySubscriptionsCatalog'));
@@ -258,6 +260,14 @@ const routes = [
   {
     path: '/catalog/activation-codes',
     element: <ProtectedRoute><ErrorBoundary><ActivationCodesCatalog /></ErrorBoundary></ProtectedRoute>,
+  },
+  {
+    path: '/catalog/partners',
+    element: <ProtectedRoute><ErrorBoundary><PartnersCatalog /></ErrorBoundary></ProtectedRoute>,
+  },
+  {
+    path: '/catalog/partners/:partnerId',
+    element: <ProtectedRoute><ErrorBoundary><PartnerDetail /></ErrorBoundary></ProtectedRoute>,
   },
   {
     path: '/catalog/user-subscriptions',
