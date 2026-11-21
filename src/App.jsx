@@ -82,6 +82,7 @@ const InteractiveLocationsCatalog = lazyPage(() => import('./pages/catalog/Inter
 const LLMKeysCatalog = lazyPage(() => import('./pages/catalog/LLMKeysCatalog'));
 const LLMUsageCatalog = lazyPage(() => import('./pages/catalog/LLMUsageCatalog'));
 const ContentAuthorsCatalog = lazyPage(() => import('./pages/catalog/ContentAuthorsCatalog'));
+const UsersCatalog = lazyPage(() => import('./pages/catalog/UsersCatalog'));
 
 // Export & Import & Tasks
 const ExportCities = lazyPage(() => import('./pages/export/ExportCities'));
@@ -204,6 +205,10 @@ const routes = [
   {
     path: '/catalog/authors',
     element: <ProtectedRoute><ErrorBoundary><ContentAuthorsCatalog /></ErrorBoundary></ProtectedRoute>,
+  },
+  {
+    path: '/catalog/users',
+    element: <ProtectedRoute><ErrorBoundary><UsersCatalog /></ErrorBoundary></ProtectedRoute>,
   },
   {
     path: '/catalog/ticket-types',
