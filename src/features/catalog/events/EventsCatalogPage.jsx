@@ -1,11 +1,7 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Layout from '../../../components/Layout';
-import Alert from '../../../components/ui/Alert';
-import Button from '../../../components/ui/Button';
-import DataTable from '../../../components/ui/DataTable';
-import { ConfirmModal } from '../../../components/ui/Modal';
-import Toast from '../../../components/ui/Toast';
+import { Alert, Button, ConfirmModal, DataTable, PageHeader, Select, Switch, TableRowActions, Toast, Glyph } from '@aspectum/admin-ui-web';
 import { useLayoutActions } from '../../../context/useLayoutActions';
 import { adminAPI } from '../../../api/generation';
 import { parseApiError } from '../../../utils/apiError';
@@ -20,12 +16,13 @@ export default function EventsCatalogPage() {
   const [toggleConfirm, setToggleConfirm] = useState(null); // { id, field, value, label }
   const [nearestLoading, setNearestLoading] = useState(false);
   const [nearestNote, setNearestNote] = useState(null);
+  const cityFilter = e.cityFilter;
 
-  const handleCalculateNearest = async () => {
+  const handleCalculateNearest = useCallback(async () => {
     setNearestLoading(true);
     setNearestNote(null);
     try {
-      const r = await adminAPI.calculateNearestEvents(e.cityFilter || undefined);
+      const r = await adminAPI.calculateNearestEvents(cityFilter || undefined);
       const msg = r?.data?.message || r?.data?.status || 'Расчёт ближайших событий запущен';
       setNearestNote({ type: 'success', text: String(msg) });
     } catch (err) {
@@ -33,7 +30,7 @@ export default function EventsCatalogPage() {
     } finally {
       setNearestLoading(false);
     }
-  };
+  }, [cityFilter]);
 
   const requestToggle = (id, field, value, label) => {
     if (!value) {
@@ -50,31 +47,32 @@ export default function EventsCatalogPage() {
       label: 'Название',
       render: (title, row) => (
         <div>
-          <div className="flex items-center gap-1.5 font-medium text-gray-900 text-sm">
+          <div className="flex items-center gap-1.5 font-medium text-aspectum-text text-sm">
             {getMultiLangValue(title) || '—'}
             {row.audio_guide_count > 0 && (
-              <button
+              <Button
                 type="button"
                 onClick={(ev) => {
                   ev.stopPropagation();
                   navigate(`/catalog/audio-guides?event_id=${row.id}`);
                 }}
-                className="text-xs text-blue-600 font-normal hover:underline"
+                variant="link"
+                size="sm"
                 title={`${row.audio_guide_count} аудиогид(ов)`}
               >
                 🎧{row.audio_guide_count}
-              </button>
+              </Button>
             )}
           </div>
           {row.tags?.length > 0 && (
             <div className="flex flex-wrap gap-1 mt-1">
               {row.tags.slice(0, 3).map((tag, i) => (
-                <span key={i} className="px-1.5 py-0.5 bg-purple-50 text-purple-700 rounded text-xs">
+                <span key={i} className="px-1.5 py-0.5 bg-aspectum-purple-soft text-aspectum-purple-strong rounded text-xs">
                   {tag}
                 </span>
               ))}
               {row.tags.length > 3 && (
-                <span className="text-xs text-gray-400">+{row.tags.length - 3}</span>
+                <span className="text-xs text-aspectum-text-disabled">+{row.tags.length - 3}</span>
               )}
             </div>
           )}
@@ -84,7 +82,7 @@ export default function EventsCatalogPage() {
     {
       key: 'city_display_name',
       label: 'Город',
-      render: (v) => <span className="text-sm text-gray-600">{v || '—'}</span>,
+      render: (v) => <span className="text-sm text-aspectum-text-subtle">{v || '—'}</span>,
     },
     {
       key: 'is_show',
@@ -92,20 +90,12 @@ export default function EventsCatalogPage() {
       render: (v, row) => {
         const loading = e.togglingIds.has(`${row.id}-is_show`);
         return (
-          <button
-            type="button"
-            role="switch"
-            aria-checked={v}
+          <Switch
+            checked={Boolean(v)}
+            loading={loading}
             aria-label={v ? 'Скрыть событие' : 'Показать событие'}
-            onClick={() => !loading && requestToggle(row.id, 'is_show', !v, `Скрыть «${getMultiLangValue(row.title) || row.id}»?`)}
-            disabled={loading}
-            className={`relative w-9 h-5 rounded-full transition-colors focus:outline-none disabled:opacity-50 ${v ? 'bg-blue-500' : 'bg-gray-300'}`}
-          >
-            {loading
-              ? <span className="absolute inset-0 flex items-center justify-center"><span className="w-3 h-3 border border-white border-t-transparent rounded-full animate-spin" /></span>
-              : <span className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-all ${v ? 'left-4' : 'left-0.5'}`} />
-            }
-          </button>
+            onChange={(next) => requestToggle(row.id, 'is_show', next, `Скрыть «${getMultiLangValue(row.title) || row.id}»?`)}
+          />
         );
       },
     },
@@ -115,20 +105,13 @@ export default function EventsCatalogPage() {
       render: (v, row) => {
         const loading = e.togglingIds.has(`${row.id}-is_bookable`);
         return (
-          <button
-            type="button"
-            role="switch"
-            aria-checked={v}
+          <Switch
+            checked={Boolean(v)}
+            loading={loading}
+            color="green"
             aria-label={v ? 'Убрать из стора' : 'Добавить в стор'}
-            onClick={() => !loading && requestToggle(row.id, 'is_bookable', !v, `Убрать «${getMultiLangValue(row.title) || row.id}» из стора?`)}
-            disabled={loading}
-            className={`relative w-9 h-5 rounded-full transition-colors focus:outline-none disabled:opacity-50 ${v ? 'bg-green-500' : 'bg-gray-300'}`}
-          >
-            {loading
-              ? <span className="absolute inset-0 flex items-center justify-center"><span className="w-3 h-3 border border-white border-t-transparent rounded-full animate-spin" /></span>
-              : <span className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-all ${v ? 'left-4' : 'left-0.5'}`} />
-            }
-          </button>
+            onChange={(next) => requestToggle(row.id, 'is_bookable', next, `Убрать «${getMultiLangValue(row.title) || row.id}» из стора?`)}
+          />
         );
       },
     },
@@ -136,19 +119,24 @@ export default function EventsCatalogPage() {
       key: 'image_url',
       label: 'Фото',
       render: (url) => url
-        ? <img src={url} alt="" className="w-10 h-10 object-cover rounded-md" />
-        : <span className="text-gray-300 text-xs">—</span>,
+        ? <img src={url} alt="" className="w-10 h-10 object-cover rounded-aspectum-compact" />
+        : <span className="text-aspectum-text-faint text-xs">—</span>,
     },
   ];
 
+  const openCreate = e.openCreate;
+  const eventSaving = e.saving;
+  const editingEvent = e.editingEvent;
+  const handleSave = e.handleSave;
+  const setEditingEvent = e.setEditingEvent;
   useEffect(() => {
     const actions = [
       {
         id: 'create-event',
         label: 'Создать событие',
-        onClick: e.openCreate,
-        disabled: e.saving,
-        variant: e.editingEvent ? 'secondary' : 'primary',
+        onClick: openCreate,
+        disabled: eventSaving,
+        variant: editingEvent ? 'secondary' : 'primary',
       },
       {
         id: 'create-event-tag',
@@ -165,65 +153,62 @@ export default function EventsCatalogPage() {
       },
     ];
 
-    if (e.editingEvent) {
+    if (editingEvent) {
       actions.push(
         {
           id: 'save-event',
-          label: e.saving
-            ? (e.editingEvent?.id ? 'Сохранение...' : 'Создание...')
-            : (e.editingEvent?.id ? 'Сохранить событие' : 'Создать событие'),
-          onClick: () => { if (!e.saving) e.handleSave(); },
-          disabled: e.saving,
+          label: eventSaving
+            ? (editingEvent?.id ? 'Сохранение...' : 'Создание...')
+            : (editingEvent?.id ? 'Сохранить событие' : 'Создать событие'),
+          onClick: () => { if (!eventSaving) handleSave(); },
+          disabled: eventSaving,
           variant: 'primary',
         },
         {
           id: 'close-event-editor',
           label: 'Закрыть форму',
-          onClick: () => e.setEditingEvent(null),
+          onClick: () => setEditingEvent(null),
         }
       );
     }
 
     setMobileActions(actions);
     return () => setMobileActions([]);
-  }, [e.openCreate, e.saving, e.editingEvent, e.handleSave, e.setEditingEvent, e.cityFilter, navigate, nearestLoading, setMobileActions]);
+  }, [openCreate, eventSaving, editingEvent, handleSave, setEditingEvent, handleCalculateNearest, navigate, nearestLoading, setMobileActions]);
 
   return (
     <Layout>
-      <div className="mb-6 flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Справочник событий</h1>
-          <p className="mt-1 text-sm text-gray-500">Просмотр и редактирование событий</p>
-        </div>
-        <Button
+      <PageHeader
+        title="Справочник событий"
+        description="Просмотр и редактирование событий"
+        className="flex-wrap"
+        actions={<Button
           type="button"
-          size="sm"
           variant="soft"
+          size="md"
           onClick={handleCalculateNearest}
           disabled={nearestLoading}
         >
           {nearestLoading ? 'Расчёт...' : 'Рассчитать ближайшие'}
-        </Button>
-      </div>
+        </Button>}
+      />
 
       {nearestNote && (
-        <div className="mb-4">
-          <Alert tone={nearestNote.type === 'error' ? 'error' : 'success'}>
-            {nearestNote.text}
-          </Alert>
-        </div>
+        <Alert tone={nearestNote.type === 'error' ? 'error' : 'success'} className="mb-4 text-sm px-3 py-2">
+          {nearestNote.text}
+        </Alert>
       )}
 
       {(e.cityOptionsError || e.filtersError) && (
         <div className="mb-4 flex flex-col gap-2">
           {e.cityOptionsError && (
-            <Alert tone="warning">
-              ⚠ {e.cityOptionsError} — фильтр по городу недоступен
+            <Alert tone="warning" className="text-sm px-3 py-2">
+              <Glyph name="⚠" /> {e.cityOptionsError} — фильтр по городу недоступен
             </Alert>
           )}
           {e.filtersError && (
-            <Alert tone="warning">
-              ⚠ {e.filtersError} — теги в форме недоступны
+            <Alert tone="warning" className="text-sm px-3 py-2">
+              <Glyph name="⚠" /> {e.filtersError} — теги в форме недоступны
             </Alert>
           )}
         </div>
@@ -246,35 +231,21 @@ export default function EventsCatalogPage() {
         onPage={e.setPage}
         filters={
           e.cityOptions.length > 0 && (
-            <select
-              value={e.cityFilter}
-              onChange={(evt) => e.setCityFilter(evt.target.value)}
-              className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none"
-            >
+            <Select value={e.cityFilter} onChange={(evt) => e.setCityFilter(evt.target.value)}>
               <option value="">Все города</option>
               {e.cityOptions.map((c) => (
                 <option key={c.id} value={c.id}>{getMultiLangValue(c.name) || c.id}</option>
               ))}
-            </select>
+            </Select>
           )
         }
         actions={(row) => (
-          <div className="flex items-center gap-1.5">
-            <Button
-              size="xs"
-              variant="soft"
-              onClick={() => e.openEdit(row)}
-            >
-              Ред.
-            </Button>
-            <Button
-              size="xs"
-              variant="softDanger"
-              onClick={() => e.requestDelete(row)}
-            >
-              Удалить
-            </Button>
-          </div>
+          <>
+            <TableRowActions
+              onEdit={() => e.openEdit(row)}
+              onDelete={() => e.requestDelete(row)}
+            />
+          </>
         )}
       />
 
@@ -335,4 +306,3 @@ export default function EventsCatalogPage() {
     </Layout>
   );
 }
-

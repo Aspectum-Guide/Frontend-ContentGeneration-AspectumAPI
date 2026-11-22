@@ -76,11 +76,11 @@ export function getPriceRowStatus({
 }
 
 const STATUS_CLASS = {
-  saved: 'bg-emerald-50 text-emerald-700',
-  draft: 'bg-sky-50 text-sky-700',
-  rules: 'bg-violet-50 text-violet-700',
-  slots: 'bg-amber-50 text-amber-700',
-  empty: 'bg-gray-100 text-gray-500',
+  saved: 'bg-aspectum-success-soft text-aspectum-success-strong',
+  draft: 'bg-aspectum-info-soft text-aspectum-info-strong',
+  rules: 'bg-aspectum-violet-soft text-aspectum-violet',
+  slots: 'bg-aspectum-warning-soft text-aspectum-warning-strong',
+  empty: 'bg-aspectum-surface-subtle text-aspectum-text-muted',
 };
 
 export function priceStatusClass(kind) {

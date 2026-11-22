@@ -3,10 +3,7 @@ import { Link } from 'react-router-dom';
 import Layout from '../../../components/Layout';
 import apiClient from '../../../api/client';
 import { imagesAPI } from './api';
-import Modal, { ConfirmModal } from '../../../components/ui/Modal';
-import Button from '../../../components/ui/Button';
-import Alert from '../../../components/ui/Alert';
-import { Card, EmptyState } from '@aspectum/admin-ui-web';
+import { FormLabel, Alert, Button, Card, ConfirmModal, EmptyState, IconButton, InlineState, Modal, PageHeader, Spinner, TextInput, Glyph } from '@aspectum/admin-ui-web';
 
 const USAGE_KIND_LABELS = {
   city: 'Город',
@@ -42,17 +39,19 @@ function usageRoleLabel(role) {
 
 function CopyableMono({ value, empty = '—' }) {
   if (!value) {
-    return <span className="text-sm text-gray-400">{empty}</span>;
+    return <span className="text-sm text-aspectum-text-disabled">{empty}</span>;
   }
   return (
-    <button
+    <Button
       type="button"
       title="Скопировать"
       onClick={() => navigator.clipboard?.writeText(String(value))}
-      className="block w-full text-left font-mono text-xs text-gray-800 bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 break-all hover:bg-gray-100"
+      variant="copyField"
+      size="md"
+      className="block w-full text-left font-mono text-xs break-all"
     >
       {value}
-    </button>
+    </Button>
   );
 }
 
@@ -177,32 +176,28 @@ export default function PhotosCatalog() {
 
   return (
     <Layout>
-      <div className="mb-6 flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Фотографии</h1>
-          <p className="mt-1 text-sm text-gray-500">Справочник изображений</p>
-        </div>
-        {totalCount > 0 && (
-          <span className="text-sm text-gray-500">Всего: {totalCount}</span>
-        )}
-      </div>
+      <PageHeader
+        title="Фотографии"
+        description="Справочник изображений"
+        actions={totalCount > 0 ? (
+          <span className="text-sm text-aspectum-text-muted">Всего: {totalCount}</span>
+        ) : null}
+      />
 
       {error && (
-        <div className="mb-4">
-          <Alert tone="warning">{error}</Alert>
-        </div>
+        <Alert tone="warning" className="mb-4">{error}</Alert>
       )}
       {actionError && (
-        <div className="mb-4 flex items-center justify-between">
-          <Alert tone="error" className="flex-1">{actionError}</Alert>
-          <button onClick={() => setActionError(null)} className="text-red-400 hover:text-red-600 ml-3 shrink-0">✕</button>
-        </div>
+        <Alert tone="error" className="mb-4 flex items-center justify-between">
+          {actionError}
+          <IconButton label="Закрыть ошибку" onClick={() => setActionError(null)} variant="ghostDanger" className="ml-3 shrink-0"><Glyph name="✕" /></IconButton>
+        </Alert>
       )}
 
       {loading ? (
-        <div className="flex justify-center py-16 text-aspectum-text-subtle">Загрузка...</div>
+        <EmptyState icon={<Spinner size="md" />} title="Загрузка..." className="py-16" />
       ) : images.length === 0 ? (
-        <Card className="p-8">
+        <Card>
           <EmptyState
             icon="🖼️"
             title="Изображений не найдено"
@@ -215,7 +210,7 @@ export default function PhotosCatalog() {
             {images.map((img) => (
               <div
                 key={img.id}
-                className="group relative bg-white rounded-lg border border-gray-200 overflow-hidden shadow-sm hover:shadow-md transition-shadow"
+                className="group relative bg-aspectum-surface rounded-aspectum-control border border-aspectum-border overflow-hidden shadow-aspectum-card hover:shadow-aspectum-raised transition-shadow"
               >
                 {img.image_url ? (
                   <img
@@ -225,29 +220,31 @@ export default function PhotosCatalog() {
                     loading="lazy"
                   />
                 ) : (
-                  <div className="w-full aspect-square bg-gray-100 flex items-center justify-center text-gray-400 text-xs">
+                  <div className="w-full aspect-square bg-aspectum-surface-subtle flex items-center justify-center text-aspectum-text-disabled text-xs">
                     No image
                   </div>
                 )}
                 <div className="p-2">
-                  <p className="text-xs text-gray-500 truncate">{img.filename || img.copyright || '—'}</p>
-                  <p className="text-xs text-gray-300 font-mono truncate" title={img.id}>#{img.id}</p>
+                  <p className="text-xs text-aspectum-text-muted truncate">{img.filename || img.copyright || '—'}</p>
+                  <p className="text-xs text-aspectum-text-faint font-mono truncate" title={img.id}>#{img.id}</p>
                 </div>
-                <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors flex items-center justify-center opacity-0 group-hover:opacity-100 gap-2">
-                  <button
+                <div className="absolute inset-0 bg-aspectum-overlay-clear group-hover:bg-aspectum-overlay-light transition-colors flex items-center justify-center opacity-0 group-hover:opacity-100 gap-2">
+                  <IconButton
+                    type="button"
+                    variant="outline"
                     onClick={() => openEdit(img)}
-                    className="p-1.5 bg-white rounded-md shadow text-xs text-gray-700 hover:bg-gray-50"
-                    title="Редактировать"
+                    label="Редактировать"
                   >
-                    ✏️
-                  </button>
-                  <button
+                    <Glyph name="✏" />
+                  </IconButton>
+                  <IconButton
+                    type="button"
+                    variant="outlineDanger"
                     onClick={() => setDeleteTarget(img)}
-                    className="p-1.5 bg-white rounded-md shadow text-xs text-red-600 hover:bg-red-50"
-                    title="Удалить"
+                    label="Удалить"
                   >
-                    🗑️
-                  </button>
+                    <Glyph name="🗑" />
+                  </IconButton>
                 </div>
               </div>
             ))}
@@ -255,11 +252,11 @@ export default function PhotosCatalog() {
 
           {totalPages > 1 && (
             <div className="flex items-center justify-center gap-2 py-4">
-              <Button size="sm" variant="secondary" disabled={page <= 1} onClick={() => setPage(page - 1)}>
+              <Button type="button" variant="outline" size="md" disabled={page <= 1} onClick={() => setPage(page - 1)}>
                 ← Предыдущая
               </Button>
               <span className="text-sm text-aspectum-text-subtle">{page} / {totalPages}</span>
-              <Button size="sm" variant="secondary" disabled={page >= totalPages} onClick={() => setPage(page + 1)}>
+              <Button type="button" variant="outline" size="md" disabled={page >= totalPages} onClick={() => setPage(page + 1)}>
                 Следующая →
               </Button>
             </div>
@@ -274,167 +271,132 @@ export default function PhotosCatalog() {
         size="lg"
       >
         {editingImage && (
-          <form onSubmit={handleSave} className="space-y-4">
-            {editingImage.image_url && (
-              <img
-                src={editingImage.image_url}
-                alt="preview"
-                className="w-full max-h-56 object-contain rounded-lg border border-gray-200 bg-gray-50"
-              />
-            )}
+            <form onSubmit={handleSave} className="space-y-4">
+              {editingImage.image_url && (
+                <img src={editingImage.image_url} alt="preview"
+                  className="w-full max-h-56 object-contain rounded-aspectum-control border border-aspectum-border bg-aspectum-surface-muted" />
+              )}
 
-            {detailLoading && (
-              <p className="text-sm text-gray-500">Загрузка деталей...</p>
-            )}
+              {detailLoading && (
+                <InlineState loading>Загрузка деталей...</InlineState>
+              )}
 
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">ID</label>
-              <CopyableMono value={editingImage.id} />
-            </div>
+              <div>
+                <FormLabel  layout="block" size="sm" weight="medium" tone="strong" spacing="xs">ID</FormLabel>
+                <CopyableMono value={editingImage.id} />
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <FormLabel  layout="block" size="sm" weight="medium" tone="strong" spacing="xs">Имя файла</FormLabel>
+                  <CopyableMono value={editingImage.filename} />
+                </div>
+                <div>
+                  <FormLabel  layout="block" size="sm" weight="medium" tone="strong" spacing="xs">Путь на сервере</FormLabel>
+                  <CopyableMono value={editingImage.path} />
+                </div>
+              </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Имя файла</label>
-                <CopyableMono value={editingImage.filename} />
+                <FormLabel  layout="block" size="sm" weight="medium" tone="strong" spacing="xs">URL файла</FormLabel>
+                {editingImage.image_url || editingImage.url ? (
+                  <a
+                    href={editingImage.image_url || editingImage.url}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="block font-mono text-xs text-aspectum-primary-hover bg-aspectum-primary-soft border border-aspectum-primary-muted rounded-aspectum-control px-3 py-2 break-all hover:underline"
+                  >
+                    {editingImage.image_url || editingImage.url}
+                  </a>
+                ) : (
+                  <CopyableMono value={null} />
+                )}
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Путь на сервере</label>
-                <CopyableMono value={editingImage.path} />
+                <FormLabel  layout="block" size="sm" weight="medium" tone="strong" spacing="xs">Авторское право</FormLabel>
+                <TextInput type="text" value={editingImage.copyright || ''} onChange={(e) => setEditingImage((p) => ({ ...p, copyright: e.target.value }))} placeholder="© Author Name" />
               </div>
             </div>
 
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">URL файла</label>
-              {editingImage.image_url || editingImage.url ? (
-                <a
-                  href={editingImage.image_url || editingImage.url}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="block font-mono text-xs text-blue-700 bg-blue-50 border border-blue-100 rounded-lg px-3 py-2 break-all hover:underline"
-                >
-                  {editingImage.image_url || editingImage.url}
-                </a>
-              ) : (
-                <CopyableMono value={null} />
-              )}
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Авторское право</label>
-              <input
-                type="text"
-                value={editingImage.copyright || ''}
-                onChange={(e) => setEditingImage((p) => ({ ...p, copyright: e.target.value }))}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none"
-                placeholder="© Author Name"
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Source URL</label>
-              <input
-                type="url"
-                value={editingImage.source_url || ''}
-                onChange={(e) => setEditingImage((p) => ({ ...p, source_url: e.target.value }))}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none"
-                placeholder="https://..."
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Страница источника (file page)</label>
-              <input
-                type="url"
-                value={editingImage.file_page_url || ''}
-                onChange={(e) => setEditingImage((p) => ({ ...p, file_page_url: e.target.value }))}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none"
-                placeholder="https://commons.wikimedia.org/..."
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Original image URL</label>
-              <input
-                type="url"
-                value={editingImage.original_image_url || ''}
-                onChange={(e) => setEditingImage((p) => ({ ...p, original_image_url: e.target.value }))}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none"
-                placeholder="https://..."
-              />
-            </div>
-
-            <div>
-              <div className="flex items-center justify-between mb-2">
-                <label className="block text-sm font-medium text-gray-700">Где используется</label>
-                <span className="text-xs text-gray-400">
-                  {(editingImage.usages || []).length} связей
-                </span>
+              <div>
+                <FormLabel  layout="block" size="sm" weight="medium" tone="strong" spacing="xs">Source URL</FormLabel>
+                <TextInput type="url" value={editingImage.source_url || ''} onChange={(e) => setEditingImage((p) => ({ ...p, source_url: e.target.value }))} placeholder="https://..." />
               </div>
-              {(editingImage.usages || []).length === 0 ? (
-                <p className="text-sm text-gray-400 bg-gray-50 border border-dashed border-gray-200 rounded-lg px-3 py-4 text-center">
-                  {detailLoading ? 'Ищем связи…' : 'Нигде не используется (или только в черновиках без привязки)'}
-                </p>
-              ) : (
-                <ul className="divide-y divide-gray-100 border border-gray-200 rounded-lg overflow-hidden">
-                  {editingImage.usages.map((u, idx) => {
-                    const title = `${usageKindLabel(u.kind)}: ${u.label || '—'}`;
-                    const role = usageRoleLabel(u.role);
-                    const inner = (
-                      <>
-                        <div className="min-w-0">
-                          <p className="text-sm text-gray-900 truncate">{title}</p>
-                          <p className="text-xs text-gray-500 truncate">
-                            {role}
-                            {u.id ? ` · #${u.id}` : ''}
-                          </p>
-                        </div>
-                        {u.href ? (
-                          <span className="text-xs text-blue-600 shrink-0">открыть →</span>
-                        ) : null}
-                      </>
-                    );
-                    return (
-                      <li key={`${u.kind}-${u.id}-${u.role}-${idx}`}>
-                        {u.href ? (
-                          <Link
-                            to={u.href}
-                            className="flex items-center justify-between gap-3 px-3 py-2.5 hover:bg-blue-50"
-                            onClick={() => setEditingImage(null)}
-                          >
-                            {inner}
-                          </Link>
-                        ) : (
-                          <div className="flex items-center justify-between gap-3 px-3 py-2.5">
-                            {inner}
+
+              <div>
+                <FormLabel  layout="block" size="sm" weight="medium" tone="strong" spacing="xs">Страница источника (file page)</FormLabel>
+                <TextInput type="url" value={editingImage.file_page_url || ''} onChange={(e) => setEditingImage((p) => ({ ...p, file_page_url: e.target.value }))} placeholder="https://commons.wikimedia.org/..." />
+              </div>
+
+              <div>
+                <FormLabel  layout="block" size="sm" weight="medium" tone="strong" spacing="xs">Original image URL</FormLabel>
+                <TextInput type="url" value={editingImage.original_image_url || ''} onChange={(e) => setEditingImage((p) => ({ ...p, original_image_url: e.target.value }))} placeholder="https://..." />
+              </div>
+
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <FormLabel  layout="block" size="sm" weight="medium" tone="strong">Где используется</FormLabel>
+                  <span className="text-xs text-aspectum-text-disabled">
+                    {(editingImage.usages || []).length} связей
+                  </span>
+                </div>
+                {(editingImage.usages || []).length === 0 ? (
+                  <EmptyState
+                    title={detailLoading ? 'Ищем связи…' : 'Изображение не используется'}
+                    description={detailLoading ? undefined : 'Или используется только в черновиках без привязки.'}
+                    className="py-4"
+                  />
+                ) : (
+                  <ul className="divide-y divide-aspectum-border-subtle border border-aspectum-border rounded-aspectum-control overflow-hidden">
+                    {editingImage.usages.map((u, idx) => {
+                      const title = `${usageKindLabel(u.kind)}: ${u.label || '—'}`;
+                      const role = usageRoleLabel(u.role);
+                      const inner = (
+                        <>
+                          <div className="min-w-0">
+                            <p className="text-sm text-aspectum-text truncate">{title}</p>
+                            <p className="text-xs text-aspectum-text-muted truncate">
+                              {role}
+                              {u.id ? ` · #${u.id}` : ''}
+                            </p>
                           </div>
-                        )}
-                      </li>
-                    );
-                  })}
-                </ul>
-              )}
-            </div>
+                          {u.href ? (
+                            <span className="text-xs text-aspectum-primary shrink-0">открыть →</span>
+                          ) : null}
+                        </>
+                      );
+                      return (
+                        <li key={`${u.kind}-${u.id}-${u.role}-${idx}`}>
+                          {u.href ? (
+                            <Link
+                              to={u.href}
+                              className="flex items-center justify-between gap-3 px-3 py-2.5 hover:bg-aspectum-primary-soft"
+                              onClick={() => setEditingImage(null)}
+                            >
+                              {inner}
+                            </Link>
+                          ) : (
+                            <div className="flex items-center justify-between gap-3 px-3 py-2.5">
+                              {inner}
+                            </div>
+                          )}
+                        </li>
+                      );
+                    })}
+                  </ul>
+                )}
+              </div>
 
-            <div className="flex gap-3 pt-2">
-              <Button
-                type="submit"
-                disabled={saving || detailLoading}
-                loading={saving}
-                variant="primary"
-                className="flex-1"
-              >
-                Сохранить
-              </Button>
-              <Button
-                type="button"
-                onClick={() => setEditingImage(null)}
-                variant="secondary"
-                className="flex-1"
-              >
-                Отмена
-              </Button>
-            </div>
-          </form>
+              <div className="flex gap-3 pt-2 sticky bottom-0 bg-aspectum-surface pb-1">
+                <Button type="submit" variant="primary" size="md" disabled={saving || detailLoading} className="flex-1">
+                  {saving ? 'Сохранение...' : 'Сохранить'}
+                </Button>
+                <Button type="button" variant="secondary" size="md" onClick={() => setEditingImage(null)} className="flex-1">
+                  Отмена
+                </Button>
+              </div>
+            </form>
         )}
       </Modal>
 

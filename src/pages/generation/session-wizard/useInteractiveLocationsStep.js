@@ -7,11 +7,11 @@ import {
   TASK_NOT_FOUND_MESSAGE,
 } from '../../../utils/generationTaskPoll';
 import { parseApiError } from '../../../utils/apiError';
-import { clampGenerationCount } from '../../../components/generation/AiGenerationCountField.jsx';
-import { formatGenerationDedupeResultMessage } from '../../../components/generation/AiGenerationDedupeToggle.jsx';
 import {
+  clampGenerationCount,
+  formatGenerationDedupeResultMessage,
   buildGenerationPayloadFields,
-} from '../../../components/generation/AiGenerationQualitySettings.jsx';
+} from '../../../components/generation/generationUtils';
 import { normalizeTagIds, normalizeId } from './sessionWizardShared.jsx';
 import {
   normalizeInteractiveLocation,
@@ -906,6 +906,7 @@ export default function useInteractiveLocationsStep({
     showNote,
     activeCityDraftIdRef,
     reloadInteractiveLocationsFromServer,
+    ilGenerating,
   ]);
 
   return {

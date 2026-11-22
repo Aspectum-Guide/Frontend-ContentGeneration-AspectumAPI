@@ -1,6 +1,6 @@
-# Multi-stage Dockerfile for frontend (Vite/React/vue)
+# Multi-stage Dockerfile for frontend (Vite/React)
 # Stage 1: build
-FROM node:18-alpine AS build
+FROM node:22-alpine AS build
 WORKDIR /app
 RUN apk add --no-cache git
 COPY package.json package-lock.json* yarn.lock* ./

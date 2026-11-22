@@ -1,8 +1,7 @@
 import { useState } from 'react';
 import Layout from '../../components/Layout';
 import apiClient from '../../api/client';
-import Button from '../../components/ui/Button';
-import { TextInput } from '../../components/ui/FormField';
+import { FormLabel, Alert, Button, Checkbox, PageHeader, Panel, TextInput } from '@aspectum/admin-ui-web';
 
 export default function Playground() {
   const [message, setMessage] = useState('Привет');
@@ -49,27 +48,29 @@ export default function Playground() {
 
   return (
     <Layout>
-      <div className="bg-white rounded-lg shadow-sm h-full flex flex-col">
+      <Panel as="div" className="shadow-aspectum-card h-full flex flex-col overflow-hidden">
         {/* Header */}
         <div className="border-b p-6">
-          <h1 className="text-2xl font-bold mb-2">Тестовый стенд ИИ</h1>
-          <p className="text-gray-600">Протестируйте ответы ИИ перед использованием</p>
+          <PageHeader
+            title="Тестовый стенд ИИ"
+            description="Протестируйте ответы ИИ перед использованием"
+            spacing="none"
+          />
         </div>
 
         {/* Settings */}
-        <div className="border-b p-6 bg-gray-50">
-          <label className="flex items-center gap-2 cursor-pointer">
-            <input
-              type="checkbox"
+        <div className="border-b p-6 bg-aspectum-surface-muted">
+          <FormLabel  layout="row" interactive>
+            <Checkbox
               checked={useSearch}
               onChange={(e) => setUseSearch(e.target.checked)}
               className="w-4 h-4"
             />
-            <span className="text-sm font-medium text-gray-700">
+            <span className="text-sm font-medium text-aspectum-text-strong">
               Использовать поиск в интернете
             </span>
-          </label>
-          <p className="text-xs text-gray-500 mt-2">
+          </FormLabel>
+          <p className="text-xs text-aspectum-text-muted mt-2">
             {useSearch
               ? 'ИИ будет использовать результаты поиска для более свежих ответов'
               : 'ИИ использует только свои знания'}
@@ -79,7 +80,7 @@ export default function Playground() {
         {/* Messages History */}
         <div className="flex-1 overflow-y-auto p-6 space-y-4">
           {messages.length === 0 ? (
-            <div className="flex items-center justify-center h-full text-gray-400">
+            <div className="flex items-center justify-center h-full text-aspectum-text-disabled">
               <p>Начните диалог, отправив сообщение</p>
             </div>
           ) : (
@@ -91,10 +92,10 @@ export default function Playground() {
                 }`}
               >
                 <div
-                  className={`max-w-xs px-4 py-2 rounded-lg ${
+                  className={`max-w-xs px-4 py-2 rounded-aspectum-control ${
                     msg.role === 'user'
-                      ? 'bg-blue-500 text-white'
-                      : 'bg-gray-100 text-gray-900'
+                      ? 'bg-aspectum-focus text-aspectum-on-accent'
+                      : 'bg-aspectum-surface-subtle text-aspectum-text'
                   }`}
                 >
                   <p className="text-sm">{msg.content}</p>
@@ -104,22 +105,20 @@ export default function Playground() {
           )}
 
           {error && (
-            <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg">
-              {error}
-            </div>
+            <Alert tone="error">{error}</Alert>
           )}
 
           {loading && (
             <div className="flex justify-start">
-              <div className="bg-gray-100 px-4 py-2 rounded-lg">
-                <p className="text-sm text-gray-600">Ожидание ответа...</p>
+              <div className="bg-aspectum-surface-subtle px-4 py-2 rounded-aspectum-control">
+                <p className="text-sm text-aspectum-text-subtle">Ожидание ответа...</p>
               </div>
             </div>
           )}
         </div>
 
         {/* Input Form */}
-        <div className="border-t p-6 bg-gray-50">
+        <div className="border-t p-6 bg-aspectum-surface-muted">
           <form onSubmit={handleSendMessage} className="flex gap-2">
             <TextInput
               type="text"
@@ -145,7 +144,7 @@ export default function Playground() {
             </Button>
           </form>
         </div>
-      </div>
+      </Panel>
     </Layout>
   );
 }

@@ -10,23 +10,23 @@ import {
   sessionsAPI,
   imagesAPI,
 } from '../../../api/generation';
-import { useLayoutActions } from '../../../context/useLayoutActions';
 import { trackEvent } from '../../../utils/analytics';
 import { parseApiError } from '../../../utils/apiError';
-import { useToast } from '../../../components/ui/Toast.jsx';
+import { useToast } from '@aspectum/admin-ui-web';
 import {
   normalizeDraftId,
   normalizeServerCityDraftsFromSessionData,
   extractReferenceCities,
 } from './useSessionWizardHelpers.js';
 import { normalizeTagIds } from './sessionWizardShared.jsx';
-import { makeLocaleData } from './useCityStep.js';
+import { makeLocaleData } from './cityStepCore.js';
 
 import useCityStep from './useCityStep.js';
 import { useAttractionsStep } from './useAttractionsStep.js';
 import useInteractiveLocationsStep from './useInteractiveLocationsStep.js';
 import { useAudioGuides } from './useAudioGuides.js';
 import usePublishStep from './usePublishStep.js';
+import { persistBeforeStepChange } from './sessionWizardNavigation.js';
 
 import type {
   UUID,
@@ -35,7 +35,6 @@ import type {
   LocaleData,
   ReferenceCity,
   ReferenceAttraction,
-  MultilangDict,
 } from '../../../types/models';
 
 const TOTAL_STEPS = 5;
@@ -60,7 +59,6 @@ export function useSessionWizardController({
   sessionId,
   confirm: confirmProp,
 }: UseSessionWizardControllerProps = {}) {
-  const { setMobileActions } = useLayoutActions();
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -105,6 +103,8 @@ export function useSessionWizardController({
   const sessionOpenedAtRef = useRef<number | null>(null);
   const firstCitySaveAtRef = useRef<number | null>(null);
   const flushDirtyDraftEditorsRef = useRef<() => Promise<void>>(async () => {});
+  const stepNavigationInFlightRef = useRef(false);
+  const [navigatingStep, setNavigatingStep] = useState(false);
   const loadSessionSeqRef = useRef(0);
   const localCreatedCityDraftsRef = useRef(new Map<UUID, CityDraft>());
   const localDeletedCityDraftIdsRef = useRef(new Set<UUID>());
@@ -319,15 +319,6 @@ export function useSessionWizardController({
     });
   }, [sessionId]);
 
-  useEffect(() => {
-    if (!session?.id) return;
-    const params = new URLSearchParams(location.search);
-    if (!params.has('step')) return;
-    const n = parseInt(params.get('step')!, 10);
-    if (!Number.isFinite(n)) return;
-    void navigateToStep(n);
-  }, [session?.id, location.search]);
-
   const collectWizardLanguageCodes = useCallback(() => {
     const codes = new Set<string>();
     const ingest = (data: LocaleData) => {
@@ -442,7 +433,10 @@ export function useSessionWizardController({
     requestedCityDraftIdRef.current = normalizeDraftId(routeDraftId || state?.cityDraftId);
   }, [location.search, location.state]);
 
-  // ─── Позиция визарда в URL: перезагрузка страницы возвращает на место ─────
+  // Позиция визарда пишется в URL, чтобы перезагрузка открыла тот же шаг.
+  // Обратно из URL шаг не читаем: начальное значение уже взято при маунте.
+  // Повторное чтение на каждый ререндер видело старый ?step= и снова
+  // запускало переход — на шагах 4→5 это крутило сохранение без остановки.
   useEffect(() => {
     const params = new URLSearchParams(location.search);
     const prevStep = params.get('step') || '';
@@ -482,27 +476,38 @@ export function useSessionWizardController({
 
   // После перезагрузки: как только достопримечательности загрузились,
   // открываем ту, что была открыта (?attraction=<id>)
+  const wizardAttractions = attractionsStep.attractions;
+  const attractionView = attractionsStep.attrView;
+  const openAttractionDetail = attractionsStep.openAttrDetail;
+  const saveCitySilently = cityStep.saveCitySilently;
+  const saveCurrentIlIfDirty = ilStep.saveCurrentIlIfDirty;
+  const setPreparingPublishStep = publishStep.setPreparingPublishStep;
+  const saveCurrentAttrIfDirty = attractionsStep.saveCurrentAttrIfDirty;
+  const saveCurrentCityInfoIfDirty = cityStep.saveCurrentCityInfoIfDirty;
+  const saveCurrentAttractionFeedItemIfDirty = attractionsStep.saveCurrentAttractionFeedItemIfDirty;
+  const saveCurrentAttractionInfoIfDirty = attractionsStep.saveCurrentAttractionInfoIfDirty;
+  const saveCurrentAttractionAudioGuideIfDirty = audioGuides.saveCurrentAttractionAudioGuideIfDirty;
   useEffect(() => {
     const wanted = requestedAttractionIdRef.current;
     if (!wanted) return;
 
-    if (currentStep !== 3 || attractionsStep.attrView === 'detail') {
+    if (currentStep !== 3 || attractionView === 'detail') {
       requestedAttractionIdRef.current = '';
       return;
     }
 
-    const attractions = attractionsStep.attractions || [];
+    const attractions = wizardAttractions || [];
     if (!attractions.length) return; // ждём загрузку списка
 
     requestedAttractionIdRef.current = '';
     if (attractions.some((a: { id: unknown }) => String(a.id) === wanted)) {
-      attractionsStep.openAttrDetail(wanted);
+      openAttractionDetail(wanted);
     }
   }, [
     currentStep,
-    attractionsStep.attractions,
-    attractionsStep.attrView,
-    attractionsStep.openAttrDetail,
+    wizardAttractions,
+    attractionView,
+    openAttractionDetail,
   ]);
 
   const navigateToStep = useCallback(
@@ -510,6 +515,8 @@ export function useSessionWizardController({
       if (target < 1 || target > TOTAL_STEPS || target === currentStepRef.current) {
         return true;
       }
+
+      if (stepNavigationInFlightRef.current) return false;
 
       const fromStep = currentStepRef.current;
 
@@ -524,31 +531,22 @@ export function useSessionWizardController({
       const isGoingToPublishStep = target === PUBLISH_STEP;
 
       if (isGoingToPublishStep) {
-        publishStep.setPreparingPublishStep(true);
+        setPreparingPublishStep(true);
       }
+      stepNavigationInFlightRef.current = true;
+      setNavigatingStep(true);
 
       try {
-        if (fromStep === 1 && target !== 1) {
-          await cityStep.saveCitySilently();
-        }
-
-        if (fromStep === 4 && target !== 4) {
-          await ilStep.saveCurrentIlIfDirty({ silent: true });
-        }
-
-        if (fromStep !== target) {
-          await flushDirtyDraftEditorsRef.current?.();
-        }
-
-        if (isGoingToPublishStep) {
-          await cityStep.saveCitySilently();
-          await flushDirtyDraftEditorsRef.current?.();
-          await loadSession(activeCityDraftIdRef.current, {
-            silent: true,
-            force: true,
-            preserveCurrentEditors: true,
-          });
-        }
+        await persistBeforeStepChange({
+          fromStep,
+          targetStep: target,
+          publishStep: PUBLISH_STEP,
+          activeCityDraftId: activeCityDraftIdRef.current,
+          saveCity: saveCitySilently,
+          saveInteractiveLocation: saveCurrentIlIfDirty,
+          flushEditors: () => flushDirtyDraftEditorsRef.current?.(),
+          reloadSession: loadSession,
+        });
       } catch (err) {
         console.error('[wizard:navigateToStep:error]', { fromStep, target, err });
         showNote(
@@ -560,66 +558,36 @@ export function useSessionWizardController({
         );
         return false;
       } finally {
+        stepNavigationInFlightRef.current = false;
+        setNavigatingStep(false);
         if (isGoingToPublishStep) {
-          publishStep.setPreparingPublishStep(false);
+          setPreparingPublishStep(false);
         }
       }
 
       setCurrentStep(target);
       return true;
     },
-    [localeData, defaultLocale, showNote, ilStep.saveCurrentIlIfDirty, cityStep.saveCitySilently, loadSession, publishStep]
+    [localeData, defaultLocale, showNote, saveCurrentIlIfDirty, saveCitySilently, loadSession, setPreparingPublishStep]
   );
 
-  useEffect(() => {
+    useEffect(() => {
     flushDirtyDraftEditorsRef.current = async () => {
-      await ilStep.saveCurrentIlIfDirty({ silent: true });
-      await attractionsStep.saveCurrentAttrIfDirty({ silent: true });
-      await cityStep.saveCurrentCityInfoIfDirty?.({ silent: true });
-      await attractionsStep.saveCurrentAttractionFeedItemIfDirty?.({ silent: true });
-      await attractionsStep.saveCurrentAttractionInfoIfDirty?.({ silent: true });
-      await audioGuides.saveCurrentAttractionAudioGuideIfDirty?.({ silent: true });
+      await saveCurrentIlIfDirty({ silent: true });
+      await saveCurrentAttrIfDirty({ silent: true });
+      await saveCurrentCityInfoIfDirty?.({ silent: true });
+      await saveCurrentAttractionFeedItemIfDirty?.({ silent: true });
+      await saveCurrentAttractionInfoIfDirty?.({ silent: true });
+      await saveCurrentAttractionAudioGuideIfDirty?.({ silent: true });
     };
   }, [
-    ilStep.saveCurrentIlIfDirty,
-    attractionsStep.saveCurrentAttrIfDirty,
-    cityStep.saveCurrentCityInfoIfDirty,
-    attractionsStep.saveCurrentAttractionFeedItemIfDirty,
-    attractionsStep.saveCurrentAttractionInfoIfDirty,
-    audioGuides.saveCurrentAttractionAudioGuideIfDirty,
+    saveCurrentIlIfDirty,
+    saveCurrentAttrIfDirty,
+    saveCurrentCityInfoIfDirty,
+    saveCurrentAttractionFeedItemIfDirty,
+    saveCurrentAttractionInfoIfDirty,
+    saveCurrentAttractionAudioGuideIfDirty,
   ]);
-
-  useEffect(() => {
-    const actions = [
-      {
-        id: 'save-city-data',
-        label: cityStep.saving ? 'Сохранение...' : 'Сохранить город',
-        onClick: () => { if (!cityStep.saving) cityStep.saveCityForStep1(); },
-        disabled: cityStep.saving,
-        variant: 'primary',
-      },
-    ];
-    if (!session?.closed_with_save) {
-      actions.push({
-        id: 'publish-session',
-        label: publishStep.publishing ? 'Публикация...' : 'Опубликовать сессию',
-        onClick: () => { if (!publishStep.publishing) publishStep.handlePublish(); },
-        disabled: publishStep.publishing,
-        variant: '',
-      });
-    }
-    if (session?.status === 'draft' || session?.status === 'in_progress') {
-      actions.push({
-        id: 'close-session',
-        label: 'Закрыть сессию',
-        onClick: () => { publishStep.setCloseMode('save'); publishStep.setCloseOpen(true); },
-        disabled: false,
-        variant: 'danger',
-      });
-    }
-
-    return () => setMobileActions([]);
-  }, [setMobileActions, cityStep.saving, publishStep.publishing, cityStep.saveCityForStep1, publishStep.handlePublish, session, publishStep.setCloseMode, publishStep.setCloseOpen]);
 
   return {
     note, showNote,
@@ -631,6 +599,7 @@ export function useSessionWizardController({
     loadSession, syncActiveDraftRoute,
     goToStep: navigateToStep,
     navigateToStep,
+    navigatingStep,
     TOTAL_STEPS,
     PUBLISH_STEP,
 

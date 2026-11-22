@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+/* eslint-env node */
 
 /**
  * Regenerates OpenAPI types from openapi/schema.yaml and fails if the git

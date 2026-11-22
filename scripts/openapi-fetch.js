@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+/* eslint-env node */
 
 /**
  * Downloads the OpenAPI schema from AspectumAPI into openapi/schema.yaml.

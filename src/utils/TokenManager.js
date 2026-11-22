@@ -7,6 +7,8 @@
  * httpOnly cookies require coordinated backend changes.
  */
 
+import { fetchWithSlashFallback } from './fetchWithSlashFallback';
+
 const TOKEN_KEY = 'jwt_tokens';
 const TOKEN_EXPIRY_BUFFER = 5 * 60 * 1000; // 5 minutes buffer before expiry
 
@@ -234,7 +236,6 @@ class TokenManager {
       // Канонический путь БЕЗ trailing slash: бэкенд регистрирует auth-роуты
       // без слэша при APPEND_SLASH=False — вариант со слэшем всегда давал 404
       // (fallback его маскировал, но 404 засорял network/console каждые ~15 мин).
-      const { fetchWithSlashFallback } = await import('./fetchWithSlashFallback');
       const response = await fetchWithSlashFallback(`${apiUrl}/auth/token/refresh`, {
         method: 'POST',
         headers: {

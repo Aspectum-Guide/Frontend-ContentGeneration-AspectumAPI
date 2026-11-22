@@ -3,7 +3,7 @@ export const CONTENT_CATALOG_SECTION = {
   title: 'Контент',
   description: 'Города, ивенты, теги и медиа',
   badge: 'CONTENT',
-  badgeClass: 'bg-violet-100 text-violet-700',
+  badgeClass: 'bg-aspectum-violet-muted text-aspectum-violet',
   items: [
     { to: '/catalog/cities', title: 'Города', description: 'Контент, карта, теги города', icon: '🏙️' },
     { to: '/catalog/events', title: 'Ивенты', description: 'События, видимость, букинг', icon: '🎪' },
@@ -38,7 +38,7 @@ export const BOOKING_CATALOG_SECTION = {
   title: 'Букинг',
   description: 'Настройка и управление продажами билетов',
   badge: 'BOOKING',
-  badgeClass: 'bg-blue-100 text-blue-700',
+  badgeClass: 'bg-aspectum-primary-muted text-aspectum-primary-hover',
   items: [...BOOKING_OPS_ITEMS, ...BOOKING_REFERENCE_ITEMS],
 };
 
@@ -47,7 +47,7 @@ export const SUBSCRIPTION_CATALOG_SECTION = {
   title: 'Подписки',
   description: 'Полный цикл подписок без Django admin: типы, коды, логи, пользователи, IAP',
   badge: 'SUBSCRIPTION',
-  badgeClass: 'bg-emerald-100 text-emerald-700',
+  badgeClass: 'bg-aspectum-success-muted text-aspectum-success-strong',
   items: [
     { to: '/catalog/subscription-types', title: 'Типы подписки', description: 'Пакеты + привязка городов и событий', icon: '🧩' },
     { to: '/catalog/activation-codes', title: 'Коды активации', description: 'CRUD и массовая генерация кодов', icon: '🔐' },
@@ -71,7 +71,7 @@ export const BOOKING_CATALOG_SECTIONS = [
     title: 'Справочники',
     description: 'CRUD по сущностям BookingAPI — как города и ивенты для контента',
     badge: 'API',
-    badgeClass: 'bg-sky-100 text-sky-700',
+    badgeClass: 'bg-aspectum-info-muted text-aspectum-info-strong',
     items: BOOKING_REFERENCE_ITEMS,
   },
   {
@@ -79,7 +79,7 @@ export const BOOKING_CATALOG_SECTIONS = [
     title: 'LLM API',
     description: 'Ключи провайдеров и использование моделей',
     badge: 'LLM',
-    badgeClass: 'bg-violet-100 text-violet-700',
+    badgeClass: 'bg-aspectum-violet-muted text-aspectum-violet',
     items: [
       { to: '/catalog/llm/keys', title: 'Ключи LLM API', description: 'Управление API keys и лимитами', icon: '🔑' },
       { to: '/catalog/llm/usage', title: 'Использование моделей', description: 'Tokens, requests и стоимость по моделям', icon: '📈' },
@@ -90,7 +90,7 @@ export const BOOKING_CATALOG_SECTIONS = [
     title: 'Операции',
     description: 'Настройка продаж, отчёты и бронирования',
     badge: 'OPS',
-    badgeClass: 'bg-blue-100 text-blue-700',
+    badgeClass: 'bg-aspectum-primary-muted text-aspectum-primary-hover',
     items: BOOKING_OPS_ITEMS,
   },
 ];

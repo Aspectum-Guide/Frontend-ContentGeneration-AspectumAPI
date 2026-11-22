@@ -4,23 +4,19 @@ import { ilCatalogAPI, imagesAPI } from './api';
 import ILCityPhotosEditor from './ILCityPhotosEditor';
 import { eventsCatalogAPI } from '../events/api';
 import Layout from '../../../components/Layout';
-import DataTable from '../../../components/ui/DataTable';
-import { Field, TextInput } from '../../../components/ui/FormField';
-import Modal, { ConfirmModal } from '../../../components/ui/Modal';
-import Button from '../../../components/ui/Button';
-import Alert from '../../../components/ui/Alert';
-import TableRowActions from '../shared/components/TableRowActions';
+import { FormLabel, Alert, Button, Chip, ConfirmModal, DataTable, EmptyState, Field, FileButton, FormGrid, IconButton, Modal, PageHeader, Panel, Select, Switch, TableRowActions, Tabs, TextInput, Glyph } from '@aspectum/admin-ui-web';
 import { useLayoutActions } from '../../../context/useLayoutActions';
 import { parseApiError } from '../../../utils/apiError';
 import { createCoordinatePasteHandler, parseCoord } from '../../../utils/coordinates';
 import { buildLangOptions, getMultiLangValue } from '../shared/i18n';
 import { LangBlock, LangTabs } from '../shared/LangFields';
+import { useAppLanguages } from '../../../hooks/useAppLanguages';
 
 const PAGE_SIZE = 20;
-const ALL_LANGS = ['ru', 'en', 'it', 'fr', 'de', 'es'];
 
 function ILEditorModal({ open, onClose, location, onSaved, cityOptions, tagOptions = [] }) {
   const isNew = !location?.id;
+  const { languages: appLanguages } = useAppLanguages();
 
   const [activeLang, setActiveLang] = useState('ru');
   const [form, setForm] = useState({
@@ -40,6 +36,10 @@ function ILEditorModal({ open, onClose, location, onSaved, cityOptions, tagOptio
   const mapRef = useRef(null);
   const markerRef = useRef(null);
   const leafletRef = useRef(null);
+  const locationRef = useRef(location);
+  const formRef = useRef(form);
+  locationRef.current = location;
+  formRef.current = form;
 
   useEffect(() => {
     if (!open) return;
@@ -50,6 +50,7 @@ function ILEditorModal({ open, onClose, location, onSaved, cityOptions, tagOptio
         tag_ids: [],
       });
     } else {
+      const location = locationRef.current;
       setForm({
         title: location.title || {},
         description: location.description || {},
@@ -69,7 +70,7 @@ function ILEditorModal({ open, onClose, location, onSaved, cityOptions, tagOptio
     setError('');
     setActiveTab('content');
     setActiveLang('ru');
-  }, [open, location?.id]);
+  }, [open, location?.id, isNew]);
 
   // Map init on tab switch
   useEffect(() => {
@@ -84,8 +85,9 @@ function ILEditorModal({ open, onClose, location, onSaved, cityOptions, tagOptio
           shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
         });
       }
-      const lat = parseCoord(form.lat);
-      const lon = parseCoord(form.lon);
+      const currentForm = formRef.current;
+      const lat = parseCoord(currentForm.lat);
+      const lon = parseCoord(currentForm.lon);
       const map = L.map(mapElRef.current).setView(
         lat != null && lon != null ? [lat, lon] : [41.9028, 12.4964],
         lat != null && lon != null ? 13 : 5,
@@ -132,9 +134,10 @@ function ILEditorModal({ open, onClose, location, onSaved, cityOptions, tagOptio
     }
   }, [open]);
 
+  const defaultLanguageCodes = ['ru', ...appLanguages.map((language) => language.code).filter((code) => code !== 'ru')].slice(0, 2);
   const langOptions = buildLangOptions(Object.keys(form.title || {}).filter(Boolean).length
     ? Object.keys(form.title)
-    : ALL_LANGS.slice(0, 2));
+    : defaultLanguageCodes);
 
   const handleImageUpload = async (e, kind) => {
     const file = e.target.files?.[0];
@@ -204,19 +207,12 @@ function ILEditorModal({ open, onClose, location, onSaved, cityOptions, tagOptio
 
   return (
     <Modal open={open} onClose={onClose} title={isNew ? 'Новая локация' : 'Редактировать локацию'} size="lg">
-      <div className="flex gap-2 mb-4 border-b border-gray-100 pb-3">
-        {tabs.map((tab) => (
-          <button
-            key={tab.key}
-            type="button"
-            onClick={() => setActiveTab(tab.key)}
-            className={`px-3 py-1.5 text-sm font-medium rounded-lg transition-colors ${
-              activeTab === tab.key ? 'bg-blue-50 text-blue-700' : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'
-            }`}
-          >
-            {tab.label}
-          </button>
-        ))}
+      <div className="mb-4 border-b border-aspectum-border-subtle pb-3">
+        <Tabs
+          items={tabs.map(({ key, label }) => ({ id: key, label }))}
+          value={activeTab}
+          onChange={setActiveTab}
+        />
       </div>
 
       <form onSubmit={handleSave}>
@@ -249,7 +245,7 @@ function ILEditorModal({ open, onClose, location, onSaved, cityOptions, tagOptio
 
         {activeTab === 'map' && (
           <div className="space-y-3">
-            <div className="grid grid-cols-2 gap-3">
+            <FormGrid responsive={false}>
               <Field label="Широта (lat)">
                 <TextInput
                   type="number"
@@ -270,15 +266,15 @@ function ILEditorModal({ open, onClose, location, onSaved, cityOptions, tagOptio
                   placeholder="12.496400"
                 />
               </Field>
-            </div>
-            <p className="text-xs text-gray-400">Кликните по карте чтобы выбрать точку</p>
-            <div ref={mapElRef} className="w-full h-72 rounded-xl border border-gray-200 overflow-hidden" />
+            </FormGrid>
+            <p className="text-xs text-aspectum-text-disabled">Кликните по карте чтобы выбрать точку</p>
+            <div ref={mapElRef} className="w-full h-72 rounded-aspectum-card border border-aspectum-border overflow-hidden" />
           </div>
         )}
 
         {activeTab === 'settings' && (
           <div className="space-y-4">
-            <div className="grid grid-cols-2 gap-3">
+            <FormGrid responsive={false}>
               <Field label="Индекс (порядок)">
                 <TextInput
                   type="number"
@@ -296,55 +292,46 @@ function ILEditorModal({ open, onClose, location, onSaved, cityOptions, tagOptio
                 />
               </Field>
               <Field label="Город">
-                <select
-                  value={form.city_id}
-                  onChange={(e) => setForm((p) => ({ ...p, city_id: e.target.value }))}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none"
-                >
+                <Select value={form.city_id} onChange={(e) => setForm((p) => ({ ...p, city_id: e.target.value }))}>
                   <option value="">— не выбран —</option>
                   {cityOptions.map((c) => (
                     <option key={c.id} value={String(c.id)}>{c.name}</option>
                   ))}
-                </select>
+                </Select>
               </Field>
-            </div>
-            <label className="flex items-center gap-2 cursor-pointer">
-              <input
-                type="checkbox"
+            </FormGrid>
+            <FormLabel  layout="row" interactive>
+              <Switch
                 checked={form.is_show}
-                onChange={(e) => setForm((p) => ({ ...p, is_show: e.target.checked }))}
-                className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                onChange={(is_show) => setForm((p) => ({ ...p, is_show }))}
+                aria-label="Показывать локацию"
               />
-              <span className="text-sm text-gray-700">Показывать в приложении</span>
-            </label>
+              <span className="text-sm text-aspectum-text-strong">Показывать в приложении</span>
+            </FormLabel>
             {tagOptions.length > 0 && (
               <Field label="Теги">
-                <div className="flex flex-wrap gap-2 max-h-36 overflow-y-auto p-2 border border-gray-200 rounded-lg bg-gray-50">
+                <Panel tone="muted" className="flex flex-wrap gap-2 max-h-36 overflow-y-auto p-2">
                   {tagOptions.map((tag) => {
                     const tid = String(tag.id);
                     const selected = form.tag_ids.includes(tid);
                     const label = tag.display_name || tag.slug || tid;
                     return (
-                      <button
+                      <Chip
                         key={tid}
-                        type="button"
+                        variant="purple"
+                        selected={selected}
                         onClick={() => setForm((p) => ({
                           ...p,
                           tag_ids: selected
                             ? p.tag_ids.filter((x) => x !== tid)
                             : [...p.tag_ids, tid],
                         }))}
-                        className={`px-2.5 py-1 rounded-full text-xs font-medium border transition-all ${
-                          selected
-                            ? 'bg-purple-600 text-white border-purple-600'
-                            : 'bg-white text-gray-600 border-gray-300 hover:border-purple-400 hover:text-purple-600'
-                        }`}
                       >
                         {label}
-                      </button>
+                      </Chip>
                     );
                   })}
-                </div>
+                </Panel>
               </Field>
             )}
           </div>
@@ -353,33 +340,20 @@ function ILEditorModal({ open, onClose, location, onSaved, cityOptions, tagOptio
         {activeTab === 'media' && (
           <div className="space-y-5">
             <div>
-              <p className="text-sm font-medium text-gray-700 mb-2">Иконка (маркер на карте)</p>
+              <p className="text-sm font-medium text-aspectum-text-strong mb-2">Иконка (маркер на карте)</p>
               <div className="flex items-start gap-4">
-                <div className="w-16 h-16 rounded-xl border border-gray-200 bg-gray-50 flex items-center justify-center shrink-0 overflow-hidden">
+                <div className="w-16 h-16 rounded-aspectum-card border border-aspectum-border bg-aspectum-surface-muted flex items-center justify-center shrink-0 overflow-hidden">
                   {form.icon_url
                     ? <img src={form.icon_url} alt="" className="w-full h-full object-contain" />
-                    : <span className="text-2xl">📍</span>
+                    : <span className="text-2xl"><Glyph name="📍" /></span>
                   }
                 </div>
                 <div className="flex flex-col gap-2">
-                  <input ref={iconInputRef} type="file" accept="image/*,.svg" className="hidden" onChange={(e) => handleImageUpload(e, 'icon')} />
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant="secondary"
-                    onClick={() => iconInputRef.current?.click()}
-                    disabled={iconUploading}
-                    loading={iconUploading}
-                  >
-                    Загрузить иконку
-                  </Button>
+                  <FileButton inputRef={iconInputRef} accept="image/*,.svg" variant="secondary" size="md" onChange={(e) => handleImageUpload(e, 'icon')} disabled={iconUploading}>
+                    {iconUploading ? 'Загрузка…' : 'Загрузить иконку'}
+                  </FileButton>
                   {form.icon_id && (
-                    <Button
-                      type="button"
-                      size="sm"
-                      variant="softDanger"
-                      onClick={() => setForm((p) => ({ ...p, icon_id: null, icon_url: null }))}
-                    >
+                    <Button type="button" variant="softDanger" size="md" onClick={() => setForm((p) => ({ ...p, icon_id: null, icon_url: null }))}>
                       Удалить иконку
                     </Button>
                   )}
@@ -388,34 +362,24 @@ function ILEditorModal({ open, onClose, location, onSaved, cityOptions, tagOptio
             </div>
 
             <div>
-              <p className="text-sm font-medium text-gray-700 mb-2">Изображение (обложка)</p>
+              <p className="text-sm font-medium text-aspectum-text-strong mb-2">Изображение (обложка)</p>
               <div className="space-y-2">
                 {form.image_url
                   ? (
-                    <div className="relative w-full h-40 rounded-xl border border-gray-200 bg-gray-100 overflow-hidden">
+                    <div className="relative w-full h-40 rounded-aspectum-card border border-aspectum-border bg-aspectum-surface-subtle overflow-hidden">
                       <img src={form.image_url} alt="" className="w-full h-full object-cover" />
-                      <button type="button" onClick={() => setForm((p) => ({ ...p, image_id: null, image_url: null }))}
-                        className="absolute top-2 right-2 w-7 h-7 bg-black/60 text-white rounded-full text-sm flex items-center justify-center hover:bg-black/80">
+                      <IconButton label="Удалить изображение" type="button" onClick={() => setForm((p) => ({ ...p, image_id: null, image_url: null }))}
+                        variant="overlay" size="iconOverlay" className="absolute top-2 right-2">
                         ×
-                      </button>
+                      </IconButton>
                     </div>
                   ) : (
-                    <div className="w-full h-40 rounded-xl border border-dashed border-gray-300 bg-gray-50 flex items-center justify-center text-sm text-gray-400">
-                      Изображение не выбрано
-                    </div>
+                    <EmptyState title="Изображение не выбрано" className="py-8" />
                   )
                 }
-                <input ref={imageInputRef} type="file" accept="image/*" className="hidden" onChange={(e) => handleImageUpload(e, 'image')} />
-                <Button
-                  type="button"
-                  size="sm"
-                  variant="secondary"
-                  onClick={() => imageInputRef.current?.click()}
-                  disabled={imageUploading}
-                  loading={imageUploading}
-                >
-                  Загрузить изображение
-                </Button>
+                <FileButton inputRef={imageInputRef} accept="image/*" variant="secondary" size="md" onChange={(e) => handleImageUpload(e, 'image')} disabled={imageUploading}>
+                  {imageUploading ? 'Загрузка…' : 'Загрузить изображение'}
+                </FileButton>
               </div>
             </div>
           </div>
@@ -425,24 +389,14 @@ function ILEditorModal({ open, onClose, location, onSaved, cityOptions, tagOptio
           <ILCityPhotosEditor cityId={form.city_id || null} disabled={isNew && !form.city_id} />
         )}
 
-        {error && <Alert variant="error" className="mt-4">{error}</Alert>}
-
-        <div className="flex items-center gap-3 mt-5 pt-4 border-t border-gray-100">
-          <Button
-            type="submit"
-            disabled={saving}
-            loading={saving}
-            variant="primary"
-          >
-            {isNew ? 'Создать' : 'Сохранить'}
+        <div className="flex items-center gap-3 mt-5 pt-4 border-t border-aspectum-border-subtle">
+          <Button type="submit" variant="primary" size="md" disabled={saving}>
+            {saving ? 'Сохранение…' : isNew ? 'Создать' : 'Сохранить'}
           </Button>
-          <Button
-            type="button"
-            variant="secondary"
-            onClick={onClose}
-          >
+          <Button type="button" variant="secondary" size="md" onClick={onClose}>
             Отмена
           </Button>
+          {error && <Alert tone="error" className="text-xs px-2 py-1">{error}</Alert>}
         </div>
       </form>
     </Modal>
@@ -458,6 +412,7 @@ export default function InteractiveLocationsCatalogPage() {
   const [error, setError] = useState(null);
 
   const [page, setPage] = useState(1);
+  const loadRequestRef = useRef(0);
   const [search, setSearch] = useState('');
   const [cityFilter, setCityFilter] = useState('');
   const [showFilter, setShowFilter] = useState('');
@@ -488,6 +443,7 @@ export default function InteractiveLocationsCatalogPage() {
   }, [rows]);
 
   const load = useCallback(async (p = 1) => {
+    const requestId = ++loadRequestRef.current;
     setLoading(true);
     setError(null);
     try {
@@ -498,19 +454,21 @@ export default function InteractiveLocationsCatalogPage() {
         ...(showFilter ? { is_show: showFilter } : {}),
       });
       const data = r?.data;
+      if (requestId !== loadRequestRef.current) return;
       setRows(data?.results || []);
       setTotal(data?.total ?? 0);
       setPage(p);
     } catch (e) {
+      if (requestId !== loadRequestRef.current) return;
       setError(parseApiError(e, 'Ошибка загрузки'));
       setRows([]);
     } finally {
-      setLoading(false);
+      if (requestId === loadRequestRef.current) setLoading(false);
     }
   }, [search, cityFilter, showFilter]);
 
-  useEffect(() => { load(1); setPage(1); }, [search, cityFilter, showFilter]);
-  useEffect(() => { load(page); }, [page]);
+  useEffect(() => { setPage(1); }, [search, cityFilter, showFilter]);
+  useEffect(() => { load(page); }, [load, page]);
 
   useEffect(() => {
     setMobileActions([{
@@ -559,15 +517,15 @@ export default function InteractiveLocationsCatalogPage() {
       render: (v, row) => (
         <div className="flex items-center gap-3">
           {row.icon_url
-            ? <img src={row.icon_url} alt="" className="w-10 h-10 rounded-lg object-contain shrink-0 bg-gray-50 border border-gray-100 p-1" />
+            ? <img src={row.icon_url} alt="" className="w-10 h-10 rounded-aspectum-control object-contain shrink-0 bg-aspectum-surface-muted border border-aspectum-border-subtle p-1" />
             : row.image_url
-              ? <img src={row.image_url} alt="" className="w-10 h-10 rounded-lg object-cover shrink-0" />
-              : <div className="w-10 h-10 rounded-lg bg-gray-100 flex items-center justify-center text-gray-300 shrink-0 text-lg">📍</div>
+              ? <img src={row.image_url} alt="" className="w-10 h-10 rounded-aspectum-control object-cover shrink-0" />
+              : <div className="w-10 h-10 rounded-aspectum-control bg-aspectum-surface-subtle flex items-center justify-center text-aspectum-text-faint shrink-0 text-lg"><Glyph name="📍" /></div>
           }
           <div className="min-w-0">
-            <p className="text-sm font-medium text-gray-900 truncate">{getMultiLangValue(v) || '—'}</p>
+            <p className="text-sm font-medium text-aspectum-text truncate">{getMultiLangValue(v) || '—'}</p>
             {row.lat != null && (
-              <p className="text-xs text-gray-400 font-mono">{Number(row.lat).toFixed(4)}, {Number(row.lon).toFixed(4)}</p>
+              <p className="text-xs text-aspectum-text-disabled font-mono">{Number(row.lat).toFixed(4)}, {Number(row.lon).toFixed(4)}</p>
             )}
           </div>
         </div>
@@ -576,51 +534,53 @@ export default function InteractiveLocationsCatalogPage() {
     {
       key: 'city_name',
       label: 'Город',
-      render: (v) => <span className="text-sm text-gray-600">{v || '—'}</span>,
+      render: (v) => <span className="text-sm text-aspectum-text-subtle">{v || '—'}</span>,
     },
     {
       key: 'index',
       label: 'Индекс',
-      render: (v) => <span className="text-sm text-gray-500">{v ?? '—'}</span>,
+      render: (v) => <span className="text-sm text-aspectum-text-muted">{v ?? '—'}</span>,
     },
     {
       key: 'is_show',
       label: 'Виден',
       render: (v, row) => (
-        <button
-          onClick={(e) => { e.stopPropagation(); toggleShow(row); }}
-          className={`relative w-9 h-5 rounded-full transition-colors focus:outline-none ${v ? 'bg-blue-500' : 'bg-gray-300'}`}
-        >
-          <span className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-all ${v ? 'left-4' : 'left-0.5'}`} />
-        </button>
+        <Switch
+          checked={Boolean(v)}
+          aria-label={v ? 'Скрыть локацию' : 'Показать локацию'}
+          onChange={() => toggleShow(row)}
+          onClick={(e) => e.stopPropagation()}
+        />
       ),
     },
     {
       key: 'actions',
       label: '',
       render: (_, row) => (
-        <TableRowActions
-          onEdit={() => { setEditingRow(row); setEditorOpen(true); }}
-          onDelete={() => setDeleteTarget(row)}
-        />
+        <div className="flex items-center gap-2 justify-end" onClick={(e) => e.stopPropagation()}>
+          <TableRowActions
+            onEdit={() => { setEditingRow(row); setEditorOpen(true); }}
+            onDelete={() => setDeleteTarget(row)}
+          />
+        </div>
       ),
     },
   ];
 
   return (
     <Layout>
-      <div className="mb-6 flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Интерактивные локации</h1>
-          <p className="mt-1 text-sm text-gray-500">Управление локациями для приложения</p>
-        </div>
-        <Button
-          onClick={() => { setEditingRow(null); setEditorOpen(true); }}
+      <PageHeader
+        title="Интерактивные локации"
+        description="Управление локациями для приложения"
+        actions={<Button
+          type="button"
           variant="primary"
+          size="md"
+          onClick={() => { setEditingRow(null); setEditorOpen(true); }}
         >
           + Новая локация
-        </Button>
-      </div>
+        </Button>}
+      />
 
       <DataTable
         columns={columns}
@@ -640,25 +600,17 @@ export default function InteractiveLocationsCatalogPage() {
         onRowClick={(row) => { setEditingRow(row); setEditorOpen(true); }}
         filters={(
           <>
-            <select
-              value={cityFilter}
-              onChange={(e) => setCityFilter(e.target.value)}
-              className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none"
-            >
+            <Select value={cityFilter} onChange={(e) => setCityFilter(e.target.value)}>
               <option value="">Все города</option>
               {cities.map((c) => (
                 <option key={c.id} value={c.id}>{c.name}</option>
               ))}
-            </select>
-            <select
-              value={showFilter}
-              onChange={(e) => setShowFilter(e.target.value)}
-              className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none"
-            >
+            </Select>
+            <Select value={showFilter} onChange={(e) => setShowFilter(e.target.value)}>
               <option value="">Любая видимость</option>
               <option value="true">Видимые</option>
               <option value="false">Скрытые</option>
-            </select>
+            </Select>
           </>
         )}
       />
@@ -678,9 +630,7 @@ export default function InteractiveLocationsCatalogPage() {
         onConfirm={handleDelete}
         title="Удалить локацию?"
         message={`«${getMultiLangValue(deleteTarget?.title) || 'Локация'}» будет удалена безвозвратно.`}
-        confirmLabel="Удалить"
-        danger
-        loading={deleting}
+        confirmLabel={deleting ? 'Удаление…' : 'Удалить'}
       />
     </Layout>
   );

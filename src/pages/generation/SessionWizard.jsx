@@ -1,18 +1,9 @@
 import 'leaflet/dist/leaflet.css';
-import { useEffect, useMemo, useState } from 'react';
+import { lazy, Suspense, useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import Layout from '../../components/Layout';
 import CommonsImagePicker from '../../components/generation/CommonsImagePicker';
-import SessionWizardAttractionsStep from './session-wizard/SessionWizardAttractionsStep';
-import SessionWizardInteractiveLocationsStep from './session-wizard/SessionWizardInteractiveLocationsStep';
-import SessionWizardCityStepSection from './session-wizard/SessionWizardCityStepSection.jsx';
-import SessionWizardPublishStep from './session-wizard/SessionWizardPublishStep';
-import SessionWizardTagsCatalogStep from './session-wizard/SessionWizardTagsCatalogStep';
-import SessionWizardAttractionInfoStep from './session-wizard/SessionWizardAttractionInfoStep';
-import SessionWizardAttractionFeedStep from './session-wizard/SessionWizardAttractionFeedStep.jsx';
-import SessionWizardAttractionAudioGuidesBlock from './session-wizard/SessionWizardAttractionAudioGuidesBlock.jsx';
 import {
-  StatusBadge as DefaultStatusBadge,
   filterCityInfosForActiveDraft,
   filterItemsForActiveAttraction,
   getAttrName,
@@ -22,12 +13,56 @@ import {
 } from './session-wizard/sessionWizardShared.jsx';
 import { useSessionWizardController } from './session-wizard/useSessionWizardController.ts';
 import { aiAPI } from '../../api/generation';
-import DefaultToast from '../../components/ui/Toast.jsx';
-import DefaultInlineProgressBanner from '../../components/ui/InlineProgressBanner.jsx';
-import { ConfirmModal as DefaultConfirmModal } from '../../components/ui/Modal.jsx';
-import { useConfirmModal } from '../../components/ui/useConfirmModal.jsx';
+import { FormLabel, Button, ConfirmModal as DefaultConfirmModal, DetailHeader, EmptyState, InlineAction, InlineProgressBanner as DefaultInlineProgressBanner, Modal, SessionStatusBadge as DefaultStatusBadge, Spinner, TextInput, Toast as DefaultToast, WizardStepButton, useConfirmModal } from '@aspectum/admin-ui-web';
 import DefaultSessionCloseDialog from '../../components/generation/SessionCloseDialog.jsx';
-import SessionWizardStepNavigation from './session-wizard/SessionWizardStepNavigation.jsx';
+import { sessionWizardStepLoaders } from './session-wizard/sessionWizardStepLoaders';
+import useUnsavedChangesWarning from './session-wizard/useUnsavedChangesWarning';
+
+const SessionWizardAttractionsStep = lazy(sessionWizardStepLoaders.attractions);
+const SessionWizardInteractiveLocationsStep = lazy(sessionWizardStepLoaders.interactiveLocations);
+const SessionWizardCityStep = lazy(sessionWizardStepLoaders.city);
+const SessionWizardGenerateCityFull = lazy(sessionWizardStepLoaders.generateCityFull);
+const SessionWizardPublishStep = lazy(sessionWizardStepLoaders.publish);
+const SessionWizardTagsCatalogStep = lazy(sessionWizardStepLoaders.tagsCatalog);
+const SessionWizardCityTagsPicker = lazy(sessionWizardStepLoaders.cityTags);
+const SessionWizardCityInfoStep = lazy(sessionWizardStepLoaders.cityInfo);
+const SessionWizardAttractionInfoStep = lazy(sessionWizardStepLoaders.attractionInfo);
+const SessionWizardAttractionFeedStep = lazy(sessionWizardStepLoaders.attractionFeed);
+const SessionWizardAttractionAudioGuidesBlock = lazy(sessionWizardStepLoaders.attractionAudioGuides);
+
+export function SessionWizardStepFallback() {
+  return (
+    <EmptyState icon={<Spinner size="md" />} title="Загрузка шага…" />
+  );
+}
+
+const STEP_LABELS = [
+  'Город',
+  'Теги',
+  'Достопримечательности',
+  'Интерактивные локации',
+  'Публикация',
+];
+
+function isAutoSessionName(value) {
+  return /^Сессия от \d{2}\.\d{2}\.\d{4}/.test(String(value || '').trim());
+}
+
+function wizardTitle({ session, cityDrafts, activeCityDraftId, localeData, activeLocale, defaultLocale }) {
+  const typed = String(localeData?.[defaultLocale]?.name || localeData?.[activeLocale]?.name || '').trim();
+  if (typed) return typed;
+
+  const draft = (cityDrafts || []).find((item) => String(item?.id) === String(activeCityDraftId));
+  const fromDraft = normalizeCommonsQuery(draft?.display_name || draft?.name);
+  if (fromDraft) return fromDraft;
+
+  const fromSession = normalizeCommonsQuery(session?.city_display_name);
+  if (fromSession) return fromSession;
+
+  const name = String(session?.name || '').trim();
+  if (name && !isAutoSessionName(name)) return name;
+  return 'Новый город';
+}
 
 function normalizeCommonsQuery(value) {
   if (value == null) return '';
@@ -86,6 +121,8 @@ export default function SessionWizard({ components = {} } = {}) {
 
     localeData,
     activeLocale,
+    defaultLocale,
+    setDefaultLocale,
 
     addLocaleOpen,
     setAddLocaleOpen,
@@ -96,12 +133,29 @@ export default function SessionWizard({ components = {} } = {}) {
 
     lat,
     lon,
+    savedLat,
+    savedLon,
+
+    imagePreview,
+    imageOriginalUrl,
+    parentCityId,
+    setParentCityId,
+    authorIds,
+    setAuthorIds,
+    imageCopyright,
+    setImageOriginalUrl,
+    setImageCopyright,
     photoUploading,
+    photoFileRef,
 
     commonsModalOpen,
     setCommonsModalOpen,
 
     cityTags,
+    cityFilterTree,
+    cityFilterTreeLoading,
+    cityFilterTreeError,
+    loadCityFilterTree,
     eventFilterTree,
     eventFilterTreeLoading,
     eventFilterTreeError,
@@ -114,7 +168,20 @@ export default function SessionWizard({ components = {} } = {}) {
     deletingEventFilterIds,
     cityInfos,
     currentCityInfo,
+    cityInfoLocaleData,
+    cityInfoActiveLocale,
     cityInfoSaving,
+    cityInfoAutoSaving,
+    cityInfoAutoSaved,
+    cityInfoGenerateModalOpen,
+    cityInfoGeneratePrompt,
+    cityInfoGenerateCount,
+    cityInfoDedupeExistingItems,
+    setCityInfoDedupeExistingItems,
+    cityInfoGenerating,
+    cityInfoGenerationError,
+    cityInfoGenerationTaskId,
+    cityInfoGenerationLang,
     aiGenerationMode,
     aiUseWebSearch,
     aiAdvancedGenerationAvailable,
@@ -196,6 +263,7 @@ export default function SessionWizard({ components = {} } = {}) {
     saving,
     autoSaving,
     autoSaved,
+    onCityFormBlur,
     hasUnsavedChangesRef,
     preparingPublishStep,
     closeOpen,
@@ -209,11 +277,23 @@ export default function SessionWizard({ components = {} } = {}) {
     setAttrActiveLocale,
     setCloseOpen,
     setCloseMode,
+    setMapContainerRef,
 
+    switchLocale,
     addLocale,
+    removeLocale,
+    updateLocaleField,
+
+    handleSelectDraft,
+    handleCreateDraft,
+    handleDeleteDraft,
+
+    handlePhotoFile,
+    handlePhotoDelete,
     handleCommonsImageSelect,
     getSessionUuid,
 
+    toggleCityTag,
     uploadCityFilterImage,
     createCityTag,
     updateCityFilter,
@@ -228,7 +308,20 @@ export default function SessionWizard({ components = {} } = {}) {
     deleteEventFilter,
 
     setCurrentCityInfo,
+    setCityInfoActiveLocale,
+    openCityInfoDetail,
+    addCityInfo,
+    updateCurrentCityInfoPatch,
+    updateCityInfoLocaleField,
     saveCurrentCityInfo,
+    deleteCurrentCityInfo,
+    importCityInfoFromText,
+    openCityInfoGenerateModal,
+    closeCityInfoGenerateModal,
+    setCityInfoGeneratePrompt,
+    setCityInfoGenerateCount,
+    setCityInfoGenerationLang,
+    generateCityInfoFromPrompt,
 
     openAttrDetail,
     addAttraction,
@@ -401,19 +494,10 @@ export default function SessionWizard({ components = {} } = {}) {
     handleTranslateSession,
 
     goToStep,
+    navigatingStep,
   } = controller;
 
-  // Предупреждение при закрытии вкладки если есть несохранённые изменения
-  useEffect(() => {
-    const handler = (e) => {
-      if (hasUnsavedChangesRef.current) {
-        e.preventDefault();
-        e.returnValue = '';
-      }
-    };
-    window.addEventListener('beforeunload', handler);
-    return () => window.removeEventListener('beforeunload', handler);
-  }, [hasUnsavedChangesRef]);
+  useUnsavedChangesWarning(hasUnsavedChangesRef);
 
   const currentLocale = localeData[activeLocale] || {};
 
@@ -771,12 +855,7 @@ export default function SessionWizard({ components = {} } = {}) {
   if (loading) {
     return (
       <Layout>
-        <div className="flex items-center justify-center py-24">
-          <div className="flex items-center gap-3 text-gray-500">
-            <div className="animate-spin w-6 h-6 border-2 border-blue-600 border-t-transparent rounded-full" />
-            <span>Загрузка сессии...</span>
-          </div>
-        </div>
+        <EmptyState icon={<Spinner size="md" className="h-6 w-6 border-aspectum-primary" />} title="Загрузка сессии..." className="py-24" />
       </Layout>
     );
   }
@@ -784,7 +863,7 @@ export default function SessionWizard({ components = {} } = {}) {
   if (!session) {
     return (
       <Layout>
-        <div className="text-center py-24 text-red-600">Сессия не найдена</div>
+        <EmptyState icon="⚠️" title="Сессия не найдена" tone="danger" className="py-24" />
       </Layout>
     );
   }
@@ -809,86 +888,79 @@ export default function SessionWizard({ components = {} } = {}) {
           .join(' ')}
       />
 
-      <div className="flex items-center justify-between gap-4 mb-5 pb-4 border-b border-gray-200">
-        <div className="flex items-center gap-3 min-w-0">
-          <button
+      <DetailHeader
+        leading={(
+          <Button
             type="button"
+            variant="ghost"
+            size="sm"
             onClick={async () => {
               if (hasUnsavedChangesRef.current) {
-                const ok = await confirm({
-                  title: 'Несохранённые изменения',
+                const confirmed = await confirm({
+                  title: 'Покинуть страницу?',
                   message: 'Есть несохранённые изменения. Покинуть страницу?',
-                  danger: true,
                   confirmLabel: 'Покинуть',
-                  cancelLabel: 'Остаться',
+                  danger: true,
                 });
-                if (!ok) return;
+                if (!confirmed) return;
               }
               navigate('/generation');
             }}
             title="Вернуться к списку сессий"
-            className="shrink-0 p-1.5 text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
           >
             <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
             </svg>
-          </button>
-
-          <div className="min-w-0">
-            <div className="flex items-center gap-2">
-              <h1 className="text-lg font-bold text-gray-900 truncate">
-                {session.name || 'Сессия генерации контента'}
-              </h1>
-              <StatusBadge status={session.status} label={session.status_display} />
-            </div>
-
-            {session.created_at && (
-              <div className="flex items-center gap-3 mt-0.5 text-xs text-gray-400">
-                <span>
-                  {new Date(session.created_at).toLocaleString('ru-RU', {
-                    day: '2-digit',
-                    month: '2-digit',
-                    year: 'numeric',
-                    hour: '2-digit',
-                    minute: '2-digit',
-                  })}
-                </span>
-                <button
-                  type="button"
-                  title="Скопировать UID"
-                  onClick={() => navigator.clipboard?.writeText(session.uuid || session.session_uuid || session.id)}
-                  className="font-mono truncate max-w-[180px] hover:text-gray-600 transition-colors cursor-copy"
-                >
-                  {(session.uuid || session.session_uuid || String(session.id)).slice(0, 8)}…
-                </button>
-              </div>
+          </Button>
+        )}
+        className="mb-3 pb-3"
+        title={wizardTitle({ session, cityDrafts, activeCityDraftId, localeData, activeLocale, defaultLocale })}
+        titleAdornment={<StatusBadge status={session.status} label={session.status_display} />}
+        metadata={session.created_at ? (
+          <>
+            <span>
+              {new Date(session.created_at).toLocaleString('ru-RU', {
+                day: '2-digit',
+                month: '2-digit',
+                year: 'numeric',
+                hour: '2-digit',
+                minute: '2-digit',
+              })}
+            </span>
+            <InlineAction
+              title="Скопировать UID"
+              onClick={() => navigator.clipboard?.writeText(session.uuid || session.session_uuid || session.id)}
+              variant="link"
+              className="font-mono truncate max-w-[180px] hover:text-aspectum-text-subtle transition-colors cursor-copy"
+            >
+              {(session.uuid || session.session_uuid || String(session.id)).slice(0, 8)}…
+            </InlineAction>
+          </>
+        ) : null}
+        status={currentStep === 1 && (autoSaving || autoSaved) ? (
+          <div className={`flex items-center gap-1.5 text-xs transition-opacity ${autoSaved && !autoSaving ? 'text-aspectum-success' : 'text-aspectum-text-disabled'}`}>
+            {autoSaving ? (
+              <>
+                <Spinner size="xs" className="border-2 border-aspectum-border-strong" />
+                <span>Сохранение...</span>
+              </>
+            ) : (
+              <>
+                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                </svg>
+                <span>Сохранено</span>
+              </>
             )}
           </div>
-        </div>
-
-        <div className="flex items-center gap-3 shrink-0">
-
-          {/* Индикатор авто-сохранения */}
-          {currentStep === 1 && (autoSaving || autoSaved) && (
-            <div className={`flex items-center gap-1.5 text-xs transition-opacity ${autoSaved && !autoSaving ? 'text-emerald-600' : 'text-gray-400'}`}>
-              {autoSaving ? (
-                <>
-                  <span className="inline-block w-3 h-3 border-2 border-gray-300 border-t-transparent rounded-full animate-spin" />
-                  <span>Сохранение...</span>
-                </>
-              ) : (
-                <>
-                  <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-                  </svg>
-                  <span>Сохранено</span>
-                </>
-              )}
-            </div>
-          )}
-
-          <button
+        ) : null}
+        actions={(
+          <div className="flex items-center gap-2">
+          {currentStep !== 2 && currentStep !== 5 && (
+          <Button
             type="button"
+            variant="primary"
+            size="md"
             onClick={() => {
               if (currentStep === 1) {
                 void (async () => {
@@ -944,12 +1016,8 @@ export default function SessionWizard({ components = {} } = {}) {
                 return;
               }
 
-              if (currentStep === 5) {
-                return;
-              }
             }}
             disabled={
-              currentStep === 2 || currentStep === 5 ||
               saving ||
               cityInfoSaving ||
               attrSaving ||
@@ -958,9 +1026,7 @@ export default function SessionWizard({ components = {} } = {}) {
               attractionFeedSaving ||
               attractionAudioGuideSaving
             }
-            style={currentStep === 2 || currentStep === 5 ? { visibility: 'hidden' } : undefined}
-            title={currentStep === 2 || currentStep === 5 ? '' : 'Сохранить текущие данные'}
-            className="px-3 py-1.5 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors"
+            title="Сохранить текущие данные"
           >
             {saving ||
             cityInfoSaving ||
@@ -971,23 +1037,175 @@ export default function SessionWizard({ components = {} } = {}) {
             attractionAudioGuideSaving
               ? 'Сохранение...'
               : 'Сохранить'}
-          </button>
-        </div>
-      </div>
+          </Button>
+          )}
+          {!session.closed_with_save && (
+            <Button
+              type="button"
+              variant="outline"
+              size="md"
+              disabled={publishing}
+              onClick={() => { if (!publishing) handlePublish(); }}
+            >
+              {publishing ? 'Публикация...' : 'Опубликовать'}
+            </Button>
+          )}
+          {(session.status === 'draft' || session.status === 'in_progress') && (
+            <Button
+              type="button"
+              variant="outlineDanger"
+              size="md"
+              onClick={() => { setCloseMode('save'); setCloseOpen(true); }}
+            >
+              Закрыть
+            </Button>
+          )}
+          </div>
+        )}
+      />
 
       <main className="min-w-0 w-full">
-        <SessionWizardStepNavigation currentStep={currentStep} onGoToStep={goToStep} />
+        <div className="mb-4">
+          <div className="flex">
+            {STEP_LABELS.map((label, index) => {
+              const step = index + 1;
+              const isCompleted = step < currentStep;
+              const isActive = step === currentStep;
 
+              return (
+                <WizardStepButton
+                  key={step}
+                  onClick={() => goToStep(step)}
+                  disabled={navigatingStep}
+                  step={step} label={label} active={isActive} completed={isCompleted}
+                />
+              );
+            })}
+          </div>
+        </div>
+
+        <Suspense
+          fallback={<SessionWizardStepFallback />}
+        >
         {currentStep === 1 && (
-          <SessionWizardCityStepSection
-            controller={controller}
-            sessionId={sessionId}
-            currentLocale={currentLocale}
-            scopedCityDraftId={scopedCityDraftId}
-            scopedDatabaseCityId={scopedDatabaseCityId}
-            visibleCityInfos={visibleCityInfos}
-            openCityCommonsModal={openCityCommonsModal}
-          />
+          /* onBlur: сейв города при уходе фокуса из формы — вместо таймера
+             2.5с, который дёргал сервер и сбрасывал курсор при наборе */
+          <div onBlur={onCityFormBlur}>
+            <SessionWizardCityStep
+              headerEnd={(
+                <SessionWizardGenerateCityFull
+                  sessionId={sessionId}
+                  defaultLang={defaultLocale || 'ru'}
+                  onDone={() => controller.loadSession(activeCityDraftId)}
+                />
+              )}
+              cityDrafts={cityDrafts}
+              referenceCities={referenceCities || []}
+              parentCityId={parentCityId}
+              setParentCityId={setParentCityId}
+              authorIds={authorIds}
+              setAuthorIds={setAuthorIds}
+              activeCityDraftId={activeCityDraftId}
+              localeData={localeData}
+              activeLocale={activeLocale}
+              defaultLocale={defaultLocale}
+              currentLocale={currentLocale}
+              lat={lat}
+              lon={lon}
+              savedLat={savedLat}
+              savedLon={savedLon}
+              imagePreview={imagePreview}
+              photoUploading={photoUploading}
+              imageOriginalUrl={imageOriginalUrl}
+              imageCopyright={imageCopyright}
+              setMapContainerRef={setMapContainerRef}
+              photoFileRef={photoFileRef}
+              onOpenCommonsModal={openCityCommonsModal}
+              onPhotoFileChange={handlePhotoFile}
+              onPhotoDelete={handlePhotoDelete}
+              onImageOriginalUrlChange={setImageOriginalUrl}
+              onImageCopyrightChange={setImageCopyright}
+              onCreateDraft={handleCreateDraft}
+              onSelectDraft={handleSelectDraft}
+              onDeleteDraft={handleDeleteDraft}
+              onSwitchLocale={switchLocale}
+              onSetDefaultLocale={setDefaultLocale}
+              onAddLocale={() => setAddLocaleOpen(true)}
+              onRemoveLocale={removeLocale}
+              onUpdateLocaleField={updateLocaleField}
+              onLatChange={controller.setLat}
+              onLonChange={controller.setLon}
+              onRestoreSavedCoords={() => {
+                if (savedLat != null && savedLon != null) {
+                  controller.setLat(String(savedLat));
+                  controller.setLon(String(savedLon));
+                }
+              }}
+              onGoToStep={goToStep}
+              saving={saving}
+            />
+
+            <div className="pt-5 border-t border-aspectum-border">
+              <SessionWizardCityTagsPicker
+                cityTags={cityTags}
+                cityTagCatalog={cityTagCatalog}
+                cityTagCatalogLoading={cityTagCatalogLoading}
+                cityTagCatalogError={cityTagCatalogError}
+                onReloadCityTagCatalog={loadCityTagCatalog}
+                cityFilterTree={cityFilterTree}
+                cityFilterTreeLoading={cityFilterTreeLoading}
+                cityFilterTreeError={cityFilterTreeError}
+                onReloadCityFilters={loadCityFilterTree}
+                onToggleCityTag={toggleCityTag}
+              />
+            </div>
+
+            <div className="pt-5 border-t border-aspectum-border">
+              <SessionWizardCityInfoStep
+                embedded
+                scopedToCityDraftId={scopedCityDraftId || scopedDatabaseCityId || ''}
+                cityInfos={visibleCityInfos}
+                currentCityInfo={currentCityInfo}
+                cityInfoLocaleData={cityInfoLocaleData}
+                cityInfoActiveLocale={cityInfoActiveLocale}
+                cityInfoSaving={cityInfoSaving}
+                cityInfoAutoSaving={cityInfoAutoSaving}
+                cityInfoAutoSaved={cityInfoAutoSaved}
+                referenceCities={referenceCities || []}
+                cityDrafts={cityDrafts || []}
+                onOpenCityInfoDetail={openCityInfoDetail}
+                onAddCityInfo={addCityInfo}
+                onSetCurrentCityInfo={setCurrentCityInfo}
+                onSetCityInfoActiveLocale={setCityInfoActiveLocale}
+                onUpdateCityInfoLocaleField={updateCityInfoLocaleField}
+                onUpdateCurrentCityInfoPatch={updateCurrentCityInfoPatch}
+                onSaveCurrentCityInfo={saveCurrentCityInfo}
+                onDeleteCurrentCityInfo={deleteCurrentCityInfo}
+                onImportCityInfoFromText={importCityInfoFromText}
+                onGoToStep={goToStep}
+                cityInfoGenerateModalOpen={cityInfoGenerateModalOpen}
+                cityInfoGeneratePrompt={cityInfoGeneratePrompt}
+                cityInfoGenerateCount={cityInfoGenerateCount}
+                cityInfoDedupeExistingItems={cityInfoDedupeExistingItems}
+                onCityInfoDedupeExistingItemsChange={setCityInfoDedupeExistingItems}
+                cityInfoGenerating={cityInfoGenerating}
+                cityInfoGenerationError={cityInfoGenerationError}
+                cityInfoGenerationTaskId={cityInfoGenerationTaskId}
+                cityInfoGenerationLang={cityInfoGenerationLang}
+                onOpenCityInfoGenerateModal={openCityInfoGenerateModal}
+                onCloseCityInfoGenerateModal={closeCityInfoGenerateModal}
+                onCityInfoGeneratePromptChange={setCityInfoGeneratePrompt}
+                onCityInfoGenerateCountChange={setCityInfoGenerateCount}
+                onCityInfoGenerationLangChange={setCityInfoGenerationLang}
+                onGenerateCityInfoFromPrompt={generateCityInfoFromPrompt}
+                aiGenerationMode={aiGenerationMode}
+                aiUseWebSearch={aiUseWebSearch}
+                aiAdvancedGenerationAvailable={aiAdvancedGenerationAvailable}
+                onAiGenerationModeChange={setAiGenerationMode}
+                onAiUseWebSearchChange={setAiUseWebSearch}
+              />
+            </div>
+          </div>
         )}
 
         {currentStep === 2 && (
@@ -1115,7 +1333,7 @@ export default function SessionWizard({ components = {} } = {}) {
               onRemoveCurrentAttractionRelatedEvent={removeCurrentAttractionRelatedEvent}
             />
 
-            <div className="pt-5 border-t border-gray-200">
+            <div className="pt-5 border-t border-aspectum-border">
               <SessionWizardAttractionInfoStep
                 embedded
                 scopedToAttractionId={activeAttractionId || activeEventId || ''}
@@ -1161,7 +1379,7 @@ export default function SessionWizard({ components = {} } = {}) {
               />
             </div>
 
-            <div className="pt-5 border-t border-gray-200">
+            <div className="pt-5 border-t border-aspectum-border">
               <SessionWizardAttractionFeedStep
                 embedded
                 scopedToAttractionId={activeAttractionId || activeEventId || ''}
@@ -1193,7 +1411,7 @@ export default function SessionWizard({ components = {} } = {}) {
               />
             </div>
 
-            <div className="pt-5 border-t border-gray-200">
+            <div className="pt-5 border-t border-aspectum-border">
               <SessionWizardAttractionAudioGuidesBlock
                 embedded
                 scopedToAttractionId={activeAttractionId || activeEventId || ''}
@@ -1395,67 +1613,41 @@ export default function SessionWizard({ components = {} } = {}) {
             onPublish={handlePublish}
           />
         )}
+        </Suspense>
       </main>
 
-      {addLocaleOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center">
-          <div
-            className="absolute inset-0 bg-black/40"
-            onClick={() => setAddLocaleOpen(false)}
-          />
-
-          <div className="relative bg-white rounded-xl shadow-xl p-6 w-80 space-y-4">
-            <h3 className="text-base font-semibold text-gray-900">
-              Добавить адаптацию
-            </h3>
-
+      <Modal
+        open={addLocaleOpen}
+        onClose={() => setAddLocaleOpen(false)}
+        title="Добавить адаптацию"
+        size="sm"
+        footer={(
+          <>
+            <Button type="button" variant="outline" size="md" onClick={() => setAddLocaleOpen(false)}>
+              Отмена
+            </Button>
+            <Button type="button" variant="primary" size="md" onClick={addLocale}>
+              Добавить
+            </Button>
+          </>
+        )}
+      >
+        <div className="space-y-4">
             <div>
-              <label className="block text-sm text-gray-600 mb-1">
+              <FormLabel  layout="block" size="sm" tone="subtle" spacing="xs">
                 Код страны (2 буквы)
-              </label>
-              <input
-                type="text"
-                maxLength={2}
-                value={newLocaleCode}
-                onChange={(e) => setNewLocaleCode(e.target.value.toUpperCase())}
-                placeholder="RU, US, DE..."
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
+              </FormLabel>
+              <TextInput type="text" maxLength={2} value={newLocaleCode} onChange={(e) => setNewLocaleCode(e.target.value.toUpperCase())} placeholder="RU, US, DE..." />
             </div>
 
             <div>
-              <label className="block text-sm text-gray-600 mb-1">
+              <FormLabel  layout="block" size="sm" tone="subtle" spacing="xs">
                 Название языка
-              </label>
-              <input
-                type="text"
-                value={newLocaleLang}
-                onChange={(e) => setNewLocaleLang(e.target.value)}
-                placeholder="Немецкий, Испанский..."
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
+              </FormLabel>
+              <TextInput type="text" value={newLocaleLang} onChange={(e) => setNewLocaleLang(e.target.value)} placeholder="Немецкий, Испанский..." />
             </div>
-
-            <div className="flex gap-2 justify-end">
-              <button
-                type="button"
-                onClick={() => setAddLocaleOpen(false)}
-                className="px-4 py-2 text-sm text-gray-600 border border-gray-300 rounded-lg hover:bg-gray-50"
-              >
-                Отмена
-              </button>
-
-              <button
-                type="button"
-                onClick={addLocale}
-                className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700"
-              >
-                Добавить
-              </button>
-            </div>
-          </div>
         </div>
-      )}
+      </Modal>
 
       <SessionCloseDialogComp
         open={closeOpen}

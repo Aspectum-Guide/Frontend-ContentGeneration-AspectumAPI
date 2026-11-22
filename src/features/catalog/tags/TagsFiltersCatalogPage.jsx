@@ -1,25 +1,18 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import Layout from '../../../components/Layout';
-import DataTable from '../../../components/ui/DataTable';
-import Modal, { ConfirmModal } from '../../../components/ui/Modal';
-import Button from '../../../components/ui/Button';
-import Alert from '../../../components/ui/Alert';
-import { Field, TextInput, FormActions, Select } from '../../../components/ui/FormField';
-import Toast, { useToast } from '../../../components/ui/Toast.jsx';
+import { Alert, Button, Checkbox, ConfirmModal, DataTable, Field, FormActions, InlineState, Modal, MultiField, PageHeader, Panel, Select, Tabs, TextInput, Toast, useToast } from '@aspectum/admin-ui-web';
 import { citiesAPI, cityFiltersAPI, eventFiltersAPI } from './api';
 import { staffCatalogAPI } from '../../../api/staffCatalog';
 import { workspaceTitle } from '../../../utils/workspace';
 import CityFilterEditorFields from './CityFilterEditorFields';
 import { isNotFoundError, parseApiError } from '../../../utils/apiError';
-import MultiLangInput from '../../../components/forms/MultiLangInput';
+import { useAppLanguages } from '../../../hooks/useAppLanguages';
 import { getMultiLangValue } from '../shared/i18n';
 import {
-  DEFAULT_APP_LANGUAGES,
   ensureAppLanguages,
   flattenEventFilterTree,
-  mapAppLanguagesForMultiLangInput,
+  mapAppLanguagesForFields,
   normalizeListResponse,
-  parseAppLanguagesResponse,
   unwrapEnvelope,
 } from '../shared/normalize';
 import {
@@ -103,7 +96,7 @@ function FilterTab({
   defaultLang = DEFAULT_TAG_LANG,
 }) {
   const multiLangLanguages = useMemo(
-    () => mapAppLanguagesForMultiLangInput(appLanguages),
+    () => mapAppLanguagesForFields(appLanguages),
     [appLanguages],
   );
   const locallyDeletedFilterIdsRef = useRef(new Set());
@@ -386,9 +379,9 @@ function FilterTab({
         label: 'Название',
         render: (name) => (
           <div>
-            <div className="font-medium text-gray-900 text-sm">{getMultiLangValue(name) || '—'}</div>
+            <div className="font-medium text-aspectum-text text-sm">{getMultiLangValue(name) || '—'}</div>
             {name && typeof name === 'object' && (
-              <div className="text-xs text-gray-400 mt-0.5">
+              <div className="text-xs text-aspectum-text-disabled mt-0.5">
                 {appLanguages
                   .filter(({ code }) => name[code])
                   .map(({ code, label }) => `${label || code}: ${name[code]}`)
@@ -405,8 +398,7 @@ function FilterTab({
         label: '',
         className: 'w-8',
         render: (id, row) => (row.type === 'tag' ? (
-          <input
-            type="checkbox"
+          <Checkbox
             aria-label="Выбрать тег для переноса"
             checked={selectedTagIds.has(String(id))}
             onClick={(e) => e.stopPropagation()}
@@ -419,7 +411,7 @@ function FilterTab({
       base.push({
         key: 'parent_id',
         label: 'Папка',
-        className: 'text-xs text-gray-600',
+        className: 'text-xs text-aspectum-text-subtle',
         render: (parentId, row) => (row.type === 'tag'
           ? (folderTitleById.get(String(parentId)) || '—')
           : ''),
@@ -427,16 +419,16 @@ function FilterTab({
       base.push({
         key: 'type',
         label: 'Тип',
-        className: 'text-xs text-gray-600 capitalize',
+        className: 'text-xs text-aspectum-text-subtle capitalize',
         render: (v) => (v === 'folder' ? 'Папка' : v === 'tag' ? 'Тег' : v || '—'),
       });
       base.push({
         key: 'workspace',
         label: 'Пространство',
-        className: 'text-xs text-gray-600',
+        className: 'text-xs text-aspectum-text-subtle',
         render: (code) => {
           if (code === undefined) return '—';
-          if (!code) return <span className="text-gray-400">Общая</span>;
+          if (!code) return <span className="text-aspectum-text-disabled">Общая</span>;
           const ws = workspaces.find((w) => w.code === code);
           return ws ? workspaceTitle(ws) : code;
         },
@@ -446,20 +438,20 @@ function FilterTab({
       base.push({
         key: 'type',
         label: 'Тип',
-        className: 'text-xs text-gray-600 capitalize',
+        className: 'text-xs text-aspectum-text-subtle capitalize',
         render: (v) => (v === 'folder' ? 'Папка' : v === 'tag' ? 'Тег' : v || '—'),
       });
       base.push({
         key: 'index',
         label: 'Индекс',
-        className: 'text-xs text-gray-500',
+        className: 'text-xs text-aspectum-text-muted',
         render: (v) => v ?? 0,
       });
       base.push({
         key: 'is_show',
         label: 'Виден',
         render: (v) => (
-          <span className={`text-xs font-medium ${v ? 'text-green-600' : 'text-gray-400'}`}>
+          <span className={`text-xs font-medium ${v ? 'text-aspectum-positive' : 'text-aspectum-text-disabled'}`}>
             {v ? 'да' : 'нет'}
           </span>
         ),
@@ -467,14 +459,14 @@ function FilterTab({
       base.push({
         key: 'city_ids',
         label: 'Города',
-        className: 'text-xs text-gray-500',
+        className: 'text-xs text-aspectum-text-muted',
         render: (v) => (Array.isArray(v) ? v.length : 0),
       });
     }
     base.push({
       key: 'slug',
       label: 'Имя (API)',
-      className: 'font-mono text-xs text-gray-500',
+      className: 'font-mono text-xs text-aspectum-text-muted',
       render: (v) => v || '—',
     });
     return base;
@@ -485,6 +477,8 @@ function FilterTab({
       <div className="flex justify-end mb-3">
         <Button
           type="button"
+          variant="primary"
+          size="md"
           onClick={() => {
             setCreateError(null);
             setCreateTitle('');
@@ -493,54 +487,34 @@ function FilterTab({
             setCreateModalOpen(true);
           }}
           disabled={creating}
-          loading={creating}
-          variant="primary"
         >
-          {createLabel || 'Создать тег'}
+          {creating ? 'Создание…' : (createLabel || 'Создать тег')}
         </Button>
       </div>
 
       {canMoveTags && selectedTagIds.size > 0 && (
-        <div className="mb-3 flex flex-wrap items-center gap-2 rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-sm">
-          <span className="font-medium text-blue-900">Выбрано тегов: {selectedTagIds.size}</span>
-          <span className="text-blue-900">→ в папку</span>
-          <select
-            value={moveTargetId}
-            onChange={(e) => setMoveTargetId(e.target.value)}
-            disabled={moving}
-            className="px-2 py-1 border border-gray-300 rounded-lg text-sm bg-white"
-          >
+        <Panel tone="info" className="mb-3 flex flex-wrap items-center gap-2 px-3 py-2 text-sm">
+          <span className="font-medium text-aspectum-primary-emphasis">Выбрано тегов: {selectedTagIds.size}</span>
+          <span className="text-aspectum-primary-emphasis">→ в папку</span>
+          <Select className="bg-aspectum-surface" value={moveTargetId} onChange={(e) => setMoveTargetId(e.target.value)} disabled={moving}>
             <option value="">— выберите папку —</option>
             {folderOptions.map((f) => (
               <option key={String(f.id)} value={String(f.id)}>
                 {getMultiLangValue(f.name) || f.slug || f.id}
               </option>
             ))}
-          </select>
-          <Button
-            type="button"
-            onClick={moveSelectedTags}
-            disabled={moving || !moveTargetId}
-            loading={moving}
-            variant="primary"
-            size="sm"
-          >
-            Перенести
+          </Select>
+          <Button type="button" variant="primary" size="md" onClick={moveSelectedTags} disabled={moving || !moveTargetId}>
+            {moving ? 'Переносим…' : 'Перенести'}
           </Button>
-          <Button
-            type="button"
-            onClick={() => { setSelectedTagIds(new Set()); setMoveError(null); }}
-            disabled={moving}
-            variant="secondary"
-            size="sm"
-          >
+          <Button type="button" variant="outline" size="md" onClick={() => { setSelectedTagIds(new Set()); setMoveError(null); }} disabled={moving}>
             Снять выбор
           </Button>
-          <span className="w-full text-xs text-blue-800">
+          <span className="w-full text-xs text-aspectum-primary-strong">
             Теги остаются теми же — привязки к достопримечательностям и ИЛ сохранятся.
           </span>
-          {moveError && <span className="w-full text-xs text-red-700">{moveError}</span>}
-        </div>
+          {moveError && <span className="w-full text-xs text-aspectum-danger-strong">{moveError}</span>}
+        </Panel>
       )}
 
       <DataTable
@@ -554,12 +528,11 @@ function FilterTab({
         onSearch={setSearch}
         searchPlaceholder="Поиск..."
         actions={(row) => (
-          <div className="flex items-center gap-1.5">
+          <>
             <Button
               type="button"
-              size="xs"
               variant="soft"
-              loading={loadingEditId === row.id}
+              size="sm"
               onClick={async () => {
                 setSaveError(null);
                 setEditEmoji(row.emoji || '');
@@ -594,12 +567,12 @@ function FilterTab({
                 }
               }}
             >
-              Ред.
+              {loadingEditId === row.id ? '…' : 'Ред.'}
             </Button>
             <Button
               type="button"
-              size="xs"
               variant="softDanger"
+              size="sm"
               disabled={deletingFilterIds.has(String(row.id))}
               onClick={(event) => {
                 event.stopPropagation();
@@ -608,7 +581,7 @@ function FilterTab({
             >
               Удалить
             </Button>
-          </div>
+          </>
         )}
       />
 
@@ -620,23 +593,22 @@ function FilterTab({
       >
         <form onSubmit={handleCreate} className="space-y-4">
           {createError && (
-            <Alert variant="error">{createError}</Alert>
+            <Alert tone="error">{createError}</Alert>
           )}
 
           {mode === 'event' && (
             <Field label="Тип">
-              <select
+              <Select
                 value={newFilter.kind}
                 onChange={(e) => setNewFilter((p) => ({
                   ...p,
                   kind: e.target.value,
                   parent_folder_id: e.target.value === 'folder' ? '' : p.parent_folder_id,
                 }))}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
               >
                 <option value="folder">Папка</option>
                 <option value="tag">Тег (внутри папки)</option>
-              </select>
+              </Select>
             </Field>
           )}
 
@@ -654,21 +626,16 @@ function FilterTab({
 
           {mode === 'event' && newFilter.kind === 'tag' && (
             <Field label="Папка" required>
-              <select
-                value={newFilter.parent_folder_id}
-                onChange={(e) => setNewFilter((p) => ({ ...p, parent_folder_id: e.target.value }))}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
-                required
-              >
+              <Select value={newFilter.parent_folder_id} onChange={(e) => setNewFilter((p) => ({ ...p, parent_folder_id: e.target.value }))} required>
                 <option value="">— выберите папку —</option>
                 {folderOptions.map((f) => (
                   <option key={String(f.id)} value={String(f.id)}>
                     {getMultiLangValue(f.name) || f.slug || f.id}
                   </option>
                 ))}
-              </select>
+              </Select>
               {folderOptions.length === 0 && (
-                <p className="mt-1 text-xs text-amber-600">Сначала создайте папку, затем теги внутри неё.</p>
+                <p className="mt-1 text-xs text-aspectum-warning">Сначала создайте папку, затем теги внутри неё.</p>
               )}
             </Field>
           )}
@@ -709,17 +676,17 @@ function FilterTab({
         {editingFilter && (
           <form onSubmit={handleSave} className="space-y-4">
             {saveError && (
-              <Alert variant="error">{saveError}</Alert>
+              <Alert tone="error">{saveError}</Alert>
             )}
             {editLoading && (
-              <p className="text-sm text-gray-400">Загрузка данных фильтра...</p>
+              <InlineState loading tone="disabled">Загрузка данных фильтра...</InlineState>
             )}
             {mode === 'event' && (
               <Field label="Тип">
                 <TextInput
                   value={editingFilter.type === 'folder' ? 'Папка' : 'Тег'}
                   readOnly
-                  className="bg-gray-50 text-gray-500 cursor-not-allowed"
+                  className="bg-aspectum-surface-muted text-aspectum-text-muted cursor-not-allowed"
                 />
               </Field>
             )}
@@ -760,13 +727,14 @@ function FilterTab({
                 </Select>
               </Field>
             )}
-            <MultiLangInput
-              label={editNameLabel}
-              required
-              languages={multiLangLanguages}
-              value={editingFilter.name || {}}
-              onChange={(name) => setEditingFilter((prev) => ({ ...prev, name }))}
-            />
+            <Field label={editNameLabel} required>
+              <MultiField
+                items={multiLangLanguages.map((lang) => ({ id: lang.code, label: lang.name }))}
+                value={editingFilter.name || {}}
+                onChange={(name) => setEditingFilter((prev) => ({ ...prev, name }))}
+                placeholder={`Введите ${editNameLabel.toLowerCase()}`}
+              />
+            </Field>
             <Field label="Эмодзи (опционально)">
               <TextInput
                 value={editEmoji}
@@ -779,7 +747,7 @@ function FilterTab({
               <TextInput
                 value={editingFilter.slug || ''}
                 readOnly
-                className="font-mono bg-gray-50 text-gray-400 cursor-not-allowed"
+                className="font-mono bg-aspectum-surface-muted text-aspectum-text-disabled cursor-not-allowed"
               />
             </Field>
             {mode === 'city' && (
@@ -812,24 +780,9 @@ function FilterTab({
 
 export default function TagsFilters() {
   const [activeTab, setActiveTab] = useState('city');
-  const [appLanguages, setAppLanguages] = useState(DEFAULT_APP_LANGUAGES);
+  const { languages: appLanguages } = useAppLanguages();
   const [cityOptions, setCityOptions] = useState([]);
   const { note, showNote } = useToast();
-
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      try {
-        const res = await staffCatalogAPI.languages();
-        if (!cancelled) {
-          setAppLanguages(parseAppLanguagesResponse(res));
-        }
-      } catch (e) {
-        console.error('Failed to load app languages', e);
-      }
-    })();
-    return () => { cancelled = true; };
-  }, []);
 
   const [workspaces, setWorkspaces] = useState([]);
   useEffect(() => {
@@ -880,29 +833,17 @@ export default function TagsFilters() {
   return (
     <Layout>
       <Toast note={note} />
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold text-gray-900">Теги и фильтры</h1>
-        <p className="mt-1 text-sm text-gray-500">Управление тегами городов и событий (CityAPI / EventsAPI)</p>
-      </div>
+      <PageHeader title="Теги и фильтры" description="Управление тегами городов и событий (CityAPI / EventsAPI)" />
 
-      <div className="flex gap-1 mb-5 bg-gray-100 rounded-xl p-1 w-fit">
-        {[
-          { key: 'city', label: '🏙️ Теги городов' },
-          { key: 'event', label: '🎪 Теги событий' },
-        ].map(({ key, label }) => (
-          <button
-            key={key}
-            type="button"
-            onClick={() => setActiveTab(key)}
-            className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors ${
-              activeTab === key
-                ? 'bg-white text-gray-900 shadow-sm'
-                : 'text-gray-600 hover:text-gray-900'
-            }`}
-          >
-            {label}
-          </button>
-        ))}
+      <div className="mb-5">
+        <Tabs
+          items={[
+            { id: 'city', label: 'Теги городов' },
+            { id: 'event', label: 'Теги событий' },
+          ]}
+          value={activeTab}
+          onChange={setActiveTab}
+        />
       </div>
 
       {activeTab === 'city' ? (

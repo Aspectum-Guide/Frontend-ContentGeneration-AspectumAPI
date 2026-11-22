@@ -1,11 +1,14 @@
 {
   "name": "aspectum-admin-content-generation",
   "version": "1.0.0",
+  "private": true,
   "type": "module",
   "description": "Aspectum Admin - Content Generation Platform",
   "scripts": {
     "dev": "vite --host",
     "build": "vite build",
+    "build:studio": "node scripts/build-scope.mjs studio",
+    "build:catalog": "node scripts/build-scope.mjs catalog",
     "preview": "vite preview",
     "lint": "eslint . --ext js,jsx,ts,tsx",
     "test": "vitest run",
@@ -26,18 +29,18 @@
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
     "react-hook-form": "^7.48.0",
-    "react-router-dom": "^6.20.0",
+    "react-router-dom": "^7.18.4",
     "zod": "^3.22.0"
   },
   "devDependencies": {
+    "@tailwindcss/postcss": "^4.3.3",
     "@testing-library/dom": "^10.4.1",
     "@testing-library/react": "^16.0.0",
     "@types/react": "^18.2.0",
     "@types/react-dom": "^18.2.0",
     "@typescript-eslint/eslint-plugin": "^8.65.0",
     "@typescript-eslint/parser": "^8.65.0",
-    "@vitejs/plugin-react": "^4.2.0",
-    "autoprefixer": "^10.4.16",
+    "@vitejs/plugin-react": "^6.1.2",
     "eslint": "^8.55.0",
     "eslint-plugin-react": "^7.33.0",
     "eslint-plugin-react-hooks": "^4.6.0",
@@ -45,9 +48,9 @@
     "jsdom": "^24.0.0",
     "openapi-typescript": "^7.13.0",
     "postcss": "^8.4.32",
-    "tailwindcss": "^3.3.0",
+    "tailwindcss": "^4.3.3",
     "typescript": "^6.0.3",
-    "vite": "^5.0.0",
-    "vitest": "^2.1.0"
+    "vite": "^8.3.4",
+    "vitest": "^4.1.11"
   }
 }
