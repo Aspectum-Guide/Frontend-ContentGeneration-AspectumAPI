@@ -1,3 +1,4 @@
+/* eslint-disable react-refresh/only-export-components -- route config is exported for Router smoke tests */
 import { lazy, Suspense } from 'react';
 import { createBrowserRouter, Navigate, RouterProvider } from 'react-router-dom';
 import ErrorBoundary, { SessionWizardErrorBoundary } from './components/ErrorBoundary';
@@ -6,6 +7,9 @@ import { LayoutActionsProvider } from './context/LayoutActionsContext';
 import { AppModeProvider } from './mode/AppModeContext';
 import RequireStudio from './mode/RequireStudio';
 import { registerAuthNavigate } from './utils/authRedirect';
+import { resolveNavScope } from './config/nav';
+import { filterRoutesByScope } from './config/scope';
+import { EmptyState, Spinner, UiProvider } from '@aspectum/admin-ui-web';
 
 function PageLoadingFallback() {
   return (
@@ -37,7 +41,6 @@ const NotFound = lazyPage(() => import('./pages/NotFound'));
 // Generation & Studio
 const SessionsList = lazyPage(() => import('./pages/generation/SessionsList'));
 const GenerationList = lazyPage(() => import('./pages/generation/GenerationList'));
-const UploadFile = lazyPage(() => import('./pages/generation/UploadFile'));
 const NewSession = lazyPage(() => import('./pages/generation/NewSession'));
 const SessionWizard = lazyPage(() => import('./pages/generation/SessionWizard'));
 
@@ -93,7 +96,7 @@ const MyTasks = lazyPage(() => import('./pages/tasks/MyTasks'));
 const AudioQueue = lazyPage(() => import('./pages/tasks/AudioQueue'));
 const MediaRecovery = lazyPage(() => import('./pages/tasks/MediaRecovery'));
 
-const routes = [
+const allRoutes = [
   {
     path: '/token-auth',
     element: <ErrorBoundary><TokenAuth /></ErrorBoundary>,
@@ -113,10 +116,6 @@ const routes = [
   {
     path: '/generation/list',
     element: <RequireStudio><ProtectedRoute><ErrorBoundary><GenerationList /></ErrorBoundary></ProtectedRoute></RequireStudio>,
-  },
-  {
-    path: '/generation/upload',
-    element: <RequireStudio><ProtectedRoute><ErrorBoundary><UploadFile /></ErrorBoundary></ProtectedRoute></RequireStudio>,
   },
   {
     path: '/generation/new',
@@ -320,6 +319,9 @@ const routes = [
   },
 ];
 
+// VITE_NAV_SCOPE=studio|catalog builds only serve their own area (config/scope.js).
+export const routes = filterRoutesByScope(allRoutes, resolveNavScope());
+
 const router = createBrowserRouter(routes, {
   future: {
     v7_startTransition: true,
@@ -333,13 +335,17 @@ registerAuthNavigate((path, opts) => router.navigate(path, opts));
 
 function App() {
   return (
-    <ErrorBoundary>
-      <AppModeProvider>
-        <LayoutActionsProvider>
-          <RouterProvider router={router} />
-        </LayoutActionsProvider>
-      </AppModeProvider>
-    </ErrorBoundary>
+    <UiProvider>
+      <ErrorBoundary>
+        <AppModeProvider>
+          <LayoutActionsProvider>
+            <Suspense fallback={<EmptyState icon={<Spinner size="md" />} title="Загрузка…" spacing="md" />}>
+              <RouterProvider router={router} />
+            </Suspense>
+          </LayoutActionsProvider>
+        </AppModeProvider>
+      </ErrorBoundary>
+    </UiProvider>
   );
 }
 

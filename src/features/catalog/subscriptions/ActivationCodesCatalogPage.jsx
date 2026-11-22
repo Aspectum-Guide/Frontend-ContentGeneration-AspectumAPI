@@ -7,19 +7,10 @@ import { resolveTypeId, typeToFormValue } from '../partners/codeTypes';
 import TypeSelect from '../partners/TypeSelect';
 import CodeBatchResult from '../partners/CodeBatchResult';
 import Layout from '../../../components/Layout';
-import DataTable from '../../../components/ui/DataTable';
-import { Field, FormActions, Select, TextInput, Textarea } from '../../../components/ui/FormField';
-import Modal, { ConfirmModal } from '../../../components/ui/Modal';
+import { Select, Alert, BulkActionModal, CheckboxField, FormHint, PageHeader, ConfirmModal, DataTable, Field, FormActions, Modal, StatusBadge, TableRowActions, Textarea, TextInput, formGridClassName } from '@aspectum/admin-ui-web';
 import { useLayoutActions } from '../../../context/useLayoutActions';
 import { parseApiError } from '../../../utils/apiError';
 import { useCatalogCrud } from '../core/useCatalogCrud';
-import BulkActionModal from '../../../components/bulk/BulkActionModal';
-import ActiveCheckboxField from '../shared/components/ActiveCheckboxField';
-import CatalogPageHeader from '../shared/components/CatalogPageHeader';
-import FormErrorAlert from '../shared/components/FormErrorAlert';
-import FormHint from '../shared/components/FormHint';
-import StatusBadge from '../shared/components/StatusBadge';
-import TableRowActions from '../shared/components/TableRowActions';
 import { formatIsoForInput, parseInputToIso } from '../shared/scheduleParsers';
 
 const PAGE_SIZE = 20;
@@ -187,6 +178,9 @@ export default function ActivationCodesCatalogPage() {
   const [bulkOpen, setBulkOpen] = useState(false);
   const [batchesVersion, setBatchesVersion] = useState(0);
 
+  const editingItem = crud.editingItem;
+  const openCreate = crud.openCreate;
+  const closeEdit = crud.closeEdit;
   useEffect(() => {
     loadSubscriptionTypes();
     loadPartners();
@@ -208,11 +202,11 @@ export default function ActivationCodesCatalogPage() {
     const actions = [
       {
         id: 'create-activation-code',
-        label: crud.editingItem ? 'Новый код' : 'Создать код',
+        label: editingItem ? 'Новый код' : 'Создать код',
         onClick: () => {
-          crud.openCreate();
+          openCreate();
         },
-        variant: crud.editingItem ? 'secondary' : 'primary',
+        variant: editingItem ? 'secondary' : 'primary',
       },
       {
         id: 'bulk-generate-activation-codes',
@@ -224,31 +218,31 @@ export default function ActivationCodesCatalogPage() {
       },
     ];
 
-    if (crud.editingItem) {
+    if (editingItem) {
       actions.push({
         id: 'close-activation-code-editor',
         label: 'Закрыть форму',
-        onClick: () => crud.closeEdit(),
+        onClick: () => closeEdit(),
         variant: 'secondary',
       });
     }
 
     setMobileActions(actions);
     return () => setMobileActions([]);
-  }, [crud.editingItem, crud.openCreate, crud.closeEdit, setMobileActions]);
+  }, [editingItem, openCreate, closeEdit, setMobileActions]);
 
   const columns = [
     {
       key: 'code',
       label: 'Код',
-      render: (value) => <span className="font-mono text-xs text-gray-700">{value || '—'}</span>,
+      render: (value) => <span className="font-mono text-xs text-aspectum-text-strong">{value || '—'}</span>,
     },
     {
       key: 'subscription_type',
       label: 'Тип подписки',
       render: (value) => {
         const item = subscriptionTypes.find((st) => st.id === value);
-        return <span className="text-sm text-gray-700">{item?.name || '—'}</span>;
+        return <span className="text-sm text-aspectum-text-strong">{item?.name || '—'}</span>;
       },
     },
     {
@@ -260,7 +254,7 @@ export default function ActivationCodesCatalogPage() {
       key: 'max_uses',
       label: 'Лимит/Использовано',
       render: (_, row) => (
-        <span className="text-sm text-gray-700">
+        <span className="text-sm text-aspectum-text-strong">
           {row.max_uses ?? '∞'} / {row.current_uses ?? 0}
         </span>
       ),
@@ -281,7 +275,7 @@ export default function ActivationCodesCatalogPage() {
 
   return (
     <Layout>
-      <CatalogPageHeader
+      <PageHeader
         title="Справочник кодов активации"
         description="Коды для активации подписки"
         createLabel="Создать код"
@@ -318,7 +312,7 @@ export default function ActivationCodesCatalogPage() {
             <Select
               value={subscriptionTypeFilter}
               onChange={(e) => setSubscriptionTypeFilter(e.target.value)}
-              className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+             
               disabled={typesLoading}
             >
               <option value="">Все типы подписки</option>
@@ -330,7 +324,7 @@ export default function ActivationCodesCatalogPage() {
             <Select
               value={partnerFilter}
               onChange={(e) => setPartnerFilter(e.target.value)}
-              className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+             
             >
               <option value="">Все партнёры</option>
               {partners.map((partner) => (
@@ -341,7 +335,7 @@ export default function ActivationCodesCatalogPage() {
             <Select
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value)}
-              className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+             
             >
               <option value="">Любой статус</option>
               <option value="active">Активные</option>
@@ -370,9 +364,9 @@ export default function ActivationCodesCatalogPage() {
       >
         {crud.editingItem && (
           <form onSubmit={crud.save} className="space-y-4">
-            <FormErrorAlert message={crud.saveError} />
+            <Alert tone="error">{crud.saveError}</Alert>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <div className={formGridClassName()}>
               <Field label="Код (опционально)">
                 <TextInput
                   value={crud.editingItem.code}
@@ -386,7 +380,7 @@ export default function ActivationCodesCatalogPage() {
                 <TypeSelect
                   value={crud.editingItem.subscription_type}
                   onChange={(e) => crud.setEditingItem((prev) => ({ ...prev, subscription_type: e.target.value }))}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+                 
                   types={subscriptionTypes}
                   placeholder="Не выбрано"
                 />
@@ -400,7 +394,7 @@ export default function ActivationCodesCatalogPage() {
               <Select
                 value={crud.editingItem.partner || ''}
                 onChange={(e) => crud.setEditingItem((prev) => ({ ...prev, partner: e.target.value }))}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+               
               >
                 <option value="">Без партнёра</option>
                 {partners.map((partner) => (
@@ -409,7 +403,7 @@ export default function ActivationCodesCatalogPage() {
               </Select>
             </Field>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <div className={formGridClassName()}>
               <Field label="Продукт">
                 <TextInput
                   value={crud.editingItem.product_name}
@@ -445,7 +439,7 @@ export default function ActivationCodesCatalogPage() {
               />
             </Field>
 
-            <ActiveCheckboxField
+            <CheckboxField
               checked={crud.editingItem.is_active}
               onChange={(next) => crud.setEditingItem((prev) => ({ ...prev, is_active: next }))}
               text="Активный код"
@@ -501,7 +495,7 @@ export default function ActivationCodesCatalogPage() {
         }}
         renderFields={({ values, setValues, error }) => (
           <>
-            <FormErrorAlert message={error} />
+            <Alert tone="error">{error}</Alert>
 
             <Field label="Название партии" hint="Пусто — подставим дату и количество. По партии видно, сколько кодов активировали; её можно выгрузить в Excel и выключить целиком.">
               <TextInput
@@ -511,7 +505,7 @@ export default function ActivationCodesCatalogPage() {
               />
             </Field>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <div className={formGridClassName()}>
               <Field label="Префикс (опционально)">
                 <TextInput
                   value={values.prefix}
@@ -536,7 +530,7 @@ export default function ActivationCodesCatalogPage() {
               <TypeSelect
                 value={values.subscription_type}
                 onChange={(e) => setValues((prev) => ({ ...prev, subscription_type: e.target.value }))}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+               
                 types={subscriptionTypes}
                 placeholder="Выберите…"
                 required
@@ -547,7 +541,7 @@ export default function ActivationCodesCatalogPage() {
               <Select
                 value={values.partner}
                 onChange={(e) => setValues((prev) => ({ ...prev, partner: e.target.value }))}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+               
               >
                 <option value="">Без партнёра</option>
                 {partners.map((partner) => (
@@ -556,7 +550,7 @@ export default function ActivationCodesCatalogPage() {
               </Select>
             </Field>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <div className={formGridClassName()}>
               <Field label="Лимит использований (опционально)">
                 <TextInput
                   type="number"

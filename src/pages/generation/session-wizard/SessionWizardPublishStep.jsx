@@ -1,5 +1,4 @@
-import { StatusBadge as DefaultStatusBadge } from './sessionWizardShared.jsx';
-import Button from '../../../components/ui/Button.jsx';
+import { Alert, Button, Panel, SectionHeader, SessionStatusBadge as DefaultStatusBadge, Glyph } from '@aspectum/admin-ui-web';
 
 const getCountLabel = (count, emptyLabel = '—') => {
   return count > 0 ? count : emptyLabel;
@@ -57,26 +56,19 @@ export default function SessionWizardPublishStep({
 
   return (
     <div className="space-y-4">
-      <div>
-        <h2 className="text-lg font-semibold text-gray-900">Публикация</h2>
+      <SectionHeader title="Публикация" description="Проверьте данные и опубликуйте сессию. В публикацию могут попасть город, полезная информация, достопримечательности, лента и связанные блоки." />
 
-        <p className="text-sm text-gray-500">
-          Проверьте данные и опубликуйте сессию. В публикацию могут попасть город,
-          полезная информация, достопримечательности, лента и связанные блоки.
-        </p>
-      </div>
-
-      <div className="bg-gray-50 rounded-xl border border-gray-200 p-4 space-y-3 text-sm">
+      <Panel tone="muted" className="p-4 space-y-3 text-sm">
         <div className="flex justify-between gap-4">
-          <span className="text-gray-500">Сессия:</span>
+          <span className="text-aspectum-text-muted">Сессия:</span>
 
-          <span className="font-medium text-gray-900 text-right">
+          <span className="font-medium text-aspectum-text text-right">
             {session?.name || '—'}
           </span>
         </div>
 
         <div className="flex justify-between gap-4">
-          <span className="text-gray-500">Статус:</span>
+          <span className="text-aspectum-text-muted">Статус:</span>
 
           <StatusBadge
             status={session?.status}
@@ -84,127 +76,114 @@ export default function SessionWizardPublishStep({
           />
         </div>
 
-        <div className="h-px bg-gray-200 my-2" />
+        <div className="h-px bg-aspectum-border my-2" />
 
         <div className="flex justify-between gap-4">
-          <span className="text-gray-500">Город:</span>
+          <span className="text-aspectum-text-muted">Город:</span>
 
-          <span className={`font-medium ${hasCity ? 'text-gray-900' : 'text-gray-400'}`}>
+          <span className={`font-medium ${hasCity ? 'text-aspectum-text' : 'text-aspectum-text-disabled'}`}>
             {hasCity ? 'Есть' : 'Нет'}
           </span>
         </div>
 
         <div className="flex justify-between gap-4">
-          <span className="text-gray-500">Черновики городов:</span>
+          <span className="text-aspectum-text-muted">Черновики городов:</span>
 
-          <span className="font-medium text-gray-900">
+          <span className="font-medium text-aspectum-text">
             {getCountLabel(cityDrafts.length)}
           </span>
         </div>
 
         <div className="flex justify-between gap-4">
-          <span className="text-gray-500">Полезная информация о городе:</span>
+          <span className="text-aspectum-text-muted">Полезная информация о городе:</span>
 
-          <span className="font-medium text-gray-900">
+          <span className="font-medium text-aspectum-text">
             {getCountLabel(cityInfos.length)}
           </span>
         </div>
 
         <div className="flex justify-between gap-4">
-          <span className="text-gray-500">Достопримечательности:</span>
+          <span className="text-aspectum-text-muted">Достопримечательности:</span>
 
-          <span className="font-medium text-gray-900">
+          <span className="font-medium text-aspectum-text">
             {getCountLabel(attractions.length)}
           </span>
         </div>
 
         <div className="flex justify-between gap-4">
-          <span className="text-gray-500">Интерактивные локации:</span>
+          <span className="text-aspectum-text-muted">Интерактивные локации:</span>
 
-          <span className="font-medium text-gray-900">
+          <span className="font-medium text-aspectum-text">
             {getCountLabel(interactiveLocations.length)}
           </span>
         </div>
 
         <div className="flex justify-between gap-4">
-          <span className="text-gray-500">
+          <span className="text-aspectum-text-muted">
             Полезная информация о достопримечательностях:
           </span>
 
-          <span className="font-medium text-gray-900">
+          <span className="font-medium text-aspectum-text">
             {getCountLabel(attractionInfos.length)}
           </span>
         </div>
 
         <div className="flex justify-between gap-4">
-          <span className="text-gray-500">Элементы ленты:</span>
+          <span className="text-aspectum-text-muted">Элементы ленты:</span>
 
-          <span className="font-medium text-gray-900">
+          <span className="font-medium text-aspectum-text">
             {getCountLabel(attractionFeedItems.length)}
           </span>
         </div>
 
         {hasAttractionFeedItems && (
           <div className="flex justify-between gap-4">
-            <span className="text-gray-500">Лента, текст / изображения:</span>
+            <span className="text-aspectum-text-muted">Лента, текст / изображения:</span>
 
-            <span className="font-medium text-gray-900">
+            <span className="font-medium text-aspectum-text">
               {textFeedItemsCount} / {imageFeedItemsCount}
             </span>
           </div>
         )}
 
         <div className="flex justify-between gap-4">
-          <span className="text-gray-500">Теги:</span>
+          <span className="text-aspectum-text-muted">Теги:</span>
 
-          <span className="font-medium text-gray-900 text-right">
+          <span className="font-medium text-aspectum-text text-right">
             {hasTags ? `${cityTags.length} выбрано` : '—'}
           </span>
         </div>
-      </div>
+      </Panel>
 
       {!hasAnythingToPublish && (
-        <div className="p-3 text-sm text-amber-700 bg-amber-50 border border-amber-200 rounded-lg">
-          В сессии пока нет данных для публикации.
-        </div>
+        <Alert tone="warning">В сессии пока нет данных для публикации.</Alert>
       )}
 
       {hasAttractionFeedItems && !hasAttractions && (
-        <div className="p-3 text-sm text-amber-700 bg-amber-50 border border-amber-200 rounded-lg">
+        <Alert tone="warning">
           В сессии есть элементы ленты, но нет достопримечательностей. Лента должна быть
           привязана к достопримечательности из базы или к достопримечательности из сессии.
-        </div>
+        </Alert>
       )}
 
       <div className="flex justify-between pt-2">
-        <Button
-          type="button"
-          variant="outline"
-          onClick={() => onGoToStep(4)}
-          className="!min-h-0 !rounded-lg !px-4 !py-2 !text-sm !font-normal !text-gray-600 hover:!bg-gray-50 transition-colors"
-        >
+        <Button type="button" variant="outline" size="md" onClick={() => onGoToStep(4)}>
           ← Назад
         </Button>
 
         <div className="flex items-center gap-2">
           <Button
             type="button"
-            variant="secondary"
+            variant="softIndigo"
+            size="md"
             onClick={onTranslateSession}
             disabled={translating || !hasAnythingToPublish}
-            className="!min-h-0 !rounded-lg !border !border-indigo-200 !bg-indigo-50 !px-4 !py-2 !text-sm !font-medium !text-indigo-700 hover:!bg-indigo-100 disabled:!opacity-50 transition-colors"
           >
             {translating ? 'Перевод...' : 'Перевести сессию'}
           </Button>
 
-          <Button
-            type="button"
-            variant="primary"
-            onClick={onPublish}
-            disabled={publishing || !hasAnythingToPublish}
-            className="!min-h-0 !rounded-lg !bg-green-600 !px-6 !py-2 !text-sm !font-medium !text-white hover:!bg-green-700 disabled:!opacity-50 transition-colors"
-          >
-            {publishing ? 'Публикация...' : '✓ Опубликовать сессию'}
+          <Button type="button" variant="success" size="md" onClick={onPublish} disabled={publishing || !hasAnythingToPublish}>
+            {publishing ? 'Публикация...' : <><Glyph name="✓" /> Опубликовать сессию</>}
           </Button>
         </div>
       </div>

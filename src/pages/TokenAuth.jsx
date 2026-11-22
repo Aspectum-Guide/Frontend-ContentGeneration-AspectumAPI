@@ -2,8 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import TokenManager from '../utils/TokenManager';
 import { authAPI } from '../api/auth.ts';
-import Button from '../components/ui/Button';
-import { TextInput } from '../components/ui/FormField';
+import { Alert, Button, Field, PageHeader, Panel, TextInput } from '@aspectum/admin-ui-web';
 import { landingPath } from '../mode/appMode';
 import { useAppMode } from '../mode/AppModeContext';
 
@@ -134,18 +133,12 @@ export default function TokenAuth() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4">
-      <div className="bg-white rounded-2xl shadow-2xl p-8 w-full max-w-md">
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">Aspectum Admin</h1>
-          <p className="text-gray-600">Введите учетные данные для доступа</p>
-        </div>
+    <div className="min-h-screen bg-gradient-to-br from-aspectum-primary-soft to-aspectum-indigo-muted flex items-center justify-center p-4">
+      <Panel radius="modal" className="w-full max-w-md p-8 shadow-aspectum-prominent">
+        <PageHeader title="Aspectum Admin" description="Введите учетные данные для доступа" titleSize="lg" spacing="lg" />
 
         <form onSubmit={handleLogin} className="space-y-6">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Email или логин
-            </label>
+          <Field label="Email или логин">
             <TextInput
               type="text"
               value={login}
@@ -154,12 +147,9 @@ export default function TokenAuth() {
               disabled={loading}
               autoFocus
             />
-          </div>
+          </Field>
 
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Пароль
-            </label>
+          <Field label="Пароль">
             <TextInput
               type="password"
               value={password}
@@ -167,36 +157,35 @@ export default function TokenAuth() {
               placeholder="••••••••"
               disabled={loading}
             />
-          </div>
+          </Field>
 
           {error && (
-            <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm">
-              {error}
-            </div>
+            <Alert tone="error">{error}</Alert>
           )}
 
           <Button
             type="submit"
             variant="primary"
-            className="w-full py-3 text-base font-medium"
+            size="xl"
+            className="w-full"
             disabled={loading || !login.trim() || !password.trim()}
           >
             {loading ? 'Вход в процессе...' : 'Войти'}
           </Button>
         </form>
 
-        <div className="flex items-center gap-3 my-5 text-xs text-gray-400"><span className="h-px bg-gray-200 flex-1" />или<span className="h-px bg-gray-200 flex-1" /></div>
-        <Button type="button" variant="secondary" className="w-full py-3" disabled={loading} onClick={handlePasskeyLogin}>
+        <div className="flex items-center gap-3 my-5 text-xs text-aspectum-text-disabled"><span className="h-px bg-aspectum-border flex-1" />или<span className="h-px bg-aspectum-border flex-1" /></div>
+        <Button type="button" variant="secondary" size="xl" className="w-full" disabled={loading} onClick={handlePasskeyLogin}>
           Войти с passkey
         </Button>
 
-        <div className="mt-6 p-4 bg-blue-50 rounded-lg border border-blue-200">
-          <p className="text-xs text-blue-900">
+        <Panel tone="info" radius="control" className="mt-6 p-4">
+          <p className="text-xs text-aspectum-primary-emphasis">
             <strong>Информация по входу:</strong><br/>
             Введите email или логин и пароль. Если passkey уже добавлен в настройках аккаунта, можно войти без пароля.
           </p>
-        </div>
-      </div>
+        </Panel>
+      </Panel>
     </div>
   );
 }

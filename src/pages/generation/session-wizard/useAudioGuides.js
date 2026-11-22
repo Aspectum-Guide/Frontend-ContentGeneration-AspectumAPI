@@ -14,7 +14,7 @@ import {
   upsertById,
   waitForPersistenceIdle,
 } from './useSessionWizardHelpers.js';
-import { buildGenerationPayloadFields } from '../../../components/generation/AiGenerationQualitySettings.jsx';
+import { buildGenerationPayloadFields } from '../../../components/generation/generationUtils';
 
 const DEFAULT_AUDIO_GUIDE_PLAN_ITEMS_COUNT = 6;
 const DEFAULT_TTS_PROVIDER = 'fish_audio';
@@ -1891,6 +1891,7 @@ export function useAudioGuides({
     attractionAudioGuideLocaleData,
     isCurrentAttractionAudioGuideDirty,
     saveCurrentAttractionAudioGuide,
+    showNote,
   ]);
 
   const openAttractionAudioGuideDetail = useCallback(
@@ -2142,7 +2143,7 @@ export function useAudioGuides({
         setAttractionAudioUploading(false);
       }
     },
-    [sessionId, showNote],
+    [sessionId, showNote, getSessionUuid],
   );
 
   const generateAttractionAudioGuideTrackAudio = useCallback(

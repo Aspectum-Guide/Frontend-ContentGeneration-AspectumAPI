@@ -36,8 +36,8 @@ export const ensureAppLanguages = (value, appLanguages, defaultLang = 'ru') => {
   return out;
 };
 
-/** Map API `{ code, label }` to MultiLangInput `{ code, name }` (preferred language first). */
-export function mapAppLanguagesForMultiLangInput(appLanguages, preferredFirst = 'ru') {
+/** Map API languages to form language descriptors, with the preferred language first. */
+export function mapAppLanguagesForFields(appLanguages, preferredFirst = 'ru') {
   const langs = Array.isArray(appLanguages) && appLanguages.length
     ? appLanguages
     : DEFAULT_APP_LANGUAGES;

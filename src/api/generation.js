@@ -1,7 +1,14 @@
 import apiClient from './client';
 import { getWorkspace, withWorkspaceParams } from '../utils/workspace';
+import { queryClient, SESSIONS_SIDEBAR_KEY } from './queryClient';
 
 const BASE = '/generation';
+
+// Session mutations change what the sidebar list shows; mark it stale after they succeed.
+const refreshSidebar = (response) => {
+  queryClient.invalidateQueries({ queryKey: SESSIONS_SIDEBAR_KEY });
+  return response;
+};
 
 /** App-wide languages from settings.LANGUAGES (tags catalog, forms). */
 export const appLanguagesAPI = {
@@ -25,28 +32,26 @@ export const sessionsAPI = {
   // Только сессии текущего пространства (и ещё без страны — чтобы не терялись).
   list: () => apiClient.get(`${BASE}/sessions/`, { params: withWorkspaceParams() }),
   get: (sessionId, config = {}) => apiClient.get(`${BASE}/sessions/${sessionId}/`, config),
-  create: (data = {}) => apiClient.post(`${BASE}/sessions/create/`, data),
-  close: (sessionId, mode = 'save') => apiClient.post(`${BASE}/sessions/${sessionId}/close/`, { mode }),
-  closeAll: () => apiClient.post(`${BASE}/sessions/close-all-my-active/`, {}),
-  forceClose: (sessionId) => apiClient.post(`${BASE}/sessions/${sessionId}/force-close/`, {}),
-  delete: (sessionId) => apiClient.delete(`${BASE}/sessions/${sessionId}/delete/`),
-  publish: (sessionId) => apiClient.post(`${BASE}/sessions/${sessionId}/publish/`, {}),
+  // Lightweight paginated list for the sidebar (scope, status, q, limit, offset).
+  sidebar: (params = {}) => apiClient.get(`${BASE}/sessions/sidebar/`, { params: withWorkspaceParams(params) }),
+  create: (data = {}) => apiClient.post(`${BASE}/sessions/create/`, data).then(refreshSidebar),
+  close: (sessionId, mode = 'save') => apiClient.post(`${BASE}/sessions/${sessionId}/close/`, { mode }).then(refreshSidebar),
+  closeAll: () => apiClient.post(`${BASE}/sessions/close-all-my-active/`, {}).then(refreshSidebar),
+  forceClose: (sessionId) => apiClient.post(`${BASE}/sessions/${sessionId}/force-close/`, {}).then(refreshSidebar),
+  delete: (sessionId) => apiClient.delete(`${BASE}/sessions/${sessionId}/delete/`).then(refreshSidebar),
+  publish: (sessionId) => apiClient.post(`${BASE}/sessions/${sessionId}/publish/`, {}).then(refreshSidebar),
   translate: (sessionId, data = {}) => apiClient.post(`${BASE}/sessions/${sessionId}/translate/`, data),
   // Бэкенд принимает только POST (тело: {close_batch?: boolean})
   checkConflicts: (sessionId, data = {}) =>
     apiClient.post(`${BASE}/sessions/${sessionId}/publish/check-conflicts/`, data),
   updateCity: (sessionId, data) =>
-    apiClient.patch(`${BASE}/sessions/${sessionId}/city/`, data),
+    apiClient.patch(`${BASE}/sessions/${sessionId}/city/`, data).then(refreshSidebar),
   createCityDraft: (sessionId, data = {}) =>
     apiClient.post(`${BASE}/sessions/${sessionId}/city-drafts/`, data),
   deleteCityDraft: (sessionId, draftId) =>
     apiClient.delete(`${BASE}/sessions/${sessionId}/city-drafts/${draftId}/delete/`),
   setPrimaryCityDraft: (sessionId, draftId) =>
     apiClient.post(`${BASE}/sessions/${sessionId}/city-drafts/${draftId}/primary/`, {}),
-  uploadFromFile: (jsonText) =>
-    apiClient.post(`${BASE}/sessions/upload/`, jsonText, {
-      headers: { 'Content-Type': 'application/json' },
-    }),
 };
 
 // ─── Interactive locations ─────────────────────────────────────────────────────

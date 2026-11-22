@@ -3,16 +3,9 @@ import { citiesAPI } from '../../../api/generation';
 import { listAllStaffEvents } from '../../../api/staffCatalog';
 import { subscriptionTypesAPI } from '../../../api/subscription';
 import Layout from '../../../components/Layout';
-import DataTable from '../../../components/ui/DataTable';
-import { Field, FormActions, Select, TextInput, Textarea } from '../../../components/ui/FormField';
-import Modal, { ConfirmModal } from '../../../components/ui/Modal';
+import { Select, Alert, CheckboxField, PageHeader, ConfirmModal, DataTable, Field, FormActions, Modal, StatusBadge, TableRowActions, Textarea, TextInput } from '@aspectum/admin-ui-web';
 import { useLayoutActions } from '../../../context/useLayoutActions';
 import { parseApiError } from '../../../utils/apiError';
-import ActiveCheckboxField from '../shared/components/ActiveCheckboxField';
-import CatalogPageHeader from '../shared/components/CatalogPageHeader';
-import FormErrorAlert from '../shared/components/FormErrorAlert';
-import StatusBadge from '../shared/components/StatusBadge';
-import TableRowActions from '../shared/components/TableRowActions';
 import { getCityLabel, getEventLabel } from './subscriptionLabels';
 
 const PAGE_SIZE = 20;
@@ -221,12 +214,12 @@ export default function SubscriptionTypesCatalogPage() {
     {
       key: 'name',
       label: 'Название',
-      render: (value) => <span className="text-sm font-medium text-gray-900">{value || '—'}</span>,
+      render: (value) => <span className="text-sm font-medium text-aspectum-text">{value || '—'}</span>,
     },
     {
       key: 'description',
       label: 'Описание',
-      render: (value) => <span className="text-sm text-gray-700">{value || '—'}</span>,
+      render: (value) => <span className="text-sm text-aspectum-text-strong">{value || '—'}</span>,
     },
     {
       key: 'access_mode',
@@ -239,20 +232,20 @@ export default function SubscriptionTypesCatalogPage() {
       render: (value, row) => {
         const count = Array.isArray(value) ? value.length : 0;
         if (row.access_mode === 'choose_city') {
-          return <span className="text-sm text-gray-700">{count ? `выбор из ${count}` : 'любой'}</span>;
+          return <span className="text-sm text-aspectum-text-strong">{count ? `выбор из ${count}` : 'любой'}</span>;
         }
-        return <span className="text-sm text-gray-700">{count}</span>;
+        return <span className="text-sm text-aspectum-text-strong">{count}</span>;
       },
     },
     {
       key: 'events',
       label: 'События',
-      render: (value) => <span className="text-sm text-gray-700">{Array.isArray(value) ? value.length : 0}</span>,
+      render: (value) => <span className="text-sm text-aspectum-text-strong">{Array.isArray(value) ? value.length : 0}</span>,
     },
     {
       key: 'ai_prompts',
       label: 'Запросов ИИ',
-      render: (value) => <span className="text-sm text-gray-700">{value > 0 ? value : 'только гид'}</span>,
+      render: (value) => <span className="text-sm text-aspectum-text-strong">{value > 0 ? value : 'только гид'}</span>,
     },
     {
       key: 'is_active',
@@ -263,7 +256,7 @@ export default function SubscriptionTypesCatalogPage() {
 
   return (
     <Layout>
-      <CatalogPageHeader
+      <PageHeader
         title="Справочник типов подписки"
         description="Типы подписок: название, города, события, запросы ИИ, статус"
         createLabel="Создать тип подписки"
@@ -289,11 +282,7 @@ export default function SubscriptionTypesCatalogPage() {
         pageSize={PAGE_SIZE}
         onPage={setPage}
         filters={(
-          <Select
-            value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value)}
-            className="w-auto text-sm"
-          >
+          <Select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
             <option value="">Любой статус</option>
             <option value="active">Активные</option>
             <option value="inactive">Отключенные</option>
@@ -327,7 +316,7 @@ export default function SubscriptionTypesCatalogPage() {
       >
         {editingItem && (
           <form onSubmit={handleSave} className="space-y-4">
-            <FormErrorAlert message={saveError} />
+            <Alert tone="error">{saveError}</Alert>
 
             <Field label="Название" required>
               <TextInput
@@ -373,7 +362,7 @@ export default function SubscriptionTypesCatalogPage() {
               />
             </Field>
 
-            <ActiveCheckboxField
+            <CheckboxField
               checked={editingItem.is_active}
               onChange={(next) => setEditingItem((prev) => ({ ...prev, is_active: next }))}
               text="Активный тип подписки"

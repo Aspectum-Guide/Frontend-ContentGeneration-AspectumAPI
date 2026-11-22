@@ -1,14 +1,12 @@
 import { useEffect, useState } from 'react';
 import Layout from '../../../components/Layout';
-import Button from '../../../components/ui/Button';
-import DataTable from '../../../components/ui/DataTable';
-import { ConfirmModal } from '../../../components/ui/Modal';
-import Toast from '../../../components/ui/Toast';
+import { Button, Checkbox, ConfirmModal, DataTable, Switch, TableRowActions, Toast } from '@aspectum/admin-ui-web';
 import { useLayoutActions } from '../../../context/useLayoutActions';
 import { iapAdminAPI } from '../../../api/generation';
 import { ADMIN } from '../../../mode/appMode';
 import { useAppMode } from '../../../mode/AppModeContext';
 import { parseApiError } from '../../../utils/apiError';
+import { resolveNavScope } from '../../../config/nav';
 import { getMultiLangValue } from '../shared/i18n';
 import CityEditorModal from './CityEditorModal';
 import { useCitiesCatalog } from './useCitiesCatalog';
@@ -61,13 +59,12 @@ export default function CitiesCatalogPage() {
       key: '_select',
       label: '',
       render: (_, row) => (
-        <input
-          type="checkbox"
-          checked={selectedIds.has(String(row.id))}
-          onChange={() => toggleSelected(row.id)}
-          onClick={(e) => e.stopPropagation()}
-          aria-label="Выбрать город"
-        />
+          <Checkbox
+            checked={selectedIds.has(String(row.id))}
+            onChange={() => toggleSelected(row.id)}
+            onClick={(e) => e.stopPropagation()}
+            aria-label="Выбрать город"
+          />
       ),
     },
     {
@@ -75,9 +72,9 @@ export default function CitiesCatalogPage() {
       label: 'Название',
       render: (name) => (
         <div>
-          <div className="font-medium text-gray-900 text-sm">{getMultiLangValue(name) || '—'}</div>
+          <div className="font-medium text-aspectum-text text-sm">{getMultiLangValue(name) || '—'}</div>
           {name && typeof name === 'object' && (
-            <div className="text-xs text-gray-400 mt-0.5">
+            <div className="text-xs text-aspectum-text-disabled mt-0.5">
               {Object.entries(name).filter(([, v]) => v).map(([k, v]) => `${k}: ${v}`).join(' · ')}
             </div>
           )}
@@ -88,14 +85,14 @@ export default function CitiesCatalogPage() {
       key: 'country',
       label: 'Страна',
       render: (country, row) => (
-        <span className="text-sm text-gray-600">{row.display_country || getMultiLangValue(country) || '—'}</span>
+        <span className="text-sm text-aspectum-text-subtle">{row.display_country || getMultiLangValue(country) || '—'}</span>
       ),
     },
     {
       key: 'lat',
       label: 'Коорд.',
       render: (lat, row) => (
-        <span className="text-xs font-mono text-gray-400">
+        <span className="text-xs font-mono text-aspectum-text-disabled">
           {lat != null ? `${parseFloat(lat).toFixed(3)}, ${parseFloat(row.lon).toFixed(3)}` : '—'}
         </span>
       ),
@@ -104,7 +101,7 @@ export default function CitiesCatalogPage() {
       key: 'iap_price_usd',
       label: 'Цена',
       render: (price) => (
-        <span className="text-sm text-gray-600">{price ? `$${price}` : '—'}</span>
+        <span className="text-sm text-aspectum-text-subtle">{price ? `$${price}` : '—'}</span>
       ),
     },
     {
@@ -113,20 +110,12 @@ export default function CitiesCatalogPage() {
       render: (v, row) => {
         const loading = c.togglingIds.has(`${row.id}-is_show`);
         return (
-          <button
-            type="button"
-            role="switch"
-            aria-checked={v}
+          <Switch
+            checked={Boolean(v)}
+            loading={loading}
             aria-label={v ? 'Скрыть город' : 'Показать город'}
-            onClick={() => !loading && requestToggle(row.id, 'is_show', !v, `Скрыть «${getMultiLangValue(row.name) || row.id}»?`)}
-            disabled={loading}
-            className={`relative w-9 h-5 rounded-full transition-colors focus:outline-none disabled:opacity-50 ${v ? 'bg-blue-500' : 'bg-gray-300'}`}
-          >
-            {loading
-              ? <span className="absolute inset-0 flex items-center justify-center"><span className="w-3 h-3 border border-white border-t-transparent rounded-full animate-spin" /></span>
-              : <span className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-all ${v ? 'left-4' : 'left-0.5'}`} />
-            }
-          </button>
+            onChange={(next) => requestToggle(row.id, 'is_show', next, `Скрыть «${getMultiLangValue(row.name) || row.id}»?`)}
+          />
         );
       },
     },
@@ -135,77 +124,83 @@ export default function CitiesCatalogPage() {
       label: 'Спец. гид',
       render: (parentCity) =>
         parentCity ? (
-          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-purple-50 text-purple-700 border border-purple-200">
+          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-aspectum-purple-soft text-aspectum-purple-strong border border-aspectum-purple-border">
             Спец. гид
           </span>
         ) : (
-          <span className="text-sm text-gray-300">—</span>
+          <span className="text-sm text-aspectum-text-faint">—</span>
         ),
     },
     {
       key: 'id',
       label: 'ID',
-      className: 'font-mono text-xs text-gray-400',
+      className: 'font-mono text-xs text-aspectum-text-disabled',
       render: (id) => String(id).slice(0, 12) + '…',
     },
   ];
 
+  const editingCity = c.editingCity;
+  const citySaving = c.saving;
+  const imageUploading = c.imageUploading;
+  const handleSave = c.handleSave;
+  const setEditingCity = c.setEditingCity;
+  const setActiveEditTab = c.setActiveEditTab;
+  const setCommonsModalOpen = c.setCommonsModalOpen;
   useEffect(() => {
     if (c.editingCity) return;
-    const actions = [
+    // Sessions live in the studio deployment; the catalog build has no such pages to open.
+    const hasSessions = isStudio && resolveNavScope() !== 'catalog';
+    setMobileActions([
       { id: 'create-city', label: 'Создать город', onClick: c.openCreate, variant: 'primary' },
+      hasSessions && { id: 'create-city-session', label: 'Через сессию', onClick: c.openNewSession, variant: 'secondary' },
       { id: 'create-city-tag', label: 'Создать тег города', onClick: c.openTags, variant: 'secondary' },
+      hasSessions && { id: 'open-sessions', label: 'Открыть сессии', onClick: c.openSessions },
       { id: 'refresh-cities', label: 'Обновить справочник', onClick: c.reload },
-    ];
-    if (isStudio) {
-      actions.splice(1, 0, { id: 'create-city-session', label: 'Через сессию', onClick: c.openNewSession, variant: 'secondary' });
-      actions.splice(3, 0, { id: 'open-sessions', label: 'Открыть сессии', onClick: c.openSessions });
-    }
-    setMobileActions(actions);
+    ].filter(Boolean));
     return () => setMobileActions([]);
   }, [c.editingCity, c.openCreate, c.openNewSession, c.openTags, c.openSessions, c.reload, isStudio, setMobileActions]);
 
   useEffect(() => {
-    if (!c.editingCity) return;
+    if (!editingCity) return;
     const actions = [
       {
         id: 'save-city',
-        label: c.saving
-          ? (c.editingCity?.id ? 'Сохранение...' : 'Создание...')
-          : (c.editingCity?.id ? 'Сохранить город' : 'Создать город'),
-        onClick: () => { if (!c.saving) c.handleSave(); },
-        disabled: c.saving,
+        label: citySaving
+          ? (editingCity?.id ? 'Сохранение...' : 'Создание...')
+          : (editingCity?.id ? 'Сохранить город' : 'Создать город'),
+        onClick: () => { if (!citySaving) handleSave(); },
+        disabled: citySaving,
         variant: 'primary',
       },
       {
         id: 'close-editor',
         label: 'Закрыть форму',
-        onClick: () => c.setEditingCity(null),
+        onClick: () => setEditingCity(null),
       },
     ];
 
-    if (!c.imageUploading) {
+    if (!imageUploading) {
       actions.push({
         id: 'open-commons-picker',
         label: 'Открыть Wikimedia Commons',
         onClick: () => {
-          c.setActiveEditTab('media');
-          c.setCommonsModalOpen(true);
+          setActiveEditTab('media');
+          setCommonsModalOpen(true);
         },
       });
     }
 
     setMobileActions(actions);
     return () => setMobileActions([]);
-  }, [c.editingCity, c.saving, c.imageUploading, c.handleSave, c.setEditingCity, c.setActiveEditTab, c.setCommonsModalOpen, setMobileActions]);
+  }, [editingCity, citySaving, imageUploading, handleSave, setEditingCity, setActiveEditTab, setCommonsModalOpen, setMobileActions]);
 
   return (
     <Layout>
       <div className="mb-4 flex flex-wrap items-center gap-2">
         <Button
           type="button"
-          size="sm"
           variant="soft"
+          size="md"
           onClick={() => handleBulkSync(false)}
           disabled={bulkSyncing || selectedIds.size === 0}
         >
@@ -213,15 +208,15 @@ export default function CitiesCatalogPage() {
         </Button>
         <Button
           type="button"
-          size="sm"
           variant="secondary"
+          size="md"
           onClick={() => handleBulkSync(true)}
           disabled={bulkSyncing}
         >
           Синк всех с SKU
         </Button>
         {bulkSyncNote && (
-          <span className={`text-sm ${bulkSyncNote.type === 'error' ? 'text-red-600' : 'text-green-700'}`}>
+          <span className={`text-sm ${bulkSyncNote.type === 'error' ? 'text-aspectum-danger' : 'text-aspectum-positive-strong'}`}>
             {bulkSyncNote.text}
           </span>
         )}
@@ -243,23 +238,18 @@ export default function CitiesCatalogPage() {
         pageSize={c.pageSize}
         onPage={c.setPage}
         actions={(row) => (
-          <div className="flex items-center gap-1.5">
-            <Button
-              size="xs"
-              variant="soft"
-              onClick={() => c.openEdit(row)}
-              disabled={c.preparingEdit}
-            >
-              {c.preparingEdit ? 'Загрузка...' : 'Ред.'}
-            </Button>
-            <Button
-              size="xs"
-              variant="softDanger"
-              onClick={() => c.requestDelete(row)}
-            >
-              Удалить
-            </Button>
-          </div>
+          <>
+            {c.preparingEdit ? (
+              <Button type="button" variant="soft" size="sm" disabled>
+                Загрузка...
+              </Button>
+            ) : (
+              <TableRowActions
+                onEdit={() => c.openEdit(row)}
+                onDelete={() => c.requestDelete(row)}
+              />
+            )}
+          </>
         )}
       />
 
@@ -321,4 +311,3 @@ export default function CitiesCatalogPage() {
     </Layout>
   );
 }
-

@@ -1,23 +1,23 @@
 /**
- * SessionsList — grouped admin table for generation sessions.
+ * SessionsList — одна строка на сессию.
  *
- * Each session is rendered as a compact group header with its single city row.
+ * Сессия — это рабочий город. Автоназвание «Сессия от …» не занимает отдельную
+ * полосу: город стоит в строке, служебное имя остаётся подписью, только если
+ * оно осмысленное.
  */
-import { Fragment, useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { sessionsAPI } from '../../api/generation';
 import Layout from '../../components/Layout';
-import { SessionStatusBadge as DefaultStatusBadge } from '../../components/ui/StatusBadge.jsx';
-import DefaultToast, { useToast } from '../../components/ui/Toast.jsx';
-import DefaultInlineProgressBanner from '../../components/ui/InlineProgressBanner.jsx';
-import { ConfirmModal as DefaultConfirmModal } from '../../components/ui/Modal.jsx';
-import { useConfirmModal } from '../../components/ui/useConfirmModal.jsx';
+import { Alert, AsyncErrorState, Button, Checkbox, DataTableSurface, IconButton, Panel, Spinner, TextInput, ConfirmModal as DefaultConfirmModal, InlineProgressBanner as DefaultInlineProgressBanner, SessionStatusBadge as DefaultStatusBadge, Toast as DefaultToast, useConfirmModal, useToast } from '@aspectum/admin-ui-web';
 import DefaultSessionDeleteDialog from '../../components/generation/SessionDeleteDialog.jsx';
 import DefaultSessionCloseDialog from '../../components/generation/SessionCloseDialog.jsx';
 import { useLayoutActions } from '../../context/useLayoutActions';
 import { trackEvent } from '../../utils/analytics';
 import { parseApiError } from '../../utils/apiError';
+
+const EMPTY_SESSIONS = [];
 
 function formatDateTime(value) {
   if (!value) return '—';
@@ -122,6 +122,37 @@ function summarizeCities(cityRows) {
   return `${names.slice(0, 3).join(', ')} +${names.length - 3}`;
 }
 
+function isGenericCityName(value) {
+  const name = (value || '').trim();
+  return !name || name === '—' || name === 'без названия';
+}
+
+function isAutoSessionName(value) {
+  return /^Сессия от \d{2}\.\d{2}\.\d{4}/.test((value || '').trim());
+}
+
+function rowTitle(row, session) {
+  if (!isGenericCityName(row?.cityName)) return row.cityName;
+  const sessionName = (session?.name || '').trim();
+  return sessionName || 'Сессия без города';
+}
+
+function rowSubtitle(row, session) {
+  const sessionName = (session?.name || '').trim();
+  const title = rowTitle(row, session);
+  if (!sessionName || sessionName === title || isAutoSessionName(sessionName)) return '';
+  return sessionName;
+}
+
+function extraCityWord(count) {
+  const n = Math.abs(count) % 100;
+  const n1 = n % 10;
+  if (n > 10 && n < 20) return 'городов';
+  if (n1 === 1) return 'город';
+  if (n1 >= 2 && n1 <= 4) return 'города';
+  return 'городов';
+}
+
 function buildCityRows(session) {
   const drafts = Array.isArray(session.city_drafts) && session.city_drafts.length > 0
     ? [...session.city_drafts].sort((a, b) => (a.order ?? a.upload_batch_order ?? 0) - (b.order ?? b.upload_batch_order ?? 0))
@@ -192,20 +223,6 @@ function parseSelectionKey(key) {
   }
 
   return null;
-}
-
-function buildRowDeleteTarget(group, row) {
-  const shouldDeleteOnlyDraft =
-    group.totalRowsCount > 1 &&
-    row.cityDraftId &&
-    row.cityDraftId !== 'legacy';
-
-  return {
-    type: shouldDeleteOnlyDraft ? 'draft' : 'session',
-    session: group.session,
-    cityRow: row,
-    totalRowsCount: group.totalRowsCount,
-  };
 }
 
 function getGroupDraftSelectionKeys(group) {
@@ -301,7 +318,7 @@ export default function SessionsList({ components = {} } = {}) {
     },
   });
 
-  const sessions = sessionsData ?? [];
+  const sessions = sessionsData ?? EMPTY_SESSIONS;
   const error = sessionsError ? parseApiError(sessionsError, 'Не удалось загрузить сессии') : null;
 
   const invalidateSessions = useCallback(
@@ -652,54 +669,21 @@ export default function SessionsList({ components = {} } = {}) {
     });
   };
 
-  const toggleDraftDelete = useCallback((group, row) => {
-    const sessionKey = buildSessionSelectionKey(group.session.id);
-    const draftKey = buildDraftSelectionKey(group.session.id, row.cityDraftId);
-    const allDraftKeys = getGroupDraftSelectionKeys(group);
-
-    setSelected((prev) => {
-      const next = new Set(prev);
-
-      if (next.has(draftKey)) {
-        next.delete(draftKey);
-      } else {
-        next.add(draftKey);
-      }
-
-      const allDraftsSelected =
-        allDraftKeys.length > 0 &&
-        allDraftKeys.every((key) => next.has(key));
-
-      if (allDraftsSelected) {
-        next.add(sessionKey);
-      } else {
-        next.delete(sessionKey);
-      }
-
-      return next;
-    });
-  }, []);
-
   useEffect(() => {
     setMobileActions([
       {
         id: 'create-session',
-        label: creating ? 'Создание...' : 'Создать сессию',
+        label: creating ? 'Создание...' : 'Новая сессия',
         onClick: () => {
           if (!creating) handleCreate();
         },
         disabled: creating,
         variant: 'primary',
       },
-      {
-        id: 'refresh-sessions',
-        label: 'Обновить список',
-        onClick: () => refetchSessions(),
-      },
     ]);
 
     return () => setMobileActions([]);
-  }, [setMobileActions, creating, refetchSessions, handleCreate]);
+  }, [setMobileActions, creating, handleCreate]);
 
   const isDeleteDraftTarget = deleteTarget?.type === 'draft';
   const deleteTargetSession = deleteTarget?.session;
@@ -709,11 +693,11 @@ export default function SessionsList({ components = {} } = {}) {
     <Layout
       pageHeader={{
         title: 'Сессии генерации',
-        description: 'Одна сессия — один рабочий город',
+        description: 'Каждая строка — один рабочий город',
         actions: [
           {
-            id: 'create-session-header',
-            label: creating ? 'Создание...' : '+ Новая сессия',
+            id: 'create-session',
+            label: creating ? 'Создание...' : 'Новая сессия',
             onClick: () => {
               if (!creating) handleCreate();
             },
@@ -740,23 +724,25 @@ export default function SessionsList({ components = {} } = {}) {
       />
 
       {createError && (
-        <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700 flex items-center justify-between">
+        <Alert tone="error" className="mb-4 flex items-center justify-between">
           <span>{createError}</span>
-          <button
+          <IconButton
+            label="Закрыть ошибку"
             onClick={() => setCreateError(null)}
-            className="ml-4 text-red-400 hover:text-red-600"
+            variant="ghostDanger"
+            className="ml-4"
           >
             ✕
-          </button>
-        </div>
+          </IconButton>
+        </Alert>
       )}
 
-      <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-        <div className="flex items-center justify-between gap-3 px-4 py-3 border-b border-gray-100">
+      <Panel className="overflow-hidden">
+        <div className="flex items-center justify-between gap-3 px-4 py-3 border-b border-aspectum-border-subtle">
           <div className="flex items-center gap-2 flex-1">
             <div className="relative flex-1 max-w-lg">
               <svg
-                className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400"
+                className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-aspectum-text-disabled"
                 fill="none"
                 viewBox="0 0 24 24"
                 stroke="currentColor"
@@ -769,235 +755,195 @@ export default function SessionsList({ components = {} } = {}) {
                 />
               </svg>
 
-              <input
-                type="search"
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                placeholder="Поиск по городу, стране, UUID, статусу или ответственному..."
-                className="w-full pl-9 pr-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
+              <TextInput className="pl-9 pr-3" type="search" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Поиск по городу, стране, UUID, статусу или ответственному..." />
             </div>
           </div>
 
           <div className="flex items-center gap-3">
             {!loading && filteredGroups.length > 0 && (
-              <div className="hidden sm:block text-xs text-gray-500">
+              <div className="hidden sm:block text-xs text-aspectum-text-muted">
                 {filteredGroups.length} сессий
               </div>
             )}
 
             {selectedDisplayCount > 0 && (
               <div className="flex items-center gap-2 text-sm">
-                <span className="text-gray-500">Выбрано: {selectedDisplayCount}</span>
+                <span className="text-aspectum-text-muted">Выбрано: {selectedDisplayCount}</span>
 
-                <button
-                  onClick={handleBulkDelete}
-                  disabled={bulkDeleting}
-                  className="flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-red-600 bg-red-50 border border-red-200 rounded-lg hover:bg-red-100 disabled:opacity-50 transition-colors"
-                >
+                <Button type="button" variant="softDanger" size="sm" onClick={handleBulkDelete} disabled={bulkDeleting}>
                   {bulkDeleting ? '...' : 'Удалить'}
-                </button>
+                </Button>
               </div>
             )}
           </div>
         </div>
 
-        {error && (
-          <div className="px-4 py-3 bg-red-50 text-sm text-red-700 border-b border-red-100">
-            {error}
-            <button onClick={refetchSessions} className="ml-3 underline">
-              Повторить
-            </button>
-          </div>
-        )}
+        <AsyncErrorState error={error} onRetry={refetchSessions} className="mb-3" />
 
-        <div className="overflow-x-auto">
+        <DataTableSurface className="rounded-aspectum-card">
           <table className="w-full min-w-[860px] text-sm">
             <thead>
-              <tr className="bg-gray-50 border-b border-gray-100">
+              <tr className="bg-aspectum-surface-muted border-b border-aspectum-border-subtle">
                 <th className="w-10 px-3 py-2.5">
-                  <input
-                    type="checkbox"
+                  <Checkbox
                     checked={allSelected}
                     onChange={toggleAll}
-                    className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
                   />
                 </th>
 
-                <th className="px-3 py-2.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">
+                <th className="px-3 py-2.5 text-left text-xs font-semibold text-aspectum-text-muted uppercase tracking-wide">
                   Город
                 </th>
 
-                <th className="px-3 py-2.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">
+                <th className="px-3 py-2.5 text-left text-xs font-semibold text-aspectum-text-muted uppercase tracking-wide">
                   Страна
                 </th>
 
-                <th className="px-3 py-2.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">
+                <th className="px-3 py-2.5 text-left text-xs font-semibold text-aspectum-text-muted uppercase tracking-wide">
                   Дата
                 </th>
 
-                <th className="px-3 py-2.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">
+                <th className="px-3 py-2.5 text-left text-xs font-semibold text-aspectum-text-muted uppercase tracking-wide">
                   Статус
                 </th>
 
-                <th className="px-3 py-2.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">
+                <th className="px-3 py-2.5 text-left text-xs font-semibold text-aspectum-text-muted uppercase tracking-wide">
                   Ответственный
                 </th>
 
-                <th className="px-3 py-2.5 text-right text-xs font-semibold text-gray-500 uppercase tracking-wide">
+                <th className="px-3 py-2.5 text-right text-xs font-semibold text-aspectum-text-muted uppercase tracking-wide">
                   Действия
                 </th>
               </tr>
             </thead>
 
-            <tbody className="divide-y divide-gray-100">
+            <tbody className="divide-y divide-aspectum-border-subtle">
               {loading ? (
                 <tr>
-                  <td colSpan={7} className="px-4 py-12 text-center text-gray-400">
+                  <td colSpan={7} className="px-4 py-12 text-center text-aspectum-text-disabled">
                     <div className="flex items-center justify-center gap-2">
-                      <div className="animate-spin w-5 h-5 border-2 border-blue-500 border-t-transparent rounded-full" />
+                      <Spinner size="md" className="border-aspectum-focus" />
                       <span>Загрузка...</span>
                     </div>
                   </td>
                 </tr>
               ) : filteredGroups.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="px-4 py-12 text-center text-gray-400">
+                  <td colSpan={7} className="px-4 py-12 text-center text-aspectum-text-disabled">
                     <div className="text-3xl mb-2">📋</div>
                     <div>{search ? 'По вашему запросу города не найдены' : 'Сессий ещё нет'}</div>
 
                     {!search && (
-                      <button
-                        onClick={handleCreate}
-                        className="mt-3 text-sm text-blue-600 hover:underline"
-                      >
+                      <Button type="button" variant="link" size="md" onClick={handleCreate} className="mt-3">
                         Создать первую сессию
-                      </button>
+                      </Button>
                     )}
                   </td>
                 </tr>
-              ) : filteredGroups.map((group) => (
-                <Fragment key={group.session.id}>
-                  <tr className="bg-slate-50 border-y border-slate-200">
-                    <td colSpan={7} className="px-3 py-3">
-                      <div className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
-                        <div className="flex items-start gap-3 min-w-0">
-                          <div className="pt-0.5">
-                            <input
-                              type="checkbox"
-                              checked={isGroupFullySelected(group, selected)}
-                              onChange={() => toggleSelect(group)}
-                              className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                            />
-                          </div>
+              ) : filteredGroups.map((group) => {
+                const row = group.cityRows[0];
+                const title = rowTitle(row, group.session);
+                const subtitle = rowSubtitle(row, group.session);
+                const extraCities = Math.max(0, group.totalRowsCount - 1);
+                const rowDeleteTarget = {
+                  type: 'session',
+                  session: group.session,
+                  cityRow: row,
+                  totalRowsCount: group.totalRowsCount,
+                };
 
-                          <div className="min-w-0">
-                            <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm">
-                              <span className="font-semibold text-slate-900">
-                                {group.session.name || 'Сессия без названия'}
-                              </span>
-                            </div>
+                return (
+                  <tr
+                    key={group.session.id}
+                    onClick={() => openSession(group.session, row, 'row')}
+                    className="cursor-pointer bg-aspectum-surface hover:bg-aspectum-primary-soft transition-colors"
+                  >
+                    <td className="w-10 px-3 py-2.5" onClick={(e) => e.stopPropagation()}>
+                      <Checkbox
+                        checked={isGroupFullySelected(group, selected)}
+                        onChange={() => toggleSelect(group)}
+                        title="Выбрать сессию"
+                      />
+                    </td>
 
-                          </div>
+                    <td className="px-3 py-2.5">
+                      <div className="font-medium text-aspectum-text">{title}</div>
+                      {(subtitle || extraCities > 0) && (
+                        <div className="mt-0.5 text-xs text-aspectum-text-disabled truncate">
+                          {subtitle}
+                          {subtitle && extraCities > 0 ? ' · ' : ''}
+                          {extraCities > 0 ? `ещё ${extraCities} ${extraCityWord(extraCities)}` : ''}
                         </div>
+                      )}
+                    </td>
 
-                        <div className="text-xs text-slate-500">
-                          Один город
-                        </div>
+                    <td className="px-3 py-2.5 text-aspectum-text-subtle">
+                      {row.country}
+                    </td>
+
+                    <td className="px-3 py-2.5 text-aspectum-text-subtle whitespace-nowrap">
+                      {formatDateTime(row.createdAt)}
+                    </td>
+
+                    <td className="px-3 py-2.5">
+                      <StatusBadge status={row.status} label={row.statusDisplay} />
+                    </td>
+
+                    <td className="px-3 py-2.5 text-aspectum-text-subtle">
+                      {row.assignee || '—'}
+                    </td>
+
+                    <td className="px-3 py-2.5 text-right" onClick={(e) => e.stopPropagation()}>
+                      <div className="flex items-center justify-end gap-1">
+                        <Button
+                          type="button"
+                          variant="soft"
+                          size="sm"
+                          onClick={() => openSession(group.session, row, 'action')}
+                        >
+                          Открыть
+                        </Button>
+
+                        {isActive(group.session) && (
+                          <Button
+                            type="button"
+                            variant="softOrange"
+                            size="sm"
+                            onClick={() => {
+                              setCloseMode('save');
+                              setCloseTarget(group.session);
+                            }}
+                          >
+                            Закрыть
+                          </Button>
+                        )}
+
+                        {group.session.status === 'draft' && (
+                          <Button
+                            type="button"
+                            variant="softDanger"
+                            size="sm"
+                            onClick={() => setDeleteTarget(rowDeleteTarget)}
+                            title="Удалить сессию"
+                          >
+                            Удалить
+                          </Button>
+                        )}
                       </div>
                     </td>
                   </tr>
-
-                  {group.cityRows.map((row) => {
-                    const rowDeleteTarget = buildRowDeleteTarget(group, row);
-                    const deletesOnlyDraft = rowDeleteTarget.type === 'draft';
-
-                    return (
-                      <tr
-                        key={row.rowKey}
-                        onClick={() => openSession(group.session, row, 'row')}
-                        className="cursor-pointer bg-white hover:bg-blue-50 transition-colors group"
-                      >
-                        <td className="w-10 px-3 py-3" onClick={(e) => e.stopPropagation()}>
-                          <input
-                            type="checkbox"
-                            checked={selected.has(buildDraftSelectionKey(group.session.id, row.cityDraftId))}
-                            onChange={() => toggleDraftDelete(group, row)}
-                            title={deletesOnlyDraft ? 'Удалить город из сессии' : 'Удалить сессию'}
-                            className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                          />
-                        </td>
-
-                        <td className="px-3 py-3">
-                          <div className="font-medium text-gray-900">{row.cityName}</div>
-                        </td>
-
-                        <td className="px-3 py-3 text-gray-600">
-                          {row.country}
-                        </td>
-
-                        <td className="px-3 py-3 text-gray-600 whitespace-nowrap">
-                          {formatDateTime(row.createdAt)}
-                        </td>
-
-                        <td className="px-3 py-3">
-                          <StatusBadge status={row.status} label={row.statusDisplay} />
-                        </td>
-
-                        <td className="px-3 py-3 text-gray-600">
-                          {row.assignee || '—'}
-                        </td>
-
-                        <td className="px-3 py-3 text-right" onClick={(e) => e.stopPropagation()}>
-                          <div className="flex items-center justify-end gap-1 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
-                            <button
-                              type="button"
-                              onClick={() => openSession(group.session, row, 'action')}
-                              className="px-2.5 py-1 text-xs font-medium text-blue-600 bg-blue-50 rounded-md hover:bg-blue-100 transition-colors"
-                            >
-                              Открыть
-                            </button>
-
-                            {isActive(group.session) && (
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  setCloseMode('save');
-                                  setCloseTarget(group.session);
-                                }}
-                                className="px-2.5 py-1 text-xs font-medium text-orange-600 bg-orange-50 rounded-md hover:bg-orange-100 transition-colors"
-                              >
-                                Закрыть
-                              </button>
-                            )}
-
-                            {group.session.status === 'draft' && (
-                              <button
-                                type="button"
-                                onClick={() => setDeleteTarget(rowDeleteTarget)}
-                                title={deletesOnlyDraft ? 'Удалить только этот город' : 'Удалить всю сессию'}
-                                className="px-2.5 py-1 text-xs font-medium text-red-600 bg-red-50 rounded-md hover:bg-red-100 transition-colors"
-                              >
-                                Удалить
-                              </button>
-                            )}
-                          </div>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </Fragment>
-              ))}
+                );
+              })}
             </tbody>
           </table>
-        </div>
+        </DataTableSurface>
 
         {!loading && filteredGroups.length > 0 && (
-          <div className="px-4 py-2.5 border-t border-gray-100 text-xs text-gray-400">
+          <div className="px-4 py-2.5 border-t border-aspectum-border-subtle text-xs text-aspectum-text-disabled">
             Показано сессий: {filteredGroups.length} из {sessions.length}
           </div>
         )}
-      </div>
+      </Panel>
 
       <SessionDeleteDialogComp
         open={!!deleteTarget}

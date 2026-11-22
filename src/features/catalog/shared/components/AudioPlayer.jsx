@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
+import { Button, Glyph } from '@aspectum/admin-ui-web';
 import { audioAPI } from '../../../../api/generation';
-import Button from '../../../../components/ui/Button';
 
 export default function AudioPlayer({ audioId }) {
   const [blobUrl, setBlobUrl] = useState(null);
@@ -29,17 +29,17 @@ export default function AudioPlayer({ audioId }) {
     if (blobRef.current) URL.revokeObjectURL(blobRef.current);
   }, []);
 
-  if (error) return <span className="text-xs text-red-500">{error}</span>;
+  if (error) return <span className="text-xs text-aspectum-danger-subtle">{error}</span>;
   if (!blobUrl) {
     return (
       <Button
         type="button"
         onClick={load}
         disabled={loading}
-        variant="outline"
-        className="min-h-0 rounded-lg bg-blue-50 px-3 py-1.5 text-xs font-medium text-blue-600"
+        variant="soft"
+        size="sm"
       >
-        {loading ? '⏳' : '▶ Слушать'}
+        {loading ? <Glyph name="⏳" /> : <><Glyph name="▶" /> Слушать</>}
       </Button>
     );
   }

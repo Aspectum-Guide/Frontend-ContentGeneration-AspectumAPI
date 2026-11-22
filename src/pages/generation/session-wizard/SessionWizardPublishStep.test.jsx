@@ -7,7 +7,7 @@ describe('SessionWizardPublishStep actions', () => {
     render(<SessionWizardPublishStep />);
 
     expect(screen.getByRole('button', { name: 'Перевести сессию' }).disabled).toBe(true);
-    expect(screen.getByRole('button', { name: '✓ Опубликовать сессию' }).disabled).toBe(true);
+    expect(screen.getByRole('button', { name: /Опубликовать сессию/ }).disabled).toBe(true);
   });
 
   it('calls the existing step, translate, and publish callbacks when content exists', () => {
@@ -27,7 +27,7 @@ describe('SessionWizardPublishStep actions', () => {
 
     fireEvent.click(screen.getByRole('button', { name: '← Назад' }));
     fireEvent.click(screen.getByRole('button', { name: 'Перевести сессию' }));
-    fireEvent.click(screen.getByRole('button', { name: '✓ Опубликовать сессию' }));
+    fireEvent.click(screen.getByRole('button', { name: /Опубликовать сессию/ }));
 
     expect(onGoToStep).toHaveBeenCalledWith(4);
     expect(onTranslateSession).toHaveBeenCalledOnce();
