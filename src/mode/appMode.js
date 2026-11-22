@@ -7,6 +7,8 @@
  * `VITE_APP_MODE=studio|admin` перебивает пробу. Пустое значение — смотрим ноду.
  */
 
+import { runtimeConfig } from '../config/runtime';
+
 export const STUDIO = 'studio';
 export const ADMIN = 'admin';
 export const APP_MODE_STORAGE_KEY = 'cg.appMode';
@@ -34,8 +36,10 @@ export function landingPath(mode) {
   return mode === ADMIN ? '/catalog' : '/generation';
 }
 
-export function explicitAppMode(env = import.meta.env) {
-  const value = String(env?.VITE_APP_MODE || '').trim().toLowerCase();
+export function explicitAppMode(env) {
+  // Без env: сначала runtime-конфиг контейнера (APP_MODE), потом VITE_APP_MODE сборки.
+  const raw = env ? env.VITE_APP_MODE : (runtimeConfig().appMode || import.meta.env?.VITE_APP_MODE);
+  const value = String(raw || '').trim().toLowerCase();
   return value === ADMIN || value === STUDIO ? value : null;
 }
 

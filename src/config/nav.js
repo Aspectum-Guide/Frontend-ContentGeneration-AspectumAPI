@@ -5,6 +5,7 @@ import {
   MapPin, MapPinOff, MessageSquareText, Mic, ScrollText, SlidersHorizontal, Smartphone, Sparkles,
   Table, Tags, Ticket, UserCheck, UserCog, Users, Handshake,
 } from 'lucide-react';
+import { runtimeConfig } from './runtime';
 
 /**
  * Single source of truth for the admin navigation and page titles.
@@ -112,7 +113,7 @@ export const NAV_GROUPS = [
 /** Icon for the dynamic "active session" entries injected into the sessions group. */
 export const SESSION_ITEM_ICON = FileText;
 
-export function resolveNavScope(value = import.meta.env?.VITE_NAV_SCOPE) {
+export function resolveNavScope(value = runtimeConfig().navScope || import.meta.env?.VITE_NAV_SCOPE) {
   return value === 'studio' || value === 'catalog' ? value : 'all';
 }
 
