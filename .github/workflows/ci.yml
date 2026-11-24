@@ -1,0 +1,42 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches:
+      - master
+      - main
+
+jobs:
+  lint-and-test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      # @aspectum/admin-ui-web ставится из git; если репозиторий кита приватный,
+      # нужен секрет ADMIN_UI_WEB_PAT с read-доступом к нему.
+      - name: Configure git auth for the UI kit repo
+        env:
+          KIT_PAT: ${{ secrets.ADMIN_UI_WEB_PAT }}
+        run: |
+          if [ -n "$KIT_PAT" ]; then
+            git config --global \
+              url."https://x-access-token:${KIT_PAT}@github.com/Aspectum-Guide/AspectumAdminUIWeb.git".insteadOf \
+              "https://github.com/Aspectum-Guide/AspectumAdminUIWeb.git"
+          fi
+
+      - name: Install npm dependencies
+        run: npm ci --prefer-offline --no-audit
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Test
+        run: npm test
