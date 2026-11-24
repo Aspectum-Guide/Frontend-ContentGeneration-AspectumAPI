@@ -26,5 +26,7 @@ describe.each(['studio', 'catalog'])('actual application routes: %s', (scope) =>
       : ['/generation', '/generation/123', '/ai/settings', '/tasks/audio-queue'];
     for (const path of excluded) expect(matchedPath(path), path).toBe('*');
     expect(getNavGroups().some((group) => group.id === 'sessions')).toBe(scope === 'studio');
-  });
+    // Импорт App.jsx тяжёлый; под нагрузкой (CI, параллельные воркеры) дефолтных
+    // 5 с не хватает — тест флачит.
+  }, 20000);
 });

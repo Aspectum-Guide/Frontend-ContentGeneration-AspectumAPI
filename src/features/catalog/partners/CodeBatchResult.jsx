@@ -54,7 +54,7 @@ export default function CodeBatchResult({ result }) {
           </button>
           <button
             type="button"
-            onClick={() => downloadTextFile(`codes-${new Date().toISOString().slice(0, 10)}.csv`, `﻿Код\n${codes.join('\n')}\n`)}
+            onClick={() => downloadTextFile(`codes-${new Date().toISOString().slice(0, 10)}.csv`, `\uFEFFКод\n${codes.join('\n')}\n`)}
             className="px-3 py-1.5 text-xs font-medium rounded-md bg-white border border-gray-300 hover:bg-gray-100"
           >
             Скачать CSV

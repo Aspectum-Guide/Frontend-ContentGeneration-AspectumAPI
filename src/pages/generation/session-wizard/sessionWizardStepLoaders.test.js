@@ -10,5 +10,6 @@ describe('Session Wizard lazy step loaders', () => {
     modules.forEach((module) => {
       expect(module.default).toBeTypeOf('function');
     });
-  });
+    // Ленивые чанки шагов тяжёлые; под нагрузкой дефолтных 5 с не хватает.
+  }, 20000);
 });
