@@ -17,6 +17,35 @@ const ACCESS_MODES = [
   { value: 'choose_city', label: 'Один город на выбор' },
 ];
 
+// Срок доступа (access_hours): пусто — навсегда, иначе код открывает города
+// на столько часов с момента активации (Антон 24.11, временные коды).
+const ACCESS_HOURS_PRESETS = [
+  { value: '', label: 'Навсегда' },
+  { value: '1', label: '1 час' },
+  { value: '2', label: '2 часа' },
+  { value: '3', label: '3 часа' },
+  { value: '6', label: '6 часов' },
+  { value: '12', label: '12 часов' },
+  { value: '24', label: '1 день' },
+  { value: '48', label: '2 дня' },
+  { value: '72', label: '3 дня' },
+];
+const CUSTOM_HOURS = 'custom';
+
+function normalizeAccessHours(value) {
+  if (value === '' || value === null || value === undefined) return null;
+  const number = Math.trunc(Number(value));
+  return Number.isFinite(number) && number > 0 ? number : null;
+}
+
+function accessHoursLabel(value) {
+  const hours = normalizeAccessHours(value);
+  if (!hours) return 'навсегда';
+  const preset = ACCESS_HOURS_PRESETS.find((item) => item.value === String(hours));
+  if (preset) return preset.label;
+  return hours % 24 === 0 ? `${hours / 24} дн.` : `${hours} ч`;
+}
+
 function accessModeLabel(value) {
   return ACCESS_MODES.find((mode) => mode.value === value)?.label || 'Набор городов';
 }
@@ -27,6 +56,7 @@ function createEmptyType() {
     name: '',
     description: '',
     access_mode: 'fixed',
+    access_hours: '',
     ai_prompts: 0,
     is_active: true,
     cities: [],
@@ -172,6 +202,7 @@ export default function SubscriptionTypesCatalogPage() {
       name: editingItem.name,
       description: editingItem.description || '',
       access_mode: editingItem.access_mode || 'fixed',
+      access_hours: normalizeAccessHours(editingItem.access_hours),
       ai_prompts: normalizeAiPrompts(editingItem.ai_prompts),
       is_active: !!editingItem.is_active,
       cities: normalizeIdList(editingItem.cities),
@@ -227,6 +258,11 @@ export default function SubscriptionTypesCatalogPage() {
       render: (value) => <span className="text-sm text-gray-700">{accessModeLabel(value)}</span>,
     },
     {
+      key: 'access_hours',
+      label: 'Срок доступа',
+      render: (value) => <span className="text-sm text-aspectum-text-strong">{accessHoursLabel(value)}</span>,
+    },
+    {
       key: 'cities',
       label: 'Города',
       render: (value, row) => {
@@ -258,7 +294,7 @@ export default function SubscriptionTypesCatalogPage() {
     <Layout>
       <PageHeader
         title="Справочник типов подписки"
-        description="Типы подписок: название, города, события, запросы ИИ, статус"
+        description="Типы подписок: название, города, события, срок доступа, запросы ИИ, статус"
         createLabel="Создать тип подписки"
         onCreate={() => {
           setSaveError(null);
@@ -297,6 +333,7 @@ export default function SubscriptionTypesCatalogPage() {
                 name: row.name || '',
                 description: row.description || '',
                 access_mode: row.access_mode || 'fixed',
+                access_hours: row.access_hours ? String(row.access_hours) : '',
                 ai_prompts: normalizeAiPrompts(row.ai_prompts),
                 is_active: row.is_active !== false,
                 cities: normalizeIdList(row.cities),
@@ -350,6 +387,43 @@ export default function SubscriptionTypesCatalogPage() {
                   <option key={mode.value} value={mode.value}>{mode.label}</option>
                 ))}
               </Select>
+            </Field>
+
+            <Field
+              label="Срок доступа"
+              hint="На сколько код открывает аудиогиды — с момента активации. «Навсегда» — как обычный код. После срока город снова закрыт, его можно купить или открыть новым кодом."
+            >
+              <Select
+                value={
+                  ACCESS_HOURS_PRESETS.some((item) => item.value === String(editingItem.access_hours ?? ''))
+                    ? String(editingItem.access_hours ?? '')
+                    : CUSTOM_HOURS
+                }
+                onChange={(e) => {
+                  const next = e.target.value;
+                  setEditingItem((prev) => ({
+                    ...prev,
+                    access_hours: next === CUSTOM_HOURS ? '4' : next,
+                  }));
+                }}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+              >
+                {ACCESS_HOURS_PRESETS.map((item) => (
+                  <option key={item.value || 'forever'} value={item.value}>{item.label}</option>
+                ))}
+                <option value={CUSTOM_HOURS}>Другой срок…</option>
+              </Select>
+              {!ACCESS_HOURS_PRESETS.some((item) => item.value === String(editingItem.access_hours ?? '')) ? (
+                <TextInput
+                  type="number"
+                  min={1}
+                  step={1}
+                  className="mt-2"
+                  placeholder="Часов"
+                  value={editingItem.access_hours ?? ''}
+                  onChange={(e) => setEditingItem((prev) => ({ ...prev, access_hours: e.target.value }))}
+                />
+              ) : null}
             </Field>
 
             <Field label="Запросов ИИ" hint="Сколько запросов ИИ получает пользователь при активации кода. 0 — код открывает только диджитал-гид">

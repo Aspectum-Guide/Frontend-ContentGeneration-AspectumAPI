@@ -6,9 +6,13 @@ export const ANY_CITY = '__any_city__';
 
 const ANY_CITY_NAME = 'Любой город на выбор';
 
-/** Тип «один любой город»: режим «на выбор» без списка — любой опубликованный город. */
+/**
+ * Тип «один любой город»: режим «на выбор» без списка — любой опубликованный
+ * город, навсегда. Временный тип с тем же режимом («любой город на 2 часа») —
+ * отдельный пункт списка, а не этот общий.
+ */
 export const isAnyCityType = (type) =>
-  type?.access_mode === 'choose_city' && !(type.cities || []).length;
+  type?.access_mode === 'choose_city' && !(type.cities || []).length && !type.access_hours;
 
 /** Значение формы → id типа подписки. */
 export async function resolveTypeId(value, types) {

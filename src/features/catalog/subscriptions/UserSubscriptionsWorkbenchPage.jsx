@@ -397,6 +397,20 @@ export default function UserSubscriptionsWorkbenchPage() {
       render: (v) => <StatusBadge active={!!v} activeLabel="Активна" inactiveLabel="Отключена" />,
     },
     {
+      // Временный код (на час, два, день): до какого момента открыт город.
+      key: 'expires_at',
+      label: 'Доступ до',
+      render: (v) => {
+        if (!v) return <span className="text-sm text-aspectum-text-subtle">навсегда</span>;
+        const expired = new Date(v).getTime() <= Date.now();
+        return (
+          <span className={`text-sm ${expired ? 'text-red-600' : 'text-aspectum-text-strong'}`}>
+            {formatDateTime(v)}{expired ? ' · истёк' : ''}
+          </span>
+        );
+      },
+    },
+    {
       key: 'created_at',
       label: 'Создана',
       render: (v) => <span className="text-sm text-aspectum-text-subtle">{formatDateTime(v)}</span>,
