@@ -52,6 +52,7 @@ export const SUBSCRIPTION_CATALOG_SECTION = {
   items: [
     { to: '/catalog/subscription-types', title: 'Типы подписки', description: 'Пакеты + привязка городов и событий', icon: '🧩' },
     { to: '/catalog/activation-codes', title: 'Коды активации', description: 'CRUD и массовая генерация кодов', icon: '🔐' },
+    { to: '/catalog/apple-codes', title: 'Коды Apple', description: 'Коды App Store для iPhone (глобальная версия): продукты, предложения, партии', icon: '🍏' },
     { to: '/catalog/partners', title: 'Партнёры', description: 'Партнёры, их коды, клиенты, покупки и комиссия', icon: '🤝' },
     { to: '/catalog/code-usage-logs', title: 'Логи активации', description: 'Журнал использования кодов (read-only)', icon: '📜' },
     { to: '/catalog/user-subscriptions', title: 'Подписки пользователей', description: 'Поиск по email, выдача/отзыв доступа', icon: '👤' },

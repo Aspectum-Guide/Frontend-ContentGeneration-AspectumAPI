@@ -89,6 +89,7 @@ export const NAV_GROUPS = [
     items: [
       { label: 'Типы подписки', to: '/catalog/subscription-types', icon: Layers },
       { label: 'Коды активации', to: '/catalog/activation-codes', icon: KeyRound },
+      { label: 'Коды Apple', to: '/catalog/apple-codes', icon: Smartphone },
       { label: 'Партнёры', to: '/catalog/partners', icon: Handshake },
       { label: 'Логи активации', to: '/catalog/code-usage-logs', icon: ScrollText },
       { label: 'Подписки пользователей', to: '/catalog/user-subscriptions', icon: UserCheck },
@@ -171,6 +172,7 @@ export const PAGE_TITLES = [
   { startsWith: '/catalog/reservations', title: 'Резервации' },
   { startsWith: '/catalog/subscription-types', title: 'Справочник типов подписки' },
   { startsWith: '/catalog/activation-codes', title: 'Справочник кодов активации' },
+  { startsWith: '/catalog/apple-codes', title: 'Коды Apple' },
   { startsWith: '/catalog/user-subscriptions', title: 'Подписки пользователей' },
   { startsWith: '/catalog/city-subscriptions', title: 'Все подписки на города' },
   { startsWith: '/catalog/code-usage-logs', title: 'Логи активации кодов' },

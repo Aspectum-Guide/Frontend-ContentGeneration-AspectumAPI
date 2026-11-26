@@ -66,6 +66,7 @@ const TicketPricesCatalog = lazyPage(() => import('./pages/catalog/TicketPricesC
 const BookingSetupWorkbench = lazyPage(() => import('./pages/catalog/BookingSetupWorkbench'));
 const CityPricingWorkbench = lazyPage(() => import('./pages/catalog/CityPricingWorkbench'));
 const SubscriptionTypesCatalog = lazyPage(() => import('./pages/catalog/SubscriptionTypesCatalog'));
+const AppleCodesCatalog = lazyPage(() => import('./pages/catalog/AppleCodesCatalog'));
 const ActivationCodesCatalog = lazyPage(() => import('./pages/catalog/ActivationCodesCatalog'));
 const PartnersCatalog = lazyPage(() => import('./pages/catalog/PartnersCatalog'));
 const PartnerDetail = lazyPage(() => import('./pages/catalog/PartnerDetail'));
@@ -266,6 +267,10 @@ const allRoutes = [
   {
     path: '/catalog/activation-codes',
     element: <ProtectedRoute><ErrorBoundary><ActivationCodesCatalog /></ErrorBoundary></ProtectedRoute>,
+  },
+  {
+    path: '/catalog/apple-codes',
+    element: <ProtectedRoute><ErrorBoundary><AppleCodesCatalog /></ErrorBoundary></ProtectedRoute>,
   },
   {
     path: '/catalog/partners',
