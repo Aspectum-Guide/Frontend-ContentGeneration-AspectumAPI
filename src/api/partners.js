@@ -36,3 +36,23 @@ export const partnerReportsAPI = {
   entriesCsv: (id, params) =>
     apiClient.get(`/partners/${id}/entries.csv`, { params, responseType: 'blob' }),
 };
+
+// Конструктор экскурсий: модерация заявок партнёров (AspectumAPI docs/TOURS_CONSTRUCTOR.md).
+export const partnerToursAdminAPI = {
+  list: (params) => apiClient.get('/partners/admin/tours/', { params }),
+  get: (id) => apiClient.get(`/partners/admin/tours/${id}/`),
+  create: (partnerId, data = {}) => apiClient.post('/partners/admin/tours/', { partner_id: partnerId, data }),
+  update: (id, body) => apiClient.patch(`/partners/admin/tours/${id}/`, body),
+  approve: (id, body) => apiClient.post(`/partners/admin/tours/${id}/approve/`, body),
+  requestChanges: (id, comment) => apiClient.post(`/partners/admin/tours/${id}/request-changes/`, { comment }),
+  unpublish: (id) => apiClient.post(`/partners/admin/tours/${id}/unpublish/`, {}),
+  // Фото кладём в папку партнёра — каталог примет только их.
+  uploadPhoto: (partnerId, file) => {
+    const form = new FormData();
+    form.append('image', file);
+    return apiClient.post(`/partners/${partnerId}/tours/photos/`, form, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+      timeout: 120000,
+    });
+  },
+};
