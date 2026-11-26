@@ -59,6 +59,19 @@ function LinesEditor({ items, lang, onChange, placeholder }) {
  * модератор), поля модератора (город, теги, связанные места) и решения:
  * «Опубликовать», «Вернуть на доработку» с комментарием, «Снять с платформы».
  */
+const langNames = (codes) => codes.map((code) => TEXT_LANGS.find((l) => l.code === code)?.label || code).join(', ');
+
+// Перевод делает студия по очереди боевого сервера (AspectumAPI docs/TOURS_CONSTRUCTOR.md, «Перевод»).
+const TRANSLATION_STATUS = {
+  pending: (t) => `Перевод в очереди: ${langNames(t.target_langs)}.`,
+  taken: (t) => `Перевод готовится: ${langNames(t.target_langs)}.`,
+  done: (t) =>
+    t.applied_langs?.length
+      ? `Перевод пришёл: ${langNames(t.applied_langs)}.`
+      : 'Перевод пришёл, но все языки уже были заполнены — ничего не заменено.',
+  failed: () => 'Перевод не удался — переведите вручную.',
+};
+
 export default function TourReviewPage() {
   const { draftId } = useParams();
   const [draft, setDraft] = useState(null);
@@ -204,6 +217,12 @@ export default function TourReviewPage() {
 
       {error && <div className="mb-3 p-3 rounded-lg bg-red-50 text-red-700 text-sm">{error}</div>}
       {notice && <div className="mb-3 p-3 rounded-lg bg-green-50 text-green-700 text-sm">{notice}</div>}
+      {draft.machine_translated?.length ? (
+        <div className="mb-3 p-3 rounded-lg bg-blue-50 text-blue-900 text-sm">
+          Переведено автоматически: {langNames(draft.machine_translated)}. Проверьте эти языки перед публикацией —
+          переключатель языка над текстами.
+        </div>
+      ) : null}
       {draft.missing?.length ? (
         <div className="mb-3 p-3 rounded-lg bg-amber-50 text-amber-800 text-sm">
           Не хватает: {draft.missing.map((key) => MISSING_LABELS[key] || key).join(', ')}
@@ -480,8 +499,11 @@ export default function TourReviewPage() {
             />
             {translateTo.length ? (
               <div className="text-xs text-gray-600">
-                Партнёр просит перевод на: {translateTo.map((code) => TEXT_LANGS.find((l) => l.code === code)?.label || code).join(', ')}
+                Партнёр просит перевод на: {langNames(translateTo)}
               </div>
+            ) : null}
+            {draft.translation ? (
+              <div className="text-xs text-gray-600">{TRANSLATION_STATUS[draft.translation.status]?.(draft.translation) || ''}</div>
             ) : null}
           </Section>
 
